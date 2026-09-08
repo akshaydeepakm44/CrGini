@@ -1,0 +1,3215 @@
+/* ==========================================================================
+   CREATIVEGINI — CINEMATIC COSMIC GENIE PARTICLE THEME
+   Stars → Explosion → 3D Lamp → Magical Dust Waterfall → Genie Entity
+   ========================================================================== */
+
+/* --- ROOT COSMIC GENIE TOKENS --- */
+:root {
+  --matter-black: #030303;
+  --matter-void: #06111A;
+  --matter-surface: rgba(6, 17, 26, 0.85);
+  --matter-surface-elevated: rgba(10, 24, 38, 0.92);
+  --matter-surface-hover: rgba(14, 32, 50, 0.98);
+  --matter-border: rgba(0, 217, 255, 0.12);
+  --matter-border-hover: rgba(0, 217, 255, 0.45);
+  --matter-border-strong: rgba(255, 176, 0, 0.5);
+  
+  /* Magical Cosmic Palette */
+  --cosmic-black: #030303;
+  --cosmic-blue-dark: #06111A;
+  --cosmic-blue-electric: #00AEEF;
+  --cosmic-cyan: #00D9FF;
+  --cosmic-gold: #FFB000;
+  --cosmic-orange: #FF8A00;
+  --cosmic-white: #F5F5F5;
+
+  --matter-white: #F5F5F5;
+  --matter-ice: #E0F7FA;
+  --matter-cyan: #00D9FF;
+  --matter-blue: #00AEEF;
+  --matter-violet: #8B5CF6;
+  --matter-gold: #FFB000;
+  --matter-orange: #FF8A00;
+  --matter-gray: #94A3B8;
+  --matter-muted: #64748B;
+
+  /* Typography Stacks */
+  --font-editorial: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Matter Easing */
+  --ease-matter: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Base Pure Black Environment */
+html,
+body,
+#root,
+.app-root.cosmic-editorial-root,
+.app-root.maximalist-root,
+.app-root {
+  background-color: #000000 !important;
+  color: var(--matter-ice) !important;
+  font-family: var(--font-editorial);
+  overflow-x: hidden !important;
+  max-width: 100vw !important;
+  width: 100%;
+  position: relative;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Lenis Smooth Inertial Scrolling Essential Styles */
+html.lenis, html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+/* Subtle Cursor Magnetic Glow */
+.cursor-cosmic-spotlight {
+  position: fixed;
+  width: 440px;
+  height: 440px;
+  margin-left: -220px;
+  margin-top: -220px;
+  background: radial-gradient(circle, rgba(0, 240, 255, 0.04) 0%, rgba(139, 92, 246, 0.02) 40%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 3;
+  transition: transform 0.08s ease-out;
+}
+
+/* ==========================================================================
+   FLOATING COSMIC CAPSULE NAVBAR
+   ========================================================================== */
+.navbar-container {
+  position: fixed;
+  top: 18px;
+  left: 0;
+  right: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  z-index: 1000;
+  padding: 0 24px;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.glass-navbar {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 1080px;
+  height: 60px;
+  padding: 0 12px 0 22px !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(8, 14, 26, 0.86) 0%, rgba(3, 6, 14, 0.94) 100%) !important;
+  backdrop-filter: blur(28px) saturate(210%);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(0, 217, 255, 0.22) !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 20px 48px -10px rgba(0, 0, 0, 0.85), 0 0 24px -2px rgba(0, 217, 255, 0.16), inset 0 1px 1px rgba(255, 255, 255, 0.15) !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.navbar-container.scrolled .glass-navbar {
+  max-width: 980px;
+  height: 54px;
+  background: linear-gradient(135deg, rgba(4, 8, 16, 0.92) 0%, rgba(2, 4, 10, 0.98) 100%) !important;
+  border-color: rgba(0, 217, 255, 0.32) !important;
+  box-shadow: 0 24px 56px -8px rgba(0, 0, 0, 0.95), 0 0 32px rgba(0, 217, 255, 0.22), inset 0 1px 1px rgba(255, 255, 255, 0.2) !important;
+  transform: translateY(-2px);
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  cursor: pointer;
+  gap: 10px;
+}
+
+.nav-logo-img {
+  height: 40px !important;
+  width: auto !important;
+  max-width: 180px !important;
+  object-fit: contain !important;
+  filter: brightness(1.2) drop-shadow(0 0 12px rgba(0, 217, 255, 0.45));
+  transition: transform 0.25s ease, filter 0.25s ease;
+}
+
+.navbar-container.scrolled .nav-logo-img {
+  height: 36px !important;
+}
+
+.nav-logo-img:hover {
+  transform: scale(1.05);
+  filter: brightness(1.3) drop-shadow(0 0 18px rgba(0, 217, 255, 0.7));
+}
+
+.nav-menu {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 4px 6px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.nav-item {
+  font-family: var(--font-display, sans-serif);
+  font-size: 13px;
+  font-weight: 500;
+  color: #94A3B8 !important;
+  text-decoration: none;
+  padding: 6px 14px !important;
+  border-radius: 9999px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  letter-spacing: 0.01em;
+  transition: all 0.22s ease !important;
+}
+
+.nav-item::after {
+  display: none !important;
+}
+
+.nav-item:hover {
+  color: #FFFFFF !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  transform: translateY(-1px) !important;
+}
+
+.nav-item.active {
+  color: #00D9FF !important;
+  background: rgba(0, 217, 255, 0.12) !important;
+  border-color: rgba(0, 217, 255, 0.3) !important;
+  box-shadow: 0 0 14px rgba(0, 217, 255, 0.25) !important;
+  font-weight: 600 !important;
+  transform: none !important;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-dashboard-nav {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(0, 217, 255, 0.25) !important;
+  color: #00D9FF !important;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 9999px !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.btn-dashboard-nav:hover {
+  background: rgba(0, 217, 255, 0.12) !important;
+  border-color: rgba(0, 217, 255, 0.45) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 14px rgba(0, 217, 255, 0.3) !important;
+}
+
+.deploy-cta-btn,
+.nav-auth-btn {
+  background: linear-gradient(135deg, #00D9FF 0%, #7C3AED 50%, #EC4899 100%) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  border-radius: 9999px !important;
+  font-family: var(--font-display, sans-serif);
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em;
+  padding: 8px 18px !important;
+  text-transform: none !important;
+  box-shadow: 0 4px 18px rgba(0, 217, 255, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important;
+  transition: all 0.25s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+}
+
+.deploy-cta-btn:hover,
+.nav-auth-btn:hover {
+  transform: translateY(-1px) scale(1.02) !important;
+  box-shadow: 0 6px 28px rgba(0, 217, 255, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.6) !important;
+}
+
+.google-btn {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 9999px !important;
+  font-family: var(--font-display, sans-serif);
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  padding: 7px 14px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.google-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.1) !important;
+}
+
+.user-profile-pill {
+  border-radius: 9999px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  padding: 4px 12px 4px 5px !important;
+}
+
+/* ==========================================================================
+   SCENE 01: PURE BLACK 3D ROLLING MATTER TYPOGRAPHY
+   ========================================================================== */
+#landing-main-scroll-wrapper {
+  background: transparent !important;
+  position: relative;
+  z-index: 10;
+}
+
+.intro-experience-wrapper {
+  background: transparent !important;
+  overflow: visible !important;
+  -webkit-mask-image: linear-gradient(to bottom, #000 65%, rgba(0, 0, 0, 0.75) 80%, transparent 98%);
+  mask-image: linear-gradient(to bottom, #000 65%, rgba(0, 0, 0, 0.75) 80%, transparent 98%);
+}
+
+.intro-experience-canvas {
+  -webkit-mask-image: linear-gradient(to bottom, #000 60%, rgba(0, 0, 0, 0.6) 80%, transparent 98%);
+  mask-image: linear-gradient(to bottom, #000 60%, rgba(0, 0, 0, 0.6) 80%, transparent 98%);
+}
+
+.intro-vignette-overlay {
+  background: radial-gradient(ellipse 90% 70% at 50% 45%, transparent 45%, rgba(3, 3, 6, 0.5) 100%) !important;
+  -webkit-mask-image: linear-gradient(to bottom, #000 50%, rgba(0, 0, 0, 0.5) 75%, transparent 96%);
+  mask-image: linear-gradient(to bottom, #000 50%, rgba(0, 0, 0, 0.5) 75%, transparent 96%);
+}
+
+.intro-content-container {
+  width: 100%;
+  max-width: 1300px;
+  padding: 0 40px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.intro-3d-stage {
+  max-width: 680px;
+  text-align: left;
+}
+
+.title-3d-card {
+  text-align: left;
+}
+
+.intro-state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--matter-cyan) !important;
+  background: rgba(6, 6, 12, 0.82) !important;
+  border: 1px solid var(--matter-border) !important;
+  border-radius: 2px !important;
+  padding: 6px 16px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+  margin-bottom: 28px;
+  transition: all 0.3s var(--ease-matter);
+}
+
+/* Screen 1 Official Logo Image Styling */
+.screen1-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.screen1-hero-logo-img {
+  max-width: min(620px, 88vw);
+  height: auto;
+  max-height: 220px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 35px rgba(0, 217, 255, 0.4)) drop-shadow(0 0 60px rgba(168, 85, 247, 0.25));
+  animation: heroLogoPulse 3.5s ease-in-out infinite alternate;
+}
+
+@keyframes heroLogoPulse {
+  0% { filter: drop-shadow(0 0 30px rgba(0, 217, 255, 0.35)) drop-shadow(0 0 50px rgba(168, 85, 247, 0.2)); transform: scale(1); }
+  100% { filter: drop-shadow(0 0 45px rgba(236, 72, 153, 0.45)) drop-shadow(0 0 75px rgba(0, 217, 255, 0.35)); transform: scale(1.015); }
+}
+
+.brand-word-creative {
+  background: linear-gradient(135deg, #FFFFFF 0%, #38BDF8 55%, #00D9FF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 50px rgba(0, 217, 255, 0.4);
+}
+
+.brand-word-gini {
+  background: linear-gradient(135deg, #A855F7 0%, #EC4899 50%, #FFB000 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 50px rgba(236, 72, 153, 0.4);
+}
+
+/* Typewriter Subtext Styling */
+.typewriter-subtext-container {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 24px;
+  padding: 12px 28px;
+  background: rgba(6, 17, 26, 0.85);
+  border: 1px solid rgba(0, 217, 255, 0.25);
+  border-radius: 999px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: clamp(13px, 1.4vw, 17px);
+  color: #E2E8F0;
+  max-width: 880px;
+  line-height: 1.5;
+  text-align: center;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.typewriter-prompt-symbol {
+  color: #00D9FF;
+  font-weight: 800;
+  font-size: 1.15em;
+  margin-right: 4px;
+}
+
+.typewriter-text {
+  color: #F8FAFC;
+  letter-spacing: 0.02em;
+}
+
+.typewriter-cursor {
+  display: inline-block;
+  color: #00D9FF;
+  font-weight: 900;
+  margin-left: 3px;
+  animation: blinkTypewriter 0.75s infinite ease-in-out;
+}
+
+@keyframes blinkTypewriter {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.roll-char-span {
+  display: inline-block;
+  will-change: transform, opacity;
+  transition: color 0.2s ease;
+}
+
+.roll-char-space {
+  display: inline-block;
+  width: 0.25em;
+}
+
+/* ==========================================================================
+   SCENE 02: 3D PARTICLE PLANETARY ORBIT (MARKET CHANNELS & GLOBE)
+   ========================================================================== */
+.next-sections-flow {
+  background: transparent !important;
+  position: relative;
+  z-index: 10;
+  width: 100%;
+}
+
+.marketing-channels-section {
+  background: transparent !important;
+  padding: 100px 24px 80px 24px !important;
+  max-width: 1300px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 10;
+}
+
+.section-container {
+  background: transparent !important;
+}
+
+.section-header-centered {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.section-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--matter-cyan) !important;
+  background: rgba(6, 17, 26, 0.85) !important;
+  border: 1px solid var(--matter-border) !important;
+  border-radius: 2px !important;
+  padding: 5px 14px !important;
+  box-shadow: none !important;
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 5.5vw, 64px) !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.035em !important;
+  line-height: 1.05 !important;
+  color: #FFFFFF !important;
+  text-shadow: 0 0 40px rgba(0, 217, 255, 0.25) !important;
+  margin-bottom: 18px;
+}
+
+.section-desc {
+  font-size: 16px !important;
+  line-height: 1.65 !important;
+  color: var(--matter-gray) !important;
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.channel-glass-panel,
+.channel-info-panel,
+.channel-detail-card,
+.channels-list-card {
+  background: rgba(6, 17, 26, 0.75) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(0, 217, 255, 0.16) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 217, 255, 0.05) !important;
+  padding: 32px !important;
+  color: #FFFFFF !important;
+  transition: border-color 0.4s ease, box-shadow 0.4s ease !important;
+}
+
+.info-panel-default-state,
+.info-panel-active-state {
+  color: #FFFFFF !important;
+}
+
+.default-title,
+.channel-title-main {
+  color: #FFFFFF !important;
+  font-family: var(--font-display);
+}
+
+.default-desc,
+.tagline-text {
+  color: var(--matter-gray) !important;
+}
+
+.quick-channel-chip {
+  background: rgba(10, 24, 38, 0.75) !important;
+  border: 1px solid var(--matter-border) !important;
+  color: #FFFFFF !important;
+  padding: 6px 14px !important;
+  border-radius: 4px !important;
+  font-size: 12.5px !important;
+  transition: all 0.2s ease !important;
+}
+
+.quick-channel-chip:hover {
+  background: rgba(0, 217, 255, 0.15) !important;
+  border-color: var(--matter-cyan) !important;
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+}
+
+.creativegini-ecosystem-callout {
+  background: rgba(0, 217, 255, 0.08) !important;
+  border: 1px solid rgba(0, 217, 255, 0.2) !important;
+  color: var(--matter-cyan) !important;
+  border-radius: 6px !important;
+  padding: 12px 16px !important;
+  font-size: 13px !important;
+}
+
+.overview-card-hero,
+.stat-card-item,
+.approach-step-card,
+.takeaway-banner {
+  background: rgba(10, 24, 38, 0.8) !important;
+  border: 1px solid var(--matter-border) !important;
+  border-radius: 8px !important;
+  color: #FFFFFF !important;
+}
+
+.stat-val-big {
+  color: var(--matter-cyan) !important;
+  font-family: var(--font-display);
+}
+
+.stat-lbl {
+  color: var(--matter-gray) !important;
+}
+
+.channel-card-item {
+  background: rgba(8, 8, 14, 0.6) !important;
+  border: 1px solid var(--matter-border) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  padding: 16px 20px !important;
+  transition: all 0.25s var(--ease-matter) !important;
+}
+
+.channel-card-item:hover {
+  background: var(--matter-surface-elevated) !important;
+  border-color: var(--matter-border-hover) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6), 0 0 16px rgba(0, 240, 255, 0.15) !important;
+}
+
+.channel-card-item.active {
+  background: #FFFFFF !important;
+  border-color: #FFFFFF !important;
+  color: #000000 !important;
+  box-shadow: 0 12px 36px rgba(255, 255, 255, 0.18) !important;
+  transform: none !important;
+}
+
+.channel-card-item.active .channel-name,
+.channel-card-item.active .channel-desc,
+.channel-card-item.active svg {
+  color: #000000 !important;
+}
+
+.channel-name {
+  font-family: var(--font-display);
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
+  color: #FFFFFF !important;
+}
+
+.channel-desc,
+.channel-subtext {
+  font-size: 13px !important;
+  color: var(--matter-muted) !important;
+  line-height: 1.5;
+}
+
+.ad-cost-card,
+.cost-breakdown-panel {
+  background: var(--matter-surface-elevated) !important;
+  border: 1px solid var(--matter-border) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  padding: 28px !important;
+}
+
+.cost-big-number {
+  font-family: var(--font-display);
+  font-size: 40px !important;
+  font-weight: 700 !important;
+  color: #FFFFFF !important;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  letter-spacing: -0.03em;
+}
+
+.cost-meter-fill {
+  background: #FFFFFF !important;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.4) !important;
+  border-radius: 2px;
+}
+
+.globe-canvas-wrapper,
+.globe-container {
+  background: transparent !important;
+}
+
+/* --- SCENE 02: MARKETING CHANNELS DISCOVERY & ACTIVE PLATFORM CARD --- */
+.platform-category-badge {
+  background: rgba(10, 24, 38, 0.85) !important;
+  border: 1px solid rgba(0, 217, 255, 0.3) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 217, 255, 0.15) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+.platform-category-badge span {
+  color: #FFFFFF !important;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.platform-category-badge svg {
+  color: var(--badge-color, var(--matter-cyan)) !important;
+}
+
+.platform-type-tag {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: var(--matter-gray) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em;
+}
+
+.platform-avatar-halo {
+  background: rgba(10, 24, 38, 0.95) !important;
+  border: 1.5px solid rgba(0, 217, 255, 0.4) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 217, 255, 0.2) !important;
+}
+
+.platform-name-title {
+  font-family: var(--font-display) !important;
+  font-size: 30px !important;
+  font-weight: 800 !important;
+  color: #FFFFFF !important;
+  background: linear-gradient(135deg, #FFFFFF 0%, #E0F7FA 65%, #00D9FF 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: 0 0 35px rgba(0, 217, 255, 0.3) !important;
+  margin-bottom: 3px !important;
+  letter-spacing: -0.025em !important;
+}
+
+.platform-reach-text {
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: var(--matter-gray) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.platform-reach-text svg {
+  color: var(--matter-cyan) !important;
+}
+
+/* Advertising Cost Card with Cosmic Cyan Border & Sleek Dark Glass */
+.ad-cost-highlight-card {
+  background: linear-gradient(135deg, rgba(8, 26, 44, 0.85) 0%, rgba(6, 17, 28, 0.92) 100%) !important;
+  border: 1px solid rgba(0, 217, 255, 0.25) !important;
+  border-left: 4px solid var(--matter-cyan) !important;
+  border-radius: 14px !important;
+  padding: 16px 20px !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 217, 255, 0.12) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.ad-cost-highlight-card:hover {
+  transform: translateY(-2px) scale(1.008) !important;
+  border-color: rgba(0, 217, 255, 0.5) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75), 0 0 32px rgba(0, 217, 255, 0.22) !important;
+}
+
+.cost-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 11.5px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.1em !important;
+  color: var(--matter-cyan) !important;
+  text-transform: uppercase !important;
+  margin-bottom: 6px !important;
+}
+
+.cost-header .cost-icon {
+  color: var(--matter-cyan) !important;
+}
+
+.cost-value-text {
+  font-size: 15px !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  margin: 0 !important;
+  line-height: 1.45 !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* Overview Description Block with Dark Glass Surface */
+.platform-description-block {
+  background: rgba(8, 20, 32, 0.75) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 14px !important;
+  padding: 16px 20px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  transition: all 0.3s ease !important;
+}
+
+.platform-description-block:hover {
+  background: rgba(10, 26, 42, 0.85) !important;
+  border-color: rgba(0, 217, 255, 0.2) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55) !important;
+}
+
+.platform-description-block .desc-text {
+  font-size: 14.5px !important;
+  color: #CBD5E1 !important;
+  line-height: 1.65 !important;
+  margin: 0 !important;
+}
+
+/* Strategic Strengths Box with Emerald Glow */
+.platform-strengths-box {
+  background: linear-gradient(135deg, rgba(6, 28, 22, 0.8) 0%, rgba(4, 18, 16, 0.9) 100%) !important;
+  border: 1.5px solid rgba(16, 185, 129, 0.3) !important;
+  border-left: 4px solid #10b981 !important;
+  border-radius: 14px !important;
+  padding: 16px 20px !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(16, 185, 129, 0.12) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.platform-strengths-box:hover {
+  transform: translateY(-2px) scale(1.008) !important;
+  border-color: rgba(16, 185, 129, 0.5) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75), 0 0 28px rgba(16, 185, 129, 0.2) !important;
+}
+
+.strengths-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 11.5px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.1em !important;
+  color: #34D399 !important;
+  text-transform: uppercase !important;
+  margin-bottom: 6px !important;
+}
+
+.strengths-content {
+  font-size: 14.5px !important;
+  color: #F1F5F9 !important;
+  line-height: 1.55 !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+}
+
+/* 3D Globe Elements in Cosmic Theme */
+.node-icon-circle {
+  background: rgba(6, 17, 26, 0.92) !important;
+  border-color: rgba(0, 217, 255, 0.35) !important;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7), 0 0 15px rgba(0, 217, 255, 0.2) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+.node-label-pill {
+  background: rgba(6, 17, 26, 0.95) !important;
+  border: 1px solid rgba(0, 217, 255, 0.3) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 217, 255, 0.2) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+.globe-interaction-hint {
+  background: rgba(6, 17, 26, 0.85) !important;
+  border: 1px solid var(--matter-border) !important;
+  color: var(--matter-gray) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 16px rgba(0, 217, 255, 0.15) !important;
+}
+
+.globe-interaction-hint svg {
+  color: var(--matter-cyan) !important;
+}
+
+/* ==========================================================================
+   SCENE 03: QUANTUM LATTICE & HORIZONTAL JOURNEY (POD SQUAD)
+   ========================================================================== */
+.marketing-journey-section {
+  padding: 150px 0;
+  position: relative;
+  z-index: 10;
+}
+
+.journey-step-card,
+.journey-slide-item {
+  background: var(--matter-surface) !important;
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid var(--matter-border) !important;
+  border-radius: 6px !important;
+  padding: 46px !important;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  color: var(--matter-ice) !important;
+  transition: all 0.35s var(--ease-matter) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.journey-step-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #FFFFFF, #00F0FF, #8B5CF6);
+  transition: width 0.4s var(--ease-matter);
+}
+
+.journey-step-card:hover {
+  border-color: var(--matter-border-hover) !important;
+  transform: translateY(-4px) !important;
+  box-shadow: 0 36px 90px rgba(0, 0, 0, 0.9), 0 0 24px rgba(0, 240, 255, 0.15) !important;
+}
+
+.journey-step-card:hover::after {
+  width: 100%;
+}
+
+.step-eyebrow-pill {
+  font-family: var(--font-mono);
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.18em !important;
+  text-transform: uppercase;
+  color: var(--matter-cyan) !important;
+  background: rgba(8, 8, 14, 0.8) !important;
+  border: 1px solid var(--matter-border) !important;
+  padding: 5px 14px !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  display: inline-block;
+  margin-bottom: 24px;
+}
+
+.journey-card-heading {
+  font-family: var(--font-display);
+  font-size: 30px !important;
+  font-weight: 700 !important;
+  color: #FFFFFF !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.15;
+  margin-bottom: 16px;
+}
+
+.journey-card-desc {
+  font-size: 15px !important;
+  color: var(--matter-gray) !important;
+  line-height: 1.65 !important;
+}
+
+.journey-preview-widget {
+  background: rgba(3, 3, 6, 0.9) !important;
+  border: 1px solid var(--matter-border) !important;
+  border-radius: 4px !important;
+  box-shadow: inset 0 2px 14px rgba(0, 0, 0, 0.7) !important;
+  padding: 22px;
+}
+
+.journey-metric-badge {
+  background: var(--matter-surface-elevated) !important;
+  border: 1px solid var(--matter-border) !important;
+  color: var(--matter-cyan) !important;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600 !important;
+  border-radius: 2px;
+  padding: 4px 10px;
+}
+
+/* ==========================================================================
+   SCENE 04: MOBIUS INFINITY LOOP & FINALE (EDGE OF MATTER)
+   ========================================================================== */
+.end-experience-wrap,
+.finale-section {
+  padding: 150px 24px 110px 24px;
+  max-width: 1240px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 10;
+}
+
+.finale-glow-card,
+.cta-glow-card {
+  background: var(--matter-surface) !important;
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid var(--matter-border-hover) !important;
+  border-radius: 8px !important;
+  padding: 90px 48px !important;
+  box-shadow: 0 36px 90px rgba(0, 0, 0, 0.9) !important;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.finale-glow-card::before {
+  content: '✦ CREATIVEGINI // 3D DIGITAL MATTER ✦';
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--matter-cyan);
+}
+
+.finale-title {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 6vw, 68px) !important;
+  font-weight: 700 !important;
+  color: #FFFFFF !important;
+  letter-spacing: -0.04em !important;
+  line-height: 1.08 !important;
+  margin: 28px 0 18px 0 !important;
+}
+
+.finale-subtitle {
+  font-size: 16.5px !important;
+  color: var(--matter-gray) !important;
+  max-width: 640px !important;
+  margin: 0 auto 44px auto !important;
+  line-height: 1.65 !important;
+}
+
+.finale-cta-btn {
+  background: #FFFFFF !important;
+  color: #000000 !important;
+  border: 1px solid #FFFFFF !important;
+  padding: 16px 40px !important;
+  border-radius: 4px !important;
+  font-family: var(--font-display);
+  font-size: 14.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer !important;
+  box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15) !important;
+  transition: all 0.25s var(--ease-matter) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.finale-cta-btn:hover {
+  background: #E4E4E7 !important;
+  color: #000000 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 16px 40px rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Pure Black Minimal Matter Footer */
+.landing-footer,
+.site-footer {
+  background: #000000 !important;
+  border-top: 1px solid var(--matter-border) !important;
+  padding: 80px 36px 48px 36px !important;
+  position: relative;
+  z-index: 10;
+}
+
+.footer-brand-title {
+  font-family: var(--font-display);
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  font-size: 18px !important;
+  letter-spacing: -0.02em;
+}
+
+.footer-brand-bio,
+.footer-link {
+  font-size: 13.5px;
+  color: var(--matter-gray) !important;
+  font-weight: 400;
+  transition: color 0.2s ease;
+}
+
+.footer-link:hover {
+  color: var(--matter-cyan) !important;
+}
+
+.footer-status-pill {
+  background: rgba(8, 8, 14, 0.8) !important;
+  border: 1px solid var(--matter-border) !important;
+  color: var(--matter-cyan) !important;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600 !important;
+  letter-spacing: 0.12em;
+  border-radius: 2px;
+  padding: 5px 12px;
+}
+
+.footer-status-pill .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--matter-cyan);
+  box-shadow: 0 0 8px var(--matter-cyan);
+}
+
+.footer-icon-btn {
+  background: var(--matter-surface) !important;
+  border: 1px solid var(--matter-border) !important;
+  color: var(--matter-gray) !important;
+  box-shadow: none !important;
+  border-radius: 4px;
+  transition: all 0.2s ease !important;
+}
+
+.footer-icon-btn:hover {
+  background: var(--matter-surface-elevated) !important;
+  border-color: var(--matter-border-hover) !important;
+  color: var(--matter-cyan) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Ensure no white flash across the entire journey */
+.pure-white-screen-layer {
+  background: #030303 !important;
+}
+
+/* Ensure all Marketing Journey scenes and flows are transparent and pure dark cosmic */
+.marketing-journey-flow-wrapper,
+.marketing-journey-pinned-section,
+.journey-sticky-viewport,
+.journey-horizontal-track,
+.journey-scene,
+.scene-01-market,
+.scene-02-outputs,
+.scene-03-strategy,
+.scene-04-tools,
+.scene-06-comparison,
+.scene-07-solution,
+.scene4-pinned-section,
+.scene4-stage-container,
+.scene4-stage-bg,
+.scene4-underlayer,
+.scene6-to-7-horizontal-section,
+.scene6-to-7-sticky-viewport,
+.scene6-to-7-horizontal-track,
+.scene-06-money-product-scene,
+.scene-07-solution-reveal-scene,
+.scene-6-to-7-pinned-section,
+.market-discovery-animated-bg {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  color: #FFFFFF !important;
+}
+
+/* Scene 04 Background Floating Money Notes & Dollar Particles Canvas */
+.scene4-money-particles-canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
+.scene4-pinned-section {
+  min-height: 100vh !important;
+  height: 100vh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.scene4-stage-container {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+}
+
+.scene4-underlayer {
+  position: relative !important;
+  z-index: 3 !important;
+  width: 100% !important;
+  max-width: 1120px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  will-change: transform, opacity !important;
+}
+
+#scene-04-costs-section .scene-main-heading {
+  text-shadow: 0 0 35px rgba(251, 191, 36, 0.35), 0 4px 20px rgba(0, 0, 0, 0.9) !important;
+}
+
+/* Scene 04 Costs Cards & Stack in Dark Cosmic Glass - Perfect Symmetrical Alignment */
+.costs-accumulation-visual {
+  width: 100% !important;
+  max-width: 1080px !important;
+  margin: 0 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 20px !important;
+}
+
+.costs-stack-grid {
+  width: 100% !important;
+  max-width: 1080px !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 14px !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+}
+
+.tool-expense-pill {
+  background: rgba(6, 17, 26, 0.82) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(251, 191, 36, 0.22) !important;
+  border-radius: 12px !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding: 12px 16px !important;
+  min-height: 56px !important;
+  box-sizing: border-box !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.tool-expense-pill:hover {
+  background: rgba(10, 26, 40, 0.95) !important;
+  border-color: rgba(251, 191, 36, 0.7) !important;
+  transform: translateY(-3px) scale(1.02) !important;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.75), 0 0 20px rgba(251, 191, 36, 0.25) !important;
+}
+
+.tool-icon-wrapper {
+  flex-shrink: 0 !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  background: rgba(245, 158, 11, 0.14) !important;
+  border: 1px solid rgba(245, 158, 11, 0.35) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.tool-dollar {
+  color: #FBBF24 !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+}
+
+.tool-name {
+  color: #FFFFFF !important;
+  font-family: var(--font-display) !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  flex: 1 !important;
+  text-align: left !important;
+  margin: 0 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.tool-cost {
+  flex-shrink: 0 !important;
+  background: rgba(245, 158, 11, 0.12) !important;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+  color: #FBBF24 !important;
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+
+.costs-equation-summary-card {
+  width: 100% !important;
+  max-width: 1080px !important;
+  margin: 0 auto !important;
+  background: rgba(6, 17, 26, 0.88) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(251, 191, 36, 0.28) !important;
+  border-radius: 16px !important;
+  padding: 16px 24px !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+.equation-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+.eq-item {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  padding: 5px 12px !important;
+  border-radius: 8px !important;
+  font-family: var(--font-display) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #E2E8F0 !important;
+  white-space: nowrap !important;
+}
+
+.eq-sign {
+  color: #F59E0B !important;
+  font-weight: 800 !important;
+  font-size: 15px !important;
+}
+
+.eq-result {
+  background: rgba(245, 158, 11, 0.2) !important;
+  color: #FCD34D !important;
+  border: 1.5px solid #F59E0B !important;
+  padding: 6px 16px !important;
+  border-radius: 10px !important;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.3) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 14.5px !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+}
+
+.disclaimer-note {
+  color: rgba(148, 163, 184, 0.8) !important;
+  font-size: 11.5px !important;
+  margin-top: 8px !important;
+  text-align: center !important;
+}
+
+.eq-result {
+  background: rgba(255, 176, 0, 0.15) !important;
+  color: var(--matter-gold) !important;
+  border: 1px solid var(--matter-gold) !important;
+  box-shadow: 0 0 16px rgba(255, 176, 0, 0.25) !important;
+  font-family: var(--font-mono);
+}
+
+.disclaimer-note {
+  color: var(--matter-gray) !important;
+}
+
+.scene4-floating-warning-banner {
+  background: rgba(6, 17, 26, 0.95) !important;
+  border: 1.5px solid rgba(220, 38, 38, 0.6) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.9), 0 0 40px rgba(220, 38, 38, 0.3) !important;
+  color: #FFFFFF !important;
+}
+
+.stop-doing-this-heading {
+  color: #FFFFFF !important;
+  font-family: var(--font-display);
+  text-shadow: 0 0 25px rgba(220, 38, 38, 0.6);
+}
+
+/* Scene 06 & 07 Elements */
+.cost-service-item-card {
+  background: var(--matter-surface) !important;
+  border: 1px solid var(--matter-border) !important;
+  color: #FFFFFF !important;
+  border-radius: 8px !important;
+}
+
+.service-name {
+  color: #FFFFFF !important;
+}
+
+.service-estimate {
+  color: var(--matter-gold) !important;
+}
+
+.service-label-tiny {
+  color: var(--matter-gray) !important;
+}
+
+.money-in-product-out-title {
+  color: #FFFFFF !important;
+  font-family: var(--font-display);
+}
+
+.vault-subtext {
+  color: var(--matter-gray) !important;
+}
+
+.vault-tag {
+  color: var(--matter-cyan) !important;
+  background: rgba(6, 17, 26, 0.85) !important;
+  border: 1px solid var(--matter-border) !important;
+}
+
+.solution-main-heading {
+  color: #FFFFFF !important;
+  font-family: var(--font-display);
+}
+
+.solution-lead-desc {
+  color: var(--matter-gray) !important;
+}
+
+.benefit-pill {
+  background: var(--matter-surface) !important;
+  border: 1px solid var(--matter-border) !important;
+  color: #FFFFFF !important;
+  border-radius: 6px !important;
+}
+
+.check-icon {
+  color: var(--matter-cyan) !important;
+}
+
+.market-node-item,
+.output-grid-card,
+.pipeline-step-node,
+.cost-compare-card,
+.solution-pillar-card,
+.problem-breakdown-card,
+.market-discovery-card,
+.agency-vs-creativegini-card,
+.tool-cost-item-card {
+  background: var(--matter-surface) !important;
+  border: 1px solid var(--matter-border) !important;
+  color: #FFFFFF !important;
+  border-radius: 8px !important;
+}
+
+.scene-main-heading {
+  font-family: var(--font-display);
+  color: #FFFFFF !important;
+  text-shadow: 0 0 35px rgba(0, 217, 255, 0.2) !important;
+}
+
+.scene-lead-paragraph {
+  color: var(--matter-gray) !important;
+}
+
+.scene-number-badge {
+  color: var(--matter-cyan) !important;
+  background: rgba(6, 17, 26, 0.85) !important;
+  border: 1px solid var(--matter-border) !important;
+}
+
+/* CreativeGini Finale Brand & Character Dark Cosmic Theme */
+.creativegini-end-experience-section,
+.screen1-visual-stage,
+.end-experience-sticky-stage {
+  background: transparent !important;
+  color: #FFFFFF !important;
+}
+
+.brand-wordmark-title {
+  color: #FFFFFF !important;
+  font-family: var(--font-display);
+}
+
+.brand-word-creative {
+  background: linear-gradient(135deg, #FFFFFF 0%, #00D9FF 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: 0 0 35px rgba(0, 217, 255, 0.4) !important;
+}
+
+.brand-word-gini {
+  background: linear-gradient(135deg, #FFB000 0%, #FF8A00 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: 0 0 35px rgba(255, 176, 0, 0.4) !important;
+}
+
+.brand-tagline-bar {
+  background: rgba(6, 17, 26, 0.85) !important;
+  border: 1px solid var(--matter-border) !important;
+  color: var(--matter-cyan) !important;
+  box-shadow: none !important;
+}
+
+.brand-description-text {
+  color: var(--matter-gray) !important;
+  text-shadow: none !important;
+}
+
+.brand-highlight-chip {
+  background: var(--matter-surface) !important;
+  border: 1px solid var(--matter-border) !important;
+  color: #FFFFFF !important;
+}
+
+/* ==========================================================================
+   EXPANSIVE BALANCED JOURNEY SCENE COMPOSITIONS & STYLING
+   ========================================================================== */
+
+/* Scene 01 (Market Discovery): Split layout with element area on left and content on right */
+.scene-01-market .scene-content-wrapper.scene-01-split-layout {
+  margin: 0 auto !important;
+  max-width: 1340px !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 44px !important;
+  text-align: left !important;
+}
+
+/* Left Section: Market Intelligence Vortex Widget */
+/* Left Section: Fluid Unconstrained Star-Particle Constellation Engine */
+.scene-01-element-section {
+  flex: 1 1 50% !important;
+  max-width: 680px !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+/* Fluid Borderless Star-Particle Vortex Canvas */
+.star-particle-vortex-fluid {
+  position: relative !important;
+  width: 100% !important;
+  max-width: 680px !important;
+  aspect-ratio: 680 / 540 !important;
+  min-height: 480px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+  user-select: none !important;
+}
+
+.star-particle-vortex-canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: auto !important;
+  cursor: crosshair !important;
+}
+
+/* Interactive Hubs for the 6 Star Constellation Nodes */
+.constellation-star-hub {
+  position: absolute !important;
+  transform: translate(-50%, -50%) scale(var(--hub-scale, 1)) !important;
+  opacity: var(--hub-opacity, 1) !important;
+  width: 76px !important;
+  height: 76px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  z-index: 5 !important;
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: transform, opacity !important;
+}
+
+.constellation-glow-aura {
+  position: absolute !important;
+  width: 90px !important;
+  height: 90px !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, rgba(var(--hub-rgb), 0.4) 0%, rgba(var(--hub-rgb), 0.15) 45%, transparent 70%) !important;
+  filter: blur(12px) !important;
+  opacity: 0.65 !important;
+  transition: opacity 0.35s ease, transform 0.35s ease !important;
+  pointer-events: none !important;
+}
+
+/* Crisp Illuminated Vector Icon Disc */
+.constellation-icon-disc {
+  position: relative !important;
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 50% !important;
+  background: rgba(6, 17, 26, 0.9) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1.8px solid rgba(var(--hub-rgb), 0.8) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 0 24px rgba(var(--hub-rgb), 0.5), inset 0 0 16px rgba(var(--hub-rgb), 0.25) !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  z-index: 6 !important;
+}
+
+.constellation-star-hub:hover .constellation-icon-disc,
+.constellation-star-hub.is-active-constellation .constellation-icon-disc {
+  transform: scale(1.18) !important;
+  border-width: 2.4px !important;
+  border-color: rgba(var(--hub-rgb), 1) !important;
+  box-shadow: 0 0 36px rgba(var(--hub-rgb), 0.85), 0 0 55px rgba(var(--hub-rgb), 0.4), inset 0 0 22px rgba(var(--hub-rgb), 0.4) !important;
+}
+
+.constellation-star-hub:hover .constellation-glow-aura,
+.constellation-star-hub.is-active-constellation .constellation-glow-aura {
+  opacity: 1 !important;
+  transform: scale(1.4) !important;
+}
+
+/* Clear Identifiable Name Tag for Each Node */
+.constellation-name-tag {
+  position: absolute !important;
+  bottom: -30px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  background: rgba(6, 17, 26, 0.82) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(var(--hub-rgb), 0.4) !important;
+  border-radius: 100px !important;
+  padding: 3px 10px !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 12px rgba(var(--hub-rgb), 0.2) !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.constellation-star-hub:hover .constellation-name-tag,
+.constellation-star-hub.is-active-constellation .constellation-name-tag {
+  border-color: rgba(var(--hub-rgb), 0.9) !important;
+  background: rgba(8, 22, 36, 0.95) !important;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.8), 0 0 20px rgba(var(--hub-rgb), 0.45) !important;
+  transform: translateX(-50%) scale(1.06) !important;
+}
+
+.name-tag-title {
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  letter-spacing: 0.02em !important;
+}
+
+.name-tag-metric {
+  font-size: 8.5px !important;
+  font-weight: 600 !important;
+  color: rgb(var(--hub-rgb)) !important;
+}
+
+/* Synchronized Card Highlighting on Right Side */
+.market-foreground-card.is-active-card {
+  transform: translateY(-6px) scale(1.025) !important;
+  border-color: var(--card-color) !important;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6), 0 0 32px var(--card-color)50 !important;
+  background: rgba(10, 26, 42, 0.98) !important;
+}
+
+@media (max-width: 1024px) {
+  .scene-01-market .scene-content-wrapper.scene-01-split-layout {
+    flex-direction: column !important;
+    gap: 12px !important;
+    max-width: 100% !important;
+    overflow-y: visible !important;
+  }
+  .scene-01-element-section {
+    display: none !important;
+  }
+  .scene-01-content-section {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  .scene-01-market .foreground-discovery-grid.scene-01-right-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+}
+
+/* Scene 02 (Creative Outputs): Split layout with content on left and element area on right */
+.scene-02-outputs .scene-content-wrapper.scene-02-split-layout {
+  margin: 0 auto !important;
+  max-width: 1340px !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 48px !important;
+  text-align: left !important;
+}
+
+/* Left Section: Content and 8 Creative Output Cards */
+.scene-02-content-section {
+  flex: 1 1 50% !important;
+  max-width: 620px !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  text-align: left !important;
+}
+
+.scene-02-outputs .scene-02-header-left {
+  margin-bottom: 20px !important;
+  max-width: 100% !important;
+}
+
+.outputs-floating-cloud-grid.scene-02-left-cards-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+/* Compact, sleek card styling in the left split column */
+.scene-02-left-cards-grid .output-creative-card {
+  padding: 12px 15px !important;
+  border-radius: 14px !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.scene-02-left-cards-grid .output-card-top {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 6px !important;
+}
+
+.scene-02-left-cards-grid .output-title {
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+  line-height: 1.3 !important;
+  margin-bottom: 8px !important;
+}
+
+.scene-02-left-cards-grid .output-format-tag {
+  font-size: 0.72rem !important;
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+}
+
+.scene-02-left-cards-grid .output-badge {
+  font-size: 0.68rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+/* Right Section: Particle Elements Staging Container */
+.scene-02-element-section {
+  flex: 1 1 50% !important;
+  max-width: 680px !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  position: relative !important;
+  min-height: 480px !important;
+}
+
+/* ==========================================================================
+   SCENE 02 CREATIVE PARTICLE NEXUS ENGINE STYLES
+   ========================================================================== */
+.creative-nexus-fluid-container {
+  position: relative !important;
+  width: 100% !important;
+  max-width: 720px !important;
+  aspect-ratio: 720 / 560 !important;
+  min-height: 480px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+  user-select: none !important;
+}
+
+.creative-nexus-canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: auto !important;
+  cursor: crosshair !important;
+}
+
+/* Central Idea Lightbulb Core */
+.nexus-central-bulb-spark {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) scale(var(--bulb-scale, 1)) !important;
+  opacity: var(--bulb-opacity, 1) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+  z-index: 5 !important;
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: transform, opacity !important;
+}
+
+.central-bulb-bloom {
+  position: absolute !important;
+  width: 110px !important;
+  height: 110px !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, rgba(255, 191, 36, 0.45) 0%, rgba(255, 120, 20, 0.15) 50%, rgba(0, 0, 0, 0) 75%) !important;
+  animation: bulbPulseAura 3s ease-in-out infinite alternate !important;
+  pointer-events: none !important;
+}
+
+@keyframes bulbPulseAura {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  100% { transform: scale(1.2); opacity: 1; }
+}
+
+.central-bulb-disc {
+  width: 66px !important;
+  height: 66px !important;
+  border-radius: 50% !important;
+  background: rgba(10, 15, 25, 0.9) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 2px solid rgba(255, 191, 36, 0.85) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 0 28px rgba(255, 191, 36, 0.6), inset 0 0 16px rgba(255, 191, 36, 0.3) !important;
+  transition: all 0.3s ease !important;
+}
+
+.central-bulb-badge {
+  margin-top: 6px !important;
+  font-family: var(--font-mono, monospace) !important;
+  font-size: 0.62rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  color: #fbbf24 !important;
+  background: rgba(6, 17, 26, 0.85) !important;
+  padding: 2px 8px !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(255, 191, 36, 0.35) !important;
+  white-space: nowrap !important;
+}
+
+/* 8 Output Hubs */
+.nexus-output-hub {
+  position: absolute !important;
+  transform: translate(-50%, -50%) scale(var(--hub-scale, 1)) !important;
+  opacity: var(--hub-opacity, 1) !important;
+  width: 60px !important;
+  height: 60px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  z-index: 4 !important;
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: transform, opacity !important;
+}
+
+.nexus-glow-aura {
+  position: absolute !important;
+  width: 90px !important;
+  height: 90px !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, rgba(var(--hub-rgb), 0.38) 0%, rgba(var(--hub-rgb), 0.08) 55%, transparent 75%) !important;
+  opacity: 0.6 !important;
+  transition: all 0.35s ease !important;
+  pointer-events: none !important;
+}
+
+.nexus-icon-disc {
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 50% !important;
+  background: rgba(6, 17, 26, 0.9) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1.8px solid rgba(var(--hub-rgb), 0.85) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 0 22px rgba(var(--hub-rgb), 0.5), inset 0 0 14px rgba(var(--hub-rgb), 0.25) !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  z-index: 6 !important;
+}
+
+.nexus-output-hub:hover .nexus-icon-disc,
+.nexus-output-hub.is-active-nexus-hub .nexus-icon-disc {
+  transform: scale(1.18) !important;
+  border-width: 2.2px !important;
+  border-color: rgba(var(--hub-rgb), 1) !important;
+  box-shadow: 0 0 35px rgba(var(--hub-rgb), 0.9), 0 0 55px rgba(var(--hub-rgb), 0.45), inset 0 0 20px rgba(var(--hub-rgb), 0.4) !important;
+}
+
+.nexus-output-hub:hover .nexus-glow-aura,
+.nexus-output-hub.is-active-nexus-hub .nexus-glow-aura {
+  opacity: 1 !important;
+  transform: scale(1.35) !important;
+}
+
+/* Clear, Identifiable Name Tag for Each Node */
+.nexus-name-tag {
+  position: absolute !important;
+  bottom: -28px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  background: rgba(6, 17, 26, 0.88) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(var(--hub-rgb), 0.5) !important;
+  border-radius: 8px !important;
+  padding: 3px 10px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 1px !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7) !important;
+  transition: all 0.3s ease !important;
+  z-index: 8 !important;
+}
+
+.nexus-tag-category {
+  font-family: var(--font-mono, monospace) !important;
+  font-size: 0.60rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  color: rgb(var(--hub-rgb)) !important;
+  line-height: 1.1 !important;
+}
+
+.nexus-tag-title {
+  font-family: var(--font-display, sans-serif) !important;
+  font-size: 0.70rem !important;
+  font-weight: 600 !important;
+  color: #FFFFFF !important;
+  line-height: 1.2 !important;
+}
+
+.nexus-output-hub:hover .nexus-name-tag,
+.nexus-output-hub.is-active-nexus-hub .nexus-name-tag {
+  border-color: rgba(var(--hub-rgb), 0.9) !important;
+  background: rgba(10, 22, 34, 0.95) !important;
+  box-shadow: 0 0 20px rgba(var(--hub-rgb), 0.4), 0 6px 20px rgba(0, 0, 0, 0.8) !important;
+  transform: translateX(-50%) scale(1.06) !important;
+}
+
+/* Synchronization on Left Cards when Active */
+.scene-02-left-cards-grid .output-creative-card.is-active-output {
+  border-color: var(--card-accent) !important;
+  background: rgba(12, 28, 44, 0.95) !important;
+  transform: translateY(-4px) scale(1.03) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7), 0 0 24px var(--card-accent) !important;
+}
+
+@media (max-width: 1080px) {
+  .scene-02-outputs .scene-content-wrapper.scene-02-split-layout {
+    flex-direction: column !important;
+    gap: 12px !important;
+    max-width: 100% !important;
+  }
+  .scene-02-content-section {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  .scene-02-element-section {
+    display: none !important;
+  }
+  .outputs-floating-cloud-grid.scene-02-left-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+}
+
+/* Scene 03 (Strategy Pipeline): Centered full-width flow rail */
+.scene-03-strategy .scene-content-wrapper {
+  margin: 0 auto !important;
+  max-width: 1280px !important;
+  width: 100% !important;
+  text-align: center !important;
+}
+
+.scene-03-strategy .scene-text-header {
+  text-align: center !important;
+  margin: 0 auto 32px auto !important;
+  max-width: 840px !important;
+}
+
+.strategy-pipeline-flow-container {
+  width: 100% !important;
+  padding: 10px 0 !important;
+  overflow: visible !important;
+}
+
+.pipeline-flow-rail {
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  gap: clamp(6px, 1.1vw, 14px) !important;
+  width: 100% !important;
+}
+
+/* Dark Cosmic Glass Styling for Strategy Pipeline Nodes (Scene 03) */
+.pipeline-step-node {
+  background: rgba(6, 17, 26, 0.90) !important;
+  border: 1px solid rgba(0, 217, 255, 0.25) !important;
+  border-radius: 16px !important;
+  padding: clamp(14px, 1.8vh, 20px) clamp(8px, 1vw, 14px) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.pipeline-step-node .step-title {
+  color: #FFFFFF !important;
+  font-family: var(--font-display) !important;
+  font-size: clamp(13px, 1.05vw, 15px) !important;
+  font-weight: 800 !important;
+  margin-bottom: 4px !important;
+}
+
+.pipeline-step-node .step-desc {
+  color: rgba(226, 232, 240, 0.82) !important;
+  font-size: clamp(10.5px, 0.75vw, 12px) !important;
+  font-weight: 500 !important;
+  line-height: 1.35 !important;
+}
+
+.pipeline-step-node .step-badge-number {
+  color: var(--matter-cyan, #00d9ff) !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  margin-bottom: 6px !important;
+}
+
+.pipeline-step-node .step-icon-aura {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 10px !important;
+  margin: 0 auto 10px auto !important;
+}
+
+.pipeline-step-node.node-focused {
+  background: rgba(12, 28, 44, 0.98) !important;
+  border-color: var(--step-color) !important;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.8), 0 0 30px var(--step-color)50 !important;
+  transform: translateY(-8px) scale(1.06) !important;
+  z-index: 10 !important;
+}
+
+.pipeline-step-node.node-dimmed {
+  opacity: 0.35 !important;
+  filter: grayscale(0.2) !important;
+  transform: scale(0.97) !important;
+}
+
+.pipeline-connector-arrow {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  color: var(--matter-cyan, #00d9ff) !important;
+  flex-shrink: 0 !important;
+  opacity: 0.75 !important;
+}
+
+.connector-wire {
+  width: clamp(10px, 1.4vw, 22px) !important;
+  height: 2px !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-radius: 999px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.wire-moving-light {
+  background: linear-gradient(90deg, transparent, var(--matter-cyan, #00d9ff), transparent) !important;
+}
+
+/* Scene 04 (Financial Burn Rate): Centered balanced presentation */
+.scene4-underlayer {
+  margin: 0 auto !important;
+  max-width: 1100px !important;
+  width: 100% !important;
+  text-align: center !important;
+  align-items: center !important;
+}
+
+.scene4-underlayer .scene-text-header {
+  text-align: center !important;
+  margin: 0 auto 28px auto !important;
+  max-width: 800px !important;
+}
+
+.costs-accumulation-visual {
+  width: 100% !important;
+  max-width: 1080px !important;
+  margin: 0 auto !important;
+  align-items: center !important;
+}
+
+.costs-stack-grid {
+  width: 100% !important;
+  max-width: 1080px !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 14px !important;
+  margin: 0 auto !important;
+}
+
+@media (max-width: 768px) {
+  .costs-stack-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.costs-equation-summary-card {
+  width: 100% !important;
+  max-width: 1080px !important;
+  margin: 0 auto !important;
+}
+
+/* Scene 07 (Solution Reveal): Grand centered solution card */
+.scene-07-solution-reveal-section {
+  width: 100vw !important;
+  min-height: 70vh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  position: relative !important;
+  padding: 40px 24px 80px 24px !important;
+  box-sizing: border-box !important;
+}
+
+.scene-07-solution-reveal-scene {
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.scene-07-solution-reveal-scene .scene-content-wrapper {
+  margin: 0 auto !important;
+  max-width: 880px !important;
+  width: 100% !important;
+  text-align: center !important;
+  align-items: center !important;
+}
+
+.solution-center-card {
+  margin: 0 auto !important;
+  text-align: center !important;
+  align-items: center !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.solution-main-heading {
+  font-size: clamp(2.4rem, 4.8vw, 4rem) !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.02em !important;
+  text-shadow: 0 0 45px rgba(0, 217, 255, 0.35) !important;
+  margin-bottom: 20px !important;
+}
+
+.solution-lead-desc {
+  font-size: clamp(1rem, 1.25vw, 1.2rem) !important;
+  line-height: 1.65 !important;
+  color: rgba(226, 232, 240, 0.85) !important;
+  max-width: 760px !important;
+  margin: 0 auto 32px auto !important;
+}
+
+.solution-benefits-row {
+  justify-content: center !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+}
+
+.solution-cta-row {
+  justify-content: center !important;
+  display: flex !important;
+  margin-top: 24px !important;
+}
+
+/* Finale Brand & Wordmark: Centered harmonious alignment with 3D entity */
+.creativegini-brand-reveal-container {
+  left: 50% !important;
+  transform: translate(-50%, 0) !important;
+  text-align: center !important;
+  max-width: 920px !important;
+  margin: 0 auto !important;
+}
+
+.brand-wordmark-title {
+  justify-content: center !important;
+}
+
+/* Dark Cosmic Glass Styling for Scene 01 and Scene 02 Cards */
+.output-creative-card,
+.market-foreground-card {
+  background: rgba(6, 17, 26, 0.94) !important;
+  border: 1px solid rgba(0, 217, 255, 0.2) !important;
+  color: #F5F5F5 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+}
+
+.output-creative-card .output-title,
+.market-foreground-card .market-card-title {
+  color: #FFFFFF !important;
+}
+
+.output-creative-card .output-badge {
+  color: rgba(226, 232, 240, 0.75) !important;
+}
+
+.output-creative-card:hover,
+.market-foreground-card:hover {
+  background: rgba(10, 25, 38, 0.95) !important;
+  border-color: rgba(0, 217, 255, 0.45) !important;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(0, 174, 239, 0.25) !important;
+}
+
+/* ==========================================================================
+   CREATIVEGINI COMPREHENSIVE RESPONSIVE SYSTEM
+   Mobile (< 480px) • Tablet (< 768px / < 900px / < 1024px)
+   ========================================================================== */
+
+/* 1. Global Viewport & Touch Controls */
+@media (hover: none), (max-width: 768px) {
+  .cursor-cosmic-spotlight {
+    display: none !important;
+  }
+}
+
+/* 2. Floating Cosmic Navbar & Mobile Drawer */
+@media (max-width: 900px) {
+  .navbar-container {
+    top: 10px !important;
+    padding: 0 12px !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+  }
+
+  .glass-navbar {
+    height: 52px !important;
+    padding: 0 8px 0 14px !important;
+    border-radius: 9999px !important;
+    max-width: 100% !important;
+  }
+
+  .navbar-container.scrolled .glass-navbar {
+    height: 48px !important;
+    max-width: 100% !important;
+    transform: none !important;
+  }
+
+  .nav-logo-img {
+    height: 32px !important;
+    max-width: 130px !important;
+  }
+
+  .navbar-container.scrolled .nav-logo-img {
+    height: 28px !important;
+    max-width: 115px !important;
+  }
+
+  .nav-menu {
+    display: none !important;
+  }
+
+  .nav-actions {
+    gap: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .deploy-cta-btn {
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+  }
+
+  .desktop-google-btn {
+    display: none !important;
+  }
+
+  .btn-dashboard-nav {
+    padding: 6px 10px !important;
+    font-size: 11.5px !important;
+  }
+
+  .user-profile-pill {
+    padding: 3px 8px 3px 4px !important;
+    font-size: 11.5px !important;
+  }
+
+  .user-profile-pill .avatar {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .mobile-toggle {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 4px !important;
+    width: 36px !important;
+    height: 36px !important;
+    background: rgba(0, 217, 255, 0.08) !important;
+    border: 1px solid rgba(0, 217, 255, 0.3) !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    box-shadow: 0 0 12px rgba(0, 217, 255, 0.2) !important;
+  }
+
+  .mobile-toggle:hover {
+    background: rgba(0, 217, 255, 0.16) !important;
+    border-color: rgba(0, 217, 255, 0.5) !important;
+  }
+
+  .hamburger-bar {
+    width: 16px !important;
+    height: 1.8px !important;
+    background-color: #00D9FF !important;
+    border-radius: 2px !important;
+    transition: all 0.25s ease !important;
+  }
+
+  .mobile-toggle.open .hamburger-bar:nth-child(1) {
+    transform: translateY(5.8px) rotate(45deg) !important;
+  }
+
+  .mobile-toggle.open .hamburger-bar:nth-child(2) {
+    opacity: 0 !important;
+    transform: scale(0) !important;
+  }
+
+  .mobile-toggle.open .hamburger-bar:nth-child(3) {
+    transform: translateY(-5.8px) rotate(-45deg) !important;
+  }
+
+  /* Cosmic Glass Mobile Drawer */
+  .mobile-drawer {
+    position: absolute !important;
+    top: 60px !important;
+    left: 12px !important;
+    right: 12px !important;
+    background: linear-gradient(145deg, rgba(8, 16, 30, 0.96) 0%, rgba(3, 7, 16, 0.98) 100%) !important;
+    backdrop-filter: blur(28px) saturate(210%) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(0, 217, 255, 0.28) !important;
+    border-radius: 22px !important;
+    padding: 16px 14px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.95), 0 0 35px rgba(0, 217, 255, 0.2) !important;
+    z-index: 1001 !important;
+    animation: mobileDrawerFade 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+
+  @keyframes mobileDrawerFade {
+    0% { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .mobile-link {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 12px 16px !important;
+    border-radius: 12px !important;
+    color: #E2E8F0 !important;
+    text-decoration: none !important;
+    font-family: var(--font-display) !important;
+    font-size: 14.5px !important;
+    font-weight: 600 !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .mobile-link:hover,
+  .mobile-link:active {
+    background: rgba(0, 217, 255, 0.12) !important;
+    color: #00D9FF !important;
+    border-color: rgba(0, 217, 255, 0.35) !important;
+  }
+
+  .mobile-divider {
+    height: 1px !important;
+    background: rgba(0, 217, 255, 0.15) !important;
+    margin: 4px 0 !important;
+  }
+
+  .mobile-deploy-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 12px !important;
+    font-size: 13.5px !important;
+  }
+
+  .mobile-google-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 11px !important;
+    font-size: 13.5px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .glass-navbar {
+    padding: 0 6px 0 10px !important;
+  }
+
+  .nav-logo-img {
+    height: 28px !important;
+    max-width: 110px !important;
+  }
+
+  .deploy-btn-text {
+    display: none !important;
+  }
+
+  .deploy-cta-btn {
+    padding: 6px 9px !important;
+    border-radius: 50% !important;
+    width: 34px !important;
+    height: 34px !important;
+    justify-content: center !important;
+  }
+
+  .mobile-toggle {
+    width: 34px !important;
+    height: 34px !important;
+  }
+}
+
+/* 3. Screen 1: Intro Experience */
+@media (max-width: 768px) {
+  .intro-content-container {
+    padding: 0 16px !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  .intro-3d-stage {
+    max-width: 100% !important;
+    text-align: center !important;
+    width: 100% !important;
+  }
+
+  .screen1-logo-container {
+    margin-bottom: 12px !important;
+  }
+
+  .screen1-hero-logo-img {
+    max-width: min(300px, 82vw) !important;
+    max-height: 110px !important;
+  }
+
+  .typewriter-subtext-container {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    border-radius: 18px !important;
+    padding: 10px 14px !important;
+    font-size: clamp(12px, 3.4vw, 14px) !important;
+    line-height: 1.45 !important;
+    width: 92% !important;
+    max-width: 480px !important;
+    margin: 14px auto 0 auto !important;
+  }
+}
+
+/* Mobile Platforms Scroll Row */
+.mobile-platforms-scroll-row {
+  display: flex !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  padding: 6px 4px 14px 4px !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+  margin-bottom: 16px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.mobile-platforms-scroll-row::-webkit-scrollbar {
+  display: none !important;
+}
+
+.mobile-platform-chip-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 8px 15px !important;
+  border-radius: 999px !important;
+  background: rgba(6, 17, 26, 0.92) !important;
+  border: 1px solid rgba(0, 217, 255, 0.22) !important;
+  color: #CBD5E1 !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.mobile-platform-chip-btn:hover {
+  background: rgba(10, 26, 42, 0.95) !important;
+  border-color: rgba(0, 217, 255, 0.45) !important;
+  color: #FFFFFF !important;
+}
+
+.mobile-platform-chip-btn.active {
+  background: rgba(0, 217, 255, 0.16) !important;
+  border-color: var(--chip-accent, #00D9FF) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 16px var(--chip-accent, #00D9FF)40, 0 4px 14px rgba(0, 0, 0, 0.6) !important;
+}
+
+.chip-mini-logo {
+  width: 16px !important;
+  height: 16px !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+@media (min-width: 1025px) {
+  .mobile-platforms-scroll-row {
+    display: none !important;
+  }
+}
+
+/* 4. Screen 2: Marketing Channels Discovery & 3D Globe */
+@media (max-width: 1024px) {
+  .marketing-channels-section {
+    padding: 60px 16px 40px 16px !important;
+    position: relative !important;
+  }
+
+  .channels-interactive-grid {
+    grid-template-columns: 1fr !important;
+    gap: 28px !important;
+  }
+
+  .channel-info-column {
+    order: 1 !important;
+    width: 100% !important;
+  }
+
+  .channel-globe-column {
+    order: 2 !important;
+    width: 100% !important;
+    height: 320px !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    overflow: hidden !important;
+    position: relative !important;
+    margin: 16px 0 0 0 !important;
+  }
+
+  .channel-glass-panel {
+    min-height: auto !important;
+    padding: 24px 20px !important;
+    border-radius: 20px !important;
+  }
+
+  .marketing-globe-wrapper {
+    width: 320px !important;
+    height: 320px !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    transform: scale(0.65) !important;
+    transform-origin: center center !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .marketing-channels-section {
+    padding: 50px 14px 36px 14px !important;
+  }
+
+  .section-header-centered {
+    margin-bottom: 20px !important;
+    padding: 0 8px !important;
+  }
+
+  .section-title {
+    font-size: clamp(1.5rem, 6vw, 2rem) !important;
+  }
+
+  .section-desc {
+    font-size: 0.88rem !important;
+    line-height: 1.45 !important;
+  }
+
+  .channel-glass-panel {
+    padding: 20px 16px !important;
+    border-radius: 18px !important;
+  }
+
+  .platform-header-row {
+    gap: 10px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .platform-avatar-halo {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .platform-name-title {
+    font-size: 1.2rem !important;
+  }
+
+  .platform-reach-text {
+    font-size: 0.78rem !important;
+  }
+
+  .ad-cost-highlight-card {
+    padding: 10px 12px !important;
+    border-radius: 12px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .cost-label {
+    font-size: 0.70rem !important;
+  }
+
+  .cost-value-text {
+    font-size: 0.95rem !important;
+  }
+
+  .platform-description-block .desc-text {
+    font-size: 0.82rem !important;
+    line-height: 1.45 !important;
+  }
+
+  .platform-strengths-box {
+    padding: 10px 12px !important;
+    font-size: 0.82rem !important;
+    border-radius: 12px !important;
+  }
+
+  .quick-channel-chip {
+    padding: 4px 9px !important;
+    font-size: 11px !important;
+  }
+
+  .channel-globe-column {
+    height: 280px !important;
+  }
+
+  .marketing-globe-wrapper {
+    width: 280px !important;
+    height: 280px !important;
+    transform: scale(0.55) !important;
+    transform-origin: center center !important;
+    margin: 0 auto !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .channel-globe-column {
+    height: 240px !important;
+  }
+
+  .marketing-globe-wrapper {
+    width: 240px !important;
+    height: 240px !important;
+    transform: scale(0.48) !important;
+    transform-origin: center center !important;
+    margin: 0 auto !important;
+  }
+}
+
+/* 5. Screen 3: Marketing Journey Track (Scenes 1, 2, 3) */
+@media (max-width: 1024px) {
+  .marketing-journey-flow-wrapper {
+    position: relative !important;
+    width: 100% !important;
+    overflow: visible !important;
+    margin-top: 30px !important;
+  }
+
+  .marketing-journey-pinned-section {
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .journey-sticky-viewport {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .journey-progress-header {
+    display: none !important;
+  }
+
+  .journey-horizontal-track,
+  .horizontal-track-scenes-1-3 {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    transform: none !important;
+    gap: 48px !important;
+  }
+
+  .journey-scene {
+    padding: 30px 16px !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    display: block !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  .scene-content-wrapper {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .scene-text-header {
+    text-align: left !important;
+    margin: 0 0 14px 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .scene-number-badge {
+    font-size: 10px !important;
+    padding: 3px 9px !important;
+    margin-bottom: 8px !important;
+    display: inline-flex !important;
+    border-radius: 999px !important;
+  }
+
+  .scene-main-heading {
+    font-size: clamp(1.4rem, 5.8vw, 1.95rem) !important;
+    font-weight: 800 !important;
+    line-height: 1.18 !important;
+    margin-bottom: 8px !important;
+    letter-spacing: -0.015em !important;
+  }
+
+  .scene-lead-paragraph {
+    font-size: 0.85rem !important;
+    line-height: 1.45 !important;
+    margin-bottom: 14px !important;
+    color: #94A3B8 !important;
+  }
+
+  /* Always hide heavy canvases on mobile so cards fit comfortably */
+  .scene-01-element-section,
+  .scene-02-element-section {
+    display: none !important;
+  }
+
+  /* Scene 01 Split Responsive Layout */
+  .scene-01-market .scene-content-wrapper.scene-01-split-layout {
+    flex-direction: column !important;
+    gap: 10px !important;
+    justify-content: flex-start !important;
+    max-width: 100% !important;
+  }
+
+  .scene-01-content-section {
+    order: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .scene-01-market .foreground-discovery-grid.scene-01-right-cards-grid,
+  .foreground-discovery-grid.scene-01-right-cards-grid,
+  .foreground-discovery-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .market-foreground-card {
+    padding: 10px 12px !important;
+    border-radius: 14px !important;
+    min-height: auto !important;
+    background: rgba(6, 17, 26, 0.94) !important;
+    border: 1px solid rgba(0, 217, 255, 0.22) !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    box-sizing: border-box !important;
+  }
+
+  .market-card-top-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-bottom: 6px !important;
+    width: 100% !important;
+  }
+
+  .market-card-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+  }
+
+  .market-card-icon svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .market-card-metric {
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    color: #E2E8F0 !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    padding: 2px 7px !important;
+    border-radius: 999px !important;
+    letter-spacing: 0.02em !important;
+    white-space: nowrap !important;
+  }
+
+  .market-card-title {
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    color: #FFFFFF !important;
+    margin-bottom: 2px !important;
+    line-height: 1.25 !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  .market-card-cat {
+    font-size: 9.5px !important;
+    color: #94A3B8 !important;
+    font-weight: 500 !important;
+    line-height: 1.25 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .market-card-radar-dot {
+    display: none !important;
+  }
+
+  /* Scene 02 Split Responsive Layout */
+  .scene-02-outputs .scene-content-wrapper.scene-02-split-layout {
+    flex-direction: column !important;
+    gap: 10px !important;
+    justify-content: flex-start !important;
+    max-width: 100% !important;
+  }
+
+  .scene-02-content-section {
+    order: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .outputs-floating-cloud-grid.scene-02-left-cards-grid,
+  .outputs-floating-cloud-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .scene-02-left-cards-grid .output-creative-card,
+  .output-creative-card {
+    padding: 9px 11px !important;
+    border-radius: 12px !important;
+    min-height: auto !important;
+    background: rgba(6, 17, 26, 0.94) !important;
+    border: 1px solid rgba(0, 217, 255, 0.22) !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5) !important;
+    box-sizing: border-box !important;
+  }
+
+  .scene-02-left-cards-grid .output-card-top {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-bottom: 4px !important;
+    width: 100% !important;
+  }
+
+  .scene-02-left-cards-grid .output-format-tag {
+    font-size: 9px !important;
+    padding: 2px 6px !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+  }
+
+  .scene-02-left-cards-grid .output-badge {
+    font-size: 8.5px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+  }
+
+  .scene-02-left-cards-grid .output-title {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #FFFFFF !important;
+    line-height: 1.25 !important;
+    margin-bottom: 4px !important;
+  }
+
+  .scene-02-left-cards-grid .output-visual-mock-bar {
+    height: 2px !important;
+  }
+
+  /* Scene 03 Strategy Pipeline Responsive Rail */
+  .scene-03-strategy .scene-content-wrapper {
+    max-width: 100% !important;
+    padding: 0 2px 20px 2px !important;
+    justify-content: flex-start !important;
+    text-align: center !important;
+  }
+
+  .scene-03-strategy .scene-text-header {
+    text-align: center !important;
+    margin: 0 auto 12px auto !important;
+  }
+
+  .pipeline-connector-arrow {
+    display: none !important;
+  }
+
+  .pipeline-flow-rail {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .pipeline-step-node {
+    padding: 8px 8px !important;
+    border-radius: 12px !important;
+    min-height: auto !important;
+  }
+
+  .pipeline-step-node .step-title {
+    font-size: 11.5px !important;
+    margin-bottom: 2px !important;
+    font-weight: 700 !important;
+  }
+
+  .pipeline-step-node .step-desc {
+    font-size: 9.5px !important;
+    line-height: 1.2 !important;
+    color: #94A3B8 !important;
+  }
+
+  .pipeline-step-node .step-icon-aura {
+    width: 26px !important;
+    height: 26px !important;
+    margin: 0 auto 4px auto !important;
+    border-radius: 6px !important;
+  }
+
+  .pipeline-step-node .step-badge-number {
+    font-size: 9.5px !important;
+    margin-bottom: 2px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .scene-number-badge {
+    font-size: 9px !important;
+    padding: 3px 8px !important;
+    margin-bottom: 5px !important;
+  }
+
+  .scene-main-heading {
+    font-size: clamp(1.25rem, 5.2vw, 1.65rem) !important;
+    margin-bottom: 5px !important;
+    line-height: 1.18 !important;
+  }
+
+  .scene-lead-paragraph {
+    font-size: 0.78rem !important;
+    line-height: 1.35 !important;
+    margin-bottom: 10px !important;
+  }
+}
+
+/* 6. Scene 04: Financial Burn Rate & Costs */
+@media (max-width: 768px) {
+  .scene4-pinned-section {
+    height: auto !important;
+    min-height: auto !important;
+    padding: 50px 14px 40px 14px !important;
+  }
+
+  .scene4-underlayer {
+    padding: 0 4px !important;
+  }
+
+  .costs-stack-grid {
+    grid-template-columns: 1fr !important;
+    gap: 7px !important;
+  }
+
+  .tool-expense-pill {
+    padding: 9px 12px !important;
+    font-size: 12.5px !important;
+    border-radius: 12px !important;
+  }
+
+  .costs-equation-summary-card {
+    padding: 14px 12px !important;
+    border-radius: 16px !important;
+    margin-top: 14px !important;
+  }
+
+  .equation-row {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 5px !important;
+    justify-content: center !important;
+  }
+
+  .eq-item {
+    padding: 4px 8px !important;
+    font-size: 10.5px !important;
+    border-radius: 6px !important;
+  }
+
+  .eq-sign {
+    font-size: 12px !important;
+  }
+
+  .eq-result {
+    font-size: 13px !important;
+    padding: 6px 12px !important;
+    width: 100% !important;
+    text-align: center !important;
+    margin-top: 4px !important;
+  }
+
+  .disclaimer-note {
+    font-size: 10px !important;
+    line-height: 1.35 !important;
+    margin-top: 8px !important;
+  }
+}
+
+/* 7. Scene 07: Solution Reveal */
+@media (max-width: 768px) {
+  .scene-07-solution-reveal-section {
+    min-height: auto !important;
+    padding: 50px 16px 40px 16px !important;
+  }
+
+  .solution-main-heading {
+    font-size: clamp(1.7rem, 6.2vw, 2.4rem) !important;
+    margin-bottom: 14px !important;
+  }
+
+  .solution-lead-desc {
+    font-size: 0.9rem !important;
+    line-height: 1.5 !important;
+    margin-bottom: 20px !important;
+  }
+
+  .solution-benefits-row {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .benefit-pill {
+    width: 100% !important;
+    max-width: 320px !important;
+    justify-content: center !important;
+    font-size: 12.5px !important;
+    padding: 9px 14px !important;
+  }
+
+  .solution-cta-row {
+    margin-top: 18px !important;
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .solution-launch-btn {
+    width: 100% !important;
+    max-width: 320px !important;
+    font-size: 13.5px !important;
+    justify-content: center !important;
+    padding: 12px 18px !important;
+  }
+}
+
+/* 8. Finale Mascot & Minimalist Footer */
+@media (max-width: 768px) {
+  .creativegini-end-experience-section {
+    min-height: 300px !important;
+    padding: 20px 0 !important;
+  }
+
+  .screen1-visual-stage {
+    height: 280px !important;
+  }
+
+  .gini-character-official-img {
+    width: min(220px, 60vw) !important;
+    max-height: 35vh !important;
+  }
+
+  .creativegini-main-footer {
+    padding: 24px 0 32px 0 !important;
+  }
+
+  .footer-container.footer-minimal-container {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 14px !important;
+    padding: 0 16px !important;
+  }
+
+  .footer-logo-row {
+    justify-content: center !important;
+    gap: 10px !important;
+  }
+
+  .footer-full-logo-img {
+    height: 30px !important;
+    max-width: 150px !important;
+  }
+
+  .footer-developer-credit {
+    gap: 6px !important;
+  }
+
+  .footer-datai2i-logo-img {
+    height: 18px !important;
+  }
+
+  .developed-by-label {
+    font-size: 11px !important;
+  }
+
+  .footer-copy-text {
+    font-size: 11.5px !important;
+  }
+}
