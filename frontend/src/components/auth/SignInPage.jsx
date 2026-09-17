@@ -5,74 +5,54 @@ import {
   Lock, 
   Eye, 
   EyeOff, 
-  User, 
   ShieldCheck, 
   ChevronRight
 } from 'lucide-react';
+import { api } from '../../services/api';
 
 export default function SignInPage({ onLogin, onBackHome, showToast }) {
-  const [mode, setMode] = useState('signin'); // 'signin' or 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
 
     if (!email.trim() || !email.includes('@')) {
-      setErrorMessage('Please enter a valid work email address.');
+      setErrorMessage('Please enter a valid email address.');
       return;
     }
 
-    if (!password || password.length < 6) {
-      setErrorMessage('Password must be at least 6 characters long.');
-      return;
-    }
-
-    if (mode === 'signup' && !fullName.trim()) {
-      setErrorMessage('Please provide your full name to set up your profile.');
+    if (!password) {
+      setErrorMessage('Please enter your password.');
       return;
     }
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
+      const response = await api.login(email.trim(), password);
       setIsSubmitting(false);
-      const nameToUse = mode === 'signup' 
-        ? fullName.trim() 
-        : email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-      onLogin({
-        name: nameToUse || 'Creative Founder',
-        email: email.trim(),
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-        plan: 'Enterprise Autonomous'
-      });
-    }, 600);
-  };
-
-  const handleGoogleLogin = () => {
-    setIsSubmitting(true);
-    setTimeout(() => {
+      onLogin(response.user);
+    } catch (err) {
       setIsSubmitting(false);
-      onLogin({
-        name: 'Alex Morgan',
-        email: 'alex.morgan@growth.ai',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-        provider: 'google'
-      });
-    }, 500);
+      console.error('[CreativeGini Auth Error]:', err);
+      if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        setErrorMessage('Unable to connect to the backend server. Please verify the backend service is running on port 5000.');
+      } else {
+        setErrorMessage(err.message || 'Invalid credentials. Please verify your email and password.');
+      }
+    }
   };
 
   const handleForgotPassword = (e) => {
     e.preventDefault();
     if (showToast) {
-      showToast('Password reset link sent! Check your inbox in a moment.');
+      showToast('Password reset link sent to your registered email.');
     } else {
       alert('Password reset link sent to your email.');
     }
@@ -80,7 +60,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast }) {
 
   return (
     <div className="signin-page-root">
-      {/* Background Ambience & Lighting */}
+      {/* Subtle Background Ambience */}
       <div className="signin-ambient-glow glow-cyan" />
       <div className="signin-ambient-glow glow-violet" />
       <div className="signin-grid-overlay" />
@@ -102,102 +82,36 @@ export default function SignInPage({ onLogin, onBackHome, showToast }) {
         </div>
       </header>
 
-      {/* Main Two-Column Auth Container */}
+      {/* Main Container */}
       <main className="signin-layout-container">
-        <div className="signin-split-grid">
+        <div className="signin-split-grid" style={{ maxWidth: '460px', margin: '0 auto', gridTemplateColumns: '1fr' }}>
           
-          {/* LEFT: Auth Form Card */}
+          {/* Auth Form Card */}
           <div className="signin-card-wrapper">
-            <div className="signin-card glass-panel">
+            <div className="signin-card glass-panel" style={{ padding: '2.5rem 2rem' }}>
               
               {/* Header inside Card */}
-              <div className="signin-card-header">
-                <div className="brand-badge-pill">
-                  <span className="live-pulse-dot" />
-                  <span>Secure AI Access Portal</span>
+              <div className="signin-card-header" style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                  <img src="/logo.png" alt="CreativeGini" style={{ height: '42px', width: 'auto' }} />
                 </div>
-                <h1 className="signin-title">
-                  {mode === 'signin' ? 'Welcome back' : 'Create your account'}
+                <h1 className="signin-title" style={{ fontSize: '1.65rem', marginBottom: '0.4rem' }}>
+                  Sign In to CreativeGini
                 </h1>
-                <p className="signin-subtitle">
-                  {mode === 'signin' 
-                    ? 'Enter your credentials or use instant demo to access the platform' 
-                    : 'Start scaling your autonomous growth engine with 12+ channels'}
+                <p className="signin-subtitle" style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.6)' }}>
+                  Enter your credentials to access your portal and workspace.
                 </p>
-              </div>
-
-              {/* Toggle Mode Switcher (Sign In / Create Account) */}
-              <div className="signin-mode-tabs" role="tablist">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === 'signin'}
-                  className={`mode-tab-btn ${mode === 'signin' ? 'active' : ''}`}
-                  onClick={() => { setMode('signin'); setErrorMessage(''); }}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === 'signup'}
-                  className={`mode-tab-btn ${mode === 'signup' ? 'active' : ''}`}
-                  onClick={() => { setMode('signup'); setErrorMessage(''); }}
-                >
-                  Create Account
-                </button>
-              </div>
-
-              {/* Social Login: Google Auth Button */}
-              <button 
-                type="button" 
-                className="google-oauth-button" 
-                onClick={handleGoogleLogin}
-                disabled={isSubmitting}
-              >
-                <svg className="google-svg-icon" width="20" height="20" viewBox="0 0 24 24">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-                </svg>
-                <span>Continue with Google</span>
-              </button>
-
-              {/* Or Divider */}
-              <div className="auth-divider">
-                <span className="divider-line" />
-                <span className="divider-label">or continue with email</span>
-                <span className="divider-line" />
               </div>
 
               {/* Error Message Alert */}
               {errorMessage && (
-                <div className="auth-error-banner" role="alert">
+                <div className="auth-error-banner" role="alert" style={{ marginBottom: '1.25rem' }}>
                   <span>{errorMessage}</span>
                 </div>
               )}
 
               {/* Main Credentials Form */}
               <form onSubmit={handleSubmit} className="auth-credentials-form">
-                {mode === 'signup' && (
-                  <div className="form-field-group">
-                    <label htmlFor="fullname-input" className="field-label">Full Name</label>
-                    <div className="input-with-icon">
-                      <User size={17} className="field-icon" />
-                      <input
-                        id="fullname-input"
-                        type="text"
-                        placeholder="Alex Morgan"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        className="auth-text-input"
-                        autoComplete="name"
-                      />
-                    </div>
-                  </div>
-                )}
-
                 <div className="form-field-group">
                   <label htmlFor="email-input" className="field-label">Work Email</label>
                   <div className="input-with-icon">
@@ -205,7 +119,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast }) {
                     <input
                       id="email-input"
                       type="email"
-                      placeholder="founder@company.com"
+                      placeholder="name@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="auth-text-input"
@@ -218,22 +132,20 @@ export default function SignInPage({ onLogin, onBackHome, showToast }) {
                 <div className="form-field-group">
                   <div className="field-label-row">
                     <label htmlFor="password-input" className="field-label">Password</label>
-                    {mode === 'signin' && (
-                      <a href="#forgot" onClick={handleForgotPassword} className="forgot-password-link">
-                        Forgot password?
-                      </a>
-                    )}
+                    <a href="#forgot" onClick={handleForgotPassword} className="forgot-password-link">
+                      Forgot password?
+                    </a>
                   </div>
                   <div className="input-with-icon">
                     <Lock size={17} className="field-icon" />
                     <input
                       id="password-input"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder={mode === 'signin' ? '••••••••' : 'At least 6 characters'}
+                      placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="auth-text-input"
-                      autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                      autoComplete="current-password"
                       required
                     />
                     <button
@@ -247,7 +159,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast }) {
                   </div>
                 </div>
 
-                <div className="form-options-row">
+                <div className="form-options-row" style={{ marginTop: '0.5rem', marginBottom: '1.25rem' }}>
                   <label className="remember-checkbox-label">
                     <input
                       type="checkbox"
@@ -267,11 +179,11 @@ export default function SignInPage({ onLogin, onBackHome, showToast }) {
                 >
                   {isSubmitting ? (
                     <span className="submit-loading-state">
-                      <span className="spinner-dots" /> Connecting to Neural Engine...
+                      Authenticating...
                     </span>
                   ) : (
                     <>
-                      <span>{mode === 'signin' ? 'Sign In to Workspace' : 'Get Started Free'}</span>
+                      <span>Sign In</span>
                       <ChevronRight size={17} />
                     </>
                   )}
@@ -279,10 +191,10 @@ export default function SignInPage({ onLogin, onBackHome, showToast }) {
               </form>
 
               {/* Trust Footer inside card */}
-              <div className="signin-card-footer">
-                <div className="trust-badge-row">
+              <div className="signin-card-footer" style={{ marginTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1.25rem' }}>
+                <div className="trust-badge-row" style={{ justifyContent: 'center' }}>
                   <ShieldCheck size={14} className="shield-icon" />
-                  <span>256-bit SSL · SOC-2 Type II Certified · Enterprise Privacy</span>
+                  <span>256-bit SSL · Role-Based Security · Enterprise Privacy</span>
                 </div>
               </div>
 

@@ -262,27 +262,32 @@ html.lenis, html.lenis body {
   box-shadow: 0 6px 28px rgba(0, 217, 255, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.6) !important;
 }
 
+.nav-signin-btn,
 .google-btn {
-  background: rgba(255, 255, 255, 0.06) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
   color: #FFFFFF !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
   border-radius: 9999px !important;
   font-family: var(--font-display, sans-serif);
-  font-size: 12.5px !important;
+  font-size: 13px !important;
   font-weight: 600 !important;
-  padding: 7px 14px !important;
+  padding: 7px 16px !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  justify-content: center !important;
+  gap: 7px !important;
   cursor: pointer !important;
   transition: all 0.2s ease !important;
+  backdrop-filter: blur(12px) !important;
 }
 
+.nav-signin-btn:hover,
 .google-btn:hover {
-  background: rgba(255, 255, 255, 0.12) !important;
-  border-color: rgba(255, 255, 255, 0.25) !important;
+  background: rgba(0, 217, 255, 0.12) !important;
+  border-color: rgba(0, 217, 255, 0.4) !important;
+  color: #00D9FF !important;
   transform: translateY(-1px) !important;
-  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 4px 16px rgba(0, 217, 255, 0.25) !important;
 }
 
 .user-profile-pill {

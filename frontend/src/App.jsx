@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Lenis from 'lenis';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -8,24 +9,56 @@ import MarketingChannelsSection from './components/landing/MarketingChannelsSect
 import MarketingJourney from './components/landing/MarketingJourney';
 import CreativeGiniEndExperience from './components/landing/CreativeGiniEndExperience';
 import Footer from './components/landing/Footer';
-import GoogleAuthModal from './components/common/GoogleAuthModal';
 import Toast from './components/common/Toast';
-import Dashboard from './components/dashboard/Dashboard';
 import CosmicSpaceCanvas from './components/common/CosmicSpaceCanvas';
 import SignInPage from './components/auth/SignInPage';
+import ProtectedRoute, { getRoleHome } from './components/common/ProtectedRoute';
+import UserDashboard from './components/dashboard/user/UserDashboard';
+import AdminDashboard from './components/dashboard/admin/AdminDashboard';
+import CompanyLeadDashboard from './components/dashboard/internal/CompanyLeadDashboard';
+import CompanyBoostDashboard from './components/dashboard/internal/CompanyBoostDashboard';
+import LandingPageDashboard from './components/dashboard/internal/LandingPageDashboard';
+import './styles/portal.css';
+import { api } from './services/api';
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function App() {
-  const [currentView, setCurrentView] = useState('landing'); 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [user, setUser] = useState(null); 
+  const [user, setUser] = useState(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
+  const [isIntroComplete, setIsIntroComplete] = useState(false);
   const spotlightRef = useRef(null);
 
-  // Global Silky-Smooth Inertial Scroll Engine (Lenis + GSAP ScrollTrigger)
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isLandingPage = location.pathname === '/';
+
+  // Check existing session on initial load
   useEffect(() => {
-    if (currentView !== 'landing') return;
+    const token = localStorage.getItem('cg_auth_token');
+    if (token) {
+      api.getMe()
+        .then((data) => {
+          if (data?.user) {
+            setUser(data.user);
+          }
+        })
+        .catch(() => {
+          api.logout();
+          setUser(null);
+        })
+        .finally(() => {
+          setIsAuthChecking(false);
+        });
+    } else {
+      setIsAuthChecking(false);
+    }
+  }, []);
+
+  // Global Inertial Scroll Engine (Lenis + GSAP ScrollTrigger) exclusively on landing page
+  useEffect(() => {
+    if (!isLandingPage) return;
 
     const lenis = new Lenis({
       duration: 1.2,
@@ -51,9 +84,11 @@ export default function App() {
       gsap.ticker.remove(updateTicker);
       lenis.destroy();
     };
-  }, [currentView]);
+  }, [isLandingPage]);
 
+  // Spotlight tracking on landing page
   useEffect(() => {
+    if (!isLandingPage) return;
     const handleMouseMove = (e) => {
       if (spotlightRef.current) {
         spotlightRef.current.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
@@ -61,7 +96,7 @@ export default function App() {
     };
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+  }, [isLandingPage]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -72,98 +107,141 @@ export default function App() {
 
   const handleLogin = (userData) => {
     setUser(userData);
-    setIsModalOpen(false);
-    setCurrentView('dashboard');
-    showToast(`Signed in as ${userData.name}. Welcome to CreativeGini!`);
+    const targetRoute = getRoleHome(userData);
+    navigate(targetRoute, { replace: true });
+    showToast(`Welcome to CreativeGini, ${userData.name}!`);
   };
-
-  const handleOpenSignIn = () => {
-    setCurrentView('signin');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleBackHome = () => {
-    setCurrentView('landing');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const [isIntroComplete, setIsIntroComplete] = useState(false);
 
   const handleLogout = () => {
+    api.logout();
     setUser(null);
-    setCurrentView('landing');
+    navigate('/', { replace: true });
     setIsIntroComplete(false);
     showToast('Signed out successfully');
   };
 
   return (
-    <div className="app-root cosmic-editorial-root">
-      {/* 3D Multi-Layer Continuous Parallax Starfield & Nebula Engine */}
-      <CosmicSpaceCanvas />
+    <div className={`app-root ${isLandingPage ? 'cosmic-editorial-root' : ''}`}>
+      {/* 3D Cosmic Space Canvas rendered strictly on landing page */}
+      {isLandingPage && <CosmicSpaceCanvas />}
       
-      <div
-        ref={spotlightRef}
-        className="cursor-cosmic-spotlight"
-        style={{ left: 0, top: 0, transform: 'translate3d(-500px, -500px, 0)' }}
-      />
-
-      {currentView === 'dashboard' ? (
-        <Dashboard
-          user={user}
-          onLogout={handleLogout}
+      {isLandingPage && (
+        <div
+          ref={spotlightRef}
+          className="cursor-cosmic-spotlight"
+          style={{ left: 0, top: 0, transform: 'translate3d(-500px, -500px, 0)' }}
         />
-      ) : currentView === 'signin' ? (
-        <SignInPage
-          onLogin={handleLogin}
-          onBackHome={handleBackHome}
-          showToast={showToast}
-        />
-      ) : (
-        <>
-          <Navbar
-            onOpenSignIn={handleOpenSignIn}
-            onOpenGoogleModal={handleOpenSignIn}
-            user={user}
-            onLogout={handleLogout}
-            onGoToDashboard={() => setCurrentView('dashboard')}
-          />
-
-          <GoogleAuthModal
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            onLogin={handleLogin}
-          />
-
-          <div id="landing-main-scroll-wrapper">
-            {/* 1. SCROLL-CONTROLLED 3D ROLLING OPENING TITLE EXPERIENCE (LAYER 1 SUB-SCROLL) */}
-            <IntroExperience
-              isComplete={isIntroComplete}
-              setIsComplete={setIsIntroComplete}
-            />
-
-            {/* 2. MAIN PAGE CONTENT FLOW (LAYER 2 UNLOCKED AFTER TITLE 3) */}
-            <div id="next-landing-container" className="next-sections-flow">
-              {/* Marketing Globe Section */}
-              <MarketingChannelsSection
-                onExploreChannel={user ? () => setCurrentView('dashboard') : handleOpenSignIn}
-              />
-
-              {/* Horizontal Scroll Journey Section */}
-              <MarketingJourney
-                onExploreSolution={user ? () => setCurrentView('dashboard') : handleOpenSignIn}
-              />
-
-              {/* 3. SCREEN 1 FINALE */}
-              <CreativeGiniEndExperience />
-
-              {/* 4. MAIN FOOTER */}
-              <Footer
-                onOpenAuth={user ? () => setCurrentView('dashboard') : handleOpenSignIn}
-              />
-            </div>
-          </div>
-        </>
       )}
+
+      <Routes>
+        {/* 1. Landing Page (100% Preserved) */}
+        <Route
+          path="/"
+          element={
+            <>
+              <Navbar
+                onOpenSignIn={() => navigate('/signin')}
+                onOpenGoogleModal={() => navigate('/signin')}
+                user={user}
+                onLogout={handleLogout}
+                onGoToDashboard={() => navigate(getRoleHome(user))}
+              />
+
+              <div id="landing-main-scroll-wrapper">
+                <IntroExperience
+                  isComplete={isIntroComplete}
+                  setIsComplete={setIsIntroComplete}
+                />
+
+                <div id="next-landing-container" className="next-sections-flow">
+                  <MarketingChannelsSection
+                    onExploreChannel={user ? () => navigate(getRoleHome(user)) : () => navigate('/signin')}
+                  />
+
+                  <MarketingJourney
+                    onExploreSolution={user ? () => navigate(getRoleHome(user)) : () => navigate('/signin')}
+                  />
+
+                  <CreativeGiniEndExperience />
+
+                  <Footer
+                    onOpenAuth={user ? () => navigate(getRoleHome(user)) : () => navigate('/signin')}
+                  />
+                </div>
+              </div>
+            </>
+          }
+        />
+
+        {/* 2. Sign In Route */}
+        <Route
+          path="/signin"
+          element={
+            user ? (
+              <Navigate to={getRoleHome(user)} replace />
+            ) : (
+              <SignInPage
+                onLogin={handleLogin}
+                onBackHome={() => navigate('/')}
+                showToast={showToast}
+              />
+            )
+          }
+        />
+
+        {/* 3. User Dashboard Route */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute user={user} allowedRoles={['USER']} isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <UserDashboard user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 4. Admin Dashboard Route */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute user={user} allowedRoles={['ADMIN']} isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <AdminDashboard user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 5. Company Lead Dashboard Route */}
+        <Route
+          path="/company-lead"
+          element={
+            <ProtectedRoute user={user} requiredPermission="companyLead" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <CompanyLeadDashboard user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 6. Company Boost Dashboard Route */}
+        <Route
+          path="/company-boost"
+          element={
+            <ProtectedRoute user={user} requiredPermission="companyBoost" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <CompanyBoostDashboard user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 7. Landing Page Enhancement Dashboard Route */}
+        <Route
+          path="/landing-page-enhancement"
+          element={
+            <ProtectedRoute user={user} requiredPermission="companyUI" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <LandingPageDashboard user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Catch-all redirect */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
 
       <Toast message={toastMessage} />
     </div>

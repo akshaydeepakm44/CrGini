@@ -1,0 +1,417 @@
+// CreativeGini API Client Service
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+const getHeaders = (includeAuth = true) => {
+  const headers = {
+    'Content-Type': 'application/json'
+  };
+  if (includeAuth) {
+    const token = localStorage.getItem('cg_auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  return headers;
+};
+
+export const api = {
+  // Authentication
+  async login(email, password) {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: getHeaders(false),
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Login failed. Please check credentials.');
+    }
+    localStorage.setItem('cg_auth_token', data.token);
+    return data;
+  },
+
+  async getMe() {
+    const res = await fetch(`${API_BASE}/auth/me`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Session expired');
+    }
+    return data;
+  },
+
+  logout() {
+    localStorage.removeItem('cg_auth_token');
+  },
+
+  // Company Information (Pre-researched leads and company profile)
+  async getMyCompany() {
+    const res = await fetch(`${API_BASE}/company/my-company`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch company details');
+    }
+    return data.company;
+  },
+
+  // Requests / Tickets
+  async getRequests() {
+    const res = await fetch(`${API_BASE}/requests`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch requests');
+    }
+    return data.requests || [];
+  },
+
+  async getRequestById(id) {
+    const res = await fetch(`${API_BASE}/requests/${id}`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Ticket not found');
+    }
+    return data.request;
+  },
+
+  async createRequest(payload) {
+    const res = await fetch(`${API_BASE}/requests`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to create ticket request');
+    }
+    return data.request;
+  },
+
+  async payRequest(id, paymentMethod = 'Corporate Card (Stripe)') {
+    const res = await fetch(`${API_BASE}/requests/${id}/pay`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({ paymentMethod })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Payment processing failed');
+    }
+    return data;
+  },
+
+  async getMessages(requestId) {
+    const res = await fetch(`${API_BASE}/requests/${requestId}/messages`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to load conversation');
+    }
+    return data.messages || [];
+  },
+
+  async sendMessage(requestId, text) {
+    const res = await fetch(`${API_BASE}/requests/${requestId}/messages`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to send message');
+    }
+    return data.message;
+  },
+
+  async updateRequestStatus(id, status, note = '') {
+    const res = await fetch(`${API_BASE}/requests/${id}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(true),
+      body: JSON.stringify({ status, note })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to update ticket status');
+    }
+    return data.request;
+  },
+
+  // Work Submissions & Client Review
+  async getSubmissions(ticketId) {
+    const res = await fetch(`${API_BASE}/requests/${ticketId}/submissions`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch deliverables');
+    }
+    return data.submissions || [];
+  },
+
+  async submitWork(ticketId, payload) {
+    const res = await fetch(`${API_BASE}/requests/${ticketId}/submissions`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to submit deliverables');
+    }
+    return data;
+  },
+
+  async approveSubmission(ticketId, submissionId, feedback = '') {
+    const res = await fetch(`${API_BASE}/requests/${ticketId}/submissions/${submissionId}/approve`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({ feedback })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to approve work');
+    }
+    return data;
+  },
+
+  async requestChanges(ticketId, submissionId, feedback) {
+    const res = await fetch(`${API_BASE}/requests/${ticketId}/submissions/${submissionId}/request-changes`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({ feedback })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to request changes');
+    }
+    return data;
+  },
+
+  async assignTicket(ticketId, payload) {
+    const res = await fetch(`${API_BASE}/requests/${ticketId}/assign`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to assign ticket');
+    }
+    return data;
+  },
+
+  async startWork(ticketId) {
+    const res = await fetch(`${API_BASE}/requests/${ticketId}/start-work`, {
+      method: 'POST',
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to start work');
+    }
+    return data;
+  },
+
+  async adminOverride(ticketId, reason) {
+    const res = await fetch(`${API_BASE}/requests/${ticketId}/admin-override`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({ reason })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to execute administrative override');
+    }
+    return data;
+  },
+
+  async getTicketActivity(ticketId) {
+    const res = await fetch(`${API_BASE}/requests/${ticketId}/activity`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to load activity logs');
+    }
+    return data.logs || [];
+  },
+
+  // In-App Notifications
+  async getNotifications() {
+    const res = await fetch(`${API_BASE}/notifications`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to load notifications');
+    }
+    return data;
+  },
+
+  async markNotificationRead(id) {
+    const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
+      method: 'PATCH',
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to mark notification read');
+    }
+    return data;
+  },
+
+  async markAllNotificationsRead() {
+    const res = await fetch(`${API_BASE}/notifications/read-all`, {
+      method: 'PATCH',
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to mark all notifications read');
+    }
+    return data;
+  },
+
+  // Admin APIs
+  async adminCreateClient(clientPayload) {
+    const res = await fetch(`${API_BASE}/admin/users`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(clientPayload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to create client');
+    }
+    return data;
+  },
+
+  async adminGetUsers() {
+    const res = await fetch(`${API_BASE}/admin/users`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to load users');
+    }
+    return data.users || [];
+  },
+
+  async adminGetUserById(id) {
+    const res = await fetch(`${API_BASE}/admin/users/${id}`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to load user details');
+    }
+    return data;
+  },
+
+  async adminUpdateUser(id, payload) {
+    const res = await fetch(`${API_BASE}/admin/users/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to update user');
+    }
+    return data;
+  },
+
+  async adminResetPassword(id) {
+    const res = await fetch(`${API_BASE}/admin/users/${id}/reset-password`, {
+      method: 'POST',
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to reset password');
+    }
+    return data;
+  },
+
+  async adminUpdateUserStatus(id, status) {
+    const res = await fetch(`${API_BASE}/admin/users/${id}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(true),
+      body: JSON.stringify({ status })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to update user status');
+    }
+    return data;
+  },
+
+  async adminDeleteUser(id) {
+    const res = await fetch(`${API_BASE}/admin/users/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to delete client user');
+    }
+    return data;
+  },
+
+  async adminGetTeamMembers() {
+    const res = await fetch(`${API_BASE}/admin/team-members`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch team members');
+    }
+    return data.teamMembers || [];
+  },
+
+  async adminCreateTeamUser(payload) {
+    const res = await fetch(`${API_BASE}/admin/team-members`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to create team user');
+    }
+    return data;
+  },
+
+  async adminUpdateUserPermissions(id, dashboardAccess) {
+    const res = await fetch(`${API_BASE}/admin/users/${id}/permissions`, {
+      method: 'PATCH',
+      headers: getHeaders(true),
+      body: JSON.stringify({ dashboardAccess })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to update dashboard permissions');
+    }
+    return data;
+  },
+
+  async adminDeleteTeamMember(id) {
+    const res = await fetch(`${API_BASE}/admin/team-members/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to delete team member');
+    }
+    return data;
+  }
+};
