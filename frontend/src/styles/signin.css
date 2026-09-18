@@ -445,3 +445,47 @@
     font-size: 1.6rem;
   }
 }
+
+@media (max-width: 380px) {
+  .signin-nav-bar {
+    padding: 12px 14px;
+  }
+
+  .signin-layout-container {
+    padding: 8px 10px 32px 10px;
+  }
+
+  .signin-card.glass-panel {
+    padding: 20px 14px;
+    border-radius: 16px;
+  }
+
+  .signin-title {
+    font-size: 1.35rem;
+  }
+
+  .signin-back-btn {
+    padding: 6px 12px;
+    font-size: 0.78rem;
+  }
+
+  .signin-nav-logo {
+    height: 26px;
+  }
+
+  .auth-toggle-pill {
+    font-size: 0.76rem;
+    padding: 6px 10px;
+  }
+}
+
+@media (max-width: 330px) {
+  .signin-card.glass-panel {
+    padding: 16px 10px;
+  }
+
+  .signin-layout-container {
+    padding: 6px 6px 24px 6px;
+  }
+}
+

@@ -21,13 +21,20 @@ export default function ClientReviewSection({
   onRequestChanges,
   isProcessing = false
 }) {
-  const [activeVersionIndex, setActiveVersionIndex] = useState(
-    submissions.length > 0 ? submissions.length - 1 : 0
-  );
+  const [activeVersionIndex, setActiveVersionIndex] = useState(0);
   const [showApproveConfirm, setShowApproveConfirm] = useState(false);
   const [showRequestChangesForm, setShowRequestChangesForm] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackError, setFeedbackError] = useState('');
+
+  // Reset view when ticket or submissions change
+  React.useEffect(() => {
+    setActiveVersionIndex(0);
+    setShowApproveConfirm(false);
+    setShowRequestChangesForm(false);
+    setFeedbackText('');
+    setFeedbackError('');
+  }, [ticket?._id, submissions?.length]);
 
   if (!submissions || submissions.length === 0) {
     return (
@@ -52,8 +59,8 @@ export default function ClientReviewSection({
     );
   }
 
-  const currentSubmission = submissions[activeVersionIndex] || submissions[submissions.length - 1];
-  const isLatestVersion = activeVersionIndex === submissions.length - 1;
+  const currentSubmission = submissions[activeVersionIndex] || submissions[0];
+  const isLatestVersion = activeVersionIndex === 0;
   const isPendingReview =
     currentSubmission.status === 'PENDING_REVIEW' &&
     (ticket.status === 'WORK_SUBMITTED' || ticket.status === 'WORK_RESUBMITTED' || ticket.status === 'CLIENT_REVIEW');
@@ -94,7 +101,9 @@ export default function ClientReviewSection({
           alignItems: 'center',
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          paddingBottom: '12px'
+          paddingBottom: '12px',
+          flexWrap: 'wrap',
+          gap: '8px'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -150,7 +159,7 @@ export default function ClientReviewSection({
         }}
       >
         {/* Title & Metadata */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span
@@ -238,13 +247,15 @@ export default function ClientReviewSection({
                     padding: '8px 12px',
                     borderRadius: '6px',
                     background: 'rgba(4, 12, 18, 0.9)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)'
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    flexWrap: 'wrap',
+                    gap: '8px'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <FileText size={16} color="#00D9FF" />
-                    <div>
-                      <span style={{ fontSize: '0.85rem', color: '#FFFFFF', fontWeight: '500' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                    <FileText size={16} color="#00D9FF" style={{ flexShrink: 0 }} />
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ fontSize: '0.85rem', color: '#FFFFFF', fontWeight: '500', wordBreak: 'break-all' }}>
                         {file.name}
                       </span>
                       {file.size && (
@@ -371,7 +382,7 @@ export default function ClientReviewSection({
           </p>
 
           {!showApproveConfirm && !showRequestChangesForm && (
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="portal-btn-primary"
@@ -438,7 +449,7 @@ export default function ClientReviewSection({
                     background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
                   }}
                 >
-                  {isProcessing ? 'Finalizing Approval...' : 'Confirm & Complete Ticket'}
+                  {isProcessing ? 'Approving Work...' : 'Approve Work'}
                 </button>
               </div>
             </div>
@@ -471,7 +482,7 @@ export default function ClientReviewSection({
                   rows={3}
                   value={feedbackText}
                   onChange={(e) => setFeedbackText(e.target.value)}
-                  placeholder="e.g. Please include CTOs for each company, and format the European phone numbers..."
+                  placeholder="e.g. Please update the European SaaS segment and include CTO contacts..."
                   required
                 />
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '10px' }}>
@@ -495,7 +506,7 @@ export default function ClientReviewSection({
                       color: '#FFF'
                     }}
                   >
-                    {isProcessing ? 'Sending Feedback...' : 'Send Revision Request to Team'}
+                    {isProcessing ? 'Requesting Changes...' : 'Request Changes'}
                   </button>
                 </div>
               </div>

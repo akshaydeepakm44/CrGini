@@ -1,9 +1,20 @@
+import mongoose from 'mongoose';
 import Submission from '../models/Submission.js';
 import Request from '../models/Request.js';
 import Notification from '../models/Notification.js';
 import ActivityLog from '../models/ActivityLog.js';
 import User from '../models/User.js';
 import { hasServiceTypeAccess } from './requestController.js';
+
+// Helper to resolve request by either Mongo _id or ticket code (e.g. CG-1001)
+export const resolveRequest = async (idOrTicketId) => {
+  if (!idOrTicketId) return null;
+  if (mongoose.Types.ObjectId.isValid(idOrTicketId)) {
+    const byId = await Request.findById(idOrTicketId);
+    if (byId) return byId;
+  }
+  return await Request.findOne({ ticketId: idOrTicketId });
+};
 
 // @desc    Submit completed or revised work for a ticket
 // @route   POST /api/requests/:id/submissions
@@ -20,7 +31,7 @@ export const createSubmission = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Submission description / notes are required' });
     }
 
-    const request = await Request.findById(requestId);
+    const request = await resolveRequest(requestId);
     if (!request) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
@@ -41,6 +52,7 @@ export const createSubmission = async (req, res) => {
     // Create submission document
     const submission = await Submission.create({
       ticketId: request._id,
+      ticketCode: request.ticketId,
       version: versionNumber,
       title: title.trim(),
       description: description.trim(),
@@ -55,15 +67,15 @@ export const createSubmission = async (req, res) => {
 
     // Update Request status & current submission version
     request.currentSubmissionVersion = versionNumber;
-    request.status = isRevision ? 'WORK_RESUBMITTED' : 'WORK_SUBMITTED';
+    request.status = 'CLIENT_REVIEW';
     await request.save();
 
     // 1. In-app notification to the client user
     await Notification.create({
       userId: request.userId,
       type: isRevision ? 'WORK_RESUBMITTED' : 'WORK_SUBMITTED',
-      title: isRevision ? 'Revised work ready for review' : 'Your work is ready for review',
-      message: `${req.user.name} (${request.assignedTeam}) has submitted ${isRevision ? `revision v${versionNumber}` : 'version v1'} for ${request.ticketId}: "${request.title}".`,
+      title: 'Work Submitted for Review',
+      message: `Your completed work for ${request.ticketId} is ready for review.`,
       ticketId: request._id,
       ticketCode: request.ticketId,
       submissionId: submission._id
@@ -76,12 +88,12 @@ export const createSubmission = async (req, res) => {
       companyId: request.companyId,
       requestId: request._id,
       action: isRevision ? 'WORK_RESUBMITTED' : 'WORK_SUBMITTED',
-      details: `Submission v${versionNumber} ("${title.trim()}") submitted by ${req.user.name}. Awaiting client review.`
+      details: `${req.user.name} submitted ${isRevision ? `revision V${versionNumber}` : 'work V1'} ("${title.trim()}"). Client notified for review.`
     });
 
     return res.status(201).json({
       success: true,
-      message: `Work submission v${versionNumber} sent to client for review.`,
+      message: `Work submission V${versionNumber} sent to client for review.`,
       submission,
       request
     });
@@ -96,7 +108,7 @@ export const createSubmission = async (req, res) => {
 // @access  Private
 export const getSubmissions = async (req, res) => {
   try {
-    const request = await Request.findById(req.params.id);
+    const request = await resolveRequest(req.params.id);
     if (!request) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
@@ -112,14 +124,52 @@ export const getSubmissions = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden' });
     }
 
-    const submissions = await Submission.find({ ticketId: req.params.id })
+    const submissions = await Submission.find({ ticketId: request._id })
       .populate('submittedBy', 'name email role')
-      .sort({ version: 1 });
+      .sort({ version: -1 });
 
     return res.json({
       success: true,
       count: submissions.length,
       submissions
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get specific submission version for a ticket
+// @route   GET /api/requests/:id/submissions/:version
+// @access  Private
+export const getSubmissionByVersion = async (req, res) => {
+  try {
+    const request = await resolveRequest(req.params.id);
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    // Permission check
+    if (req.user.role === 'USER') {
+      const userCompId = (req.user.companyId?._id || req.user.companyId)?.toString();
+      const reqCompId = (request.companyId?._id || request.companyId)?.toString();
+      if (userCompId !== reqCompId) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+    } else if (req.user.role !== 'ADMIN' && !hasServiceTypeAccess(req.user, request.serviceType)) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    const versionNum = parseInt(req.params.version, 10);
+    const submission = await Submission.findOne({ ticketId: request._id, version: versionNum })
+      .populate('submittedBy', 'name email role');
+
+    if (!submission) {
+      return res.status(404).json({ success: false, message: `Submission version ${req.params.version} not found` });
+    }
+
+    return res.json({
+      success: true,
+      submission
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -133,7 +183,7 @@ export const approveSubmission = async (req, res) => {
   try {
     const { id: requestId, submissionId } = req.params;
 
-    const request = await Request.findById(requestId);
+    const request = await resolveRequest(requestId);
     if (!request) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
@@ -149,7 +199,16 @@ export const approveSubmission = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Only client or admin can approve work' });
     }
 
-    const submission = await Submission.findOne({ _id: submissionId, ticketId: request._id });
+    let submission = null;
+    if (mongoose.Types.ObjectId.isValid(submissionId)) {
+      submission = await Submission.findOne({ _id: submissionId, ticketId: request._id });
+    }
+    if (!submission) {
+      const versionNum = parseInt(submissionId, 10);
+      if (!isNaN(versionNum)) {
+        submission = await Submission.findOne({ ticketId: request._id, version: versionNum });
+      }
+    }
     if (!submission) {
       return res.status(404).json({ success: false, message: 'Submission not found' });
     }
@@ -192,7 +251,7 @@ export const approveSubmission = async (req, res) => {
         userId: targetSpecialistId,
         type: 'WORK_APPROVED',
         title: 'Work approved by client!',
-        message: `${req.user.name} approved submission v${submission.version} for ${request.ticketId}. Ticket is now COMPLETED.`,
+        message: `Client approved the work for ${request.ticketId}.`,
         ticketId: request._id,
         ticketCode: request.ticketId,
         submissionId: submission._id
@@ -206,12 +265,12 @@ export const approveSubmission = async (req, res) => {
       companyId: request.companyId,
       requestId: request._id,
       action: 'WORK_APPROVED',
-      details: `Submission v${submission.version} approved by ${req.user.name}. Ticket ${request.ticketId} marked COMPLETED.`
+      details: `Client approved the work for ${request.ticketId}. Ticket marked COMPLETED.`
     });
 
     return res.json({
       success: true,
-      message: `Submission v${submission.version} successfully approved. Ticket marked COMPLETED.`,
+      message: `Submission V${submission.version} successfully approved. Ticket marked COMPLETED.`,
       submission,
       request
     });
@@ -236,7 +295,7 @@ export const requestChanges = async (req, res) => {
       });
     }
 
-    const request = await Request.findById(requestId);
+    const request = await resolveRequest(requestId);
     if (!request) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
@@ -252,7 +311,16 @@ export const requestChanges = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Only client or admin can request changes' });
     }
 
-    const submission = await Submission.findOne({ _id: submissionId, ticketId: request._id });
+    let submission = null;
+    if (mongoose.Types.ObjectId.isValid(submissionId)) {
+      submission = await Submission.findOne({ _id: submissionId, ticketId: request._id });
+    }
+    if (!submission) {
+      const versionNum = parseInt(submissionId, 10);
+      if (!isNaN(versionNum)) {
+        submission = await Submission.findOne({ ticketId: request._id, version: versionNum });
+      }
+    }
     if (!submission) {
       return res.status(404).json({ success: false, message: 'Submission not found' });
     }
@@ -291,8 +359,8 @@ export const requestChanges = async (req, res) => {
       await Notification.create({
         userId: targetSpecialistId,
         type: 'CHANGES_REQUESTED',
-        title: 'Changes requested by client',
-        message: `${req.user.name} requested changes on submission v${submission.version} for ${request.ticketId}. Feedback: "${feedback.trim()}"`,
+        title: `Changes requested for ${request.ticketId}`,
+        message: `Changes requested for ${request.ticketId}. Feedback: "${feedback.trim()}"`,
         ticketId: request._id,
         ticketCode: request.ticketId,
         submissionId: submission._id
@@ -306,7 +374,7 @@ export const requestChanges = async (req, res) => {
       companyId: request.companyId,
       requestId: request._id,
       action: 'CHANGES_REQUESTED',
-      details: `Client requested changes on submission v${submission.version}. Feedback: "${feedback.trim()}"`
+      details: `Client requested changes on submission V${submission.version}. Feedback: "${feedback.trim()}"`
     });
 
     return res.json({

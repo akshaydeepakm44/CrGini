@@ -177,7 +177,9 @@ export default function AdminDashboard({ user, onLogout }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (overrideModalTicket) {
+        if (isMobileDrawerOpen) {
+          setIsMobileDrawerOpen(false);
+        } else if (overrideModalTicket) {
           setOverrideModalTicket(null);
         } else if (deletingUser) {
           setDeletingUser(null);
@@ -207,7 +209,7 @@ export default function AdminDashboard({ user, onLogout }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    overrideModalTicket, deletingUser, statusConfirmUser, resetSuccessPass,
+    isMobileDrawerOpen, overrideModalTicket, deletingUser, statusConfirmUser, resetSuccessPass,
     resettingUser, editingUser, viewingUser, creationSuccessData, isCreateModalOpen,
     selectedTicket, isNotificationsOpen, isProfileMenuOpen
   ]);
@@ -385,7 +387,7 @@ export default function AdminDashboard({ user, onLogout }) {
   };
 
   // Ticket inspection
-  const handleOpenTicket = async (ticket) => {
+  const handleOpenTicket = async (ticket, initialTab) => {
     setSelectedTicket(ticket);
     try {
       const [messages, subs, act] = await Promise.all([
@@ -396,7 +398,7 @@ export default function AdminDashboard({ user, onLogout }) {
       setTicketMessages(messages);
       setTicketSubmissions(subs);
       setTicketActivity(act);
-      setActiveTicketModalTab('scope');
+      setActiveTicketModalTab(initialTab === 'review' ? 'deliverables' : (initialTab || 'scope'));
     } catch (err) {
       setTicketMessages([]);
       setTicketSubmissions([]);
@@ -456,10 +458,15 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   };
 
-  const handleOpenTicketById = (ticketId) => {
-    const t = requests.find(r => r._id === ticketId || r.ticketId === ticketId);
+  const handleOpenTicketById = async (ticketId, defaultTab) => {
+    let t = requests.find(r => String(r._id) === String(ticketId) || r.ticketId === ticketId);
+    if (!t && ticketId) {
+      try {
+        t = await api.getRequestById(ticketId);
+      } catch (e) {}
+    }
     if (t) {
-      handleOpenTicket(t);
+      handleOpenTicket(t, defaultTab);
       setIsNotificationsOpen(false);
     }
   };
@@ -626,6 +633,15 @@ export default function AdminDashboard({ user, onLogout }) {
           <div className="portal-sidebar-brand-logo-area">
             <img src="/logo.png" alt="CreativeGini" className="portal-sidebar-logo" />
           </div>
+          <button
+            type="button"
+            className="portal-mobile-drawer-close"
+            onClick={() => setIsMobileDrawerOpen(false)}
+            title="Close navigation drawer"
+            aria-label="Close navigation drawer"
+          >
+            <X size={18} />
+          </button>
           <button
             type="button"
             className="portal-sidebar-toggle-btn"
@@ -1206,7 +1222,7 @@ export default function AdminDashboard({ user, onLogout }) {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1.25rem' }}>
                         {/* Member Identity */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '260px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 'min(260px, 100%)' }}>
                           <div style={{
                             width: '46px',
                             height: '46px',
@@ -1248,7 +1264,7 @@ export default function AdminDashboard({ user, onLogout }) {
                         </div>
 
                         {/* Dashboard Access Checklist */}
-                        <div style={{ flex: 1, minWidth: '320px', background: 'rgba(15, 23, 42, 0.6)', padding: '1rem 1.25rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <div style={{ flex: 1, minWidth: 'min(280px, 100%)', background: 'rgba(15, 23, 42, 0.6)', padding: '1rem 1.25rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                           <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', fontWeight: '700', marginBottom: '10px' }}>
                             Dashboard Access:
                           </div>
@@ -1343,7 +1359,7 @@ export default function AdminDashboard({ user, onLogout }) {
                         </div>
 
                         {/* Action Buttons: Edit Access / Delete User / Save Changes / Cancel */}
-                        <div style={{ minWidth: '220px', textAlign: 'right' }}>
+                        <div style={{ minWidth: 'auto', textAlign: 'right' }}>
                           {isMemberAdmin ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', color: '#64748B', fontSize: '0.82rem', fontWeight: '600' }}>
                               <ShieldCheck size={16} style={{ color: '#FFB000' }} />
@@ -2190,6 +2206,86 @@ export default function AdminDashboard({ user, onLogout }) {
                     </div>
                   </div>
 
+                  {/* CLIENT TICKETS & JIRA CONVERSATIONS */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(0, 217, 255, 0.15)', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
+                      <h4 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', color: '#00D9FF', margin: 0, letterSpacing: '0.04em' }}>
+                        Client Tickets & Jira Conversations
+                      </h4>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                        {(viewUserData.requests || []).length} Total Ticket{(viewUserData.requests || []).length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+
+                    {(!viewUserData.requests || viewUserData.requests.length === 0) ? (
+                      <div style={{ padding: '1.25rem', textAlign: 'center', background: 'var(--portal-surface-card)', borderRadius: '8px', border: '1px dashed var(--portal-border)', color: '#94a3b8', fontSize: '0.82rem' }}>
+                        No tickets submitted by this client yet.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+                        {viewUserData.requests.map(req => {
+                          const svcColor = req.serviceType === 'COMPANY_BOOST' ? '#FFB000' : req.serviceType === 'COMPANY_LEAD' ? '#00D9FF' : '#a855f7';
+                          const svcName = req.serviceType === 'COMPANY_BOOST' ? 'Company Boost' : req.serviceType === 'COMPANY_LEAD' ? 'Company Lead' : 'Landing Page';
+                          return (
+                            <div
+                              key={req._id}
+                              style={{
+                                background: 'var(--portal-surface-card)',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                borderLeft: `3px solid ${svcColor}`,
+                                borderRadius: '8px',
+                                padding: '12px 14px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                gap: '8px'
+                              }}
+                            >
+                              <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#FFFFFF' }}>{req.ticketId}</span>
+                                  <span style={{ fontSize: '0.7rem', color: svcColor, fontWeight: '700' }}>{svcName}</span>
+                                </div>
+                                <div style={{ fontSize: '0.82rem', color: '#F5F5F5', fontWeight: '600', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {req.title}
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '2px' }}>
+                                  Status: <span style={{ color: '#00D9FF', fontWeight: '600' }}>{req.status}</span>
+                                  {req.assignedTo && <span> • {req.assignedTo.name || 'Specialist'}</span>}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setViewingUser(null);
+                                  setViewUserData(null);
+                                  handleOpenTicket(req, 'chat');
+                                }}
+                                style={{
+                                  background: 'rgba(0, 217, 255, 0.1)',
+                                  border: '1px solid rgba(0, 217, 255, 0.25)',
+                                  color: '#00D9FF',
+                                  borderRadius: '6px',
+                                  padding: '6px 10px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  marginTop: '4px'
+                                }}
+                              >
+                                <MessageSquare size={13} /> Open Jira Conversation
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   {/* RECENT ACTIVITY */}
                   {viewUserData.activity && viewUserData.activity.length > 0 && (
                     <div>
@@ -2466,7 +2562,7 @@ export default function AdminDashboard({ user, onLogout }) {
           <div className="portal-modal-card wide" onClick={(e) => e.stopPropagation()}>
             <div className="portal-modal-header">
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="portal-modal-header-badges">
                   <span style={{ fontFamily: 'monospace', fontWeight: '800', color: '#00D9FF', fontSize: '1.15rem' }}>
                     {selectedTicket.ticketId}
                   </span>
@@ -2502,7 +2598,10 @@ export default function AdminDashboard({ user, onLogout }) {
                   gap: '8px',
                   borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
                   marginBottom: '1rem',
-                  paddingBottom: '8px'
+                  paddingBottom: '8px',
+                  overflowX: 'auto',
+                  whiteSpace: 'nowrap',
+                  WebkitOverflowScrolling: 'touch'
                 }}
               >
                 <button
@@ -3251,6 +3350,7 @@ export default function AdminDashboard({ user, onLogout }) {
           </div>
         </div>
       )}
+
 
     </div>
   );

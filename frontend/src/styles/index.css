@@ -5217,3 +5217,52 @@ body {
     gap: 16px;
   }
 }
+
+/* ==========================================================================
+   LANDING PAGE MOBILE VIEWPORT SAFETY & HARDENING (320px - 480px)
+   ========================================================================== */
+@media (max-width: 480px) {
+  .navbar-container {
+    padding: 0 10px !important;
+    top: 10px !important;
+  }
+
+  .glass-navbar {
+    height: 48px !important;
+    padding: 0 14px !important;
+  }
+
+  .nav-logo-img {
+    height: 22px !important;
+  }
+
+  .mobile-drawer {
+    left: 10px !important;
+    right: 10px !important;
+    top: 64px !important;
+    padding: 16px !important;
+    border-radius: 16px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .navbar-container {
+    padding: 0 6px !important;
+    top: 6px !important;
+  }
+
+  .glass-navbar {
+    padding: 0 10px !important;
+  }
+
+  .mobile-drawer {
+    left: 6px !important;
+    right: 6px !important;
+    padding: 12px 10px !important;
+  }
+
+  .mobile-link {
+    font-size: 0.88rem !important;
+  }
+}
+

@@ -6,7 +6,8 @@ import {
   FileCheck,
   RotateCcw,
   CheckCheck,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react';
 
 export default function NotificationPanel({
@@ -73,13 +74,18 @@ export default function NotificationPanel({
       markReadFn(n._id);
     }
     if (n.ticketId && onOpenTicket) {
-      onOpenTicket(n.ticketId);
+      const targetTab = n.type === 'NEW_MESSAGE'
+        ? 'chat'
+        : (['WORK_SUBMITTED', 'WORK_RESUBMITTED'].includes(n.type) ? 'review' : undefined);
+      onOpenTicket(n.ticketId, targetTab);
     }
     onClose?.();
   };
 
   const getNotificationIcon = (type) => {
     switch (type) {
+      case 'NEW_MESSAGE':
+        return <MessageSquare size={16} color="#00D9FF" />;
       case 'WORK_SUBMITTED':
       case 'WORK_RESUBMITTED':
         return <FileCheck size={16} color="#00D9FF" />;

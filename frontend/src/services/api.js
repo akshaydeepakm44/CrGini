@@ -195,6 +195,17 @@ export const api = {
     return data;
   },
 
+  async getSubmissionByVersion(ticketId, version) {
+    const res = await fetch(`${API_BASE}/requests/${ticketId}/submissions/version/${version}`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch submission version');
+    }
+    return data.submission;
+  },
+
   async assignTicket(ticketId, payload) {
     const res = await fetch(`${API_BASE}/requests/${ticketId}/assign`, {
       method: 'POST',
@@ -413,5 +424,6 @@ export const api = {
       throw new Error(data.message || 'Failed to delete team member');
     }
     return data;
-  }
+  },
+
 };

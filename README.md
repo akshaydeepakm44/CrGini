@@ -1,6 +1,6 @@
 # CreativeGini — Autonomous AI Growth Engine & Delivery Portal
 
-CreativeGini is a full-stack platform combining a futuristic public marketing experience with a role-based B2B service delivery portal. The platform automates service fulfillment, Jira-style ticket tracking, revision workflows, client approvals, and real-time notifications.
+CreativeGini is an enterprise full-stack platform combining a futuristic public marketing experience with a role-based B2B service delivery portal. The platform automates service fulfillment, Jira-style ticket tracking, revision workflows, client approvals, team permission administration, and real-time notifications.
 
 ---
 
@@ -18,31 +18,31 @@ creativegini-main/
 │       ├── server.js             # Express application entry point & CORS configuration
 │       ├── seed.js               # Database seeder (creates default admin, specialists, clients)
 │       ├── config/
-│       │   └── db.js             # MongoDB Mongoose connection manager
+│       │   └── db.js             # MongoDB Mongoose connection manager with auto-reconnect
 │       ├── controllers/          # Business logic handlers
 │       │   ├── authController.js         # User authentication, JWT issuance, profile lookup
 │       │   ├── companyController.js      # Client company profile & pre-researched leads
 │       │   ├── notificationController.js # In-app notification creation & read management
-│       │   ├── requestController.js      # Service request creation & payment processing
-│       │   ├── submissionController.js   # Specialist deliverables, versions & client reviews
-│       │   └── userController.js         # Admin client user CRUD & password resets
+│       │   ├── requestController.js      # Service request creation, payment, tickets, messaging
+│       │   ├── submissionController.js   # Versioned deliverables, work submissions, client reviews
+│       │   └── userController.js         # Client & internal team member CRUD, permissions, audit
 │       ├── middleware/
-│       │   └── authMiddleware.js         # JWT verification & role-based route guard
+│       │   └── auth.js                   # JWT verification & role-based route guards
 │       ├── models/               # Mongoose schema definitions
 │       │   ├── ActivityLog.js    # Audit trail for ticket lifecycle events
 │       │   ├── Company.js        # Client company profiles & intelligence records
-│       │   ├── Message.js        # Internal Jira ticket conversation messages
-│       │   ├── Notification.js   # In-app notifications with read/unread status
-│       │   ├── Payment.js        # Payment records & financial audit transactions
-│       │   ├── Request.js        # Service requests & tickets (lifecycle, pricing, assignments)
+│       │   ├── Message.js        # Ticket-specific Jira conversation messages
+│       │   ├── Notification.js   # In-app notifications with read/unread tracking
+│       │   ├── Payment.js        # Payment records & invoice transaction ledger
+│       │   ├── Request.js        # Service requests & tickets (status, pricing, assignments)
 │       │   ├── Submission.js     # Versioned deliverables (files, links, reviews)
-│       │   └── User.js           # Accounts, hashed passwords (bcrypt), and roles
+│       │   └── User.js           # Accounts, hashed passwords (bcrypt), roles, dashboard permissions
 │       └── routes/               # Express API route declarations
-│           ├── adminRoutes.js    # Administrative metrics, users & force-complete overrides
+│           ├── adminRoutes.js    # /api/admin (users, team-members, permissions, audit logs)
 │           ├── authRoutes.js     # /api/auth (login, session verification)
 │           ├── companyRoutes.js  # /api/company (company profiles & lead intelligence)
 │           ├── notificationRoutes.js # /api/notifications (feed & mark-as-read)
-│           └── requestRoutes.js  # /api/requests (tickets, status updates, reviews, submissions)
+│           └── requestRoutes.js  # /api/requests (tickets, submissions, reviews, chat, payments)
 │
 ├── frontend/                     # React 18 + Vite Web Application
 │   ├── index.html                # HTML document template
@@ -68,14 +68,14 @@ creativegini-main/
 │       │   │   └── Toast.jsx             # Notification toast popup
 │       │   ├── dashboard/        # Role-based dashboard interfaces
 │       │   │   ├── admin/
-│       │   │   │   └── AdminDashboard.jsx       # Executive administration, user management, tickets
+│       │   │   │   └── AdminDashboard.jsx       # Client management, users, team permissions, tickets
 │       │   │   ├── common/                      # Shared portal widgets & modals
-│       │   │   │   ├── ActionMenu.jsx           # Dropdown actions for table rows
-│       │   │   │   ├── ActivityTimeline.jsx     # Jira-style audit history timeline
+│       │   │   │   ├── ActionMenu.jsx           # Dropdown actions for client user rows
+│       │   │   │   ├── ActivityTimeline.jsx     # Embedded Jira-style audit history timeline
 │       │   │   │   ├── ClientReviewSection.jsx  # Deliverable inspection, approval & change requests
-│       │   │   │   ├── NotificationPanel.jsx    # Topbar notification drawer
+│       │   │   │   ├── NotificationPanel.jsx    # Dedicated notification bell drawer
 │       │   │   │   ├── PortalCosmicBackground.jsx # Unified dark cosmic theme backdrop
-│       │   │   │   └── WorkSubmissionModal.jsx  # Deliverable submission modal for specialists
+│       │   │   │   └── WorkSubmissionModal.jsx  # Versioned deliverable submission modal
 │       │   │   ├── internal/                    # Specialist team dashboards
 │       │   │   │   ├── CompanyBoostDashboard.jsx # Outbound automation & growth pipeline
 │       │   │   │   ├── CompanyLeadDashboard.jsx  # Prospect intelligence & verified leads
@@ -111,11 +111,84 @@ creativegini-main/
 
 | Role | Default Email | Default Password | Default Route | Description |
 |---|---|---|---|---|
-| **ADMIN** | `admin@creativegini.com` | `admin123` | `/admin` | Full system access: manage clients, reset passwords, oversee all service tickets, force-complete overrides, and revenue tracking. |
-| **USER** (Client) | `client@acmecorp.com` | `client123` | `/dashboard` | Client portal: view pre-researched leads, create service requests, pay invoices, review deliverables, request revisions, and approve completed work. |
+| **ADMIN** | `admin@creativegini.com` | `admin123` | `/admin` | Full executive access: manage clients, invite/manage team members, assign granular permissions, oversee all service tickets, force-complete overrides, and revenue tracking. Protected against account deletion. |
+| **USER** (Client) | `akhil.k@datai2i.com` / `client@acmecorp.com` | `client123` | `/dashboard` | Client portal: view pre-researched leads, create service requests, pay invoices, inspect deliverables, request revisions, and approve completed work. |
 | **COMPANY_LEAD** | `lead@creativegini.com` | `specialist123` | `/company-lead` | Specialist queue: B2B decision-maker research, verified lead lists, data enrichment, and deliverable submission. |
-| **COMPANY_BOOST** | `boost@creativegini.com` | `specialist123` | `/company-boost` | Specialist queue: autonomous outbound sales funnels, email automation workflows, and campaign execution. |
+| **COMPANY_BOOST** | `boost@creativegini.com` | `specialist123` | `/company-boost` | Specialist queue: autonomous outbound sales funnels, email automation workflows, campaign execution, and deliverable submission. |
 | **LANDING_PAGE** | `ui@creativegini.com` | `specialist123` | `/landing-page-enhancement` | Specialist queue: UI/UX redesigns, conversion architecture sprints, Figma handoffs, and asset delivery. |
+
+---
+
+## 🚀 Key Feature Workflows
+
+### 1. "Submit Completed Work" & Non-Destructive Versioning
+- **Initiation**: The `[ Submit Completed Work ]` button is strictly located **inside the specific ticket** for authorized specialists. It is never displayed globally on dashboards and never auto-opens.
+- **Submission Modal**:
+  - Automatically associates with the active ticket code (e.g. `CG-1001`).
+  - Automatically calculates version numbers (`V1`, `V2`, `V3`).
+  - Captures Submission Title, Description, File uploads (multi-file with file size and type detection), External Link (e.g. Loom, Figma), and Deliverable Notes.
+- **Version History**: All historical versions remain preserved and accessible (ordered newest first). Submissions are never overwritten.
+- **Ticket Isolation**: Submissions for `CG-1001` are strictly isolated from `CG-1002`.
+
+### 2. Client Review & Approval Workflow
+- **Client Review View**: When work is submitted, the ticket moves to `CLIENT_REVIEW`. The client receives a targeted notification.
+- **Action Buttons**:
+  - `[ Approve Work ]`: Prompts for confirmation. Sets ticket status to `COMPLETED`, records `approvedAt`, `approvedBy`, `completedAt`, and notifies the assigned specialist.
+  - `[ Request Changes ]`: Requires non-empty feedback explaining what modifications are needed. Moves ticket to `CHANGES_REQUESTED` and alerts the assigned specialist with the feedback text.
+- **Resubmission**: The specialist views the client's feedback inside the ticket and clicks `[ Submit Completed Work ]`. The system automatically generates `V2`.
+
+### 3. Team Management & Granular Permissions
+- **Super Admin Management**: Admin can invite and manage internal specialists via `/api/admin/team-members`.
+- **Granular Dashboard Permissions**: Team members can be granted granular access to:
+  - `Company Boost` (`companyBoost`)
+  - `Company Lead` (`companyLead`)
+  - `Company UI` (`companyUI`)
+- **Security Guarantees**:
+  - Super Admin (`admin@creativegini.com`) is permanently protected from deletion.
+  - Newly created team members can never be granted `ADMIN` privileges.
+  - Backend endpoints strictly verify service-level authorization (`hasServiceTypeAccess`) on all mutating actions.
+
+### 4. Ticket-Specific Jira Conversation & Activity Timeline
+- **Ticket-Specific Jira Conversation**: All communications are tied strictly to the ticket (e.g. `CG-1001`). There are no permanent service-level cross-ticket chats.
+- **Activity Timeline**: An audit timeline is embedded inside each ticket detailing every lifecycle action (`REQUEST_CREATED`, `PAYMENT_SUCCESS`, `WORK_STARTED`, `WORK_SUBMITTED`, `CHANGES_REQUESTED`, `WORK_RESUBMITTED`, `WORK_APPROVED`).
+- **No Standalone Activity Page**: Standalone activity views have been deprecated in favor of ticket-embedded audit logs.
+
+### 5. Dedicated In-App Notifications
+- **Clean Notification Bell**: The notification dropdown strictly houses notifications (separated from messaging UI).
+- **Direct Ticket Routing**:
+  - Clicking a deliverable notification routes directly to the ticket's review tab.
+  - Clicking a message notification routes directly to the ticket's Jira conversation (`chat`) tab.
+
+---
+
+## 🔄 Service Request & Ticket Lifecycle State Diagram
+
+```text
+[Client Creates Request] ──> Status: REQUEST_CREATED (Payment Pending)
+           │
+           ▼
+   [Client Pays via Portal]
+           │
+           ▼ (Automatic Assignment)
+[Ticket Auto-Assigned to Specialist] ──> Status: ASSIGNED
+           │                             (Specialist receives in-app notification)
+           ▼
+[Specialist Clicks "Start Work"] ──> Status: IN_PROGRESS
+           │
+           ▼
+[Specialist Submits Work (V1)] ──> Status: WORK_SUBMITTED / CLIENT_REVIEW
+           │                       (Client receives review notification)
+           ├─── Client Requests Changes ──> Status: CHANGES_REQUESTED
+           │                                 │
+           │                                 ▼
+           │                     [Specialist Submits Revision (V2)] ──> Status: WORK_RESUBMITTED / CLIENT_REVIEW
+           │                                                                     │
+           └─── Client Approves Deliverable ◄────────────────────────────────────┘
+                       │
+                       ▼
+               Status: COMPLETED
+               (approvedAt, approvedBy, completedAt saved; Specialist notified)
+```
 
 ---
 
@@ -130,7 +203,7 @@ creativegini-main/
 cd backend
 npm install
 
-# (Optional) Seed the database with default test accounts and demo tickets:
+# (Optional) Seed the database with default accounts and demo tickets:
 npm run seed
 
 # Start the backend server (runs on port 5000):
@@ -146,50 +219,25 @@ npm install
 npm run dev
 ```
 
-### 3. Open the Application
+### 3. Accessing the Application
 - Public Landing Page: [http://localhost:5174/](http://localhost:5174/)
 - Sign In Portal: [http://localhost:5174/signin](http://localhost:5174/signin)
-
----
-
-## 🔄 Service Request & Ticket Lifecycle
-
-```text
-[Client Creates Request] ──> Status: REQUEST_CREATED (Payment Pending)
-           │
-           ▼
-   [Client Pays via Portal]
-           │
-           ▼ (Automatic Assignment)
-[Ticket Auto-Assigned to Specialist] ──> Status: ASSIGNED
-           │                             (Specialist receives in-app notification)
-           ▼
-[Specialist Clicks "Start Work"] ──> Status: IN_PROGRESS
-           │
-           ▼
-[Specialist Submits Work (v1)] ──> Status: WORK_SUBMITTED / CLIENT_REVIEW
-           │                       (Client receives notification to review)
-           ├─── Client Requests Changes ──> Status: CHANGES_REQUESTED
-           │                                 │
-           │                                 ▼
-           │                     [Specialist Submits Revision (v2)] ──> Status: WORK_RESUBMITTED
-           │                                                                     │
-           └─── Client Approves Deliverable ◄────────────────────────────────────┘
-                       │
-                       ▼
-               Status: COMPLETED
-               (Both Client and Specialist receive completion notifications)
-```
+- User Dashboard: [http://localhost:5174/dashboard](http://localhost:5174/dashboard)
+- Admin Dashboard: [http://localhost:5174/admin](http://localhost:5174/admin)
+- Specialist Dashboards:
+  - Company Boost: [http://localhost:5174/company-boost](http://localhost:5174/company-boost)
+  - Company Lead: [http://localhost:5174/company-lead](http://localhost:5174/company-lead)
+  - Company UI: [http://localhost:5174/landing-page-enhancement](http://localhost:5174/landing-page-enhancement)
 
 ---
 
 ## 🛠️ Verification & Build Commands
 
-- **Production Build**:
+- **Frontend Production Build**:
   ```bash
   npm.cmd --prefix frontend run build
   ```
-- **Backend Server**:
+- **Backend Syntax Verification**:
   ```bash
-  npm.cmd --prefix backend run dev
+  node --check backend/src/server.js
   ```

@@ -38,6 +38,11 @@ const SubmissionSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  ticketCode: {
+    type: String,
+    default: '',
+    index: true
+  },
   version: {
     type: Number,
     required: true,

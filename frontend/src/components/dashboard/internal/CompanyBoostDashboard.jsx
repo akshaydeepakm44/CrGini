@@ -116,7 +116,7 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
     loadTickets();
   }, []);
 
-  const handleOpenTicket = async (ticket) => {
+  const handleOpenTicket = async (ticket, initialTab) => {
     setSelectedTicket(ticket);
     try {
       const [messages, subs, act] = await Promise.all([
@@ -127,11 +127,24 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
       setTicketMessages(messages);
       setTicketSubmissions(subs);
       setTicketActivity(act);
-      setActiveTicketModalTab('deliverables');
+      setActiveTicketModalTab(initialTab === 'review' ? 'deliverables' : (initialTab || 'deliverables'));
     } catch (err) {
       setTicketMessages([]);
       setTicketSubmissions([]);
       setTicketActivity([]);
+    }
+  };
+
+  const handleOpenTicketById = async (ticketId, defaultTab) => {
+    let t = requests.find(r => String(r._id) === String(ticketId) || r.ticketId === ticketId);
+    if (!t && ticketId) {
+      try {
+        t = await api.getRequestById(ticketId);
+      } catch (e) {}
+    }
+    if (t) {
+      handleOpenTicket(t, defaultTab);
+      setIsNotificationsOpen(false);
     }
   };
 
@@ -172,26 +185,13 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
     }
   };
 
-  const handleOpenTicketById = async (ticketId) => {
-    let t = requests.find(r => r._id === ticketId || r.ticketId === ticketId);
-    if (!t) {
-      try {
-        t = await api.getRequestById(ticketId);
-      } catch (e) {
-        console.error('Could not find ticket:', e);
-      }
-    }
-    if (t) {
-      handleOpenTicket(t);
-      setIsNotificationsOpen(false);
-    }
-  };
-
   // Close active modal on Escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (isSubmissionModalOpen) {
+        if (isMobileDrawerOpen) {
+          setIsMobileDrawerOpen(false);
+        } else if (isSubmissionModalOpen) {
           setIsSubmissionModalOpen(false);
         } else if (selectedTicket) {
           setSelectedTicket(null);
@@ -202,7 +202,7 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSubmissionModalOpen, selectedTicket, isNotificationsOpen]);
+  }, [isMobileDrawerOpen, isSubmissionModalOpen, selectedTicket, isNotificationsOpen]);
 
   const handleMarkNotifRead = async (id) => {
     try {
@@ -302,6 +302,15 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
           </div>
           <button
             type="button"
+            className="portal-mobile-drawer-close"
+            onClick={() => setIsMobileDrawerOpen(false)}
+            title="Close navigation drawer"
+            aria-label="Close navigation drawer"
+          >
+            <X size={18} />
+          </button>
+          <button
+            type="button"
             className="portal-sidebar-toggle-btn"
             onClick={toggleSidebarCollapse}
             title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -354,17 +363,6 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
             </button>
           )}
 
-          {hasBoostAccess && (
-            <button
-              className="portal-nav-btn active"
-              onClick={() => { setActiveTab('dashboard'); setIsMobileDrawerOpen(false); }}
-              title="Company Boost Dashboard"
-            >
-              <TrendingUp size={18} />
-              <span>Company Boost</span>
-            </button>
-          )}
-
           {hasUIAccess && (
             <button
               className="portal-nav-btn"
@@ -377,6 +375,15 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
           )}
 
           <div className="portal-nav-section-title" style={{ marginTop: '12px' }}>Workspace</div>
+
+          <button
+            className={`portal-nav-btn ${activeTab === 'conversations' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('conversations'); setIsMobileDrawerOpen(false); }}
+            title="Ticket Conversations"
+          >
+            <MessageSquare size={18} />
+            <span>Conversations</span>
+          </button>
 
           <button
             className={`portal-nav-btn ${activeTab === 'tickets' ? 'active' : ''}`}
@@ -439,11 +446,13 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
             <div className="portal-topbar-title-group">
               <h2>
                 {activeTab === 'dashboard' && 'Company Boost Dashboard'}
+                {activeTab === 'conversations' && 'Company Boost Client Conversations'}
                 {activeTab === 'tickets' && 'Company Boost Requests & Tickets'}
                 {activeTab === 'settings' && 'Company Boost Settings'}
               </h2>
               <p>
                 {activeTab === 'dashboard' && 'Overview of assigned work, sprint progress and delivery status.'}
+                {activeTab === 'conversations' && 'Persistent direct communication channels with your Company Boost clients.'}
                 {activeTab === 'tickets' && 'Manage and track all Company Boost requests and tickets.'}
                 {activeTab === 'settings' && 'Team specialist account configuration and operational settings.'}
               </p>
@@ -987,6 +996,92 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
               </div>
             </div>
           )}
+
+          {/* Conversations View (Ticket-Specific Conversations for Company Boost) */}
+          {activeTab === 'conversations' && (
+            <div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h2 style={{ fontSize: '1.35rem', fontWeight: '800', margin: '0 0 0.35rem 0', color: '#FFFFFF' }}>
+                  Company Boost Ticket Conversations
+                </h2>
+                <p style={{ color: '#8fa0b5', margin: 0, fontSize: '0.88rem' }}>
+                  Isolated Jira conversation channels for your Company Boost tickets. Select any ticket to communicate directly with the client.
+                </p>
+              </div>
+
+              {requests.length === 0 ? (
+                <div className="portal-card" style={{ textAlign: 'center', padding: '40px 20px', color: '#8fa0b5' }}>
+                  <MessageSquare size={36} color="#FFB000" style={{ opacity: 0.5, margin: '0 auto 12px' }} />
+                  <h4 style={{ color: '#FFFFFF', margin: '0 0 6px 0' }}>No Active Tickets</h4>
+                  <p style={{ fontSize: '0.84rem', maxWidth: '400px', margin: '0 auto' }}>
+                    When Company Boost tickets are assigned to you, their conversations will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="jira-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                  <table className="jira-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '120px' }}>Ticket ID</th>
+                        <th>Ticket Title</th>
+                        <th style={{ width: '180px' }}>Client / Company</th>
+                        <th style={{ width: '140px' }}>Status</th>
+                        <th style={{ width: '120px' }}>Priority</th>
+                        <th style={{ width: '180px', textAlign: 'right' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {requests.map((r) => (
+                        <tr key={r._id} style={{ cursor: 'pointer' }} onClick={() => handleOpenTicket(r, 'chat')}>
+                          <td>
+                            <span className="ticket-key" style={{ color: '#FFB000', fontWeight: '700' }}>
+                              {r.ticketId}
+                            </span>
+                          </td>
+                          <td className="cell-truncate" title={r.title} style={{ fontWeight: '600', color: '#F5F5F5' }}>
+                            {r.title}
+                          </td>
+                          <td style={{ color: '#CBD5E1' }}>
+                            {r.companyId?.name || r.userId?.name || 'Client'}
+                          </td>
+                          <td>
+                            <span className={`status-pill ${r.status}`}>
+                              {r.status.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`priority-pill ${r.priority}`}>{r.priority}</span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="portal-btn-primary"
+                              style={{
+                                padding: '5px 14px',
+                                fontSize: '0.8rem',
+                                background: 'linear-gradient(135deg, #FFB000 0%, #f59e0b 100%)',
+                                color: '#030303',
+                                fontWeight: '700',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenTicket(r, 'chat');
+                              }}
+                            >
+                              <MessageSquare size={13} /> Open Jira Conversation
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -996,7 +1091,7 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
           <div className="portal-modal-card wide" onClick={(e) => e.stopPropagation()}>
             <div className="portal-modal-header">
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="portal-modal-header-badges">
                   <span style={{ fontFamily: 'monospace', fontWeight: '800', color: '#FFB000', fontSize: '1.2rem' }}>
                     {selectedTicket.ticketId}
                   </span>
@@ -1025,9 +1120,12 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                 style={{
                   display: 'flex',
                   gap: '8px',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                   marginBottom: '1rem',
-                  paddingBottom: '8px'
+                  paddingBottom: '8px',
+                  overflowX: 'auto',
+                  whiteSpace: 'nowrap',
+                  WebkitOverflowScrolling: 'touch'
                 }}
               >
                 <button
@@ -1115,44 +1213,41 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                   {selectedTicket.status === 'CHANGES_REQUESTED' && (
                     <div
                       style={{
-                        padding: '14px',
+                        padding: '16px',
                         borderRadius: '8px',
-                        background: 'rgba(245, 158, 11, 0.1)',
-                        border: '1px solid rgba(245, 158, 11, 0.35)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
+                        background: 'rgba(245, 158, 11, 0.12)',
+                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                        marginBottom: '4px'
                       }}
                     >
-                      <div>
-                        <div style={{ color: '#F59E0B', fontWeight: '700', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <AlertCircle size={16} /> Client Requested Revisions
-                        </div>
-                        <div style={{ color: '#CBD5E1', fontSize: '0.82rem', marginTop: '4px' }}>
-                          Review client feedback below and submit updated deliverables (v{(selectedTicket.currentSubmissionVersion || 1) + 1}).
-                        </div>
+                      <div style={{ color: '#F59E0B', fontWeight: '700', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <AlertCircle size={16} /> Changes Requested
                       </div>
-                      <button
-                        type="button"
-                        className="portal-btn-primary"
-                        onClick={() => setIsSubmissionModalOpen(true)}
-                        style={{ padding: '8px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #FFB000 0%, #f59e0b 100%)', color: '#030303' }}
-                      >
-                        <RotateCcw size={14} /> Submit Revised Work (v{(selectedTicket.currentSubmissionVersion || 1) + 1})
-                      </button>
+                      <div style={{ marginTop: '8px', fontSize: '0.84rem', color: '#CBD5E1', background: 'rgba(8, 20, 32, 0.95)', padding: '10px 12px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                        <strong style={{ color: '#FFB000' }}>Client Feedback: </strong>
+                        "{ticketSubmissions[0]?.review?.feedback || ticketSubmissions[ticketSubmissions.length - 1]?.review?.feedback || 'Please update the deliverables according to client specifications.'}"
+                      </div>
+                      <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="portal-btn-primary"
+                          onClick={() => setIsSubmissionModalOpen(true)}
+                          style={{ padding: '8px 18px', fontSize: '0.84rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #FFB000 0%, #f59e0b 100%)', color: '#030303' }}
+                        >
+                          <Upload size={14} /> Submit Completed Work
+                        </button>
+                      </div>
                     </div>
                   )}
 
                   {(selectedTicket.status === 'ASSIGNED' || selectedTicket.status === 'PAYMENT_COMPLETED') && (
                     <div
+                      className="portal-ticket-action-banner"
                       style={{
                         padding: '14px',
                         borderRadius: '8px',
                         background: 'rgba(255, 176, 0, 0.08)',
-                        border: '1px solid rgba(255, 176, 0, 0.25)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
+                        border: '1px solid rgba(255, 176, 0, 0.25)'
                       }}
                     >
                       <div>
@@ -1163,46 +1258,56 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                           Ready to begin growth strategy sprint?
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        className="portal-btn-primary"
-                        onClick={handleStartWork}
-                        disabled={isUpdatingStatus}
-                        style={{ padding: '6px 14px', fontSize: '0.82rem', background: 'linear-gradient(135deg, #FFB000 0%, #f59e0b 100%)', color: '#030303' }}
-                      >
-                        <Clock size={14} /> Start Work (Set IN PROGRESS)
-                      </button>
+                      <div className="portal-ticket-action-buttons">
+                        <button
+                          type="button"
+                          className="portal-btn-primary"
+                          onClick={handleStartWork}
+                          disabled={isUpdatingStatus}
+                          style={{ padding: '6px 14px', fontSize: '0.82rem', background: 'linear-gradient(135deg, #FFB000 0%, #f59e0b 100%)', color: '#030303' }}
+                        >
+                          <Clock size={14} /> Start Work (Set IN PROGRESS)
+                        </button>
+                        <button
+                          type="button"
+                          className="portal-btn-secondary"
+                          onClick={() => setIsSubmissionModalOpen(true)}
+                          style={{ padding: '6px 14px', fontSize: '0.82rem', borderColor: 'rgba(255, 176, 0, 0.35)', color: '#FFB000' }}
+                        >
+                          <Upload size={14} /> Submit Completed Work
+                        </button>
+                      </div>
                     </div>
                   )}
 
                   {selectedTicket.status === 'IN_PROGRESS' && (
                     <div
+                      className="portal-ticket-action-banner"
                       style={{
                         padding: '14px',
                         borderRadius: '8px',
-                        background: 'rgba(255, 176, 0, 0.08)',
-                        border: '1px solid rgba(255, 176, 0, 0.25)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
+                        background: 'rgba(0, 217, 255, 0.08)',
+                        border: '1px solid rgba(0, 217, 255, 0.25)'
                       }}
                     >
                       <div>
-                        <div style={{ color: '#FFB000', fontWeight: '700', fontSize: '0.88rem' }}>
-                          Growth Sprint in Progress
+                        <div style={{ color: '#00D9FF', fontWeight: '700', fontSize: '0.88rem' }}>
+                          Sprint In Progress
                         </div>
                         <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '2px' }}>
-                          When your growth playbook & assets are ready, submit them through the portal for client review.
+                          Deliverables underway by Growth & Boost Specialist
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        className="portal-btn-primary"
-                        onClick={() => setIsSubmissionModalOpen(true)}
-                        style={{ padding: '8px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #FFB000 0%, #f59e0b 100%)', color: '#030303' }}
-                      >
-                        <Upload size={14} /> Submit Work to Client
-                      </button>
+                      <div className="portal-ticket-action-buttons">
+                        <button
+                          type="button"
+                          className="portal-btn-primary"
+                          onClick={() => setIsSubmissionModalOpen(true)}
+                          style={{ padding: '8px 18px', fontSize: '0.84rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #FFB000 0%, #f59e0b 100%)', color: '#030303' }}
+                        >
+                          <Upload size={14} /> Submit Completed Work
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -1440,7 +1545,7 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                     )}
                   </div>
 
-                  <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <form onSubmit={handleSendMessage} className="ticket-chat-form">
                     <input
                       type="text"
                       className="portal-form-input"

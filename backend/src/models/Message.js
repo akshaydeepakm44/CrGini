@@ -4,9 +4,13 @@ const MessageSchema = new mongoose.Schema({
   requestId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Request',
-    required: true,
+    required: [true, 'Request / Ticket ID is required'],
     index: true
   },
+  readBy: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    readAt: { type: Date, default: Date.now }
+  }],
   senderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

@@ -15,6 +15,7 @@ import {
 import {
   createSubmission,
   getSubmissions,
+  getSubmissionByVersion,
   approveSubmission,
   requestChanges
 } from '../controllers/submissionController.js';
@@ -56,10 +57,16 @@ router.route('/:id/submissions')
   .post(protect, authorize('ADMIN', 'COMPANY_LEAD', 'COMPANY_BOOST', 'LANDING_PAGE'), createSubmission)
   .get(protect, getSubmissions);
 
+router.route('/:id/submissions/version/:version')
+  .get(protect, getSubmissionByVersion);
+
 router.route('/:id/submissions/:submissionId/approve')
   .post(protect, approveSubmission);
 
 router.route('/:id/submissions/:submissionId/request-changes')
+  .post(protect, requestChanges);
+
+router.route('/:id/submissions/:submissionId/changes')
   .post(protect, requestChanges);
 
 export default router;

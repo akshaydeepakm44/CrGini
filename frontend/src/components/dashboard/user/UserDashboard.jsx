@@ -136,7 +136,9 @@ export default function UserDashboard({ user, onLogout }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (viewingInvoice) {
+        if (isMobileDrawerOpen) {
+          setIsMobileDrawerOpen(false);
+        } else if (viewingInvoice) {
           setViewingInvoice(null);
         } else if (isRequestModalOpen) {
           setIsRequestModalOpen(false);
@@ -156,12 +158,12 @@ export default function UserDashboard({ user, onLogout }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    viewingInvoice, isRequestModalOpen, pendingPaymentTicket, selectedTicket,
+    isMobileDrawerOpen, viewingInvoice, isRequestModalOpen, pendingPaymentTicket, selectedTicket,
     isHelpModalOpen, isNotificationsOpen, isProfileMenuOpen
   ]);
 
   // Open Ticket Detail and Fetch Messages, Submissions, and Activity
-  const handleOpenTicket = async (ticket) => {
+  const handleOpenTicket = async (ticket, initialTab) => {
     setSelectedTicket(ticket);
     try {
       const [messages, subs, act] = await Promise.all([
@@ -172,7 +174,9 @@ export default function UserDashboard({ user, onLogout }) {
       setTicketMessages(messages);
       setTicketSubmissions(subs);
       setTicketActivity(act);
-      if (subs.length > 0 || ticket.status === 'WORK_SUBMITTED' || ticket.status === 'WORK_RESUBMITTED' || ticket.status === 'CLIENT_REVIEW' || ticket.status === 'CHANGES_REQUESTED') {
+      if (initialTab) {
+        setActiveTicketModalTab(initialTab);
+      } else if (subs.length > 0 || ticket.status === 'WORK_SUBMITTED' || ticket.status === 'WORK_RESUBMITTED' || ticket.status === 'CLIENT_REVIEW' || ticket.status === 'CHANGES_REQUESTED') {
         setActiveTicketModalTab('review');
       } else {
         setActiveTicketModalTab('scope');
@@ -252,10 +256,15 @@ export default function UserDashboard({ user, onLogout }) {
     }
   };
 
-  const handleOpenTicketById = (ticketId) => {
-    const t = requests.find(r => r._id === ticketId || r.ticketId === ticketId);
+  const handleOpenTicketById = async (ticketId, defaultTab) => {
+    let t = requests.find(r => String(r._id) === String(ticketId) || r.ticketId === ticketId);
+    if (!t && ticketId) {
+      try {
+        t = await api.getRequestById(ticketId);
+      } catch (e) {}
+    }
     if (t) {
-      handleOpenTicket(t);
+      handleOpenTicket(t, defaultTab);
       setIsNotificationsOpen(false);
     }
   };
@@ -396,6 +405,15 @@ export default function UserDashboard({ user, onLogout }) {
           <div className="portal-sidebar-brand-logo-area">
             <img src="/logo.png" alt="CreativeGini" className="portal-sidebar-logo" />
           </div>
+          <button
+            type="button"
+            className="portal-mobile-drawer-close"
+            onClick={() => setIsMobileDrawerOpen(false)}
+            title="Close navigation drawer"
+            aria-label="Close navigation drawer"
+          >
+            <X size={18} />
+          </button>
           <button
             type="button"
             className="portal-sidebar-toggle-btn"
@@ -547,6 +565,7 @@ export default function UserDashboard({ user, onLogout }) {
                 {activeNav === 'company-boost' && 'Company Boost Growth Engine'}
                 {activeNav === 'company-lead' && 'Company Lead Intelligence'}
                 {activeNav === 'landing-page' && 'Landing Page Enhancement'}
+                {activeNav === 'conversations' && 'Service Conversations'}
                 {activeNav === 'requests' && 'Jira-Style Ticket Center'}
                 {activeNav === 'billing' && 'Invoices & Billing'}
                 {activeNav === 'settings' && 'Workspace Settings'}
@@ -1398,7 +1417,7 @@ export default function UserDashboard({ user, onLogout }) {
                   ))}
                 </div>
 
-                <div style={{ position: 'relative', minWidth: '220px' }}>
+                <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: '320px' }}>
                   <Search size={15} style={{ position: 'absolute', left: '10px', top: '10px', color: '#94a3b8' }} />
                   <input
                     type="text"
@@ -1681,6 +1700,8 @@ export default function UserDashboard({ user, onLogout }) {
             </div>
           )}
 
+
+
         </div>
       </div>
 
@@ -1863,7 +1884,7 @@ export default function UserDashboard({ user, onLogout }) {
           <div className="portal-modal-card" style={{ maxWidth: '900px' }} onClick={(e) => e.stopPropagation()}>
             <div className="portal-modal-header">
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="portal-modal-header-badges">
                   <span style={{ fontFamily: 'monospace', fontWeight: '800', color: '#00D9FF', fontSize: '1.2rem' }}>
                     {selectedTicket.ticketId}
                   </span>
@@ -2032,7 +2053,7 @@ export default function UserDashboard({ user, onLogout }) {
                         )}
                       </div>
 
-                      <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                      <form onSubmit={handleSendMessage} className="ticket-chat-form">
                         <input
                           type="text"
                           className="portal-form-input"

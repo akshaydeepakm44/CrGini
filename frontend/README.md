@@ -11,6 +11,8 @@ frontend/
 ├── index.html                   # HTML document root with Inter and Space Grotesk Google fonts
 ├── vite.config.js               # Vite config with React plugin, host '0.0.0.0', port 5174
 ├── package.json                 # Dependencies (gsap, lenis, three, lucide-react, react-router-dom)
+├── package-lock.json
+├── README.md                    # Frontend component architecture guide
 ├── public/                      # Static brand assets
 │   ├── logo.png                 # CreativeGini logo
 │   ├── logo-icon.png            # CreativeGini mark
@@ -27,26 +29,26 @@ frontend/
     │   ├── common/              # Global utility components
     │   │   ├── CosmicSpaceCanvas.jsx # Three.js canvas for particle vortex & background
     │   │   ├── ErrorBoundary.jsx     # Graceful error catcher with reload & home actions
-    │   │   ├── ProtectedRoute.jsx    # Enforces JWT session & role access
+    │   │   ├── ProtectedRoute.jsx    # Enforces JWT session & role/permission access
     │   │   └── Toast.jsx             # Ephemeral notification toast banner
     │   │
     │   ├── dashboard/           # Role-based dashboard interfaces
     │   │   ├── admin/
-    │   │   │   └── AdminDashboard.jsx       # Tabbed admin: users, metrics, tickets, override
+    │   │   │   └── AdminDashboard.jsx       # Tabbed admin: clients, users, team permissions, tickets
     │   │   │
     │   │   ├── internal/                    # Specialist team dashboards
-    │   │   │   ├── CompanyBoostDashboard.jsx # Outbound automation ticket queue & health
-    │   │   │   ├── CompanyLeadDashboard.jsx  # Lead research ticket queue & breakdown
+    │   │   │   ├── CompanyBoostDashboard.jsx # Outbound automation ticket queue & deliverables
+    │   │   │   ├── CompanyLeadDashboard.jsx  # Lead research ticket queue & deliverables
     │   │   │   └── LandingPageDashboard.jsx  # UI/UX engineering sprint queue & deliverables
     │   │   │
     │   │   ├── user/
-    │   │   │   └── UserDashboard.jsx        # Client portal: requests, payments, approvals
+    │   │   │   └── UserDashboard.jsx        # Client portal: requests, payments, review & approvals
     │   │   │
     │   │   └── common/                      # Shared portal widgets
-    │   │       ├── ActionMenu.jsx           # Dropdown table row actions
+    │   │       ├── ActionMenu.jsx           # Dropdown table row actions for clients
     │   │       ├── ActivityTimeline.jsx     # Jira-style audit history timeline component
-    │   │       ├── ClientReviewSection.jsx  # Deliverables viewer, approval & revision modal
-    │   │       ├── NotificationPanel.jsx    # Topbar notification drawer with mark-read
+    │   │       ├── ClientReviewSection.jsx  # Deliverables viewer, approval & change request modal
+    │   │       ├── NotificationPanel.jsx    # Topbar notification drawer with mark-read & routing
     │   │       ├── PortalCosmicBackground.jsx # Fixed ambient glowing background
     │   │       └── WorkSubmissionModal.jsx  # Versioned deliverable submission modal
     │   │

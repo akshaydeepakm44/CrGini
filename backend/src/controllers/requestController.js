@@ -4,6 +4,7 @@ import Payment from '../models/Payment.js';
 import ActivityLog from '../models/ActivityLog.js';
 import Notification from '../models/Notification.js';
 import User from '../models/User.js';
+import { resolveRequest } from './submissionController.js';
 
 // Helper to generate unique, collision-free Ticket ID
 const generateTicketId = async () => {
@@ -123,13 +124,15 @@ export const hasServiceTypeAccess = (user, serviceType) => {
   if (user.role === 'ADMIN') return true;
   if (user.role === 'USER') return false;
 
+  const normalized = (serviceType || '').toUpperCase().replace('-', '_');
+
   const access = typeof user.getEffectiveDashboardAccess === 'function'
     ? user.getEffectiveDashboardAccess()
     : user.dashboardAccess || {};
 
-  if (serviceType === 'COMPANY_LEAD') return Boolean(access.companyLead);
-  if (serviceType === 'COMPANY_BOOST') return Boolean(access.companyBoost);
-  if (serviceType === 'LANDING_PAGE') return Boolean(access.companyUI);
+  if (normalized === 'COMPANY_LEAD') return Boolean(access.companyLead ?? user.role === 'COMPANY_LEAD');
+  if (normalized === 'COMPANY_BOOST') return Boolean(access.companyBoost ?? user.role === 'COMPANY_BOOST');
+  if (normalized === 'LANDING_PAGE' || normalized === 'COMPANY_UI') return Boolean(access.companyUI ?? user.role === 'LANDING_PAGE');
 
   return false;
 };
@@ -191,7 +194,15 @@ export const getRequests = async (req, res) => {
 // @access  Private
 export const getRequestById = async (req, res) => {
   try {
-    const request = await Request.findById(req.params.id)
+    const rawRequest = await resolveRequest(req.params.id);
+    if (!rawRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Request ticket not found'
+      });
+    }
+
+    const request = await Request.findById(rawRequest._id)
       .populate('companyId')
       .populate('userId', 'name email phone')
       .populate('assignedTo', 'name email phone avatar role');
@@ -237,7 +248,7 @@ export const getRequestById = async (req, res) => {
 export const assignTicket = async (req, res) => {
   try {
     const { assignedTo, assignedTeam, dueDate } = req.body;
-    const request = await Request.findById(req.params.id);
+    const request = await resolveRequest(req.params.id);
 
     if (!request) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
@@ -313,7 +324,7 @@ export const assignTicket = async (req, res) => {
 // @access  Private (Internal teams & Admin)
 export const startWork = async (req, res) => {
   try {
-    const request = await Request.findById(req.params.id);
+    const request = await resolveRequest(req.params.id);
 
     if (!request) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
@@ -358,7 +369,7 @@ export const adminOverride = async (req, res) => {
       });
     }
 
-    const request = await Request.findById(req.params.id);
+    const request = await resolveRequest(req.params.id);
     if (!request) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
@@ -397,7 +408,12 @@ export const adminOverride = async (req, res) => {
 // @access  Private
 export const getTicketActivity = async (req, res) => {
   try {
-    const logs = await ActivityLog.find({ requestId: req.params.id })
+    const request = await resolveRequest(req.params.id);
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    const logs = await ActivityLog.find({ requestId: request._id })
       .sort({ createdAt: 1 });
 
     return res.json({
@@ -416,7 +432,7 @@ export const getTicketActivity = async (req, res) => {
 export const updateRequestStatus = async (req, res) => {
   try {
     const { status, note } = req.body;
-    const request = await Request.findById(req.params.id);
+    const request = await resolveRequest(req.params.id);
 
     if (!request) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
@@ -463,7 +479,7 @@ export const updateRequestStatus = async (req, res) => {
 // @access  Private (USER, ADMIN)
 export const processPayment = async (req, res) => {
   try {
-    const request = await Request.findById(req.params.id);
+    const request = await resolveRequest(req.params.id);
     if (!request) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
@@ -531,7 +547,57 @@ export const processPayment = async (req, res) => {
 // @access  Private
 export const getMessages = async (req, res) => {
   try {
-    const messages = await Message.find({ requestId: req.params.id }).sort({ createdAt: 1 });
+    const request = await resolveRequest(req.params.id);
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    // Authorization check
+    if (req.user.role === 'USER') {
+      if (String(request.userId) !== String(req.user._id)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You can only view conversations for your own tickets.'
+        });
+      }
+    } else if (req.user.role !== 'ADMIN' && !hasServiceTypeAccess(req.user, request.serviceType)) {
+      return res.status(403).json({
+        success: false,
+        message: `Forbidden: You do not have permission to access conversations for ${request.serviceType}.`
+      });
+    }
+
+    const messages = await Message.find({ requestId: request._id }).sort({ createdAt: 1 });
+
+    // Mark messages as read for this user
+    await Message.updateMany(
+      {
+        requestId: request._id,
+        'readBy.userId': { $ne: req.user._id }
+      },
+      {
+        $push: {
+          readBy: {
+            userId: req.user._id,
+            readAt: new Date()
+          }
+        }
+      }
+    );
+
+    // Mark in-app message notifications for this ticket and user as read
+    await Notification.updateMany(
+      {
+        userId: req.user._id,
+        ticketId: request._id,
+        type: 'NEW_MESSAGE',
+        isRead: false
+      },
+      {
+        $set: { isRead: true }
+      }
+    );
+
     return res.json({
       success: true,
       messages
@@ -551,14 +617,75 @@ export const sendMessage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Message text is required' });
     }
 
+    const request = await resolveRequest(req.params.id);
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    // Authorization check
+    if (req.user.role === 'USER') {
+      if (String(request.userId) !== String(req.user._id)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You can only post messages to your own tickets.'
+        });
+      }
+    } else if (req.user.role !== 'ADMIN' && !hasServiceTypeAccess(req.user, request.serviceType)) {
+      return res.status(403).json({
+        success: false,
+        message: `Forbidden: You do not have permission to post messages to ${request.serviceType}.`
+      });
+    }
+
     const message = await Message.create({
-      requestId: req.params.id,
+      requestId: request._id,
       senderId: req.user._id,
       senderName: req.user.name,
       senderRole: req.user.role,
       text: text.trim(),
-      attachments: attachments || []
+      attachments: attachments || [],
+      readBy: [{
+        userId: req.user._id,
+        readAt: new Date()
+      }]
     });
+
+    // Create targeted notification for counterparty
+    if (req.user.role === 'USER') {
+      // Notify assigned specialist or team specialists
+      const recipients = [];
+      if (request.assignedTo) {
+        recipients.push(request.assignedTo);
+      } else {
+        const key = request.serviceType === 'COMPANY_LEAD'
+          ? 'dashboardAccess.companyLead'
+          : request.serviceType === 'COMPANY_BOOST'
+          ? 'dashboardAccess.companyBoost'
+          : 'dashboardAccess.companyUI';
+        const specialists = await User.find({ [key]: true, status: 'ACTIVE' }).select('_id');
+        recipients.push(...specialists.map(s => s._id));
+      }
+      for (const recId of recipients) {
+        await Notification.create({
+          userId: recId,
+          type: 'NEW_MESSAGE',
+          title: `New message on ${request.ticketId}`,
+          message: `${req.user.name} sent a new message on ${request.ticketId}: "${request.title}".`,
+          ticketId: request._id,
+          ticketCode: request.ticketId
+        });
+      }
+    } else {
+      // Internal specialist or Admin replied -> notify the client user
+      await Notification.create({
+        userId: request.userId,
+        type: 'NEW_MESSAGE',
+        title: `New message on ${request.ticketId}`,
+        message: `${req.user.name} (${request.assignedTeam || 'CreativeGini Team'}) sent a new message on ${request.ticketId}.`,
+        ticketId: request._id,
+        ticketCode: request.ticketId
+      });
+    }
 
     return res.status(201).json({
       success: true,
