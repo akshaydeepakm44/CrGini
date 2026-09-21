@@ -1,67 +1,28 @@
-import {
-  createRequest as createRequestInDB,
-  findRequestById,
-  listRequests,
-  updateRequest,
-  updateRequestStatus as updateRequestStatusInDB,
-  countRequests,
-} from '../repositories/requestRepository.js';
+import Request from '../models/Request.js';
+import Message from '../models/Message.js';
+import Payment from '../models/Payment.js';
+import ActivityLog from '../models/ActivityLog.js';
+import Notification from '../models/Notification.js';
+import User from '../models/User.js';
+import { resolveRequest } from './submissionController.js';
 
-import {
-  createPayment,
-  countPayments,
-} from '../repositories/paymentRepository.js';
-
-import {
-  createMessage,
-  findMessagesByRequestId,
-  markRequestMessagesRead,
-} from '../repositories/messageRepository.js';
-
-import {
-  createNotification,
-  markNotificationAsRead,
-} from '../repositories/notificationRepository.js';
-
-import {
-  createActivityLog,
-  findActivityLogsByRequestId,
-} from '../repositories/activityLogRepository.js';
-
-import {
-  findUserById,
-  findActiveSpecialists,
-} from '../repositories/userRepository.js';
-
-import {
-  hasServiceTypeAccess,
-  resolveRequest,
-} from '../utils/ticketHelpers.js';
-
-import { query } from '../config/postgres.js';
-
-// Re-export for submissionController which imports from here
-export { hasServiceTypeAccess, resolveRequest };
-
-// Helper to generate unique Ticket ID
+// Helper to generate unique, collision-free Ticket ID
 const generateTicketId = async () => {
-  const result = await query(`
-    SELECT ticket_id FROM requests
-    WHERE ticket_id LIKE 'CG-%'
-    ORDER BY created_at DESC
-    LIMIT 1
-  `);
+  const requests = await Request.find({}, 'ticketId').lean();
   let maxNum = 1000;
-  if (result.rows[0]) {
-    const num = parseInt(result.rows[0].ticket_id.replace('CG-', ''), 10);
-    if (!isNaN(num) && num > maxNum) maxNum = num;
+  for (const r of requests) {
+    if (r.ticketId && typeof r.ticketId === 'string' && r.ticketId.startsWith('CG-')) {
+      const num = parseInt(r.ticketId.replace('CG-', ''), 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    }
   }
-  // Check for highest ticket number overall
-  const allResult = await query(`SELECT MAX(CAST(SUBSTRING(ticket_id FROM 4) AS INTEGER)) FROM requests WHERE ticket_id LIKE 'CG-%'`);
-  if (allResult.rows[0].max && allResult.rows[0].max > maxNum) {
-    maxNum = allResult.rows[0].max;
+  let nextNum = maxNum + 1;
+  while (await Request.exists({ ticketId: `CG-${nextNum}` })) {
+    nextNum++;
   }
-  return `CG-${maxNum + 1}`;
+  return `CG-${nextNum}`;
 };
 
 // @desc    Create a new service request / ticket
@@ -69,7 +30,7 @@ const generateTicketId = async () => {
 // @access  Private (USER)
 export const createRequest = async (req, res) => {
   try {
-    const { serviceType, title, description, priority, price, notes } = req.body;
+    const { serviceType, title, description, priority, price, notes, attachments } = req.body;
 
     if (!serviceType || !title || !description) {
       return res.status(400).json({
@@ -78,62 +39,69 @@ export const createRequest = async (req, res) => {
       });
     }
 
-    const userId = req.user.id || req.user._id;
-    const companyId = req.user.companyId
-      ? (req.user.companyId.id || req.user.companyId._id || req.user.companyId)
-      : null;
-
-    if (!companyId) {
+    if (!req.user.companyId) {
       return res.status(400).json({
         success: false,
         message: 'User does not have an associated company profile.'
       });
     }
 
+    // Team assignment based on service
     const teamMap = {
       COMPANY_LEAD: 'Company Lead Team',
       COMPANY_BOOST: 'Company Boost Team',
       LANDING_PAGE: 'Landing Page Enhancement Team'
     };
 
-    const defaultPrice = serviceType === 'COMPANY_LEAD' ? 499
-      : serviceType === 'COMPANY_BOOST' ? 799
-      : 599;
+    let request = null;
+    let ticketId = '';
+    let attempts = 0;
 
-    const ticketId = await generateTicketId();
+    while (attempts < 3 && !request) {
+      try {
+        ticketId = await generateTicketId();
+        request = await Request.create({
+          ticketId,
+          userId: req.user._id,
+          companyId: req.user.companyId._id || req.user.companyId,
+          serviceType,
+          title,
+          description,
+          priority: priority || 'MEDIUM',
+          price: price || (serviceType === 'COMPANY_LEAD' ? 499 : serviceType === 'COMPANY_BOOST' ? 799 : 599),
+          assignedTeam: teamMap[serviceType] || 'CreativeGini Core Team',
+          notes: notes || '',
+          attachments: attachments || [],
+          status: 'REQUEST_CREATED',
+          paymentStatus: 'PENDING'
+        });
+      } catch (insertErr) {
+        attempts++;
+        if (insertErr.code === 11000 && attempts < 3) {
+          console.warn(`[Request Controller]: Collision on ${ticketId}, retrying...`);
+          continue;
+        }
+        throw insertErr;
+      }
+    }
 
-    const request = await createRequestInDB({
-      ticketId,
-      userId,
-      companyId,
-      serviceType,
-      title,
-      description,
-      priority: priority || 'MEDIUM',
-      price: price || defaultPrice,
-      assignedTeam: teamMap[serviceType] || 'CreativeGini Core Team',
-      notes: notes || null,
-      status: 'REQUEST_CREATED',
-      paymentStatus: 'PENDING'
-    });
-
-    // Create activity log
-    await createActivityLog({
-      userId,
+    // Create initial activity log
+    await ActivityLog.create({
+      userId: req.user._id,
       userName: req.user.name,
-      companyId,
-      requestId: request.id,
+      companyId: req.user.companyId._id || req.user.companyId,
+      requestId: request._id,
       action: 'REQUEST_CREATED',
-      details: `Ticket ${ticketId} created for ${serviceType.replace(/_/g, ' ')}.`
+      details: `Ticket ${ticketId} created for ${serviceType.replace('_', ' ')}.`
     });
 
     // Notify user
-    await createNotification({
-      userId,
+    await Notification.create({
+      userId: req.user._id,
       type: 'ASSIGNMENT',
       title: 'Request Ticket Created',
       message: `Your request ${ticketId} ("${title}") has been created. Proceed to payment to activate sprint.`,
-      ticketId: request.id,
+      ticketId: request._id,
       ticketCode: ticketId
     });
 
@@ -151,35 +119,61 @@ export const createRequest = async (req, res) => {
   }
 };
 
+export const hasServiceTypeAccess = (user, serviceType) => {
+  if (!user) return false;
+  if (user.role === 'ADMIN') return true;
+  if (user.role === 'USER') return false;
+
+  const normalized = (serviceType || '').toUpperCase().replace('-', '_');
+
+  const access = typeof user.getEffectiveDashboardAccess === 'function'
+    ? user.getEffectiveDashboardAccess()
+    : user.dashboardAccess || {};
+
+  if (normalized === 'COMPANY_LEAD') return Boolean(access.companyLead ?? user.role === 'COMPANY_LEAD');
+  if (normalized === 'COMPANY_BOOST') return Boolean(access.companyBoost ?? user.role === 'COMPANY_BOOST');
+  if (normalized === 'LANDING_PAGE' || normalized === 'COMPANY_UI') return Boolean(access.companyUI ?? user.role === 'LANDING_PAGE');
+
+  return false;
+};
+
 // @desc    Get all requests filtered by role permissions
 // @route   GET /api/requests
 // @access  Private
 export const getRequests = async (req, res) => {
   try {
     const { role } = req.user;
-    let queryParams = {};
+    let query = {};
 
     if (role === 'USER') {
-      const companyId = req.user.companyId
-        ? (req.user.companyId.id || req.user.companyId._id || req.user.companyId)
-        : null;
-      queryParams = { companyId };
+      // User can only see their own company requests
+      query = { companyId: req.user.companyId };
     } else if (role === 'ADMIN') {
-      queryParams = {};
+      // ADMIN has query = {}, sees all requests
+      query = {};
     } else {
-      const access = req.user.dashboardAccess || {};
+      // Team members see requests for all services they have permissions for
+      const access = typeof req.user.getEffectiveDashboardAccess === 'function'
+        ? req.user.getEffectiveDashboardAccess()
+        : req.user.dashboardAccess || {};
+
       const allowedServices = [];
       if (access.companyLead) allowedServices.push('COMPANY_LEAD');
       if (access.companyBoost) allowedServices.push('COMPANY_BOOST');
       if (access.companyUI) allowedServices.push('LANDING_PAGE');
 
       if (allowedServices.length === 0) {
-        return res.json({ success: true, count: 0, requests: [] });
+        query = { _id: null }; // No permissions granted, return empty
+      } else {
+        query = { serviceType: { $in: allowedServices } };
       }
-      queryParams = { serviceTypes: allowedServices };
     }
 
-    const requests = await listRequests({ ...queryParams, limit: 200 });
+    const requests = await Request.find(query)
+      .populate('companyId', 'name contactPerson email website industry')
+      .populate('userId', 'name email phone')
+      .populate('assignedTo', 'name email phone avatar role')
+      .sort({ createdAt: -1 });
 
     return res.json({
       success: true,
@@ -187,7 +181,6 @@ export const getRequests = async (req, res) => {
       requests
     });
   } catch (error) {
-    console.error('Get requests error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch requests',
@@ -201,7 +194,19 @@ export const getRequests = async (req, res) => {
 // @access  Private
 export const getRequestById = async (req, res) => {
   try {
-    const request = await resolveRequest(req.params.id);
+    const rawRequest = await resolveRequest(req.params.id);
+    if (!rawRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Request ticket not found'
+      });
+    }
+
+    const request = await Request.findById(rawRequest._id)
+      .populate('companyId')
+      .populate('userId', 'name email phone')
+      .populate('assignedTo', 'name email phone avatar role');
+
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -212,13 +217,7 @@ export const getRequestById = async (req, res) => {
     // Role security check
     const { role } = req.user;
     if (role === 'USER') {
-      const userCompanyId = req.user.companyId
-        ? String(req.user.companyId.id || req.user.companyId._id || req.user.companyId)
-        : null;
-      const requestCompanyId = request.companyId
-        ? String(request.companyId.id || request.companyId._id || request.companyId)
-        : null;
-      if (userCompanyId !== requestCompanyId) {
+      if (request.companyId._id.toString() !== req.user.companyId._id.toString()) {
         return res.status(403).json({
           success: false,
           message: 'Not authorized to view this ticket'
@@ -236,8 +235,10 @@ export const getRequestById = async (req, res) => {
       request
     });
   } catch (error) {
-    console.error('Get request by id error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
@@ -253,55 +254,67 @@ export const assignTicket = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
+    // Role / permission check
     if (req.user.role !== 'ADMIN' && !hasServiceTypeAccess(req.user, request.serviceType)) {
       return res.status(403).json({ success: false, message: 'Forbidden' });
     }
 
     let assignedUser = null;
     if (assignedTo) {
-      assignedUser = await findUserById(assignedTo);
+      assignedUser = await User.findById(assignedTo);
       if (!assignedUser) {
         return res.status(400).json({ success: false, message: 'Assigned specialist user not found' });
       }
+      request.assignedTo = assignedUser._id;
     }
 
-    const updates = {};
-    if (assignedUser) updates.assignedTo = assignedUser.id;
-    if (assignedTeam) updates.assignedTeam = assignedTeam;
-    if (dueDate) updates.dueDate = new Date(dueDate);
+    if (assignedTeam) {
+      request.assignedTeam = assignedTeam;
+    }
+    if (dueDate) {
+      request.dueDate = new Date(dueDate);
+    }
+
+    // Move to ASSIGNED if previously created or paid
     if (request.status === 'REQUEST_CREATED' || request.status === 'PAYMENT_COMPLETED') {
-      updates.status = 'ASSIGNED';
+      request.status = 'ASSIGNED';
     }
 
-    const updatedRequest = await updateRequest(request.id, updates);
+    await request.save();
 
+    // Create notification for assigned person
     if (assignedUser) {
-      await createNotification({
-        userId: assignedUser.id,
+      await Notification.create({
+        userId: assignedUser._id,
         type: 'ASSIGNMENT',
         title: 'New ticket assigned',
         message: `Ticket ${request.ticketId}: "${request.title}" has been assigned to you by CreativeGini.`,
-        ticketId: request.id,
+        ticketId: request._id,
         ticketCode: request.ticketId
       });
     }
 
-    await createActivityLog({
-      userId: req.user.id || req.user._id,
+    // Log activity
+    await ActivityLog.create({
+      userId: req.user._id,
       userName: req.user.name,
-      companyId: request.companyId?.id || request.companyId,
-      requestId: request.id,
+      companyId: request.companyId,
+      requestId: request._id,
       action: 'TICKET_ASSIGNED',
-      details: `Ticket ${request.ticketId} assigned to ${assignedUser ? assignedUser.name : 'Team'} (${updatedRequest.assignedTeam}).`
+      details: `Ticket ${request.ticketId} assigned to ${assignedUser ? assignedUser.name : 'Team'} (${request.assignedTeam}).`
     });
+
+    const populatedRequest = await Request.findById(request._id)
+      .populate('companyId')
+      .populate('userId', 'name email phone')
+      .populate('assignedTo', 'name email phone avatar role');
 
     return res.json({
       success: true,
-      message: `Ticket successfully assigned to ${assignedUser ? assignedUser.name : updatedRequest.assignedTeam}.`,
-      request: updatedRequest
+      message: `Ticket successfully assigned to ${assignedUser ? assignedUser.name : request.assignedTeam}.`,
+      request: populatedRequest
     });
   } catch (error) {
-    console.error('Assign ticket error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -321,13 +334,14 @@ export const startWork = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden' });
     }
 
-    const updatedRequest = await updateRequest(request.id, { status: 'IN_PROGRESS' });
+    request.status = 'IN_PROGRESS';
+    await request.save();
 
-    await createActivityLog({
-      userId: req.user.id || req.user._id,
+    await ActivityLog.create({
+      userId: req.user._id,
       userName: req.user.name,
-      companyId: request.companyId?.id || request.companyId,
-      requestId: request.id,
+      companyId: request.companyId,
+      requestId: request._id,
       action: 'WORK_STARTED',
       details: `Work started on ${request.ticketId} by ${req.user.name}.`
     });
@@ -335,10 +349,9 @@ export const startWork = async (req, res) => {
     return res.json({
       success: true,
       message: 'Work marked IN PROGRESS.',
-      request: updatedRequest
+      request
     });
   } catch (error) {
-    console.error('Start work error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -361,25 +374,21 @@ export const adminOverride = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
-    // Use raw query for admin override fields
-    await query(`
-      UPDATE requests SET
-        status = 'COMPLETED',
-        completed_at = NOW(),
-        admin_override = true,
-        admin_override_reason = $1,
-        admin_overridden_by = $2,
-        admin_overridden_at = NOW()
-      WHERE id = $3
-    `, [reason.trim(), req.user.id || req.user._id, request.id]);
+    request.status = 'COMPLETED';
+    request.completedAt = new Date();
+    request.adminOverride = {
+      isOverridden: true,
+      reason: reason.trim(),
+      overriddenBy: req.user._id,
+      overriddenAt: new Date()
+    };
+    await request.save();
 
-    const updatedRequest = await findRequestById(request.id);
-
-    await createActivityLog({
-      userId: req.user.id || req.user._id,
+    await ActivityLog.create({
+      userId: req.user._id,
       userName: req.user.name,
-      companyId: request.companyId?.id || request.companyId,
-      requestId: request.id,
+      companyId: request.companyId,
+      requestId: request._id,
       action: 'ADMIN_OVERRIDE',
       details: `Administrator override performed by ${req.user.name}. Ticket marked COMPLETED. Reason: "${reason.trim()}".`
     });
@@ -387,10 +396,9 @@ export const adminOverride = async (req, res) => {
     return res.json({
       success: true,
       message: 'Administrative completion override recorded.',
-      request: updatedRequest
+      request
     });
   } catch (error) {
-    console.error('Admin override error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -405,7 +413,8 @@ export const getTicketActivity = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
-    const logs = await findActivityLogsByRequestId(request.id);
+    const logs = await ActivityLog.find({ requestId: request._id })
+      .sort({ createdAt: 1 });
 
     return res.json({
       success: true,
@@ -413,7 +422,6 @@ export const getTicketActivity = async (req, res) => {
       logs
     });
   } catch (error) {
-    console.error('Get ticket activity error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -430,10 +438,12 @@ export const updateRequestStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
+    // Role / permission check
     if (req.user.role !== 'ADMIN' && !hasServiceTypeAccess(req.user, request.serviceType)) {
       return res.status(403).json({ success: false, message: 'Forbidden' });
     }
 
+    // GUARD: Do NOT allow internal team to mark COMPLETED directly!
     if (status === 'COMPLETED' && req.user.role !== 'ADMIN') {
       return res.status(400).json({
         success: false,
@@ -442,23 +452,24 @@ export const updateRequestStatus = async (req, res) => {
     }
 
     const previousStatus = request.status;
-    const updatedRequest = await updateRequest(request.id, { status });
+    request.status = status;
+    await request.save();
 
-    await createActivityLog({
-      userId: req.user.id || req.user._id,
+    // Log activity
+    await ActivityLog.create({
+      userId: req.user._id,
       userName: req.user.name,
-      companyId: request.companyId?.id || request.companyId,
-      requestId: request.id,
+      companyId: request.companyId,
+      requestId: request._id,
       action: 'STATUS_UPDATE',
       details: `Status changed from ${previousStatus} to ${status}. ${note || ''}`
     });
 
     return res.json({
       success: true,
-      request: updatedRequest
+      request
     });
   } catch (error) {
-    console.error('Update request status error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -473,42 +484,36 @@ export const processPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
-    const updates = { paymentStatus: 'PAID' };
-    let specialist = null;
-
+    request.paymentStatus = 'PAID';
     if (request.status === 'REQUEST_CREATED') {
       // Auto-assign to active specialist for this service type
-      const specialists = await findActiveSpecialists(request.serviceType);
-      specialist = specialists[0] || null;
-
+      const specialist = await User.findOne({ role: request.serviceType, status: 'ACTIVE' });
       if (specialist) {
-        updates.assignedTo = specialist.id;
-        updates.status = 'ASSIGNED';
+        request.assignedTo = specialist._id;
+        request.status = 'ASSIGNED';
 
-        await createNotification({
-          userId: specialist.id,
+        await Notification.create({
+          userId: specialist._id,
           type: 'ASSIGNMENT',
           title: 'New paid ticket assigned',
           message: `Ticket ${request.ticketId}: "${request.title}" has been paid and assigned to you.`,
-          ticketId: request.id,
+          ticketId: request._id,
           ticketCode: request.ticketId
         });
       } else {
-        updates.status = 'PAYMENT_COMPLETED';
+        request.status = 'PAYMENT_COMPLETED';
       }
     }
+    await request.save();
 
-    const updatedRequest = await updateRequest(request.id, updates);
+    const invCount = await Payment.countDocuments();
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${1000 + invCount + 1}`;
 
-    // Generate invoice number
-    const paymentCount = await countPayments();
-    const invoiceNumber = `INV-${new Date().getFullYear()}-${1000 + paymentCount + 1}`;
-
-    const payment = await createPayment({
+    const payment = await Payment.create({
       invoiceNumber,
-      requestId: request.id,
-      userId: req.user.id || req.user._id,
-      companyId: request.companyId?.id || request.companyId,
+      requestId: request._id,
+      userId: req.user._id,
+      companyId: request.companyId,
       amount: request.price,
       currency: 'USD',
       status: 'PAID',
@@ -516,11 +521,12 @@ export const processPayment = async (req, res) => {
       paymentMethod: req.body.paymentMethod || 'Stripe Corporate Card'
     });
 
-    await createActivityLog({
-      userId: req.user.id || req.user._id,
+    // Log activity
+    await ActivityLog.create({
+      userId: req.user._id,
       userName: req.user.name,
-      companyId: request.companyId?.id || request.companyId,
-      requestId: request.id,
+      companyId: request.companyId,
+      requestId: request._id,
       action: 'PAYMENT_SUCCESS',
       details: `Payment of $${request.price} completed for ${request.ticketId}. Invoice: ${invoiceNumber}`
     });
@@ -528,11 +534,10 @@ export const processPayment = async (req, res) => {
     return res.json({
       success: true,
       message: 'Payment completed successfully. Ticket is now active.',
-      request: updatedRequest,
+      request,
       payment
     });
   } catch (error) {
-    console.error('Process payment error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -547,12 +552,9 @@ export const getMessages = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
-    const userId = req.user.id || req.user._id;
-
     // Authorization check
     if (req.user.role === 'USER') {
-      const requestUserId = String(request.userId?.id || request.userId?._id || request.userId);
-      if (requestUserId !== String(userId)) {
+      if (String(request.userId) !== String(req.user._id)) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. You can only view conversations for your own tickets.'
@@ -565,27 +567,42 @@ export const getMessages = async (req, res) => {
       });
     }
 
-    const messages = await findMessagesByRequestId(request.id);
+    const messages = await Message.find({ requestId: request._id }).sort({ createdAt: 1 });
 
     // Mark messages as read for this user
-    await markRequestMessagesRead(request.id, userId).catch(() => {});
+    await Message.updateMany(
+      {
+        requestId: request._id,
+        'readBy.userId': { $ne: req.user._id }
+      },
+      {
+        $push: {
+          readBy: {
+            userId: req.user._id,
+            readAt: new Date()
+          }
+        }
+      }
+    );
 
-    // Mark message notifications as read
-    await query(`
-      UPDATE notifications
-      SET is_read = true
-      WHERE user_id = $1
-        AND ticket_id = $2
-        AND type = 'NEW_MESSAGE'
-        AND is_read = false
-    `, [userId, request.id]);
+    // Mark in-app message notifications for this ticket and user as read
+    await Notification.updateMany(
+      {
+        userId: req.user._id,
+        ticketId: request._id,
+        type: 'NEW_MESSAGE',
+        isRead: false
+      },
+      {
+        $set: { isRead: true }
+      }
+    );
 
     return res.json({
       success: true,
       messages
     });
   } catch (error) {
-    console.error('Get messages error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -595,7 +612,7 @@ export const getMessages = async (req, res) => {
 // @access  Private
 export const sendMessage = async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, attachments } = req.body;
     if (!text || !text.trim()) {
       return res.status(400).json({ success: false, message: 'Message text is required' });
     }
@@ -605,11 +622,9 @@ export const sendMessage = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
-    const userId = req.user.id || req.user._id;
-
+    // Authorization check
     if (req.user.role === 'USER') {
-      const requestUserId = String(request.userId?.id || request.userId?._id || request.userId);
-      if (requestUserId !== String(userId)) {
+      if (String(request.userId) !== String(req.user._id)) {
         return res.status(403).json({
           success: false,
           message: 'Access denied. You can only post messages to your own tickets.'
@@ -622,52 +637,54 @@ export const sendMessage = async (req, res) => {
       });
     }
 
-    const message = await createMessage({
-      requestId: request.id,
-      senderId: userId,
+    const message = await Message.create({
+      requestId: request._id,
+      senderId: req.user._id,
       senderName: req.user.name,
       senderRole: req.user.role,
-      text: text.trim()
+      text: text.trim(),
+      attachments: attachments || [],
+      readBy: [{
+        userId: req.user._id,
+        readAt: new Date()
+      }]
     });
 
-    // Notify counterparty
+    // Create targeted notification for counterparty
     if (req.user.role === 'USER') {
       // Notify assigned specialist or team specialists
       const recipients = [];
       if (request.assignedTo) {
-        const assignedId = request.assignedTo?.id || request.assignedTo?._id || request.assignedTo;
-        if (assignedId) recipients.push(String(assignedId));
+        recipients.push(request.assignedTo);
+      } else {
+        const key = request.serviceType === 'COMPANY_LEAD'
+          ? 'dashboardAccess.companyLead'
+          : request.serviceType === 'COMPANY_BOOST'
+          ? 'dashboardAccess.companyBoost'
+          : 'dashboardAccess.companyUI';
+        const specialists = await User.find({ [key]: true, status: 'ACTIVE' }).select('_id');
+        recipients.push(...specialists.map(s => s._id));
       }
-
-      if (recipients.length === 0) {
-        // Find specialists with access
-        const specialists = await findActiveSpecialists(request.serviceType);
-        recipients.push(...specialists.map(s => String(s.id)));
-      }
-
       for (const recId of recipients) {
-        await createNotification({
+        await Notification.create({
           userId: recId,
           type: 'NEW_MESSAGE',
           title: `New message on ${request.ticketId}`,
           message: `${req.user.name} sent a new message on ${request.ticketId}: "${request.title}".`,
-          ticketId: request.id,
+          ticketId: request._id,
           ticketCode: request.ticketId
         });
       }
     } else {
       // Internal specialist or Admin replied -> notify the client user
-      const clientUserId = request.userId?.id || request.userId?._id || request.userId;
-      if (clientUserId) {
-        await createNotification({
-          userId: String(clientUserId),
-          type: 'NEW_MESSAGE',
-          title: `New message on ${request.ticketId}`,
-          message: `${req.user.name} (${request.assignedTeam || 'CreativeGini Team'}) sent a new message on ${request.ticketId}.`,
-          ticketId: request.id,
-          ticketCode: request.ticketId
-        });
-      }
+      await Notification.create({
+        userId: request.userId,
+        type: 'NEW_MESSAGE',
+        title: `New message on ${request.ticketId}`,
+        message: `${req.user.name} (${request.assignedTeam || 'CreativeGini Team'}) sent a new message on ${request.ticketId}.`,
+        ticketId: request._id,
+        ticketCode: request.ticketId
+      });
     }
 
     return res.status(201).json({
@@ -675,7 +692,6 @@ export const sendMessage = async (req, res) => {
       message
     });
   } catch (error) {
-    console.error('Send message error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

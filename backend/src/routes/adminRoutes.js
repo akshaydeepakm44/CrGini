@@ -4,10 +4,10 @@ import {
   createTeamUser,
   getAllUsers,
   getUserById,
-  updateUser,
+  updateUserHandler,
   resetUserPassword,
   updateUserStatus,
-  deleteUser,
+  deleteUserHandler,
   deleteTeamUser,
   getActivityLogs,
   getTeamMembers,
@@ -25,11 +25,11 @@ router.get('/users', getAllUsers);
 router.get('/team-members', getTeamMembers);
 router.delete('/team-members/:id', deleteTeamUser);
 router.get('/users/:id', getUserById);
-router.patch('/users/:id', updateUser);
+router.patch('/users/:id', updateUserHandler);
 router.patch('/users/:id/permissions', updateUserPermissions);
 router.post('/users/:id/reset-password', resetUserPassword);
 router.patch('/users/:id/status', updateUserStatus);
-router.delete('/users/:id', deleteUser);
+router.delete('/users/:id', deleteUserHandler);
 router.get('/activity-logs', getActivityLogs);
 
 export default router;

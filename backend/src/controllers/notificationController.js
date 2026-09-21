@@ -1,18 +1,19 @@
-import Notification from '../models/Notification.js';
+import {
+  findNotificationsByUserId,
+  markNotificationAsRead as markReadInDB,
+  markAllNotificationsAsRead as markAllReadInDB,
+  getUnreadNotificationCount,
+} from '../repositories/notificationRepository.js';
 
 // @desc    Get user notifications
 // @route   GET /api/notifications
 // @access  Private
 export const getNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({ userId: req.user._id })
-      .sort({ createdAt: -1 })
-      .limit(50);
+    const userId = req.user.id || req.user._id;
 
-    const unreadCount = await Notification.countDocuments({
-      userId: req.user._id,
-      isRead: false
-    });
+    const notifications = await findNotificationsByUserId(userId, { limit: 50 });
+    const unreadCount = await getUnreadNotificationCount(userId);
 
     return res.json({
       success: true,
@@ -20,6 +21,7 @@ export const getNotifications = async (req, res) => {
       notifications
     });
   } catch (error) {
+    console.error('Get notifications error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -29,23 +31,18 @@ export const getNotifications = async (req, res) => {
 // @access  Private
 export const markNotificationAsRead = async (req, res) => {
   try {
-    const notification = await Notification.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user._id },
-      { isRead: true },
-      { new: true }
-    );
+    const userId = req.user.id || req.user._id;
+    const notification = await markReadInDB(req.params.id, userId);
 
     if (!notification) {
       return res.status(404).json({ success: false, message: 'Notification not found' });
     }
 
-    const unreadCount = await Notification.countDocuments({
-      userId: req.user._id,
-      isRead: false
-    });
+    const unreadCount = await getUnreadNotificationCount(userId);
 
     return res.json({ success: true, notification, unreadCount });
   } catch (error) {
+    console.error('Mark notification read error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -55,13 +52,12 @@ export const markNotificationAsRead = async (req, res) => {
 // @access  Private
 export const markAllNotificationsAsRead = async (req, res) => {
   try {
-    await Notification.updateMany(
-      { userId: req.user._id, isRead: false },
-      { isRead: true }
-    );
+    const userId = req.user.id || req.user._id;
+    await markAllReadInDB(userId);
 
     return res.json({ success: true, message: 'All notifications marked as read', unreadCount: 0 });
   } catch (error) {
+    console.error('Mark all notifications read error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

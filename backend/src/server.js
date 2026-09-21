@@ -1,8 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
-import { connectDB } from './config/db.js';
+import { connectPostgres, getPool } from './config/postgres.js';
 import authRoutes from './routes/authRoutes.js';
 import companyRoutes from './routes/companyRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
@@ -14,8 +13,14 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Connect to MongoDB Atlas
-connectDB();
+// Connect to PostgreSQL
+connectPostgres().then((ok) => {
+  if (ok) {
+    console.log('[CreativeGini API] PostgreSQL connected successfully.');
+  } else {
+    console.error('[CreativeGini API] PostgreSQL connection failed. Check credentials.');
+  }
+});
 
 // CORS configuration: allow origins from CLIENT_URL or any localhost during dev
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174')
@@ -24,11 +29,10 @@ const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, postman) or matching local origins
     if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
       callback(null, true);
     } else {
-      callback(null, true); // Permissive during local development
+      callback(null, true); // Permissive for production flexibility
     }
   },
   credentials: true
@@ -44,22 +48,43 @@ app.use('/api/requests', requestRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// Health Check with Database Connectivity Diagnostics
-app.get('/api/health', (req, res) => {
-  const readyStateNames = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
-  const dbState = readyStateNames[mongoose.connection.readyState] || 'unknown';
-  const isHealthy = mongoose.connection.readyState === 1;
-
-  res.status(isHealthy ? 200 : 503).json({
-    status: isHealthy ? 'online' : 'degraded',
-    service: 'CreativeGini Portal API',
-    timestamp: new Date().toISOString(),
-    database: {
-      status: dbState,
-      readyState: mongoose.connection.readyState,
-      host: mongoose.connection.host || 'unavailable'
+// Health Check with PostgreSQL Connectivity Diagnostics
+app.get('/api/health', async (req, res) => {
+  try {
+    const pool = getPool();
+    const client = await pool.connect();
+    let dbStatus = 'disconnected';
+    let dbInfo = {};
+    try {
+      const result = await client.query('SELECT current_database() AS database, current_user AS "user", version() AS version');
+      dbStatus = 'connected';
+      dbInfo = result.rows[0];
+    } finally {
+      client.release();
     }
-  });
+
+    res.status(200).json({
+      status: 'online',
+      service: 'CreativeGini Portal API',
+      timestamp: new Date().toISOString(),
+      database: {
+        type: 'PostgreSQL',
+        status: dbStatus,
+        ...dbInfo
+      }
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'degraded',
+      service: 'CreativeGini Portal API',
+      timestamp: new Date().toISOString(),
+      database: {
+        type: 'PostgreSQL',
+        status: 'disconnected',
+        error: err.message
+      }
+    });
+  }
 });
 
 // Global 404 Handler
@@ -76,6 +101,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`[CreativeGini API] Server running in development mode on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[CreativeGini API] Server running on port ${PORT}`);
 });

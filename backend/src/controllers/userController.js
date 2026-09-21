@@ -1,9 +1,24 @@
 import crypto from 'crypto';
-import User from '../models/User.js';
-import Company from '../models/Company.js';
-import Request from '../models/Request.js';
-import Payment from '../models/Payment.js';
-import ActivityLog from '../models/ActivityLog.js';
+import bcrypt from 'bcryptjs';
+import {
+  findUserById,
+  findUserByEmail,
+  createUser,
+  updateUser as updateUserInDB,
+  deleteUser as deleteUserInDB,
+  getEffectiveDashboardAccess,
+  listUsers,
+} from '../repositories/userRepository.js';
+import {
+  findCompanyById,
+  createCompany,
+  updateCompany,
+} from '../repositories/companyRepository.js';
+import { query } from '../config/postgres.js';
+import {
+  createActivityLog,
+  listActivityLogs,
+} from '../repositories/activityLogRepository.js';
 
 // Helper to generate a friendly secure temporary password
 const generateTempPassword = () => {
@@ -35,7 +50,6 @@ export const createClientUser = async (req, res) => {
       industry,
       companyInfo,
       description,
-      location,
       researchSummary,
       initialLeads,
       initialKeyPeople,
@@ -53,7 +67,7 @@ export const createClientUser = async (req, res) => {
       });
     }
 
-    const existingUser = await User.findOne({ email: userEmail });
+    const existingUser = await findUserByEmail(userEmail);
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -64,37 +78,41 @@ export const createClientUser = async (req, res) => {
     // Temporary password generation if not provided
     const tempPassword = password && password.trim() ? password.trim() : generateTempPassword();
 
-    // 1. Create Company profile in MongoDB
-    const company = await Company.create({
+    // Hash the password before storing
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(tempPassword, salt);
+
+    // 1. Create Company profile in PostgreSQL
+    const company = await createCompany({
       name: compName,
       contactPerson: clientName,
       email: userEmail,
-      phone: phone || '',
-      website: website || '',
+      phone: phone || null,
+      website: website || null,
       industry: industry || 'Technology / SaaS',
-      companyInfo: companyInfo || description || '',
+      companyInfo: companyInfo || description || null,
       researchSummary: researchSummary || 'Pre-researched market positioning and initial leads provided by CreativeGini.',
       initialLeads: initialLeads || [],
       initialKeyPeople: initialKeyPeople || [],
-      createdBy: req.user._id
+      createdBy: req.user.id || req.user._id
     });
 
     // 2. Create User account strictly with role: USER
-    const user = await User.create({
+    const user = await createUser({
       name: clientName,
       email: userEmail,
-      password: tempPassword, // Hashed automatically by UserSchema pre('save')
-      role: 'USER', // Always strictly USER
-      companyId: company._id,
-      phone: phone || '',
+      password: hashedPassword,
+      role: 'USER',
+      companyId: company.id,
+      phone: phone || null,
       status: 'ACTIVE'
     });
 
     // 3. Log action in audit trail
-    await ActivityLog.create({
-      userId: req.user._id,
+    await createActivityLog({
+      userId: req.user.id || req.user._id,
       userName: req.user.name,
-      companyId: company._id,
+      companyId: company.id,
       action: 'CLIENT_CREATED',
       details: `Admin ${req.user.name} created client user ${clientName} for company ${compName} (${userEmail}).`
     });
@@ -104,8 +122,8 @@ export const createClientUser = async (req, res) => {
       message: 'Client user created successfully.',
       temporaryPassword: tempPassword,
       user: {
-        _id: user._id,
-        id: user._id,
+        _id: user.id,
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -128,34 +146,74 @@ export const createClientUser = async (req, res) => {
 // @access  Private (ADMIN only)
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({ isDeleted: { $ne: true } })
-      .populate('companyId')
-      .select('-password')
-      .sort({ createdAt: -1 });
+    // Get all non-deleted users with company info
+    const result = await query(`
+      SELECT
+        u.id, u.name, u.email, u.role,
+        u.company_boost, u.company_lead, u.company_ui,
+        u.company_id, u.phone, u.status,
+        u.avatar, u.last_login, u.created_at, u.updated_at,
+        c.name AS company_name, c.email AS company_email,
+        c.website AS company_website, c.industry AS company_industry,
+        c.contact_person AS company_contact_person,
+        (SELECT COUNT(*)::int FROM requests r WHERE r.company_id = u.company_id) AS requests_count
+      FROM users u
+      LEFT JOIN companies c ON c.id = u.company_id
+      WHERE u.is_deleted = false
+      ORDER BY u.created_at DESC
+    `);
 
-    // Aggregate request counts for each user
-    const usersWithStats = await Promise.all(
-      users.map(async (u) => {
-        let requestsCount = 0;
-        if (u.companyId) {
-          requestsCount = await Request.countDocuments({ companyId: u.companyId._id });
-        }
-        return {
-          ...u.toObject(),
-          dashboardAccess: typeof u.getEffectiveDashboardAccess === 'function'
-            ? u.getEffectiveDashboardAccess()
-            : u.dashboardAccess,
-          requestsCount
-        };
-      })
-    );
+    const users = result.rows.map(row => {
+      const user = {
+        _id: row.id,
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        role: row.role,
+        phone: row.phone,
+        status: row.status,
+        avatar: row.avatar,
+        lastLogin: row.last_login,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        requestsCount: row.requests_count || 0,
+        dashboardAccess: getEffectiveDashboardAccess({
+          role: row.role,
+          dashboardAccess: {
+            companyBoost: Boolean(row.company_boost),
+            companyLead: Boolean(row.company_lead),
+            companyUI: Boolean(row.company_ui),
+          }
+        }),
+        companyId: row.company_id ? {
+          _id: row.company_id,
+          id: row.company_id,
+          name: row.company_name,
+          email: row.company_email,
+          website: row.company_website,
+          industry: row.company_industry,
+          contactPerson: row.company_contact_person,
+        } : null,
+        company: row.company_id ? {
+          _id: row.company_id,
+          id: row.company_id,
+          name: row.company_name,
+          email: row.company_email,
+          website: row.company_website,
+          industry: row.company_industry,
+          contactPerson: row.company_contact_person,
+        } : null,
+      };
+      return user;
+    });
 
     return res.json({
       success: true,
-      count: usersWithStats.length,
-      users: usersWithStats
+      count: users.length,
+      users
     });
   } catch (error) {
+    console.error('Get all users error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -165,22 +223,92 @@ export const getAllUsers = async (req, res) => {
 // @access  Private (ADMIN only)
 export const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id)
-      .populate('companyId')
-      .select('-password');
+    const userResult = await query(`
+      SELECT
+        u.*,
+        c.name AS company_name, c.email AS company_email,
+        c.phone AS company_phone, c.website AS company_website,
+        c.industry AS company_industry, c.company_info AS company_info,
+        c.research_summary AS company_research_summary,
+        c.contact_person AS company_contact_person,
+        c.created_at AS company_created_at
+      FROM users u
+      LEFT JOIN companies c ON c.id = u.company_id
+      WHERE u.id = $1 AND u.is_deleted = false
+      LIMIT 1
+    `, [req.params.id]);
 
-    if (!user) {
+    if (!userResult.rows[0]) {
       return res.status(404).json({ success: false, message: 'Client user not found' });
     }
+    const row = userResult.rows[0];
+
+    const user = {
+      _id: row.id,
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      role: row.role,
+      phone: row.phone,
+      status: row.status,
+      createdAt: row.created_at,
+      dashboardAccess: getEffectiveDashboardAccess({
+        role: row.role,
+        dashboardAccess: {
+          companyBoost: Boolean(row.company_boost),
+          companyLead: Boolean(row.company_lead),
+          companyUI: Boolean(row.company_ui),
+        }
+      }),
+      companyId: row.company_id ? {
+        _id: row.company_id,
+        id: row.company_id,
+        name: row.company_name,
+        email: row.company_email,
+        phone: row.company_phone,
+        website: row.company_website,
+        industry: row.company_industry,
+        companyInfo: row.company_info,
+        researchSummary: row.company_research_summary,
+        contactPerson: row.company_contact_person,
+        createdAt: row.company_created_at,
+      } : null,
+    };
 
     let requests = [];
     let payments = [];
     let activity = [];
 
-    if (user.companyId) {
-      requests = await Request.find({ companyId: user.companyId._id }).sort({ createdAt: -1 });
-      payments = await Payment.find({ companyId: user.companyId._id }).sort({ createdAt: -1 });
-      activity = await ActivityLog.find({ companyId: user.companyId._id }).sort({ createdAt: -1 }).limit(20);
+    if (row.company_id) {
+      const reqResult = await query(
+        `SELECT * FROM requests WHERE company_id = $1 ORDER BY created_at DESC`,
+        [row.company_id]
+      );
+      requests = reqResult.rows.map(r => ({
+        _id: r.id, id: r.id,
+        ticketId: r.ticket_id, serviceType: r.service_type,
+        title: r.title, status: r.status, price: r.price,
+        paymentStatus: r.payment_status, createdAt: r.created_at,
+      }));
+
+      const payResult = await query(
+        `SELECT * FROM payments WHERE company_id = $1 ORDER BY created_at DESC`,
+        [row.company_id]
+      );
+      payments = payResult.rows.map(p => ({
+        _id: p.id, id: p.id,
+        invoiceNumber: p.invoice_number, amount: p.amount,
+        status: p.status, paidAt: p.paid_at, createdAt: p.created_at,
+      }));
+
+      const actResult = await query(
+        `SELECT * FROM activity_logs WHERE company_id = $1 ORDER BY created_at DESC LIMIT 20`,
+        [row.company_id]
+      );
+      activity = actResult.rows.map(a => ({
+        _id: a.id, id: a.id,
+        action: a.action, details: a.details, createdAt: a.created_at,
+      }));
     }
 
     const requestSummary = {
@@ -193,7 +321,7 @@ export const getUserById = async (req, res) => {
     };
 
     const paymentSummary = {
-      totalPaid: payments.filter(p => p.status === 'PAID').reduce((acc, p) => acc + (p.amount || 0), 0),
+      totalPaid: payments.filter(p => p.status === 'PAID').reduce((acc, p) => acc + Number(p.amount || 0), 0),
       pending: payments.filter(p => p.status === 'PENDING').length,
       failed: payments.filter(p => p.status === 'FAILED').length
     };
@@ -207,6 +335,7 @@ export const getUserById = async (req, res) => {
       activity
     });
   } catch (error) {
+    console.error('Get user by id error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -214,62 +343,64 @@ export const getUserById = async (req, res) => {
 // @desc    Admin update client information (Name, Email, Phone, Company, Status)
 // @route   PATCH /api/admin/users/:id
 // @access  Private (ADMIN only)
-export const updateUser = async (req, res) => {
+export const updateUserHandler = async (req, res) => {
   try {
     const { name, email, phone, status, companyName, website, industry, companyInfo } = req.body;
 
-    const user = await User.findById(req.params.id).populate('companyId');
+    const user = await findUserById(req.params.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'Client user not found' });
     }
 
-    if (name) user.name = name.trim();
-    if (phone !== undefined) user.phone = phone.trim();
+    const userUpdates = {};
+    if (name) userUpdates.name = name.trim();
+    if (phone !== undefined) userUpdates.phone = phone.trim();
     if (status && ['ACTIVE', 'DISABLED', 'INACTIVE', 'SUSPENDED'].includes(status)) {
-      user.status = status;
+      userUpdates.status = status;
     }
 
     if (email && email.toLowerCase().trim() !== user.email) {
-      const emailExists = await User.findOne({
-        email: email.toLowerCase().trim(),
-        _id: { $ne: user._id }
-      });
-      if (emailExists) {
+      const emailExists = await findUserByEmail(email.toLowerCase().trim());
+      if (emailExists && emailExists.id !== user.id) {
         return res.status(400).json({ success: false, message: 'Email is already taken by another account.' });
       }
-      user.email = email.toLowerCase().trim();
+      userUpdates.email = email.toLowerCase().trim();
     }
 
-    await user.save();
+    const updatedUser = await updateUserInDB(user.id, userUpdates);
 
     // Update Company details if provided
     if (user.companyId) {
-      const company = await Company.findById(user.companyId._id);
-      if (company) {
-        if (companyName) company.name = companyName.trim();
-        if (website !== undefined) company.website = website.trim();
-        if (industry !== undefined) company.industry = industry.trim();
-        if (companyInfo !== undefined) company.companyInfo = companyInfo.trim();
-        await company.save();
+      const companyUpdates = {};
+      if (companyName) companyUpdates.name = companyName.trim();
+      if (website !== undefined) companyUpdates.website = website.trim();
+      if (industry !== undefined) companyUpdates.industry = industry.trim();
+      if (companyInfo !== undefined) companyUpdates.companyInfo = companyInfo.trim();
+      if (Object.keys(companyUpdates).length > 0) {
+        await updateCompany(user.companyId, companyUpdates);
       }
     }
 
-    await ActivityLog.create({
-      userId: req.user._id,
+    await createActivityLog({
+      userId: req.user.id || req.user._id,
       userName: req.user.name,
-      companyId: user.companyId?._id || null,
+      companyId: user.companyId || null,
       action: 'CLIENT_UPDATED',
       details: `Admin ${req.user.name} updated client account for ${user.name} (${user.email}).`
     });
 
-    const updatedUser = await User.findById(user._id).populate('companyId').select('-password');
+    const finalUser = await findUserById(user.id);
 
     return res.json({
       success: true,
       message: 'Client user updated successfully.',
-      user: updatedUser
+      user: {
+        ...finalUser,
+        dashboardAccess: getEffectiveDashboardAccess(finalUser),
+      }
     });
   } catch (error) {
+    console.error('Update user error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -279,17 +410,19 @@ export const updateUser = async (req, res) => {
 // @access  Private (ADMIN only)
 export const resetUserPassword = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await findUserById(req.params.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'Client user not found' });
     }
 
     const tempPassword = generateTempPassword();
-    user.password = tempPassword; // Hashed automatically by pre('save')
-    await user.save();
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(tempPassword, salt);
 
-    await ActivityLog.create({
-      userId: req.user._id,
+    await updateUserInDB(user.id, { password: hashedPassword });
+
+    await createActivityLog({
+      userId: req.user.id || req.user._id,
       userName: req.user.name,
       companyId: user.companyId || null,
       action: 'PASSWORD_RESET',
@@ -302,6 +435,7 @@ export const resetUserPassword = async (req, res) => {
       temporaryPassword: tempPassword
     });
   } catch (error) {
+    console.error('Reset password error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -319,16 +453,15 @@ export const updateUserStatus = async (req, res) => {
       });
     }
 
-    const user = await User.findById(req.params.id);
+    const user = await findUserById(req.params.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'Client user not found' });
     }
 
-    user.status = status;
-    await user.save();
+    await updateUserInDB(user.id, { status });
 
-    await ActivityLog.create({
-      userId: req.user._id,
+    await createActivityLog({
+      userId: req.user.id || req.user._id,
       userName: req.user.name,
       companyId: user.companyId || null,
       action: status === 'DISABLED' ? 'ACCOUNT_DISABLED' : 'ACCOUNT_ENABLED',
@@ -338,9 +471,10 @@ export const updateUserStatus = async (req, res) => {
     return res.json({
       success: true,
       message: `Account has been ${status === 'DISABLED' ? 'disabled' : 'enabled'} successfully.`,
-      status: user.status
+      status
     });
   } catch (error) {
+    console.error('Update user status error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -350,16 +484,37 @@ export const updateUserStatus = async (req, res) => {
 // @access  Private (ADMIN only)
 export const getActivityLogs = async (req, res) => {
   try {
-    const logs = await ActivityLog.find()
-      .populate('companyId', 'name')
-      .sort({ createdAt: -1 })
-      .limit(50);
+    const result = await query(`
+      SELECT
+        al.*,
+        c.name AS company_name
+      FROM activity_logs al
+      LEFT JOIN companies c ON c.id = al.company_id
+      ORDER BY al.created_at DESC
+      LIMIT 100
+    `);
+
+    const logs = result.rows.map(row => ({
+      _id: row.id,
+      id: row.id,
+      userId: row.user_id,
+      userName: row.user_name,
+      companyId: row.company_id ? {
+        _id: row.company_id,
+        id: row.company_id,
+        name: row.company_name,
+      } : null,
+      action: row.action,
+      details: row.details,
+      createdAt: row.created_at,
+    }));
 
     return res.json({
       success: true,
       logs
     });
   } catch (error) {
+    console.error('Get activity logs error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -369,7 +524,7 @@ export const getActivityLogs = async (req, res) => {
 // @access  Private (ADMIN only)
 export const deleteTeamUser = async (req, res) => {
   try {
-    const targetUser = await User.findById(req.params.id);
+    const targetUser = await findUserById(req.params.id);
     if (!targetUser) {
       return res.status(404).json({ success: false, message: 'Team user not found' });
     }
@@ -382,12 +537,10 @@ export const deleteTeamUser = async (req, res) => {
       });
     }
 
-    // Permanently remove the user document from the database
-    await User.findByIdAndDelete(targetUser._id);
+    await deleteUserInDB(targetUser.id);
 
-    // Log action in ActivityLog
-    await ActivityLog.create({
-      userId: req.user._id,
+    await createActivityLog({
+      userId: req.user.id || req.user._id,
       userName: req.user.name,
       companyId: targetUser.companyId || null,
       action: 'TEAM_USER_DELETED',
@@ -399,6 +552,7 @@ export const deleteTeamUser = async (req, res) => {
       message: `Team user ${targetUser.name} deleted successfully.`
     });
   } catch (error) {
+    console.error('Delete team user error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -406,9 +560,9 @@ export const deleteTeamUser = async (req, res) => {
 // @desc    Admin delete user (client or team user)
 // @route   DELETE /api/admin/users/:id
 // @access  Private (ADMIN only)
-export const deleteUser = async (req, res) => {
+export const deleteUserHandler = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await findUserById(req.params.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -422,26 +576,25 @@ export const deleteUser = async (req, res) => {
     }
 
     if (user.role === 'USER') {
-      // Log deletion before removing client user record
-      await ActivityLog.create({
-        userId: req.user._id,
+      await createActivityLog({
+        userId: req.user.id || req.user._id,
         userName: req.user.name,
         companyId: user.companyId || null,
         action: 'CLIENT_DELETED',
         details: `Admin ${req.user.name} deleted client user ${user.name} (${user.email}).`
       });
 
-      await User.findByIdAndDelete(user._id);
+      await deleteUserInDB(user.id);
 
       return res.json({
         success: true,
         message: 'Client user deleted successfully.'
       });
     } else {
-      // If team member ID passed to this endpoint, delegate to deleteTeamUser
       return deleteTeamUser(req, res);
     }
   } catch (error) {
+    console.error('Delete user error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -451,17 +604,35 @@ export const deleteUser = async (req, res) => {
 // @access  Private (ADMIN only)
 export const getTeamMembers = async (req, res) => {
   try {
-    const teamUsers = await User.find({
-      role: { $ne: 'USER' },
-      isDeleted: { $ne: true }
-    }).select('-password');
+    const result = await query(`
+      SELECT *
+      FROM users
+      WHERE role != 'USER'
+        AND is_deleted = false
+      ORDER BY created_at ASC
+    `);
 
-    // Display order:
-    // 1. Landing Page UI/UX Architect (ui@creativegini.com)
-    // 2. Growth & Boost Strategist (boost@creativegini.com)
-    // 3. Company Lead Specialist (lead@creativegini.com)
-    // 4. CreativeGini Admin (admin@creativegini.com)
-    // Followed by any newly created team users
+    const teamUsers = result.rows.map(row => ({
+      _id: row.id,
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      role: row.role,
+      phone: row.phone,
+      status: row.status,
+      avatar: row.avatar,
+      createdAt: row.created_at,
+      dashboardAccess: getEffectiveDashboardAccess({
+        role: row.role,
+        dashboardAccess: {
+          companyBoost: Boolean(row.company_boost),
+          companyLead: Boolean(row.company_lead),
+          companyUI: Boolean(row.company_ui),
+        }
+      }),
+    }));
+
+    // Display order
     const fixedOrder = [
       'ui@creativegini.com',
       'boost@creativegini.com',
@@ -478,19 +649,13 @@ export const getTeamMembers = async (req, res) => {
       return a.name.localeCompare(b.name);
     });
 
-    const formatted = teamUsers.map((u) => ({
-      ...u.toObject(),
-      dashboardAccess: typeof u.getEffectiveDashboardAccess === 'function'
-        ? u.getEffectiveDashboardAccess()
-        : u.dashboardAccess
-    }));
-
     return res.json({
       success: true,
-      count: formatted.length,
-      teamMembers: formatted
+      count: teamUsers.length,
+      teamMembers: teamUsers
     });
   } catch (error) {
+    console.error('Get team members error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -508,14 +673,12 @@ export const updateUserPermissions = async (req, res) => {
       });
     }
 
-    const targetUser = await User.findById(req.params.id);
+    const targetUser = await findUserById(req.params.id);
     if (!targetUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const prevAccess = typeof targetUser.getEffectiveDashboardAccess === 'function'
-      ? targetUser.getEffectiveDashboardAccess()
-      : targetUser.dashboardAccess || {};
+    const prevAccess = getEffectiveDashboardAccess(targetUser);
 
     const formatPerms = (p) => {
       const parts = [];
@@ -535,26 +698,40 @@ export const updateUserPermissions = async (req, res) => {
 
     const newStr = formatPerms(newAccess);
 
-    targetUser.dashboardAccess = newAccess;
-    await targetUser.save();
+    // Determine updated role based on new access
+    let newRole = targetUser.role;
+    if (newAccess.companyLead) newRole = 'COMPANY_LEAD';
+    else if (newAccess.companyBoost) newRole = 'COMPANY_BOOST';
+    else if (newAccess.companyUI) newRole = 'LANDING_PAGE';
 
-    // Log permission change in ActivityLog for audit trail
-    await ActivityLog.create({
-      userId: req.user._id,
+    await query(`
+      UPDATE users
+      SET company_boost = $1, company_lead = $2, company_ui = $3, role = $4
+      WHERE id = $5
+    `, [
+      newAccess.companyBoost,
+      newAccess.companyLead,
+      newAccess.companyUI,
+      targetUser.role === 'ADMIN' ? 'ADMIN' : newRole,
+      targetUser.id
+    ]);
+
+    await createActivityLog({
+      userId: req.user.id || req.user._id,
       userName: req.user.name,
       companyId: targetUser.companyId || null,
       action: 'PERMISSIONS_UPDATED',
       details: `Super Admin ${req.user.name} updated dashboard access for ${targetUser.name} (${targetUser.email}). Previous: [${prevStr}] -> New: [${newStr}].`
     });
 
-    const updatedUser = await User.findById(targetUser._id).select('-password');
+    const updatedUser = await findUserById(targetUser.id);
 
     return res.json({
       success: true,
       message: `Permissions updated successfully for ${targetUser.name}.`,
       user: {
-        ...updatedUser.toObject(),
-        dashboardAccess: updatedUser.getEffectiveDashboardAccess()
+        ...updatedUser,
+        dashboardAccess: getEffectiveDashboardAccess(updatedUser)
       }
     });
   } catch (error) {
@@ -587,13 +764,17 @@ export const createTeamUser = async (req, res) => {
       });
     }
 
-    const existingUser = await User.findOne({ email: userEmail });
+    const existingUser = await findUserByEmail(userEmail);
     if (existingUser) {
       return res.status(400).json({
         success: false,
         message: 'A user with this email already exists.'
       });
     }
+
+    // Hash the password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password.trim(), salt);
 
     // Sanitize dashboard permissions
     const cleanAccess = {
@@ -613,13 +794,13 @@ export const createTeamUser = async (req, res) => {
       role = 'LANDING_PAGE';
     }
 
-    const user = await User.create({
+    const user = await createUser({
       name: memberName,
       email: userEmail,
-      password: password.trim(), // Automatically hashed by UserSchema pre('save')
+      password: hashedPassword,
       role,
       dashboardAccess: cleanAccess,
-      phone: phone ? phone.trim() : '',
+      phone: phone ? phone.trim() : null,
       status: status && ['ACTIVE', 'DISABLED', 'INACTIVE'].includes(status) ? status : 'ACTIVE'
     });
 
@@ -631,9 +812,8 @@ export const createTeamUser = async (req, res) => {
       return parts.length > 0 ? parts.join(', ') : 'None';
     };
 
-    // Audit trail log
-    await ActivityLog.create({
-      userId: req.user._id,
+    await createActivityLog({
+      userId: req.user.id || req.user._id,
       userName: req.user.name,
       action: 'TEAM_USER_CREATED',
       details: `Super Admin ${req.user.name} created team user ${user.name} (${user.email}) with dashboard access: [${formatPerms(cleanAccess)}].`
@@ -643,14 +823,14 @@ export const createTeamUser = async (req, res) => {
       success: true,
       message: 'Team user created successfully.',
       user: {
-        id: user._id,
-        _id: user._id,
+        id: user.id,
+        _id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
         status: user.status,
         phone: user.phone,
-        dashboardAccess: user.getEffectiveDashboardAccess(),
+        dashboardAccess: getEffectiveDashboardAccess(user),
         createdAt: user.createdAt
       }
     });
