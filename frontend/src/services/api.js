@@ -118,11 +118,11 @@ export const api = {
     return data.messages || [];
   },
 
-  async sendMessage(requestId, text) {
+  async sendMessage(requestId, text, isProgressUpdate = false) {
     const res = await fetch(`${API_BASE}/requests/${requestId}/messages`, {
       method: 'POST',
       headers: getHeaders(true),
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text, isProgressUpdate })
     });
     const data = await res.json();
     if (!res.ok || !data.success) {

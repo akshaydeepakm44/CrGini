@@ -529,11 +529,15 @@ export const deleteTeamUser = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Team user not found' });
     }
 
-    // STRICT SECURITY GUARD: Super Admin cannot be deleted
-    if (targetUser.role === 'ADMIN' || targetUser.email === 'admin@creativegini.com') {
+    // STRICT SECURITY GUARD: Super Admin and currently logged-in user cannot be deleted
+    if (
+      targetUser.role === 'ADMIN' ||
+      targetUser.email === 'admin@creativegini.com' ||
+      String(targetUser.id) === String(req.user?.id || req.user?._id)
+    ) {
       return res.status(403).json({
         success: false,
-        message: 'Super Admin account cannot be deleted.'
+        message: 'Super Admin or currently logged-in account cannot be deleted.'
       });
     }
 
@@ -836,9 +840,16 @@ export const createTeamUser = async (req, res) => {
     });
   } catch (error) {
     console.error('Create team user error:', error);
+    if (error.code === '23505') {
+      return res.status(400).json({
+        success: false,
+        message: 'A user with this email already exists.',
+        error: error.message
+      });
+    }
     return res.status(500).json({
       success: false,
-      message: 'Failed to create team user',
+      message: error.message || 'Failed to create team user',
       error: error.message
     });
   }

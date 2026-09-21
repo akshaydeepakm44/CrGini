@@ -128,6 +128,21 @@ export const createUser = async ({
     VALUES (
       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
     )
+    ON CONFLICT (email) DO UPDATE
+    SET
+      name = EXCLUDED.name,
+      password = EXCLUDED.password,
+      role = EXCLUDED.role,
+      company_boost = EXCLUDED.company_boost,
+      company_lead = EXCLUDED.company_lead,
+      company_ui = EXCLUDED.company_ui,
+      company_id = EXCLUDED.company_id,
+      phone = EXCLUDED.phone,
+      status = EXCLUDED.status,
+      avatar = EXCLUDED.avatar,
+      is_deleted = false,
+      deleted_at = NULL,
+      updated_at = NOW()
     RETURNING
       id,
       name,

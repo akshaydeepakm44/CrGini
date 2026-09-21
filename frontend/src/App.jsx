@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import Lenis from 'lenis';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -22,6 +22,31 @@ import './styles/portal.css';
 import { api } from './services/api';
 
 gsap.registerPlugin(ScrollTrigger);
+
+// Helper component to route /ticket/:ticketId directly to the appropriate dashboard
+function TicketRedirect({ user, isAuthChecking }) {
+  const { ticketId } = useParams();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const tab = searchParams.get('tab') || '';
+
+  if (isAuthChecking) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#060B13', color: '#00E5FF' }}>
+        <div className="portal-spinner" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    const returnUrl = `/ticket/${encodeURIComponent(ticketId)}${tab ? `?tab=${encodeURIComponent(tab)}` : ''}`;
+    return <Navigate to={`/signin?redirect=${encodeURIComponent(returnUrl)}`} replace />;
+  }
+
+  const roleHome = getRoleHome(user);
+  const targetUrl = `${roleHome}?ticket=${encodeURIComponent(ticketId)}${tab ? `&tab=${encodeURIComponent(tab)}` : ''}`;
+  return <Navigate to={targetUrl} replace />;
+}
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -107,7 +132,9 @@ export default function App() {
 
   const handleLogin = (userData) => {
     setUser(userData);
-    const targetRoute = getRoleHome(userData);
+    const searchParams = new URLSearchParams(location.search);
+    const redirectParam = searchParams.get('redirect');
+    const targetRoute = redirectParam || getRoleHome(userData);
     navigate(targetRoute, { replace: true });
     showToast(`Welcome to CreativeGini, ${userData.name}!`);
   };
@@ -237,6 +264,12 @@ export default function App() {
               <LandingPageDashboard user={user} onLogout={handleLogout} />
             </ProtectedRoute>
           }
+        />
+
+        {/* 8. Direct Ticket Deep Link Helper Route */}
+        <Route
+          path="/ticket/:ticketId"
+          element={<TicketRedirect user={user} isAuthChecking={isAuthChecking} />}
         />
 
         {/* Catch-all redirect */}

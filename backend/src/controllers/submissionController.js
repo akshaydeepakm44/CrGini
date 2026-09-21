@@ -28,6 +28,14 @@ import {
   resolveRequest,
   } from '../utils/ticketHelpers.js';
 
+import {
+  sendWorkSubmittedEmail,
+  sendChangesRequestedEmail,
+  sendWorkResubmittedEmail,
+  sendWorkApprovedEmail,
+  sendTicketCompletedEmail,
+} from '../services/emailService.js';
+
 export {
   hasServiceTypeAccess,
   resolveRequest,
@@ -173,8 +181,11 @@ export const createSubmission = async (req, res) => {
       ? 'WORK_RESUBMITTED'
       : 'WORK_SUBMITTED';
 
+    const clientUserId = request.userId?.id || request.userId?._id || request.userId;
+    const companyId = request.companyId?.id || request.companyId?._id || request.companyId;
+
     await createNotification({
-      userId: request.userId,
+      userId: clientUserId,
       type: notificationType,
       title: 'Work Submitted for Review',
       message: `Your completed work for ${request.ticketId} is ready for review.`,
@@ -186,13 +197,37 @@ export const createSubmission = async (req, res) => {
     await createActivityLog({
       userId: req.user._id,
       userName: req.user.name,
-      companyId: request.companyId,
+      companyId,
       requestId: request._id,
       action: notificationType,
       details: `${req.user.name} submitted ${
         isRevision ? `revision V${versionNumber}` : 'work V1'
       } ("${title.trim()}"). Client notified for review.`,
     });
+
+    // Safeguard 1: Trigger email to client for work review
+    let clientUser = request.userId;
+    if (!clientUser?.email && clientUserId) {
+      clientUser = await findUserById(clientUserId).catch(() => null);
+    }
+
+    if (clientUser?.email) {
+      if (isRevision) {
+        sendWorkResubmittedEmail({
+          client: clientUser,
+          ticket: updatedRequest || request,
+          submission,
+          specialist: req.user
+        }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
+      } else {
+        sendWorkSubmittedEmail({
+          client: clientUser,
+          ticket: updatedRequest || request,
+          submission,
+          specialist: req.user
+        }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
+      }
+    }
 
     return res.status(201).json({
       success: true,
@@ -393,9 +428,12 @@ export const approveSubmission = async (req, res) => {
       }
     );
 
-    if (request.assignedTo) {
+    const assignedSpecialistId = request.assignedTo?.id || request.assignedTo?._id || request.assignedTo;
+    const companyId = request.companyId?.id || request.companyId?._id || request.companyId;
+
+    if (assignedSpecialistId) {
       await createNotification({
-        userId: request.assignedTo,
+        userId: assignedSpecialistId,
         type: 'WORK_APPROVED',
         title: 'Work approved by client!',
         message: `Client approved the work for ${request.ticketId}.`,
@@ -408,11 +446,45 @@ export const approveSubmission = async (req, res) => {
     await createActivityLog({
       userId: req.user._id,
       userName: req.user.name,
-      companyId: request.companyId,
+      companyId,
       requestId: request._id,
       action: 'WORK_APPROVED',
       details: `Client approved the work for ${request.ticketId}. Ticket marked COMPLETED.`,
     });
+
+    // Safeguard 1: Trigger Work Approved email to specialist
+    if (request.assignedTo) {
+      let specialistUser = null;
+      const assignedId = request.assignedTo?.id || request.assignedTo?._id || request.assignedTo;
+      if (request.assignedTo?.email) {
+        specialistUser = request.assignedTo;
+      } else if (assignedId) {
+        specialistUser = await findUserById(assignedId).catch(() => null);
+      }
+
+      if (specialistUser?.email) {
+        sendWorkApprovedEmail({
+          specialist: specialistUser,
+          ticket: updatedRequest || request,
+          client: req.user
+        }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
+      }
+    }
+
+    // Safeguard 1: Ticket marked COMPLETED -> send completion email to client
+    let clientUser = request.userId;
+    const clientUserId = request.userId?.id || request.userId?._id || request.userId;
+    if (!clientUser?.email && clientUserId) {
+      clientUser = await findUserById(clientUserId).catch(() => null);
+    }
+    if (clientUser?.email) {
+      sendTicketCompletedEmail({
+        client: clientUser,
+        ticket: updatedRequest || request,
+        completedBy: req.user,
+        reason: req.body.feedback || 'Client reviewed and approved all submitted sprint deliverables.'
+      }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
+    }
 
     return res.json({
       success: true,
@@ -500,6 +572,8 @@ export const requestChanges = async (req, res) => {
       });
     }
 
+    const wasAlreadyChangesRequested = submission.status === 'CHANGES_REQUESTED' || request.status === 'CHANGES_REQUESTED';
+
     const now = new Date();
 
     const updatedSubmission = await updateSubmission(
@@ -523,9 +597,12 @@ export const requestChanges = async (req, res) => {
       }
     );
 
-    if (request.assignedTo) {
+    const assignedSpecialistId = request.assignedTo?.id || request.assignedTo?._id || request.assignedTo;
+    const companyId = request.companyId?.id || request.companyId?._id || request.companyId;
+
+    if (assignedSpecialistId) {
       await createNotification({
-        userId: request.assignedTo,
+        userId: assignedSpecialistId,
         type: 'CHANGES_REQUESTED',
         title: `Changes requested for ${request.ticketId}`,
         message: `Changes requested for ${request.ticketId}. Feedback: "${feedback.trim()}"`,
@@ -538,11 +615,31 @@ export const requestChanges = async (req, res) => {
     await createActivityLog({
       userId: req.user._id,
       userName: req.user.name,
-      companyId: request.companyId,
+      companyId,
       requestId: request._id,
       action: 'CHANGES_REQUESTED',
       details: `Client requested changes on submission V${submission.version}. Feedback: "${feedback.trim()}"`,
     });
+
+    // Safeguard 1: Trigger Changes Requested email to specialist
+    if (!wasAlreadyChangesRequested && request.assignedTo) {
+      let specialistUser = null;
+      const assignedId = request.assignedTo?.id || request.assignedTo?._id || request.assignedTo;
+      if (request.assignedTo?.email) {
+        specialistUser = request.assignedTo;
+      } else if (assignedId) {
+        specialistUser = await findUserById(assignedId).catch(() => null);
+      }
+
+      if (specialistUser?.email) {
+        sendChangesRequestedEmail({
+          specialist: specialistUser,
+          ticket: updatedRequest || request,
+          feedback: feedback.trim(),
+          client: req.user
+        }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
+      }
+    }
 
     return res.json({
       success: true,

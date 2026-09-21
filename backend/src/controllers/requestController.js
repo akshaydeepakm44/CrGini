@@ -38,6 +38,13 @@ import {
   resolveRequest,
 } from '../utils/ticketHelpers.js';
 
+import {
+  sendTicketAssignedEmail,
+  sendWorkStartedEmail,
+  sendTicketProgressEmail,
+  sendTicketCompletedEmail,
+} from '../services/emailService.js';
+
 import { query } from '../config/postgres.js';
 
 // Re-export for submissionController which imports from here
@@ -265,6 +272,9 @@ export const assignTicket = async (req, res) => {
       }
     }
 
+    const prevAssignedId = request.assignedTo?.id || request.assignedTo?._id || request.assignedTo;
+    const isNewAssignment = assignedUser && String(prevAssignedId) !== String(assignedUser.id);
+
     const updates = {};
     if (assignedUser) updates.assignedTo = assignedUser.id;
     if (assignedTeam) updates.assignedTeam = assignedTeam;
@@ -284,6 +294,15 @@ export const assignTicket = async (req, res) => {
         ticketId: request.id,
         ticketCode: request.ticketId
       });
+
+      // Safeguard 1: Trigger email ONLY when actually assigned or reassigned to a different user
+      if (isNewAssignment) {
+        sendTicketAssignedEmail({
+          specialist: assignedUser,
+          ticket: updatedRequest || request,
+          assignedBy: req.user
+        }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
+      }
     }
 
     await createActivityLog({
@@ -321,6 +340,7 @@ export const startWork = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden' });
     }
 
+    const wasAlreadyInProgress = request.status === 'IN_PROGRESS';
     const updatedRequest = await updateRequest(request.id, { status: 'IN_PROGRESS' });
 
     await createActivityLog({
@@ -331,6 +351,22 @@ export const startWork = async (req, res) => {
       action: 'WORK_STARTED',
       details: `Work started on ${request.ticketId} by ${req.user.name}.`
     });
+
+    // Safeguard 1: Trigger email ONLY upon actual state transition to IN_PROGRESS
+    if (!wasAlreadyInProgress) {
+      let clientUser = request.userId;
+      const clientUserId = request.userId?.id || request.userId?._id || request.userId;
+      if (!clientUser?.email && clientUserId) {
+        clientUser = await findUserById(clientUserId).catch(() => null);
+      }
+      if (clientUser?.email) {
+        sendWorkStartedEmail({
+          client: clientUser,
+          ticket: updatedRequest || request,
+          specialist: req.user
+        }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
+      }
+    }
 
     return res.json({
       success: true,
@@ -361,6 +397,8 @@ export const adminOverride = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
+    const wasAlreadyCompleted = request.status === 'COMPLETED';
+
     // Use raw query for admin override fields
     await query(`
       UPDATE requests SET
@@ -383,6 +421,23 @@ export const adminOverride = async (req, res) => {
       action: 'ADMIN_OVERRIDE',
       details: `Administrator override performed by ${req.user.name}. Ticket marked COMPLETED. Reason: "${reason.trim()}".`
     });
+
+    // Safeguard 1: Trigger completion email ONLY on actual transition to COMPLETED
+    if (!wasAlreadyCompleted) {
+      let clientUser = request.userId;
+      const clientUserId = request.userId?.id || request.userId?._id || request.userId;
+      if (!clientUser?.email && clientUserId) {
+        clientUser = await findUserById(clientUserId).catch(() => null);
+      }
+      if (clientUser?.email) {
+        sendTicketCompletedEmail({
+          client: clientUser,
+          ticket: updatedRequest || request,
+          completedBy: req.user,
+          reason: reason.trim()
+        }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
+      }
+    }
 
     return res.json({
       success: true,
@@ -453,6 +508,33 @@ export const updateRequestStatus = async (req, res) => {
       details: `Status changed from ${previousStatus} to ${status}. ${note || ''}`
     });
 
+    // Safeguard 1 & 3: Check state transition and meaningful update
+    let clientUser = request.userId;
+    const clientUserId = request.userId?.id || request.userId?._id || request.userId;
+    if (!clientUser?.email && clientUserId) {
+      clientUser = await findUserById(clientUserId).catch(() => null);
+    }
+
+    if (status === 'COMPLETED' && previousStatus !== 'COMPLETED') {
+      if (clientUser?.email) {
+        sendTicketCompletedEmail({
+          client: clientUser,
+          ticket: updatedRequest || request,
+          completedBy: req.user,
+          reason: note || undefined
+        }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
+      }
+    } else if (note && note.trim().length > 0 && previousStatus !== status) {
+      if (clientUser?.email) {
+        sendTicketProgressEmail({
+          client: clientUser,
+          ticket: updatedRequest || request,
+          specialist: req.user,
+          updateNote: `Status updated to ${status}: ${note.trim()}`
+        }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
+      }
+    }
+
     return res.json({
       success: true,
       request: updatedRequest
@@ -493,6 +575,13 @@ export const processPayment = async (req, res) => {
           ticketId: request.id,
           ticketCode: request.ticketId
         });
+
+        // Safeguard 1: Trigger assignment email on state transition to ASSIGNED
+        sendTicketAssignedEmail({
+          specialist,
+          ticket: { ...request, ...updates },
+          assignedBy: { name: 'Automated Sprint Assignment' }
+        }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
       } else {
         updates.status = 'PAYMENT_COMPLETED';
       }
@@ -595,7 +684,7 @@ export const getMessages = async (req, res) => {
 // @access  Private
 export const sendMessage = async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, isProgressUpdate } = req.body;
     if (!text || !text.trim()) {
       return res.status(400).json({ success: false, message: 'Message text is required' });
     }
@@ -667,6 +756,26 @@ export const sendMessage = async (req, res) => {
           ticketId: request.id,
           ticketCode: request.ticketId
         });
+
+        // Safeguard 3: Only email client if this message is an explicit progress update or prefixed with progress tags
+        const trimmedText = text.trim();
+        const hasProgressPrefix = /^(\[update\]|\[progress\]|update:|progress:)/i.test(trimmedText);
+        const isMeaningfulUpdate = Boolean(isProgressUpdate || hasProgressPrefix);
+
+        if (isMeaningfulUpdate) {
+          let clientUser = request.userId;
+          if (!clientUser?.email) {
+            clientUser = await findUserById(clientUserId).catch(() => null);
+          }
+          if (clientUser?.email) {
+            sendTicketProgressEmail({
+              client: clientUser,
+              ticket: request,
+              specialist: req.user,
+              updateText: trimmedText
+            }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
+          }
+        }
       }
     }
 

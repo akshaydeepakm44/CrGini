@@ -54,6 +54,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
 
   const [ticketMessages, setTicketMessages] = useState([]);
   const [newMessageText, setNewMessageText] = useState('');
+  const [isProgressUpdate, setIsProgressUpdate] = useState(false);
   const [statusUpdateNote, setStatusUpdateNote] = useState('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [filterStatus, setFilterStatus] = useState('ALL');
@@ -168,6 +169,18 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     }
   };
 
+  // Open ticket directly from URL query parameter (e.g. /company-lead?ticket=CG-1001)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ticketParam = params.get('ticket');
+    const tabParam = params.get('tab');
+    if (ticketParam) {
+      handleOpenTicketById(ticketParam, tabParam || undefined);
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+  }, [requests.length]);
+
   const handleStartWork = async () => {
     if (!selectedTicket) return;
     try {
@@ -231,9 +244,10 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     if (!newMessageText.trim() || !selectedTicket) return;
 
     try {
-      const newMsg = await api.sendMessage(selectedTicket._id, newMessageText);
+      const newMsg = await api.sendMessage(selectedTicket._id, newMessageText, isProgressUpdate);
       setTicketMessages(prev => [...prev, newMsg]);
       setNewMessageText('');
+      setIsProgressUpdate(false);
     } catch (err) {
       alert('Failed to send message: ' + err.message);
     }
@@ -299,7 +313,8 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       <aside className={`portal-sidebar ${isSidebarCollapsed ? 'collapsed' : ''} ${isMobileDrawerOpen ? 'mobile-open' : ''}`}>
         <div className="portal-sidebar-brand">
           <div className="portal-sidebar-brand-logo-area">
-            <img src="/logo.png" alt="CreativeGini" className="portal-sidebar-logo" />
+            <img src="/logo.png" alt="CreativeGini" className="portal-sidebar-logo portal-sidebar-logo-full" />
+            <img src="/logo-icon.png" alt="CreativeGini" className="portal-sidebar-logo portal-sidebar-logo-icon" />
           </div>
           <button
             type="button"
@@ -335,7 +350,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
           
           <button
             className={`portal-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('dashboard'); setIsMobileDrawerOpen(false); }}
+            onClick={() => { setActiveTab('dashboard'); setSelectedTicket(null); setIsMobileDrawerOpen(false); }}
             title="Dashboard Overview"
           >
             <LayoutDashboard size={18} />
@@ -378,7 +393,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
 
           <button
             className={`portal-nav-btn ${activeTab === 'conversations' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('conversations'); setIsMobileDrawerOpen(false); }}
+            onClick={() => { setActiveTab('conversations'); setSelectedTicket(null); setIsMobileDrawerOpen(false); }}
             title="Ticket Conversations"
           >
             <MessageSquare size={18} />
@@ -387,7 +402,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
 
           <button
             className={`portal-nav-btn ${activeTab === 'tickets' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('tickets'); setIsMobileDrawerOpen(false); }}
+            onClick={() => { setActiveTab('tickets'); setSelectedTicket(null); setIsMobileDrawerOpen(false); }}
             title="Requests / Tickets"
           >
             <TicketCheck size={18} />
@@ -397,7 +412,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
 
           <button
             className={`portal-nav-btn ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('settings'); setIsMobileDrawerOpen(false); }}
+            onClick={() => { setActiveTab('settings'); setSelectedTicket(null); setIsMobileDrawerOpen(false); }}
             title="Settings"
           >
             <Settings size={18} />
@@ -445,16 +460,26 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
             </button>
             <div className="portal-topbar-title-group">
               <h2>
-                {activeTab === 'dashboard' && 'Company Lead Dashboard'}
-                {activeTab === 'conversations' && 'Company Lead Client Conversations'}
-                {activeTab === 'tickets' && 'Company Lead Requests & Tickets'}
-                {activeTab === 'settings' && 'Company Lead Settings'}
+                {selectedTicket ? `Ticket ${selectedTicket.ticketId}: ${selectedTicket.title}` : (
+                  <>
+                    {activeTab === 'dashboard' && 'Company Lead Dashboard'}
+                    {activeTab === 'conversations' && 'Company Lead Client Conversations'}
+                    {activeTab === 'tickets' && 'Company Lead Requests & Tickets'}
+                    {activeTab === 'settings' && 'Company Lead Settings'}
+                  </>
+                )}
               </h2>
               <p>
-                {activeTab === 'dashboard' && 'Overview of prospect intelligence pipelines, lead research progress and delivery status.'}
-                {activeTab === 'conversations' && 'Persistent direct communication channels with your Company Lead clients.'}
-                {activeTab === 'tickets' && 'Manage and track all Company Lead requests and tickets.'}
-                {activeTab === 'settings' && 'Data provider configurations, compliance standards and team specifications.'}
+                {selectedTicket
+                  ? `Status: ${selectedTicket.status.replace(/_/g, ' ')} • Priority: ${selectedTicket.priority} • Service: ${selectedTicket.serviceType ? selectedTicket.serviceType.replace(/_/g, ' ') : 'General'}`
+                  : (
+                    <>
+                      {activeTab === 'dashboard' && 'Overview of prospect intelligence pipelines, lead research progress and delivery status.'}
+                      {activeTab === 'conversations' && 'Persistent direct communication channels with your Company Lead clients.'}
+                      {activeTab === 'tickets' && 'Manage and track all Company Lead requests and tickets.'}
+                      {activeTab === 'settings' && 'Data provider configurations, compliance standards and team specifications.'}
+                    </>
+                  )}
               </p>
             </div>
           </div>
@@ -520,8 +545,468 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
         </header>
 
         <div className="portal-content-container">
-          {/* DASHBOARD: OPERATIONAL OVERVIEW / WORK MANAGEMENT PAGE */}
-          {activeTab === 'dashboard' && (
+          {selectedTicket ? (
+            <div className="portal-ticket-detail-view">
+              <div className="portal-ticket-breadcrumb">
+                <button
+                  type="button"
+                  className="portal-breadcrumb-back-btn"
+                  onClick={() => setSelectedTicket(null)}
+                >
+                  <ChevronLeft size={16} />
+                  <span>Back to {activeTab === 'tickets' ? 'Tickets' : 'Dashboard'}</span>
+                </button>
+                <div className="portal-breadcrumb-trail">
+                  <span>Company Lead</span>
+                  <span className="portal-breadcrumb-sep">/</span>
+                  <span>{selectedTicket.serviceType ? selectedTicket.serviceType.replace(/_/g, ' ') : 'Tickets'}</span>
+                  <span className="portal-breadcrumb-sep">/</span>
+                  <span className="portal-breadcrumb-current">{selectedTicket.ticketId}</span>
+                </div>
+              </div>
+
+              <div className="portal-ticket-detail-card">
+                <div className="portal-modal-header portal-ticket-header">
+                  <div>
+                    <div className="portal-modal-header-badges">
+                      <span style={{ fontFamily: 'monospace', fontWeight: '800', color: '#00D9FF', fontSize: '1.2rem' }}>
+                        {selectedTicket.ticketId}
+                      </span>
+                      <span className={`status-pill ${selectedTicket.status}`}>
+                        {selectedTicket.status.replace(/_/g, ' ')}
+                      </span>
+                      <span className={`priority-pill ${selectedTicket.priority}`}>
+                        {selectedTicket.priority}
+                      </span>
+                    </div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: '700', marginTop: '4px', marginBottom: 0, color: '#F5F5F5' }}>
+                      {selectedTicket.title}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    className="portal-btn-secondary"
+                    style={{ padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                    onClick={() => setSelectedTicket(null)}
+                  >
+                    <X size={16} />
+                    <span>Close</span>
+                  </button>
+                </div>
+
+                {/* Modal Tab Bar */}
+                <div className="portal-modal-tab-bar">
+                  <button
+                    type="button"
+                    className={`portal-modal-tab-btn ${activeTicketModalTab === 'deliverables' ? 'active' : ''}`}
+                    onClick={() => setActiveTicketModalTab('deliverables')}
+                  >
+                    <FileCheck size={15} />
+                    <span>Deliverables & Submissions</span>
+                    {ticketSubmissions.length > 0 && (
+                      <span style={{ background: 'rgba(0, 217, 255, 0.15)', color: '#00D9FF', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
+                        v{selectedTicket.currentSubmissionVersion || ticketSubmissions.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className={`portal-modal-tab-btn ${activeTicketModalTab === 'scope' ? 'active' : ''}`}
+                    onClick={() => setActiveTicketModalTab('scope')}
+                  >
+                    <FileText size={15} />
+                    <span>Scope & Requirements</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`portal-modal-tab-btn ${activeTicketModalTab === 'chat' ? 'active' : ''}`}
+                    onClick={() => setActiveTicketModalTab('chat')}
+                  >
+                    <MessageSquare size={15} />
+                    <span>Jira Conversation</span>
+                    {ticketMessages.length > 0 && (
+                      <span style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#CBD5E1', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
+                        {ticketMessages.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className={`portal-modal-tab-btn ${activeTicketModalTab === 'activity' ? 'active' : ''}`}
+                    onClick={() => setActiveTicketModalTab('activity')}
+                  >
+                    <Clock size={15} />
+                    <span>Activity Timeline</span>
+                    {ticketActivity.length > 0 && (
+                      <span style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#CBD5E1', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
+                        {ticketActivity.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                <div className="portal-modal-body">
+                  <div className="portal-modal-two-col">
+                    {/* Left Column: Switchable Views */}
+                    <div>
+                      {/* TAB 1: Deliverables & Submissions */}
+                      {activeTicketModalTab === 'deliverables' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                            <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: 0, letterSpacing: '0.04em' }}>
+                              Submitted Work & Deliverables
+                            </h5>
+                            {selectedTicket.status !== 'COMPLETED' && (
+                              <button
+                                type="button"
+                                className="portal-btn-primary"
+                                style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                                onClick={() => setIsSubmissionModalOpen(true)}
+                              >
+                                <Upload size={13} />
+                                <span>Submit Deliverables</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {ticketSubmissions.length === 0 ? (
+                            <div style={{ textAlign: 'center', color: '#94A3B8', padding: '2.5rem 1rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px dashed rgba(255, 255, 255, 0.08)' }}>
+                              <FileCheck size={32} style={{ color: '#00D9FF', margin: '0 auto 8px', opacity: 0.5 }} />
+                              <p style={{ margin: '0 0 10px 0', fontSize: '0.88rem' }}>No deliverables have been submitted yet.</p>
+                              {selectedTicket.status !== 'COMPLETED' && (
+                                <button
+                                  type="button"
+                                  className="portal-btn-primary"
+                                  style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+                                  onClick={() => setIsSubmissionModalOpen(true)}
+                                >
+                                  <Upload size={14} />
+                                  <span>Submit Version 1 Deliverables</span>
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {ticketSubmissions.map((sub) => (
+                                <div
+                                  key={sub._id}
+                                  style={{
+                                    background: 'rgba(255, 255, 255, 0.02)',
+                                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                                    borderRadius: '8px',
+                                    padding: '14px'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span style={{ fontWeight: '800', color: '#00D9FF', fontSize: '0.95rem' }}>
+                                        v{sub.version}
+                                      </span>
+                                      <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#F5F5F5' }}>
+                                        {sub.title}
+                                      </span>
+                                    </div>
+                                    <span className={`status-pill ${sub.status}`}>
+                                      {sub.status.replace(/_/g, ' ')}
+                                    </span>
+                                  </div>
+
+                                  <p style={{ color: '#CBD5E1', fontSize: '0.85rem', lineHeight: '1.5', margin: '0 0 10px 0' }}>
+                                    {sub.notes}
+                                  </p>
+
+                                  {sub.files && sub.files.length > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
+                                      {sub.files.map((file, fIdx) => (
+                                        <div
+                                          key={fIdx}
+                                          style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            padding: '6px 10px',
+                                            background: 'rgba(0, 0, 0, 0.2)',
+                                            borderRadius: '6px',
+                                            fontSize: '0.82rem'
+                                          }}
+                                        >
+                                          <span style={{ color: '#F5F5F5' }}>{file.name}</span>
+                                          <a
+                                            href={file.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="portal-btn-secondary"
+                                            style={{ padding: '2px 8px', fontSize: '0.72rem', textDecoration: 'none' }}
+                                          >
+                                            Download
+                                          </a>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {sub.review && (
+                                    <div
+                                      style={{
+                                        background: sub.review.status === 'APPROVED' ? 'rgba(52, 211, 153, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                                        border: sub.review.status === 'APPROVED' ? '1px solid rgba(52, 211, 153, 0.25)' : '1px solid rgba(245, 158, 11, 0.25)',
+                                        borderRadius: '6px',
+                                        padding: '10px',
+                                        marginTop: '8px'
+                                      }}
+                                    >
+                                      <div style={{ fontSize: '0.78rem', fontWeight: '700', color: sub.review.status === 'APPROVED' ? '#34D399' : '#FFB000', marginBottom: '4px' }}>
+                                        Client Feedback ({sub.review.reviewerName || 'Client'}):
+                                      </div>
+                                      <div style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>
+                                        "{sub.review.feedback}"
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* TAB 2: Scope & Requirements */}
+                      {activeTicketModalTab === 'scope' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          <div>
+                            <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 8px 0', letterSpacing: '0.04em' }}>
+                              Client Requirement Description
+                            </h5>
+                            <p style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '1rem', borderRadius: '8px', color: '#CBD5E1', fontSize: '0.88rem', lineHeight: '1.6', margin: 0 }}>
+                              {selectedTicket.description}
+                            </p>
+                          </div>
+
+                          {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
+                            <div>
+                              <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 8px 0', letterSpacing: '0.04em' }}>
+                                Attached Reference Documents
+                              </h5>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {selectedTicket.attachments.map((att, idx) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '8px 12px',
+                                      borderRadius: '6px',
+                                      background: 'rgba(255, 255, 255, 0.03)',
+                                      border: '1px solid rgba(255, 255, 255, 0.08)'
+                                    }}
+                                  >
+                                    <span style={{ fontSize: '0.84rem', color: '#FFFFFF' }}>{att.name}</span>
+                                    <a
+                                      href={att.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="portal-btn-secondary"
+                                      style={{ padding: '4px 8px', fontSize: '0.75rem', textDecoration: 'none' }}
+                                    >
+                                      Download
+                                    </a>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* TAB 3: Jira Conversation */}
+                      {activeTicketModalTab === 'chat' && (
+                        <div>
+                          <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '6px', letterSpacing: '0.04em' }}>
+                            <MessageSquare size={14} /> Jira Conversation Stream
+                          </h5>
+
+                          <div className="ticket-chat-container" style={{ height: '300px', overflowY: 'auto' }}>
+                            {ticketMessages.length === 0 ? (
+                              <div style={{ textAlign: 'center', color: '#94A3B8', padding: '2rem 1rem', fontSize: '0.85rem' }}>
+                                No messages yet in this ticket. Send a note to the client below!
+                              </div>
+                            ) : (
+                              ticketMessages.map((msg) => {
+                                const isClient = msg.senderRole === 'USER';
+                                return (
+                                  <div
+                                    key={msg._id}
+                                    className={`chat-bubble ${isClient ? 'client' : 'team'}`}
+                                  >
+                                    <div className="chat-bubble-sender" style={{ color: isClient ? '#FFB000' : '#00D9FF' }}>
+                                      {msg.senderName} ({msg.senderRole.replace('_', ' ')})
+                                    </div>
+                                    <div>{msg.text}</div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          <form onSubmit={handleSendMessage} className="ticket-chat-form" style={{ flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                              <input
+                                type="text"
+                                className="portal-form-input"
+                                placeholder="Type an update or question for the client..."
+                                value={newMessageText}
+                                onChange={(e) => setNewMessageText(e.target.value)}
+                              />
+                              <button
+                                type="submit"
+                                className="portal-btn-primary"
+                                style={{ padding: '0 16px' }}
+                                disabled={!newMessageText.trim()}
+                              >
+                                <Send size={16} />
+                              </button>
+                            </div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#94A3B8', cursor: 'pointer', userSelect: 'none' }}>
+                              <input
+                                type="checkbox"
+                                checked={isProgressUpdate}
+                                onChange={(e) => setIsProgressUpdate(e.target.checked)}
+                                style={{ accentColor: '#10B981', cursor: 'pointer' }}
+                              />
+                              <span>Send as Progress Update (notifies client via email)</span>
+                            </label>
+                          </form>
+                        </div>
+                      )}
+
+                      {/* TAB 4: Activity Timeline */}
+                      {activeTicketModalTab === 'activity' && (
+                        <div>
+                          <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 12px 0', letterSpacing: '0.04em' }}>
+                            Lifecycle Activity & Audit Timeline
+                          </h5>
+                          <ActivityTimeline logs={ticketActivity} />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right Column: Ticket Specifications & Actions */}
+                    <div>
+                      <div style={{ background: 'rgba(6, 17, 26, 0.85)', border: '1px solid var(--portal-border)', padding: '1.25rem', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        <div>
+                          <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 12px 0', letterSpacing: '0.04em' }}>
+                            Ticket Specifications
+                          </h5>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
+                            <div>
+                              <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Client Company</span>
+                              <div style={{ color: '#F5F5F5', fontWeight: '700' }}>{selectedTicket.companyId?.name || '—'}</div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Assigned Specialist</span>
+                              <div style={{ color: '#F5F5F5', fontWeight: '600' }}>
+                                {selectedTicket.assignedTo?.name || 'Unassigned'}
+                              </div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Due Date</span>
+                              <div style={{ color: '#CBD5E1' }}>
+                                {selectedTicket.dueDate
+                                  ? new Date(selectedTicket.dueDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                                  : 'Active Delivery Sprint'}
+                              </div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Service Category</span>
+                              <div style={{ color: '#00D9FF', fontWeight: '600' }}>{selectedTicket.serviceType ? selectedTicket.serviceType.replace(/_/g, ' ') : 'General'}</div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Payment Status</span>
+                              <div style={{ fontWeight: '700', color: selectedTicket.paymentStatus === 'PAID' ? '#34d399' : '#f59e0b' }}>
+                                {selectedTicket.paymentStatus} (${selectedTicket.price}.00 USD)
+                              </div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Created Date</span>
+                              <div style={{ color: '#CBD5E1' }}>
+                                {new Date(selectedTicket.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Workflow Actions */}
+                        <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <h6 style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#94A3B8', margin: 0, letterSpacing: '0.04em' }}>
+                            Workflow Actions
+                          </h6>
+                          {(selectedTicket.status === 'CREATED' || selectedTicket.status === 'PAID' || selectedTicket.status === 'ASSIGNED') && (
+                            <button
+                              type="button"
+                              className="portal-btn-primary"
+                              onClick={handleStartWork}
+                              disabled={startingWork}
+                              style={{ width: '100%', justifyContent: 'center' }}
+                            >
+                              <RotateCcw size={14} />
+                              <span>{startingWork ? 'Starting...' : 'Start Work (In Progress)'}</span>
+                            </button>
+                          )}
+                          {(selectedTicket.status === 'IN_PROGRESS' || selectedTicket.status === 'CHANGES_REQUESTED' || selectedTicket.status === 'CLIENT_REVIEW') && (
+                            <button
+                              type="button"
+                              className="portal-btn-primary"
+                              onClick={() => setIsSubmissionModalOpen(true)}
+                              style={{ width: '100%', justifyContent: 'center' }}
+                            >
+                              <Upload size={14} />
+                              <span>Submit Deliverables</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Client Info */}
+                        <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '12px' }}>
+                          <h6 style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#94A3B8', margin: '0 0 8px 0', letterSpacing: '0.04em' }}>
+                            Client Info
+                          </h6>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem' }}>
+                            <div>
+                              <span style={{ color: '#94A3B8' }}>Contact:</span>
+                              <div style={{ color: '#F5F5F5' }}>{selectedTicket.userId?.name || '—'}</div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#94A3B8' }}>Email:</span>
+                              <div><a href={`mailto:${selectedTicket.companyId?.email}`} style={{ color: '#00D9FF', textDecoration: 'none' }}>{selectedTicket.companyId?.email || '—'}</a></div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#94A3B8' }}>NDA Protection:</span>
+                              <div style={{ color: '#34D399', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.76rem' }}>
+                                <ShieldCheck size={14} /> Enterprise NDA Verified
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="portal-modal-footer">
+                  <button
+                    className="portal-btn-secondary"
+                    onClick={() => setSelectedTicket(null)}
+                  >
+                    Close Ticket
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* DASHBOARD: OPERATIONAL OVERVIEW / WORK MANAGEMENT PAGE */}
+              {activeTab === 'dashboard' && (
             <>
               {/* 5 KPI / Summary Cards */}
               <div className="portal-metrics-grid cols-5">
@@ -1082,496 +1567,10 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
               )}
             </div>
           )}
-        </div>
+          </>
+        )}
       </div>
-
-      {/* TICKET DETAIL & JIRA CHAT MODAL - 2-COLUMN BALANCED LAYOUT */}
-      {selectedTicket && (
-        <div className="portal-modal-overlay" onClick={() => setSelectedTicket(null)}>
-          <div className="portal-modal-card wide" onClick={(e) => e.stopPropagation()}>
-            <div className="portal-modal-header">
-              <div>
-                <div className="portal-modal-header-badges">
-                  <span style={{ fontFamily: 'monospace', fontWeight: '800', color: '#00D9FF', fontSize: '1.2rem' }}>
-                    {selectedTicket.ticketId}
-                  </span>
-                  <span className={`status-pill ${selectedTicket.status}`}>
-                    {selectedTicket.status.replace(/_/g, ' ')}
-                  </span>
-                  <span className={`priority-pill ${selectedTicket.priority}`}>
-                    {selectedTicket.priority}
-                  </span>
-                </div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: '700', marginTop: '4px', marginBottom: 0, color: '#F5F5F5' }}>
-                  {selectedTicket.title}
-                </h3>
-              </div>
-              <button
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
-                onClick={() => setSelectedTicket(null)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Modal Tab Bar */}
-            <div className="portal-modal-tab-bar">
-              <button
-                type="button"
-                className={`portal-modal-tab-btn ${activeTicketModalTab === 'deliverables' ? 'active' : ''}`}
-                onClick={() => setActiveTicketModalTab('deliverables')}
-              >
-                <FileCheck size={15} />
-                <span>Deliverables & Submissions</span>
-                {ticketSubmissions.length > 0 && (
-                  <span style={{ background: 'rgba(0, 217, 255, 0.15)', color: '#00D9FF', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
-                    v{selectedTicket.currentSubmissionVersion || ticketSubmissions.length}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                className={`portal-modal-tab-btn ${activeTicketModalTab === 'scope' ? 'active' : ''}`}
-                onClick={() => setActiveTicketModalTab('scope')}
-              >
-                <FileText size={15} />
-                <span>Client Scope</span>
-              </button>
-              <button
-                type="button"
-                className={`portal-modal-tab-btn ${activeTicketModalTab === 'chat' ? 'active' : ''}`}
-                onClick={() => setActiveTicketModalTab('chat')}
-              >
-                <MessageSquare size={15} />
-                <span>Jira Conversation</span>
-                {ticketMessages.length > 0 && (
-                  <span style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#CBD5E1', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
-                    {ticketMessages.length}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                className={`portal-modal-tab-btn ${activeTicketModalTab === 'activity' ? 'active' : ''}`}
-                onClick={() => setActiveTicketModalTab('activity')}
-              >
-                <Clock size={15} />
-                <span>Activity Timeline</span>
-                {ticketActivity.length > 0 && (
-                  <span style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#CBD5E1', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
-                    {ticketActivity.length}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            <div className="portal-modal-body">
-              <div className="portal-modal-two-col">
-                {/* Left Column: Tabbed Content */}
-                <div>
-                  {/* TAB 1: Deliverables Workspace */}
-                  {activeTicketModalTab === 'deliverables' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      {/* Lifecycle Action Banner */}
-                      {selectedTicket.status === 'CHANGES_REQUESTED' && (
-                        <div
-                          style={{
-                            padding: '16px',
-                            borderRadius: '8px',
-                            background: 'rgba(245, 158, 11, 0.12)',
-                            border: '1px solid rgba(245, 158, 11, 0.4)',
-                            marginBottom: '4px'
-                          }}
-                        >
-                          <div style={{ color: '#F59E0B', fontWeight: '700', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <AlertCircle size={16} /> Changes Requested
-                          </div>
-                          <div style={{ marginTop: '8px', fontSize: '0.84rem', color: '#CBD5E1', background: 'rgba(8, 20, 32, 0.95)', padding: '10px 12px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                            <strong style={{ color: '#00D9FF' }}>Client Feedback: </strong>
-                            "{ticketSubmissions[0]?.review?.feedback || ticketSubmissions[ticketSubmissions.length - 1]?.review?.feedback || 'Please update the deliverables according to client specifications.'}"
-                          </div>
-                          <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
-                            <button
-                              type="button"
-                              className="portal-btn-primary"
-                              onClick={() => setIsSubmissionModalOpen(true)}
-                              style={{ padding: '8px 18px', fontSize: '0.84rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}
-                            >
-                              <Upload size={14} /> Submit Completed Work
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {(selectedTicket.status === 'ASSIGNED' || selectedTicket.status === 'PAYMENT_COMPLETED') && (
-                        <div
-                          className="portal-ticket-action-banner"
-                          style={{
-                            padding: '14px',
-                            borderRadius: '8px',
-                            background: 'rgba(0, 217, 255, 0.08)',
-                            border: '1px solid rgba(0, 217, 255, 0.25)'
-                          }}
-                        >
-                          <div>
-                            <div style={{ color: '#00D9FF', fontWeight: '700', fontSize: '0.88rem' }}>
-                              Ticket Assigned to You
-                            </div>
-                            <div style={{ color: '#94A3B8', fontSize: '0.78rem', marginTop: '2px' }}>
-                              Ready to begin research sprint?
-                            </div>
-                          </div>
-                          <div className="portal-ticket-action-buttons">
-                            <button
-                              type="button"
-                              className="portal-btn-primary"
-                              onClick={handleStartWork}
-                              disabled={isUpdatingStatus}
-                              style={{ padding: '6px 14px', fontSize: '0.82rem' }}
-                            >
-                              <Clock size={14} /> Start Work (Set IN PROGRESS)
-                            </button>
-                            <button
-                              type="button"
-                              className="portal-btn-secondary"
-                              onClick={() => setIsSubmissionModalOpen(true)}
-                              style={{ padding: '6px 14px', fontSize: '0.82rem', borderColor: 'rgba(0, 217, 255, 0.35)', color: '#00D9FF' }}
-                            >
-                              <Upload size={14} /> Submit Completed Work
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {selectedTicket.status === 'IN_PROGRESS' && (
-                        <div
-                          className="portal-ticket-action-banner"
-                          style={{
-                            padding: '16px',
-                            borderRadius: '8px',
-                            background: 'rgba(0, 217, 255, 0.08)',
-                            border: '1px solid rgba(0, 217, 255, 0.25)'
-                          }}
-                        >
-                          <div>
-                            <div style={{ color: '#00D9FF', fontWeight: '700', fontSize: '0.9rem' }}>
-                              Work in Progress
-                            </div>
-                            <div style={{ color: '#94A3B8', fontSize: '0.8rem', marginTop: '3px' }}>
-                              Work is completed? Submit your deliverables for client inspection and review.
-                            </div>
-                          </div>
-                          <div className="portal-ticket-action-buttons">
-                            <button
-                              type="button"
-                              className="portal-btn-primary"
-                              onClick={() => setIsSubmissionModalOpen(true)}
-                              style={{ padding: '8px 18px', fontSize: '0.84rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}
-                            >
-                              <Upload size={14} /> Submit Completed Work
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {(selectedTicket.status === 'WORK_SUBMITTED' || selectedTicket.status === 'WORK_RESUBMITTED' || selectedTicket.status === 'CLIENT_REVIEW') && (
-                        <div
-                          style={{
-                            padding: '14px',
-                            borderRadius: '8px',
-                            background: 'rgba(0, 217, 255, 0.08)',
-                            border: '1px solid rgba(0, 217, 255, 0.25)'
-                          }}
-                        >
-                          <div style={{ color: '#00D9FF', fontWeight: '700', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Clock size={15} /> Deliverables Submitted (v{selectedTicket.currentSubmissionVersion})
-                          </div>
-                          <div style={{ color: '#94A3B8', fontSize: '0.8rem', marginTop: '4px' }}>
-                            Deliverables have been submitted through the portal. The client has received a review notification. You will be alerted when the client approves or requests changes.
-                          </div>
-                        </div>
-                      )}
-
-                      {selectedTicket.status === 'COMPLETED' && (
-                        <div
-                          style={{
-                            padding: '14px',
-                            borderRadius: '8px',
-                            background: 'rgba(52, 211, 153, 0.08)',
-                            border: '1px solid rgba(52, 211, 153, 0.3)'
-                          }}
-                        >
-                          <div style={{ color: '#34D399', fontWeight: '700', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <CheckCircle2 size={16} /> Sprint Completed
-                          </div>
-                          <div style={{ color: '#94A3B8', fontSize: '0.8rem', marginTop: '4px' }}>
-                            Client has approved all deliverables. Ticket finalized.
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Submission History List */}
-                      <div>
-                        <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '8px 0 10px 0', letterSpacing: '0.04em' }}>
-                          Submission History ({ticketSubmissions.length})
-                        </h5>
-                        {ticketSubmissions.length === 0 ? (
-                          <div style={{ color: '#94A3B8', fontSize: '0.82rem', padding: '16px', textAlign: 'center', background: 'rgba(4, 12, 18, 0.8)', borderRadius: '8px', border: '1px dashed var(--portal-border)' }}>
-                            No deliverables submitted yet.
-                          </div>
-                        ) : (
-                          ticketSubmissions.map((sub) => (
-                            <div
-                              key={sub._id}
-                              style={{
-                                background: 'rgba(4, 12, 18, 0.85)',
-                                border: '1px solid var(--portal-border)',
-                                borderRadius: '8px',
-                                padding: '14px',
-                                marginBottom: '10px'
-                              }}
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                                <div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ background: 'rgba(0, 217, 255, 0.15)', color: '#00D9FF', fontWeight: '700', fontSize: '0.74rem', padding: '2px 8px', borderRadius: '4px' }}>
-                                      Version v{sub.version}
-                                    </span>
-                                    <span style={{ fontSize: '0.84rem', fontWeight: '600', color: '#F5F5F5' }}>
-                                      {sub.title}
-                                    </span>
-                                  </div>
-                                  <div style={{ fontSize: '0.76rem', color: '#94A3B8', marginTop: '4px' }}>
-                                    Submitted by {sub.submittedByName || 'Specialist'} on{' '}
-                                    {new Date(sub.submittedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                  </div>
-                                </div>
-                                <div>
-                                  {sub.status === 'APPROVED' && (
-                                    <span className="status-pill COMPLETED" style={{ fontSize: '0.7rem' }}>Approved</span>
-                                  )}
-                                  {sub.status === 'CHANGES_REQUESTED' && (
-                                    <span className="status-pill CHANGES_REQUESTED" style={{ fontSize: '0.7rem' }}>Changes Requested</span>
-                                  )}
-                                  {sub.status === 'PENDING_REVIEW' && (
-                                    <span className="status-pill CLIENT_REVIEW" style={{ fontSize: '0.7rem' }}>Under Review</span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <p style={{ color: '#CBD5E1', fontSize: '0.84rem', lineHeight: '1.5', margin: '8px 0', background: 'rgba(8, 20, 32, 0.95)', border: '1px solid rgba(255, 255, 255, 0.06)', padding: '10px', borderRadius: '6px' }}>
-                                {sub.description}
-                              </p>
-
-                              {sub.files && sub.files.length > 0 && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
-                                  {sub.files.map((file, fIdx) => (
-                                    <div
-                                      key={fIdx}
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        padding: '6px 10px',
-                                        borderRadius: '6px',
-                                        background: 'rgba(10, 24, 38, 0.85)',
-                                        border: '1px solid rgba(0, 217, 255, 0.15)'
-                                      }}
-                                    >
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <FileText size={15} color="#00D9FF" />
-                                        <span style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>{file.name}</span>
-                                        {file.size && <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>({file.size})</span>}
-                                      </div>
-                                      <a
-                                        href={file.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="portal-btn-secondary"
-                                        style={{ padding: '3px 8px', fontSize: '0.74rem', textDecoration: 'none' }}
-                                      >
-                                        View
-                                      </a>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-
-                              {sub.review && (
-                                <div
-                                  style={{
-                                    marginTop: '10px',
-                                    padding: '8px 10px',
-                                    borderRadius: '6px',
-                                    background: sub.review.status === 'APPROVED' ? 'rgba(52, 211, 153, 0.08)' : 'rgba(245, 158, 11, 0.08)',
-                                    border: sub.review.status === 'APPROVED' ? '1px solid rgba(52, 211, 153, 0.25)' : '1px solid rgba(245, 158, 11, 0.25)'
-                                  }}
-                                >
-                                  <div style={{ fontWeight: '700', fontSize: '0.78rem', color: sub.review.status === 'APPROVED' ? '#34d399' : '#FFB000' }}>
-                                    Client Feedback ({sub.review.reviewerName || 'Client'}):
-                                  </div>
-                                  <div style={{ fontSize: '0.82rem', color: '#F5F5F5', marginTop: '2px' }}>
-                                    "{sub.review.feedback}"
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 2: Scope & Requirements */}
-                  {activeTicketModalTab === 'scope' && (
-                    <div>
-                      <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 6px 0', letterSpacing: '0.04em' }}>
-                        Client Requirement & Scope
-                      </h5>
-                      <p style={{ background: 'rgba(4, 12, 18, 0.85)', border: '1px solid var(--portal-border)', padding: '0.85rem', borderRadius: '8px', color: '#CBD5E1', fontSize: '0.875rem', margin: 0, lineHeight: '1.5' }}>
-                        {selectedTicket.description}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* TAB 3: Jira Conversation Stream */}
-                  {activeTicketModalTab === 'chat' && (
-                    <div>
-                      <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '6px', letterSpacing: '0.04em' }}>
-                        <MessageSquare size={14} /> Jira Conversation Stream
-                      </h5>
-
-                      <div className="ticket-chat-container" style={{ height: '260px', overflowY: 'auto' }}>
-                        {ticketMessages.length === 0 ? (
-                          <div style={{ textAlign: 'center', color: '#94A3B8', padding: '2rem 1rem', fontSize: '0.85rem' }}>
-                            No messages recorded yet. Send an update to the client!
-                          </div>
-                        ) : (
-                          ticketMessages.map((msg) => {
-                            const isTeam = msg.senderRole !== 'USER';
-                            return (
-                              <div
-                                key={msg._id}
-                                className={`chat-bubble ${isTeam ? 'team' : 'client'}`}
-                              >
-                                <div className="chat-bubble-sender" style={{ color: isTeam ? '#00D9FF' : '#FFB000' }}>
-                                  {msg.senderName} ({msg.senderRole.replace('_', ' ')})
-                                </div>
-                                <div>{msg.text}</div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-
-                      <form onSubmit={handleSendMessage} className="ticket-chat-form">
-                        <input
-                          type="text"
-                          className="portal-form-input"
-                          placeholder="Send research update to client..."
-                          value={newMessageText}
-                          onChange={(e) => setNewMessageText(e.target.value)}
-                        />
-                        <button type="submit" className="portal-btn-primary" style={{ padding: '0 14px' }}>
-                          <Send size={16} />
-                        </button>
-                      </form>
-                    </div>
-                  )}
-
-                  {/* TAB 4: Activity Timeline */}
-                  {activeTicketModalTab === 'activity' && (
-                    <div>
-                      <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 12px 0', letterSpacing: '0.04em' }}>
-                        Lifecycle Activity Timeline
-                      </h5>
-                      <ActivityTimeline logs={ticketActivity} />
-                    </div>
-                  )}
-                </div>
-
-                {/* Right Column: Ticket Specifications & Client Metadata */}
-                <div>
-                  {/* Ticket Specifications Box */}
-                  <div style={{ background: 'rgba(4, 12, 18, 0.85)', border: '1px solid var(--portal-border)', padding: '1rem', borderRadius: '10px', marginBottom: '1.25rem' }}>
-                    <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 10px 0', letterSpacing: '0.04em' }}>
-                      Ticket Specifications
-                    </h5>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
-                      <div>
-                        <span style={{ color: '#94A3B8' }}>Status:</span>
-                        <div style={{ marginTop: '2px' }}>
-                          <span className={`status-pill ${selectedTicket.status}`}>{selectedTicket.status.replace(/_/g, ' ')}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8' }}>Assigned Specialist:</span>
-                        <div style={{ color: '#00D9FF', fontWeight: '700' }}>
-                          {selectedTicket.assignedTo?.name || user?.name || 'Company Lead Specialist'}
-                        </div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8' }}>Due Date:</span>
-                        <div style={{ color: '#CBD5E1' }}>
-                          {selectedTicket.dueDate
-                            ? new Date(selectedTicket.dueDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-                            : 'Active Sprint'}
-                        </div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8' }}>Current Version:</span>
-                        <div style={{ color: '#00D9FF', fontWeight: '700' }}>
-                          v{selectedTicket.currentSubmissionVersion || 0}
-                        </div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8' }}>Sprint Price:</span>
-                        <div style={{ color: '#34D399', fontWeight: '700' }}>${selectedTicket.price || 499}.00 (PAID)</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Client Profile Card */}
-                  <div style={{ background: 'rgba(4, 12, 18, 0.85)', border: '1px solid var(--portal-border)', padding: '1rem', borderRadius: '10px' }}>
-                    <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 10px 0', letterSpacing: '0.04em' }}>
-                      Client & Company Details
-                    </h5>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
-                      <div>
-                        <span style={{ color: '#94A3B8' }}>Company:</span>
-                        <div style={{ color: '#00D9FF', fontWeight: '700' }}>{selectedTicket.companyId?.name || '—'}</div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8' }}>Contact:</span>
-                        <div style={{ color: '#F5F5F5', fontWeight: '600' }}>{selectedTicket.companyId?.contactPerson || '—'}</div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8' }}>Email:</span>
-                        <div><a href={`mailto:${selectedTicket.companyId?.email}`} style={{ color: '#00D9FF', textDecoration: 'none' }}>{selectedTicket.companyId?.email || '—'}</a></div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8' }}>NDA Protection:</span>
-                        <div style={{ color: '#34D399', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.76rem' }}>
-                          <ShieldCheck size={14} /> Enterprise NDA Verified
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="portal-modal-footer">
-              <button
-                className="portal-btn-secondary"
-                onClick={() => setSelectedTicket(null)}
-              >
-                Close Ticket
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    </div>
 
       {/* WORK SUBMISSION MODAL */}
       {isSubmissionModalOpen && selectedTicket && (

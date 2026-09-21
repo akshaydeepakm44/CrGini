@@ -129,6 +129,51 @@ export default function UserDashboard({ user, onLogout }) {
     }
   };
 
+    // Centralized Navigation Handler: always resets any active ticket or create ticket view
+  const handleNavigate = (navKey) => {
+    setActiveNav(navKey);
+    setSelectedTicket(null);
+    setIsRequestModalOpen(false);
+    setIsMobileDrawerOpen(false);
+    if (window.history.state?.modal) {
+      window.history.replaceState({ nav: navKey }, '');
+    }
+  };
+
+  const handleCancelRequest = () => {
+    setIsRequestModalOpen(false);
+    if (window.history.state?.modal === 'create-request') {
+      window.history.back();
+    }
+  };
+
+  const handleCloseTicket = () => {
+    setSelectedTicket(null);
+    if (window.history.state?.modal === 'ticket-detail') {
+      window.history.back();
+    }
+  };
+
+  // Reactive safety: whenever activeNav changes, automatically close open tickets and create ticket form
+  useEffect(() => {
+    setSelectedTicket(null);
+    setIsRequestModalOpen(false);
+  }, [activeNav]);
+
+  // Listen for browser back/forward buttons (popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      if (isRequestModalOpen) {
+        setIsRequestModalOpen(false);
+      }
+      if (selectedTicket) {
+        setSelectedTicket(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isRequestModalOpen, selectedTicket]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -164,7 +209,10 @@ export default function UserDashboard({ user, onLogout }) {
 
   // Open Ticket Detail and Fetch Messages, Submissions, and Activity
   const handleOpenTicket = async (ticket, initialTab) => {
+    setIsRequestModalOpen(false);
     setSelectedTicket(ticket);
+    window.history.pushState({ modal: 'ticket-detail', ticketId: ticket.ticketId }, '');
+    setIsRequestModalOpen(false);
     try {
       const [messages, subs, act] = await Promise.all([
         api.getMessages(ticket._id).catch(() => []),
@@ -269,6 +317,18 @@ export default function UserDashboard({ user, onLogout }) {
     }
   };
 
+  // Open ticket directly from URL query parameter (e.g. /dashboard?ticket=CG-1001&tab=review)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ticketParam = params.get('ticket');
+    const tabParam = params.get('tab');
+    if (ticketParam) {
+      handleOpenTicketById(ticketParam, tabParam || undefined);
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+  }, [requests.length]);
+
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     try {
@@ -311,6 +371,7 @@ export default function UserDashboard({ user, onLogout }) {
 
   // Open New Request Modal for a specific service
   const handleOpenNewRequest = (serviceType) => {
+    setSelectedTicket(null);
     setRequestService(serviceType);
     if (serviceType === 'COMPANY_LEAD') {
       setRequestTitle('Additional Target Leads Research Sprint');
@@ -323,6 +384,7 @@ export default function UserDashboard({ user, onLogout }) {
       setRequestDesc('Redesign hero section with interactive capability visualizer and optimize mobile conversion flow.');
     }
     setIsRequestModalOpen(true);
+    window.history.pushState({ modal: 'create-request' }, '');
   };
 
   // Submit New Request
@@ -403,7 +465,8 @@ export default function UserDashboard({ user, onLogout }) {
       <aside className={`portal-sidebar ${isSidebarCollapsed ? 'collapsed' : ''} ${isMobileDrawerOpen ? 'mobile-open' : ''}`}>
         <div className="portal-sidebar-brand">
           <div className="portal-sidebar-brand-logo-area">
-            <img src="/logo.png" alt="CreativeGini" className="portal-sidebar-logo" />
+            <img src="/logo.png" alt="CreativeGini" className="portal-sidebar-logo portal-sidebar-logo-full" />
+            <img src="/logo-icon.png" alt="CreativeGini" className="portal-sidebar-logo portal-sidebar-logo-icon" />
           </div>
           <button
             type="button"
@@ -440,7 +503,7 @@ export default function UserDashboard({ user, onLogout }) {
           
           <button
             className={`portal-nav-btn ${activeNav === 'dashboard' ? 'active' : ''}`}
-            onClick={() => { setActiveNav('dashboard'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigate('dashboard')}
             title="Executive Dashboard"
           >
             <LayoutDashboard size={18} />
@@ -451,7 +514,7 @@ export default function UserDashboard({ user, onLogout }) {
 
           <button
             className={`portal-nav-btn ${activeNav === 'company-boost' ? 'active' : ''}`}
-            onClick={() => { setActiveNav('company-boost'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigate('company-boost')}
             title="Company Boost"
           >
             <Zap size={18} />
@@ -460,7 +523,7 @@ export default function UserDashboard({ user, onLogout }) {
 
           <button
             className={`portal-nav-btn ${activeNav === 'company-lead' ? 'active' : ''}`}
-            onClick={() => { setActiveNav('company-lead'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigate('company-lead')}
             title="Company Lead"
           >
             <Users size={18} />
@@ -470,7 +533,7 @@ export default function UserDashboard({ user, onLogout }) {
 
           <button
             className={`portal-nav-btn ${activeNav === 'landing-page' ? 'active' : ''}`}
-            onClick={() => { setActiveNav('landing-page'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigate('landing-page')}
             title="Landing Page Enhancement"
           >
             <LayoutTemplate size={18} />
@@ -481,7 +544,7 @@ export default function UserDashboard({ user, onLogout }) {
 
           <button
             className={`portal-nav-btn ${activeNav === 'requests' ? 'active' : ''}`}
-            onClick={() => { setActiveNav('requests'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigate('requests')}
             title="My Requests"
           >
             <TicketCheck size={18} />
@@ -495,7 +558,7 @@ export default function UserDashboard({ user, onLogout }) {
 
           <button
             className={`portal-nav-btn ${activeNav === 'billing' ? 'active' : ''}`}
-            onClick={() => { setActiveNav('billing'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigate('billing')}
             title="Invoices & Payments"
           >
             <Receipt size={18} />
@@ -509,7 +572,7 @@ export default function UserDashboard({ user, onLogout }) {
 
           <button
             className={`portal-nav-btn ${activeNav === 'settings' ? 'active' : ''}`}
-            onClick={() => { setActiveNav('settings'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigate('settings')}
             title="Settings"
           >
             <Settings size={18} />
@@ -561,17 +624,33 @@ export default function UserDashboard({ user, onLogout }) {
             </button>
             <div className="portal-topbar-title-group">
               <h2>
-                {activeNav === 'dashboard' && 'Executive Overview'}
-                {activeNav === 'company-boost' && 'Company Boost Growth Engine'}
-                {activeNav === 'company-lead' && 'Company Lead Intelligence'}
-                {activeNav === 'landing-page' && 'Landing Page Enhancement'}
-                {activeNav === 'conversations' && 'Service Conversations'}
-                {activeNav === 'requests' && 'Jira-Style Ticket Center'}
-                {activeNav === 'billing' && 'Invoices & Billing'}
-                {activeNav === 'settings' && 'Workspace Settings'}
+                {selectedTicket ? (
+                  <>
+                    <span style={{ color: '#00D9FF', marginRight: '8px' }}>{selectedTicket.ticketId}</span>
+                    <span>{selectedTicket.title}</span>
+                  </>
+                ) : isRequestModalOpen ? (
+                  'Create New Request / Ticket'
+                ) : (
+                  <>
+                    {activeNav === 'dashboard' && 'Executive Growth Overview'}
+                    {activeNav === 'company-boost' && 'Company Boost Pipeline'}
+                    {activeNav === 'company-lead' && 'Pre-Researched Lead Intelligence'}
+                    {activeNav === 'landing-page' && 'Landing Page Sprint Queue'}
+                    {activeNav === 'requests' && 'Service Requests & Deliverable Approvals'}
+                    {activeNav === 'billing' && 'Invoices & Transaction Ledger'}
+                    {activeNav === 'settings' && 'Company Profile & Security Settings'}
+                  </>
+                )}
               </h2>
               <p>
-                {company?.name ? `${company.name} · ${company.industry || 'Technology'}` : 'Loading...'}
+                {selectedTicket ? (
+                  <span>Ticket Details & Deliverables • Status: <strong style={{ color: '#00D9FF' }}>{selectedTicket.status.replace(/_/g, ' ')}</strong></span>
+                ) : isRequestModalOpen ? (
+                  <span>Specify requirements & deliverables for <strong style={{ color: '#00D9FF' }}>{requestService.replace(/_/g, ' ')}</strong></span>
+                ) : (
+                  company?.name ? `${company.name} · ${company.industry || 'Technology'}` : 'Loading...'
+                )}
               </p>
             </div>
           </div>
@@ -631,10 +710,7 @@ export default function UserDashboard({ user, onLogout }) {
                   </div>
                   <button
                     className="portal-dropdown-item"
-                    onClick={() => {
-                      setActiveNav('settings');
-                      setIsProfileMenuOpen(false);
-                    }}
+                    onClick={() => handleNavigate('settings')}
                   >
                     <Settings size={15} />
                     <span>Account Settings</span>
@@ -664,8 +740,440 @@ export default function UserDashboard({ user, onLogout }) {
         </header>
 
         <div className="portal-content-container">
+          {selectedTicket ? (
+            <div className="portal-ticket-detail-view">
+              <div className="portal-ticket-breadcrumb">
+                <button
+                  type="button"
+                  className="portal-breadcrumb-back-btn"
+                  onClick={handleCloseTicket}
+                >
+                  <ChevronLeft size={16} />
+                  <span>Back to {activeNav === 'requests' ? 'My Requests' : 'Dashboard'}</span>
+                </button>
+                <div className="portal-breadcrumb-trail">
+                  <span>{company?.name || 'Client Portal'}</span>
+                  <span className="portal-breadcrumb-sep">/</span>
+                  <span>{selectedTicket.serviceType ? selectedTicket.serviceType.replace(/_/g, ' ') : 'Tickets'}</span>
+                  <span className="portal-breadcrumb-sep">/</span>
+                  <span className="portal-breadcrumb-current">{selectedTicket.ticketId}</span>
+                </div>
+              </div>
 
-          {/* VIEW: DASHBOARD OVERVIEW */}
+              <div className="portal-ticket-detail-card">
+                <div className="portal-modal-header portal-ticket-header">
+                  <div>
+                    <div className="portal-modal-header-badges">
+                      <span style={{ fontFamily: 'monospace', fontWeight: '800', color: '#00D9FF', fontSize: '1.2rem' }}>
+                        {selectedTicket.ticketId}
+                      </span>
+                      <span className={'status-pill ' + selectedTicket.status}>
+                        {selectedTicket.status.replace(/_/g, ' ')}
+                      </span>
+                      <span className={'priority-pill ' + selectedTicket.priority}>
+                        {selectedTicket.priority}
+                      </span>
+                      {selectedTicket.currentSubmissionVersion ? (
+                        <span style={{ background: 'rgba(0, 217, 255, 0.15)', color: '#00D9FF', fontWeight: '700', fontSize: '0.74rem', padding: '2px 8px', borderRadius: '4px' }}>
+                          Deliverables v{selectedTicket.currentSubmissionVersion}
+                        </span>
+                      ) : null}
+                    </div>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginTop: '6px', marginBottom: 0, color: '#F5F5F5' }}>
+                      {selectedTicket.title}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    className="portal-btn-secondary"
+                    style={{ padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                    onClick={handleCloseTicket}
+                  >
+                    <X size={16} />
+                    <span>Close</span>
+                  </button>
+                </div>
+
+                <div className="portal-modal-tab-bar">
+              <button
+                type="button"
+                className={`portal-modal-tab-btn ${activeTicketModalTab === 'review' ? 'active' : ''}`}
+                onClick={() => setActiveTicketModalTab('review')}
+              >
+                <FileCheck size={15} />
+                <span>Deliverables & Review</span>
+                {ticketSubmissions.length > 0 && (
+                  <span style={{ background: 'rgba(0, 217, 255, 0.15)', color: '#00D9FF', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
+                    v{selectedTicket.currentSubmissionVersion || ticketSubmissions.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                className={`portal-modal-tab-btn ${activeTicketModalTab === 'scope' ? 'active' : ''}`}
+                onClick={() => setActiveTicketModalTab('scope')}
+              >
+                <FileText size={15} />
+                <span>Scope & Requirements</span>
+              </button>
+              <button
+                type="button"
+                className={`portal-modal-tab-btn ${activeTicketModalTab === 'chat' ? 'active' : ''}`}
+                onClick={() => setActiveTicketModalTab('chat')}
+              >
+                <MessageSquare size={15} />
+                <span>Jira Conversation</span>
+                {ticketMessages.length > 0 && (
+                  <span style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#CBD5E1', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
+                    {ticketMessages.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                className={`portal-modal-tab-btn ${activeTicketModalTab === 'activity' ? 'active' : ''}`}
+                onClick={() => setActiveTicketModalTab('activity')}
+              >
+                <Clock size={15} />
+                <span>Activity Timeline</span>
+                {ticketActivity.length > 0 && (
+                  <span style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#CBD5E1', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
+                    {ticketActivity.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            <div className="portal-modal-body">
+              <div className="portal-modal-two-col">
+                {/* Left Column: Switchable Views */}
+                <div>
+                  {/* TAB 1: Deliverables & Review */}
+                  {activeTicketModalTab === 'review' && (
+                    <ClientReviewSection
+                      ticket={selectedTicket}
+                      submissions={ticketSubmissions}
+                      userRole="USER"
+                      onApprove={handleApproveSubmission}
+                      onRequestChanges={handleRequestChanges}
+                      isProcessing={isProcessingReview}
+                    />
+                  )}
+
+                  {/* TAB 2: Scope & Requirements */}
+                  {activeTicketModalTab === 'scope' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div>
+                        <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 8px 0', letterSpacing: '0.04em' }}>
+                          Client Requirement Description & Scope
+                        </h5>
+                        <p style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '1rem', borderRadius: '8px', color: '#CBD5E1', fontSize: '0.88rem', lineHeight: '1.6', margin: 0 }}>
+                          {selectedTicket.description}
+                        </p>
+                      </div>
+
+                      {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
+                        <div>
+                          <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 8px 0', letterSpacing: '0.04em' }}>
+                            Client Attached Files
+                          </h5>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {selectedTicket.attachments.map((att, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '8px 12px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(255, 255, 255, 0.03)',
+                                  border: '1px solid rgba(255, 255, 255, 0.08)'
+                                }}
+                              >
+                                <span style={{ fontSize: '0.84rem', color: '#FFFFFF' }}>{att.name}</span>
+                                <a
+                                  href={att.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="portal-btn-secondary"
+                                  style={{ padding: '4px 8px', fontSize: '0.75rem', textDecoration: 'none' }}
+                                >
+                                  Download
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB 3: Jira Conversation */}
+                  {activeTicketModalTab === 'chat' && (
+                    <div>
+                      <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '6px', letterSpacing: '0.04em' }}>
+                        <MessageSquare size={14} /> Jira Conversation Stream
+                      </h5>
+
+                      <div className="ticket-chat-container" style={{ height: '300px', overflowY: 'auto' }}>
+                        {ticketMessages.length === 0 ? (
+                          <div style={{ textAlign: 'center', color: '#94A3B8', padding: '2rem 1rem', fontSize: '0.85rem' }}>
+                            No messages yet in this ticket. Send a note to the CreativeGini team below!
+                          </div>
+                        ) : (
+                          ticketMessages.map((msg) => {
+                            const isClient = msg.senderRole === 'USER';
+                            return (
+                              <div
+                                key={msg._id}
+                                className={`chat-bubble ${isClient ? 'client' : 'team'}`}
+                              >
+                                <div className="chat-bubble-sender" style={{ color: isClient ? '#FFB000' : '#00D9FF' }}>
+                                  {msg.senderName} ({msg.senderRole.replace('_', ' ')})
+                                </div>
+                                <div>{msg.text}</div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      <form onSubmit={handleSendMessage} className="ticket-chat-form">
+                        <input
+                          type="text"
+                          className="portal-form-input"
+                          placeholder="Type a message to the CreativeGini team..."
+                          value={newMessageText}
+                          onChange={(e) => setNewMessageText(e.target.value)}
+                          disabled={sendingMessage}
+                        />
+                        <button
+                          type="submit"
+                          className="portal-btn-primary"
+                          style={{ padding: '0 16px' }}
+                          disabled={sendingMessage || !newMessageText.trim()}
+                        >
+                          <Send size={16} />
+                        </button>
+                      </form>
+                    </div>
+                  )}
+
+                  {/* TAB 4: Activity Timeline */}
+                  {activeTicketModalTab === 'activity' && (
+                    <div>
+                      <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 12px 0', letterSpacing: '0.04em' }}>
+                        Lifecycle Activity & Audit Timeline
+                      </h5>
+                      <ActivityTimeline logs={ticketActivity} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column: Ticket Metadata Card */}
+                <div>
+                  <div style={{ background: 'rgba(6, 17, 26, 0.85)', border: '1px solid var(--portal-border)', padding: '1.25rem', borderRadius: '10px' }}>
+                    <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 12px 0', letterSpacing: '0.04em' }}>
+                      Ticket Specifications
+                    </h5>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.82rem' }}>
+                      <div>
+                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Assigned Team</span>
+                        <div style={{ color: '#00D9FF', fontWeight: '700', fontSize: '0.9rem' }}>{selectedTicket.assignedTeam}</div>
+                      </div>
+                      <div>
+                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Assigned Specialist</span>
+                        <div style={{ color: '#F5F5F5', fontWeight: '600' }}>
+                          {selectedTicket.assignedTo?.name || 'Assigned Lead Specialist'}
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Due Date</span>
+                        <div style={{ color: '#CBD5E1' }}>
+                          {selectedTicket.dueDate
+                            ? new Date(selectedTicket.dueDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                            : 'Active Delivery Sprint'}
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Service Category</span>
+                        <div style={{ color: '#F5F5F5', fontWeight: '600' }}>{selectedTicket.serviceType.replace('_', ' ')}</div>
+                      </div>
+                      <div>
+                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Current Version</span>
+                        <div style={{ color: '#00D9FF', fontWeight: '700' }}>
+                          v{selectedTicket.currentSubmissionVersion || 0}
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Payment Status</span>
+                        <div style={{ fontWeight: '700', color: selectedTicket.paymentStatus === 'PAID' ? '#34d399' : '#f59e0b' }}>
+                          {selectedTicket.paymentStatus} (${selectedTicket.price}.00 USD)
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Created Date</span>
+                        <div style={{ color: '#CBD5E1' }}>
+                          {new Date(selectedTicket.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748B', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Security & Privacy</span>
+                        <div style={{ color: '#16A34A', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
+                          <ShieldCheck size={14} /> Enterprise NDA Protected
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+                <div className="portal-modal-footer">
+                  <button
+                className="portal-btn-secondary"
+                onClick={handleCloseTicket}
+              >
+                Close Ticket
+              </button>
+                </div>
+              </div>
+            </div>
+          ) : isRequestModalOpen ? (
+            <div className="portal-ticket-detail-view">
+              <div className="portal-ticket-breadcrumb">
+                <button
+                  type="button"
+                  className="portal-breadcrumb-back-btn"
+                  onClick={handleCancelRequest}
+                >
+                  <ChevronLeft size={16} />
+                  <span>Back to {activeNav === 'requests' ? 'My Requests' : activeNav === 'dashboard' ? 'Dashboard' : 'Service Page'}</span>
+                </button>
+                <div className="portal-breadcrumb-trail">
+                  <span>Dashboard</span>
+                  <span className="portal-breadcrumb-sep">/</span>
+                  <span>Requests</span>
+                  <span className="portal-breadcrumb-sep">/</span>
+                  <span className="portal-breadcrumb-current">Create New Ticket</span>
+                </div>
+              </div>
+
+              <div className="portal-ticket-detail-card" style={{ maxWidth: '840px', margin: '0 auto' }}>
+                <div className="portal-modal-header portal-ticket-header">
+                  <div>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0, color: '#F5F5F5' }}>
+                      Create New Request / Ticket
+                    </h3>
+                    <div style={{ fontSize: '0.84rem', color: '#94A3B8', marginTop: '4px' }}>
+                      Service: <strong style={{ color: '#00D9FF' }}>{requestService.replace(/_/g, ' ')}</strong> · Company: <strong style={{ color: '#F5F5F5' }}>{company?.name}</strong>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="portal-btn-secondary"
+                    style={{ padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                    onClick={handleCancelRequest}
+                  >
+                    <X size={16} />
+                    <span>Cancel</span>
+                  </button>
+                </div>
+
+                <form onSubmit={handleSubmitRequest}>
+                  <div className="portal-modal-body" style={{ maxHeight: 'none', overflow: 'visible' }}>
+                    <div style={{ background: 'rgba(0, 217, 255, 0.08)', border: '1px solid rgba(0, 217, 255, 0.25)', padding: '0.85rem 1rem', borderRadius: '8px', fontSize: '0.84rem', color: '#CBD5E1', marginBottom: '1.25rem' }}>
+                      <Building size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px', color: '#00D9FF' }} />
+                      Your company background for <strong>{company?.name}</strong> is already stored. Only specify your new requirements below.
+                    </div>
+
+                    <div className="portal-form-group">
+                      <label className="portal-form-label">Service Type</label>
+                      <select
+                        className="portal-form-select"
+                        value={requestService}
+                        onChange={(e) => setRequestService(e.target.value)}
+                      >
+                        <option value="COMPANY_LEAD">Company Lead Service ($499)</option>
+                        <option value="COMPANY_BOOST">Company Boost Service ($799)</option>
+                        <option value="LANDING_PAGE">Landing Page Enhancement ($599)</option>
+                      </select>
+                    </div>
+
+                    <div className="portal-form-group">
+                      <label className="portal-form-label">Request Title</label>
+                      <input
+                        className="portal-form-input"
+                        value={requestTitle}
+                        onChange={(e) => setRequestTitle(e.target.value)}
+                        placeholder="e.g. 50 Additional CTO Leads from European SaaS"
+                        required
+                      />
+                    </div>
+
+                    <div className="portal-form-group">
+                      <label className="portal-form-label">Requirement Description</label>
+                      <textarea
+                        className="portal-form-textarea"
+                        rows="5"
+                        value={requestDesc}
+                        onChange={(e) => setRequestDesc(e.target.value)}
+                        placeholder="Explain what specific work or deliverable you need..."
+                        required
+                      />
+                    </div>
+
+                    <div className="portal-form-group">
+                      <label className="portal-form-label">Priority</label>
+                      <select
+                        className="portal-form-select"
+                        value={requestPriority}
+                        onChange={(e) => setRequestPriority(e.target.value)}
+                      >
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HIGH">High</option>
+                        <option value="URGENT">Urgent</option>
+                      </select>
+                    </div>
+
+                    <div style={{ background: 'rgba(0, 217, 255, 0.08)', border: '1px solid rgba(0, 217, 255, 0.25)', borderRadius: '8px', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Total Service Fee</div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: '800', color: '#00D9FF' }}>
+                          ${requestService === 'COMPANY_LEAD' ? '499' : requestService === 'COMPANY_BOOST' ? '799' : '599'}.00 USD
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CheckCircle2 size={16} /> 100% Satisfaction Guaranteed
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="portal-modal-footer">
+                    <button
+                      type="button"
+                      className="portal-btn-secondary"
+                      onClick={handleCancelRequest}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="portal-btn-primary"
+                      disabled={isSubmittingRequest}
+                      style={{ padding: '8px 24px', fontSize: '0.88rem' }}
+                    >
+                      {isSubmittingRequest ? 'Creating Ticket...' : 'Proceed to Checkout & Create Ticket'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* VIEW: DASHBOARD OVERVIEW */}
           {activeNav === 'dashboard' && (
             <>
               {/* Welcome Section Using Existing Company Info */}
@@ -686,7 +1194,7 @@ export default function UserDashboard({ user, onLogout }) {
                   </button>
                   <button
                     className="portal-btn-secondary"
-                    onClick={() => setActiveNav('requests')}
+                    onClick={() => handleNavigate('requests')}
                   >
                     <TicketCheck size={16} />
                     <span>Track Active Tickets ({activeRequests.length})</span>
@@ -810,7 +1318,7 @@ export default function UserDashboard({ user, onLogout }) {
                     <div className="portal-service-actions">
                       <button
                         className="portal-btn-primary"
-                        onClick={() => setActiveNav('company-lead')}
+                        onClick={() => handleNavigate('company-lead')}
                       >
                         Explore Leads
                       </button>
@@ -835,7 +1343,7 @@ export default function UserDashboard({ user, onLogout }) {
                     <div className="portal-service-actions">
                       <button
                         className="portal-btn-primary"
-                        onClick={() => setActiveNav('company-boost')}
+                        onClick={() => handleNavigate('company-boost')}
                       >
                         View Strategy
                       </button>
@@ -860,7 +1368,7 @@ export default function UserDashboard({ user, onLogout }) {
                     <div className="portal-service-actions">
                       <button
                         className="portal-btn-primary"
-                        onClick={() => setActiveNav('landing-page')}
+                        onClick={() => handleNavigate('landing-page')}
                       >
                         View Audit
                       </button>
@@ -882,7 +1390,7 @@ export default function UserDashboard({ user, onLogout }) {
                   <h3 className="portal-section-title">
                     Active Requests & Jira Tickets
                   </h3>
-                  <button className="portal-btn-secondary" onClick={() => setActiveNav('requests')}>
+                  <button className="portal-btn-secondary" onClick={() => handleNavigate('requests')}>
                     View All Tickets ({requests.length})
                   </button>
                 </div>
@@ -1302,11 +1810,11 @@ export default function UserDashboard({ user, onLogout }) {
                 <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '0.75rem', color: '#FFFFFF' }}>
                   Target Website Under Optimization
                 </h4>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: '#F8FAFC', border: '1px solid var(--portal-border)', padding: '1rem 1.25rem', borderRadius: '10px' }}>
-                  <Globe size={24} color="#2563EB" />
+                <div className="portal-target-website-card">
+                  <Globe size={24} className="portal-target-website-icon" color="#00D9FF" />
                   <div>
-                    <div style={{ fontWeight: '700', fontSize: '1rem', color: '#FFFFFF' }}>{company?.website || 'https://acmecloud.ai'}</div>
-                    <div style={{ fontSize: '0.82rem', color: 'var(--portal-text-muted)', marginTop: '2px' }}>
+                    <div className="portal-target-website-url">{company?.website || 'https://acmecloud.ai'}</div>
+                    <div className="portal-target-website-desc">
                       Associated with {company?.name}. No need to re-enter URLs or basic company data.
                     </div>
                   </div>
@@ -1569,8 +2077,8 @@ export default function UserDashboard({ user, onLogout }) {
                 Activity & Status Notifications
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ padding: '0.9rem 1.15rem', borderRadius: '8px', background: '#F8FAFC', border: '1px solid var(--portal-border)', borderLeft: '4px solid #a78bfa' }}>
-                  <div style={{ fontWeight: '600', fontSize: '0.9rem', color: '#FFFFFF' }}>Welcome to CreativeGini Portal!</div>
+                <div style={{ padding: '0.9rem 1.15rem', borderRadius: '8px', background: 'rgba(6, 17, 26, 0.85)', border: '1px solid var(--portal-border)', borderLeft: '4px solid #a78bfa' }}>
+                  <div style={{ fontWeight: '600', fontSize: '0.9rem', color: '#F5F5F5' }}>Welcome to CreativeGini Portal!</div>
                   <div style={{ fontSize: '0.82rem', color: 'var(--portal-text-muted)', marginTop: '3px' }}>
                     Your pre-researched market positioning and initial leads have been provisioned to your account.
                   </div>
@@ -1699,124 +2207,10 @@ export default function UserDashboard({ user, onLogout }) {
               </form>
             </div>
           )}
-
-
-
+            </>
+          )}
         </div>
       </div>
-
-      {/* 3. NEW REQUEST MODAL */}
-      {isRequestModalOpen && (
-        <div className="portal-modal-overlay" onClick={() => setIsRequestModalOpen(false)}>
-          <div className="portal-modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="portal-modal-header">
-              <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: '700', margin: 0 }}>
-                  Create New Request / Ticket
-                </h3>
-                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
-                  Service: <strong>{requestService.replace('_', ' ')}</strong> · Company: <strong>{company?.name}</strong>
-                </div>
-              </div>
-              <button
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-                onClick={() => setIsRequestModalOpen(false)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitRequest}>
-              <div className="portal-modal-body">
-                {/* Note reminding user that company info is already known */}
-                <div style={{ background: 'rgba(0, 217, 255, 0.08)', border: '1px solid rgba(0, 217, 255, 0.25)', padding: '0.85rem 1rem', borderRadius: '8px', fontSize: '0.82rem', color: '#CBD5E1', marginBottom: '1.25rem' }}>
-                  <Building size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px', color: '#00D9FF' }} />
-                  Your company background for <strong>{company?.name}</strong> is already stored. Only specify your new requirements below.
-                </div>
-
-                <div className="portal-form-group">
-                  <label className="portal-form-label">Service Type</label>
-                  <select
-                    className="portal-form-select"
-                    value={requestService}
-                    onChange={(e) => setRequestService(e.target.value)}
-                  >
-                    <option value="COMPANY_LEAD">Company Lead Service ($499)</option>
-                    <option value="COMPANY_BOOST">Company Boost Service ($799)</option>
-                    <option value="LANDING_PAGE">Landing Page Enhancement ($599)</option>
-                  </select>
-                </div>
-
-                <div className="portal-form-group">
-                  <label className="portal-form-label">Request Title</label>
-                  <input
-                    className="portal-form-input"
-                    value={requestTitle}
-                    onChange={(e) => setRequestTitle(e.target.value)}
-                    placeholder="e.g. 50 Additional CTO Leads from European SaaS"
-                    required
-                  />
-                </div>
-
-                <div className="portal-form-group">
-                  <label className="portal-form-label">Requirement Description</label>
-                  <textarea
-                    className="portal-form-textarea"
-                    rows="4"
-                    value={requestDesc}
-                    onChange={(e) => setRequestDesc(e.target.value)}
-                    placeholder="Explain what specific work or deliverable you need..."
-                    required
-                  />
-                </div>
-
-                <div className="portal-form-group">
-                  <label className="portal-form-label">Priority</label>
-                  <select
-                    className="portal-form-select"
-                    value={requestPriority}
-                    onChange={(e) => setRequestPriority(e.target.value)}
-                  >
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                    <option value="URGENT">Urgent</option>
-                  </select>
-                </div>
-
-                <div style={{ background: 'rgba(0, 217, 255, 0.08)', border: '1px solid rgba(0, 217, 255, 0.25)', borderRadius: '8px', padding: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Total Service Fee</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#00D9FF' }}>
-                      ${requestService === 'COMPANY_LEAD' ? '499' : requestService === 'COMPANY_BOOST' ? '799' : '599'}.00 USD
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#10B981', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <CheckCircle2 size={14} /> 100% Satisfaction Guaranteed
-                  </div>
-                </div>
-              </div>
-
-              <div className="portal-modal-footer">
-                <button
-                  type="button"
-                  className="portal-btn-secondary"
-                  onClick={() => setIsRequestModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="portal-btn-primary"
-                  disabled={isSubmittingRequest}
-                >
-                  {isSubmittingRequest ? 'Creating Ticket...' : 'Proceed to Checkout & Create Ticket'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* 4. PAYMENT CONFIRMATION MODAL */}
       {pendingPaymentTicket && (
@@ -1872,330 +2266,6 @@ export default function UserDashboard({ user, onLogout }) {
                 disabled={isPaying}
               >
                 {isPaying ? 'Authorizing Payment...' : `Pay $${pendingPaymentTicket.price}.00 Now`}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 5. JIRA-STYLE TICKET DETAILS & CHAT MODAL */}
-      {selectedTicket && (
-        <div className="portal-modal-overlay" onClick={() => setSelectedTicket(null)}>
-          <div className="portal-modal-card" style={{ maxWidth: '900px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="portal-modal-header">
-              <div>
-                <div className="portal-modal-header-badges">
-                  <span style={{ fontFamily: 'monospace', fontWeight: '800', color: '#00D9FF', fontSize: '1.2rem' }}>
-                    {selectedTicket.ticketId}
-                  </span>
-                  <span className={`status-pill ${selectedTicket.status}`}>
-                    {selectedTicket.status.replace(/_/g, ' ')}
-                  </span>
-                  <span className={`priority-pill ${selectedTicket.priority}`}>
-                    {selectedTicket.priority}
-                  </span>
-                </div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: '700', marginTop: '4px', marginBottom: 0, color: '#F5F5F5' }}>
-                  {selectedTicket.title}
-                </h3>
-              </div>
-              <button
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
-                onClick={() => setSelectedTicket(null)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Modal Tab Navigation Bar */}
-            <div className="portal-modal-tab-bar">
-              <button
-                type="button"
-                className={`portal-modal-tab-btn ${activeTicketModalTab === 'review' ? 'active' : ''}`}
-                onClick={() => setActiveTicketModalTab('review')}
-              >
-                <FileCheck size={15} />
-                <span>Deliverables & Review</span>
-                {ticketSubmissions.length > 0 && (
-                  <span style={{ background: 'rgba(0, 217, 255, 0.15)', color: '#00D9FF', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
-                    v{selectedTicket.currentSubmissionVersion || ticketSubmissions.length}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                className={`portal-modal-tab-btn ${activeTicketModalTab === 'scope' ? 'active' : ''}`}
-                onClick={() => setActiveTicketModalTab('scope')}
-              >
-                <FileText size={15} />
-                <span>Scope & Requirements</span>
-              </button>
-              <button
-                type="button"
-                className={`portal-modal-tab-btn ${activeTicketModalTab === 'chat' ? 'active' : ''}`}
-                onClick={() => setActiveTicketModalTab('chat')}
-              >
-                <MessageSquare size={15} />
-                <span>Jira Conversation</span>
-                {ticketMessages.length > 0 && (
-                  <span style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#CBD5E1', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
-                    {ticketMessages.length}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                className={`portal-modal-tab-btn ${activeTicketModalTab === 'activity' ? 'active' : ''}`}
-                onClick={() => setActiveTicketModalTab('activity')}
-              >
-                <Clock size={15} />
-                <span>Activity Timeline</span>
-                {ticketActivity.length > 0 && (
-                  <span style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#CBD5E1', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
-                    {ticketActivity.length}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            <div className="portal-modal-body">
-              <div className="portal-modal-two-col">
-                {/* Left Column: Switchable Views */}
-                <div>
-                  {/* TAB 1: Deliverables & Review */}
-                  {activeTicketModalTab === 'review' && (
-                    <ClientReviewSection
-                      ticket={selectedTicket}
-                      submissions={ticketSubmissions}
-                      userRole="USER"
-                      onApprove={handleApproveSubmission}
-                      onRequestChanges={handleRequestChanges}
-                      isProcessing={isProcessingReview}
-                    />
-                  )}
-
-                  {/* TAB 2: Scope & Requirements */}
-                  {activeTicketModalTab === 'scope' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      <div>
-                        <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 8px 0', letterSpacing: '0.04em' }}>
-                          Client Requirement Description & Scope
-                        </h5>
-                        <p style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '1rem', borderRadius: '8px', color: '#CBD5E1', fontSize: '0.88rem', lineHeight: '1.6', margin: 0 }}>
-                          {selectedTicket.description}
-                        </p>
-                      </div>
-
-                      {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
-                        <div>
-                          <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 8px 0', letterSpacing: '0.04em' }}>
-                            Client Attached Files
-                          </h5>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {selectedTicket.attachments.map((att, idx) => (
-                              <div
-                                key={idx}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '8px 12px',
-                                  borderRadius: '6px',
-                                  background: 'rgba(255, 255, 255, 0.03)',
-                                  border: '1px solid rgba(255, 255, 255, 0.08)'
-                                }}
-                              >
-                                <span style={{ fontSize: '0.84rem', color: '#FFFFFF' }}>{att.name}</span>
-                                <a
-                                  href={att.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="portal-btn-secondary"
-                                  style={{ padding: '4px 8px', fontSize: '0.75rem', textDecoration: 'none' }}
-                                >
-                                  Download
-                                </a>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* TAB 3: Jira Conversation */}
-                  {activeTicketModalTab === 'chat' && (
-                    <div>
-                      <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '6px', letterSpacing: '0.04em' }}>
-                        <MessageSquare size={14} /> Jira Conversation Stream
-                      </h5>
-
-                      <div className="ticket-chat-container" style={{ height: '300px', overflowY: 'auto' }}>
-                        {ticketMessages.length === 0 ? (
-                          <div style={{ textAlign: 'center', color: '#94A3B8', padding: '2rem 1rem', fontSize: '0.85rem' }}>
-                            No messages yet in this ticket. Send a note to the CreativeGini team below!
-                          </div>
-                        ) : (
-                          ticketMessages.map((msg) => {
-                            const isClient = msg.senderRole === 'USER';
-                            return (
-                              <div
-                                key={msg._id}
-                                className={`chat-bubble ${isClient ? 'client' : 'team'}`}
-                              >
-                                <div className="chat-bubble-sender" style={{ color: isClient ? '#FFB000' : '#00D9FF' }}>
-                                  {msg.senderName} ({msg.senderRole.replace('_', ' ')})
-                                </div>
-                                <div>{msg.text}</div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-
-                      <form onSubmit={handleSendMessage} className="ticket-chat-form">
-                        <input
-                          type="text"
-                          className="portal-form-input"
-                          placeholder="Type a message to the CreativeGini team..."
-                          value={newMessageText}
-                          onChange={(e) => setNewMessageText(e.target.value)}
-                          disabled={sendingMessage}
-                        />
-                        <button
-                          type="submit"
-                          className="portal-btn-primary"
-                          style={{ padding: '0 16px' }}
-                          disabled={sendingMessage || !newMessageText.trim()}
-                        >
-                          <Send size={16} />
-                        </button>
-                      </form>
-                    </div>
-                  )}
-
-                  {/* TAB 4: Activity Timeline */}
-                  {activeTicketModalTab === 'activity' && (
-                    <div>
-                      <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 12px 0', letterSpacing: '0.04em' }}>
-                        Lifecycle Activity & Audit Timeline
-                      </h5>
-                      <ActivityTimeline logs={ticketActivity} />
-                    </div>
-                  )}
-                </div>
-
-                {/* Right Column: Ticket Metadata Card */}
-                <div>
-                  <div style={{ background: 'rgba(6, 17, 26, 0.85)', border: '1px solid var(--portal-border)', padding: '1.25rem', borderRadius: '10px' }}>
-                    <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 12px 0', letterSpacing: '0.04em' }}>
-                      Ticket Specifications
-                    </h5>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.82rem' }}>
-                      <div>
-                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Assigned Team</span>
-                        <div style={{ color: '#00D9FF', fontWeight: '700', fontSize: '0.9rem' }}>{selectedTicket.assignedTeam}</div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Assigned Specialist</span>
-                        <div style={{ color: '#F5F5F5', fontWeight: '600' }}>
-                          {selectedTicket.assignedTo?.name || 'Assigned Lead Specialist'}
-                        </div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Due Date</span>
-                        <div style={{ color: '#CBD5E1' }}>
-                          {selectedTicket.dueDate
-                            ? new Date(selectedTicket.dueDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-                            : 'Active Delivery Sprint'}
-                        </div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Service Category</span>
-                        <div style={{ color: '#F5F5F5', fontWeight: '600' }}>{selectedTicket.serviceType.replace('_', ' ')}</div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Current Version</span>
-                        <div style={{ color: '#00D9FF', fontWeight: '700' }}>
-                          v{selectedTicket.currentSubmissionVersion || 0}
-                        </div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Payment Status</span>
-                        <div style={{ fontWeight: '700', color: selectedTicket.paymentStatus === 'PAID' ? '#34d399' : '#f59e0b' }}>
-                          {selectedTicket.paymentStatus} (${selectedTicket.price}.00 USD)
-                        </div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Created Date</span>
-                        <div style={{ color: '#CBD5E1' }}>
-                          {new Date(selectedTicket.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                        </div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#64748B', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase' }}>Security & Privacy</span>
-                        <div style={{ color: '#16A34A', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
-                          <ShieldCheck size={14} /> Enterprise NDA Protected
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="portal-modal-footer">
-              <button
-                className="portal-btn-secondary"
-                onClick={() => setSelectedTicket(null)}
-              >
-                Close Ticket
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 5. HELP & CONCIERGE MODAL */}
-      {isHelpModalOpen && (
-        <div className="portal-modal-overlay" onClick={() => setIsHelpModalOpen(false)}>
-          <div className="portal-modal-card" style={{ maxWidth: '540px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="portal-modal-header">
-              <div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: '700', margin: 0, color: '#F5F5F5' }}>
-                  CreativeGini Client Concierge
-                </h3>
-                <div style={{ fontSize: '0.82rem', color: '#94A3B8', marginTop: '3px' }}>
-                  Direct sprint assistance & advisory
-                </div>
-              </div>
-              <button
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
-                onClick={() => setIsHelpModalOpen(false)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="portal-modal-body">
-              <p style={{ color: '#CBD5E1', fontSize: '0.92rem', lineHeight: '1.6', margin: '0 0 1.25rem 0' }}>
-                Have questions regarding your deliverable timelines, custom enterprise lead criteria, or conversion designs?
-              </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div style={{ padding: '1.1rem', borderRadius: '10px', background: 'rgba(6, 17, 26, 0.85)', border: '1px solid var(--portal-border)' }}>
-                  <Mail size={20} color="#00D9FF" />
-                  <div style={{ fontWeight: '600', marginTop: '8px', color: '#F5F5F5', fontSize: '0.92rem' }}>Email Support</div>
-                  <div style={{ fontSize: '0.82rem', color: '#94A3B8', marginTop: '3px' }}>concierge@creativegini.com</div>
-                </div>
-                <div style={{ padding: '1.1rem', borderRadius: '10px', background: 'rgba(6, 17, 26, 0.85)', border: '1px solid var(--portal-border)' }}>
-                  <Clock size={20} color="#34d399" />
-                  <div style={{ fontWeight: '600', marginTop: '8px', color: '#F5F5F5', fontSize: '0.92rem' }}>Response SLA</div>
-                  <div style={{ fontSize: '0.82rem', color: '#94A3B8', marginTop: '3px' }}>&lt; 2 hours for active sprints</div>
-                </div>
-              </div>
-            </div>
-            <div className="portal-modal-footer">
-              <button className="portal-btn-primary" onClick={() => setIsHelpModalOpen(false)}>
-                Understood
               </button>
             </div>
           </div>

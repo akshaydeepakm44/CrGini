@@ -23,6 +23,7 @@ import {
   Activity,
   Receipt,
   Eye,
+  EyeOff,
   Edit3,
   KeyRound,
   UserX,
@@ -112,6 +113,8 @@ export default function AdminDashboard({ user, onLogout }) {
   const [resetSuccessPass, setResetSuccessPass] = useState(null);
   const [statusConfirmUser, setStatusConfirmUser] = useState(null); // disable/enable confirm
   const [deletingUser, setDeletingUser] = useState(null); // delete confirmation modal
+  const [deletingTeamMember, setDeletingTeamMember] = useState(null);
+  const [isDeletingTeamMember, setIsDeletingTeamMember] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [ticketMessages, setTicketMessages] = useState([]);
 
@@ -128,12 +131,12 @@ export default function AdminDashboard({ user, onLogout }) {
     password: 'Client@123'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toastNotice, setToastNotice] = useState('');
+  const [toastNotice, setToastNotice] = useState(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
-  const showNotice = (msg) => {
-    setToastNotice(msg);
-    setTimeout(() => setToastNotice(''), 4500);
+  const showNotice = (msg, type = 'success') => {
+    setToastNotice({ message: msg, type });
+    setTimeout(() => setToastNotice(null), 4500);
   };
 
   const loadAdminData = async () => {
@@ -181,6 +184,8 @@ export default function AdminDashboard({ user, onLogout }) {
           setIsMobileDrawerOpen(false);
         } else if (overrideModalTicket) {
           setOverrideModalTicket(null);
+        } else if (deletingTeamMember) {
+          setDeletingTeamMember(null);
         } else if (deletingUser) {
           setDeletingUser(null);
         } else if (statusConfirmUser) {
@@ -209,7 +214,7 @@ export default function AdminDashboard({ user, onLogout }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    isMobileDrawerOpen, overrideModalTicket, deletingUser, statusConfirmUser, resetSuccessPass,
+    isMobileDrawerOpen, overrideModalTicket, deletingTeamMember, deletingUser, statusConfirmUser, resetSuccessPass,
     resettingUser, editingUser, viewingUser, creationSuccessData, isCreateModalOpen,
     selectedTicket, isNotificationsOpen, isProfileMenuOpen
   ]);
@@ -471,6 +476,35 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   };
 
+  // Open ticket directly from URL query parameter (e.g. /admin?ticket=CG-1001&tab=review)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ticketParam = params.get('ticket');
+    const tabParam = params.get('tab');
+    if (ticketParam) {
+      handleOpenTicketById(ticketParam, tabParam || undefined);
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+  }, [requests.length]);
+
+  // Centralized Navigation Handler: always resets any active ticket or Add Team Member view and delete dialogs
+  const handleNavigateTab = (tab) => {
+    setActiveTab(tab);
+    setSelectedTicket(null);
+    setIsAddTeamUserModalOpen(false);
+    setDeletingTeamMember(null);
+    setDeletingUser(null);
+    setIsMobileDrawerOpen(false);
+  };
+
+  // Reactive safety: whenever activeTab changes, automatically close open tickets, Add Team Member, and delete views
+  useEffect(() => {
+    setSelectedTicket(null);
+    setIsAddTeamUserModalOpen(false);
+    setDeletingTeamMember(null);
+  }, [activeTab]);
+
   // Data aggregates
   const clientUsers = users.filter(u => u.role === 'USER' && !u.isDeleted);
   const teamMembers = users.filter(u => u.role !== 'USER' && !u.isDeleted);
@@ -519,6 +553,8 @@ export default function AdminDashboard({ user, onLogout }) {
 
   // Add Team User Modal State & Handlers
   const [isAddTeamUserModalOpen, setIsAddTeamUserModalOpen] = useState(false);
+  const [showTeamPassword, setShowTeamPassword] = useState(false);
+  const [teamPasswordCopied, setTeamPasswordCopied] = useState(false);
   const [newTeamUserData, setNewTeamUserData] = useState({
     name: '',
     email: '',
@@ -533,6 +569,8 @@ export default function AdminDashboard({ user, onLogout }) {
   const [isCreatingTeamUser, setIsCreatingTeamUser] = useState(false);
 
   const handleOpenAddTeamUserModal = () => {
+    setShowTeamPassword(false);
+    setTeamPasswordCopied(false);
     setNewTeamUserData({
       name: '',
       email: '',
@@ -544,21 +582,55 @@ export default function AdminDashboard({ user, onLogout }) {
         companyUI: false
       }
     });
-    setIsAddTeamUserModalOpen(false);
-    setTimeout(() => setIsAddTeamUserModalOpen(true), 10);
+    setIsAddTeamUserModalOpen(true);
+  };
+
+  const handleCopyTeamPassword = async () => {
+    if (!newTeamUserData.password) {
+      showNotice('Please enter or generate a password first.', 'error');
+      return;
+    }
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(newTeamUserData.password);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = newTeamUserData.password;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setTeamPasswordCopied(true);
+      setTimeout(() => setTeamPasswordCopied(false), 2000);
+    } catch {
+      showNotice('Failed to copy password to clipboard.', 'error');
+    }
+  };
+
+  const handleGenerateTeamPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*';
+    let pass = 'CG@';
+    for (let i = 0; i < 9; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewTeamUserData(prev => ({ ...prev, password: pass }));
+    setShowTeamPassword(true);
   };
 
   const handleCreateTeamUser = async (e) => {
     e.preventDefault();
     if (!newTeamUserData.name.trim() || !newTeamUserData.email.trim() || !newTeamUserData.password.trim()) {
-      showNotice('Please provide full name, email, and password.');
+      showNotice('Please provide full name, email, and password.', 'error');
       return;
     }
     const hasAnyAccess = newTeamUserData.dashboardAccess.companyBoost || 
                          newTeamUserData.dashboardAccess.companyLead || 
                          newTeamUserData.dashboardAccess.companyUI;
     if (!hasAnyAccess) {
-      showNotice('Please select at least one dashboard to grant access to.');
+      showNotice('Please select at least one dashboard to grant access to.', 'error');
       return;
     }
 
@@ -575,29 +647,31 @@ export default function AdminDashboard({ user, onLogout }) {
       setIsAddTeamUserModalOpen(false);
       await loadAdminData();
     } catch (err) {
-      showNotice(err.message || 'Failed to create team member.');
+      showNotice(err.message || 'Failed to create team member.', 'error');
     } finally {
       setIsCreatingTeamUser(false);
     }
   };
 
-  // Delete Team Member State & Handler (Requirement 4)
-  const [deletingTeamMember, setDeletingTeamMember] = useState(null);
-  const [isDeletingTeamMember, setIsDeletingTeamMember] = useState(false);
+  // Delete Team Member Handler
 
   const handleConfirmDeleteTeamMember = async () => {
     if (!deletingTeamMember) return;
     const targetId = deletingTeamMember._id || deletingTeamMember.id;
+    if (!targetId) {
+      showNotice('Invalid team member identifier.', 'error');
+      return;
+    }
     try {
       setIsDeletingTeamMember(true);
       await api.adminDeleteTeamMember(targetId);
       // Immediately remove from UI state
       setUsers(prev => prev.filter(u => String(u._id || u.id) !== String(targetId)));
-      showNotice(`Team user "${deletingTeamMember.name}" deleted successfully.`);
+      showNotice(`Team member "${deletingTeamMember.name}" deleted successfully.`);
       setDeletingTeamMember(null);
       await loadAdminData();
     } catch (err) {
-      showNotice(err.message || 'Failed to delete team member.');
+      showNotice(err.message || 'Failed to delete team member.', 'error');
     } finally {
       setIsDeletingTeamMember(false);
     }
@@ -631,7 +705,8 @@ export default function AdminDashboard({ user, onLogout }) {
       <aside className={`portal-sidebar ${isSidebarCollapsed ? 'collapsed' : ''} ${isMobileDrawerOpen ? 'mobile-open' : ''}`}>
         <div className="portal-sidebar-brand">
           <div className="portal-sidebar-brand-logo-area">
-            <img src="/logo.png" alt="CreativeGini" className="portal-sidebar-logo" />
+            <img src="/logo.png" alt="CreativeGini" className="portal-sidebar-logo portal-sidebar-logo-full" />
+            <img src="/logo-icon.png" alt="CreativeGini" className="portal-sidebar-logo portal-sidebar-logo-icon" />
           </div>
           <button
             type="button"
@@ -667,7 +742,7 @@ export default function AdminDashboard({ user, onLogout }) {
           
           <button 
             className={`portal-nav-btn ${activeTab === 'overview' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('overview'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigateTab('overview')}
             title="Admin Central"
           >
             <ShieldCheck size={18} />
@@ -676,7 +751,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
           <button 
             className={`portal-nav-btn ${activeTab === 'clients' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('clients'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigateTab('clients')}
             title="Client Users"
           >
             <Building size={18} />
@@ -686,7 +761,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
           <button 
             className={`portal-nav-btn ${activeTab === 'teams' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('teams'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigateTab('teams')}
             title="Team & Dashboard Permissions"
           >
             <UserCheck size={18} />
@@ -696,7 +771,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
           <button 
             className={`portal-nav-btn ${activeTab === 'services' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('services'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigateTab('services')}
             title="Service Requests"
           >
             <Layers size={18} />
@@ -705,7 +780,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
           <button 
             className={`portal-nav-btn ${activeTab === 'tickets' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('tickets'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigateTab('tickets')}
             title="Tickets"
           >
             <TicketCheck size={18} />
@@ -715,7 +790,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
           <button 
             className={`portal-nav-btn ${activeTab === 'payments' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('payments'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigateTab('payments')}
             title="Payments"
           >
             <Receipt size={18} />
@@ -724,7 +799,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
           <button 
             className={`portal-nav-btn ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('settings'); setIsMobileDrawerOpen(false); }}
+            onClick={() => handleNavigateTab('settings')}
             title="Settings"
           >
             <Settings size={18} />
@@ -773,15 +848,25 @@ export default function AdminDashboard({ user, onLogout }) {
             </button>
             <div className="portal-topbar-title-group">
               <h2>
-                {activeTab === 'overview' && 'CreativeGini Master Admin Dashboard'}
-                {activeTab === 'clients' && 'Client Users Management'}
-                {activeTab === 'teams' && 'Internal Team Members & Dashboard Permissions'}
-                {activeTab === 'services' && 'Service Requests Breakdown'}
-                {activeTab === 'tickets' && 'Jira-Style Ticket Center'}
-                {activeTab === 'payments' && 'Payment & Revenue Ledger'}
-                {activeTab === 'settings' && 'Global Administration Settings'}
+                {selectedTicket ? `Ticket ${selectedTicket.ticketId}: ${selectedTicket.title}` : isAddTeamUserModalOpen ? 'Add Team Member' : (
+                  <>
+                    {activeTab === 'overview' && 'CreativeGini Master Admin Dashboard'}
+                    {activeTab === 'clients' && 'Client Users Management'}
+                    {activeTab === 'teams' && 'Internal Team Members & Dashboard Permissions'}
+                    {activeTab === 'services' && 'Service Requests Breakdown'}
+                    {activeTab === 'tickets' && 'Jira-Style Ticket Center'}
+                    {activeTab === 'payments' && 'Payment & Revenue Ledger'}
+                    {activeTab === 'settings' && 'Global Administration Settings'}
+                  </>
+                )}
               </h2>
-              <p>Full system control, user provisioning, revenue monitoring, and global ticket oversight.</p>
+              <p>
+                {selectedTicket
+                  ? `Status: ${selectedTicket.status.replace(/_/g, ' ')} • Priority: ${selectedTicket.priority} • Service: ${selectedTicket.serviceType ? selectedTicket.serviceType.replace(/_/g, ' ') : 'General'}`
+                  : isAddTeamUserModalOpen
+                  ? 'Create an internal specialist account with granular dashboard permissions'
+                  : 'Full system control, user provisioning, revenue monitoring, and global ticket oversight.'}
+              </p>
             </div>
           </div>
 
@@ -834,7 +919,7 @@ export default function AdminDashboard({ user, onLogout }) {
                   <button
                     className="portal-dropdown-item"
                     onClick={() => {
-                      setActiveTab('settings');
+                      handleNavigateTab('settings');
                       setIsProfileMenuOpen(false);
                     }}
                   >
@@ -857,14 +942,720 @@ export default function AdminDashboard({ user, onLogout }) {
 
         <div className="portal-content-container">
           {toastNotice && (
-            <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(52, 211, 153, 0.35)', color: '#16A34A', padding: '1rem 1.25rem', borderRadius: '10px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500' }}>
-              <CheckCircle2 size={18} />
-              <span>{toastNotice}</span>
+            <div style={{
+              background: (typeof toastNotice === 'object' && toastNotice?.type === 'error') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+              border: (typeof toastNotice === 'object' && toastNotice?.type === 'error') ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(52, 211, 153, 0.35)',
+              color: (typeof toastNotice === 'object' && toastNotice?.type === 'error') ? '#EF4444' : '#16A34A',
+              padding: '1rem 1.25rem',
+              borderRadius: '10px',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontWeight: '500'
+            }}>
+              {(typeof toastNotice === 'object' && toastNotice?.type === 'error') ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
+              <span>{typeof toastNotice === 'object' ? toastNotice?.message : toastNotice}</span>
             </div>
           )}
 
-          {/* TAB 1: ADMIN CENTRAL OVERVIEW */}
-          {activeTab === 'overview' && (
+          {selectedTicket ? (
+            <div className="portal-ticket-detail-view">
+              <div className="portal-ticket-breadcrumb">
+                <button
+                  type="button"
+                  className="portal-breadcrumb-back-btn"
+                  onClick={() => setSelectedTicket(null)}
+                >
+                  <ChevronLeft size={16} />
+                  <span>Back to {activeTab === 'tickets' ? 'Tickets' : 'Dashboard'}</span>
+                </button>
+                <div className="portal-breadcrumb-trail">
+                  <span>CreativeGini Admin</span>
+                  <span className="portal-breadcrumb-sep">/</span>
+                  <span>{selectedTicket.serviceType ? selectedTicket.serviceType.replace(/_/g, ' ') : 'Tickets'}</span>
+                  <span className="portal-breadcrumb-sep">/</span>
+                  <span className="portal-breadcrumb-current">{selectedTicket.ticketId}</span>
+                </div>
+              </div>
+
+              <div className="portal-ticket-detail-card">
+                <div className="portal-modal-header portal-ticket-header">
+                  <div>
+                    <div className="portal-modal-header-badges">
+                      <span style={{ fontFamily: 'monospace', fontWeight: '800', color: '#00D9FF', fontSize: '1.15rem' }}>
+                        {selectedTicket.ticketId}
+                      </span>
+                      <span className={`status-pill ${selectedTicket.status}`}>
+                        {selectedTicket.status.replace(/_/g, ' ')}
+                      </span>
+                      <span className={`priority-pill ${selectedTicket.priority}`}>
+                        {selectedTicket.priority}
+                      </span>
+                      {selectedTicket.currentSubmissionVersion ? (
+                        <span style={{ background: 'rgba(0, 217, 255, 0.15)', color: '#00D9FF', fontWeight: '700', fontSize: '0.74rem', padding: '2px 8px', borderRadius: '4px' }}>
+                          Deliverables v{selectedTicket.currentSubmissionVersion}
+                        </span>
+                      ) : null}
+                    </div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginTop: '4px', marginBottom: 0, color: '#F5F5F5' }}>
+                      {selectedTicket.title}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    className="portal-btn-secondary"
+                    style={{ padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                    onClick={() => setSelectedTicket(null)}
+                  >
+                    <X size={16} />
+                    <span>Close</span>
+                  </button>
+                </div>
+
+                <div className="portal-modal-body">
+                  {/* Modal Navigation Tabs */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '8px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                      marginBottom: '1rem',
+                      paddingBottom: '8px',
+                      overflowX: 'auto',
+                      whiteSpace: 'nowrap',
+                      WebkitOverflowScrolling: 'touch'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setActiveTicketModalTab('scope')}
+                      style={{
+                        background: activeTicketModalTab === 'scope' ? 'rgba(0, 217, 255, 0.15)' : 'transparent',
+                        color: activeTicketModalTab === 'scope' ? '#00D9FF' : '#94A3B8',
+                        border: activeTicketModalTab === 'scope' ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
+                        borderRadius: '6px',
+                        padding: '6px 14px',
+                        fontSize: '0.82rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <TicketCheck size={15} /> Scope & Assignment
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTicketModalTab('deliverables')}
+                      style={{
+                        background: activeTicketModalTab === 'deliverables' ? 'rgba(0, 217, 255, 0.15)' : 'transparent',
+                        color: activeTicketModalTab === 'deliverables' ? '#00D9FF' : '#94A3B8',
+                        border: activeTicketModalTab === 'deliverables' ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
+                        borderRadius: '6px',
+                        padding: '6px 14px',
+                        fontSize: '0.82rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <FileCheck size={15} /> Deliverables & Submissions ({ticketSubmissions.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTicketModalTab('chat')}
+                      style={{
+                        background: activeTicketModalTab === 'chat' ? 'rgba(0, 217, 255, 0.15)' : 'transparent',
+                        color: activeTicketModalTab === 'chat' ? '#00D9FF' : '#94A3B8',
+                        border: activeTicketModalTab === 'chat' ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
+                        borderRadius: '6px',
+                        padding: '6px 14px',
+                        fontSize: '0.82rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <MessageSquare size={15} /> Jira Conversation Stream ({ticketMessages.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTicketModalTab('activity')}
+                      style={{
+                        background: activeTicketModalTab === 'activity' ? 'rgba(0, 217, 255, 0.15)' : 'transparent',
+                        color: activeTicketModalTab === 'activity' ? '#00D9FF' : '#94A3B8',
+                        border: activeTicketModalTab === 'activity' ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
+                        borderRadius: '6px',
+                        padding: '6px 14px',
+                        fontSize: '0.82rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Clock size={15} /> Audit Activity Timeline ({ticketActivity.length})
+                    </button>
+                  </div>
+
+                  {/* TAB 1: SCOPE, ATTACHMENTS & ASSIGNMENT */}
+                  {activeTicketModalTab === 'scope' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(280px, 1fr)', gap: '20px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#94A3B8', fontWeight: '700', letterSpacing: '0.04em' }}>
+                            Client Requirement Description
+                          </label>
+                          <div style={{ marginTop: '6px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '14px', fontSize: '0.9rem', color: '#F5F5F5', lineHeight: '1.6' }}>
+                            {selectedTicket.description}
+                          </div>
+                        </div>
+
+                        {selectedTicket.adminOverride?.isOverridden && (
+                          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '12px' }}>
+                            <div style={{ color: '#EF4444', fontWeight: '700', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <ShieldCheck size={16} /> Ticket Administratively Overridden
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: '#CBD5E1', marginTop: '4px' }}>
+                              Reason logged: "{selectedTicket.adminOverride.reason}"
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
+                          <div>
+                            <label style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#94A3B8', fontWeight: '700', letterSpacing: '0.04em' }}>
+                              Client Attached Documents ({selectedTicket.attachments.length})
+                            </label>
+                            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              {selectedTicket.attachments.map((att, idx) => (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '10px 14px',
+                                    background: 'rgba(255, 255, 255, 0.03)',
+                                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                                    borderRadius: '8px'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <FileText size={16} color="#00D9FF" />
+                                    <span style={{ fontSize: '0.85rem', color: '#F5F5F5' }}>{att.name}</span>
+                                  </div>
+                                  <a
+                                    href={att.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="portal-btn-secondary"
+                                    style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
+                                  >
+                                    Download
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right Panel: Specifications Card */}
+                      <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase' }}>Ticket Specifications</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
+                          <div>
+                            <span style={{ color: '#94A3B8', fontSize: '0.75rem', display: 'block' }}>Client Company:</span>
+                            <div style={{ color: '#F5F5F5', fontWeight: '700' }}>{selectedTicket.companyId?.name || 'Client'}</div>
+                          </div>
+                          <div>
+                            <span style={{ color: '#94A3B8', fontSize: '0.75rem', display: 'block' }}>Service Type:</span>
+                            <div style={{ color: '#00D9FF', fontWeight: '700' }}>{selectedTicket.serviceType ? selectedTicket.serviceType.replace(/_/g, ' ') : 'General'}</div>
+                          </div>
+                          <div>
+                            <span style={{ color: '#94A3B8', fontSize: '0.75rem', display: 'block' }}>Assigned Specialist:</span>
+                            <div style={{ color: '#F5F5F5' }}>
+                              {selectedTicket.assignedTo?.name || (selectedTicket.assignedTeam ? `${selectedTicket.assignedTeam} (Unassigned)` : 'Not Assigned')}
+                            </div>
+                          </div>
+                          <div>
+                            <span style={{ color: '#94A3B8', fontSize: '0.75rem', display: 'block' }}>Price & Payment:</span>
+                            <div style={{ color: '#34D399', fontWeight: '700' }}>
+                              ${selectedTicket.price || 0}.00 ({selectedTicket.paymentStatus || 'PAID'})
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: DELIVERABLES & SUBMISSIONS */}
+                  {activeTicketModalTab === 'deliverables' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {ticketSubmissions.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '2.5rem', color: '#94A3B8', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '10px', border: '1px dashed rgba(255, 255, 255, 0.1)' }}>
+                          <FileText size={32} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
+                          <p style={{ margin: 0, fontSize: '0.9rem' }}>No deliverables submitted yet for this ticket.</p>
+                        </div>
+                      ) : (
+                        ticketSubmissions.map((sub) => (
+                          <div
+                            key={sub._id}
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.02)',
+                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              borderRadius: '10px',
+                              padding: '16px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                              <span style={{ color: '#00D9FF', fontWeight: '800', fontSize: '1rem' }}>
+                                Version {sub.version}
+                              </span>
+                              <span className={`status-pill ${sub.status}`}>
+                                {sub.status}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '0.85rem', color: '#CBD5E1', margin: '0 0 12px 0' }}>
+                              {sub.notes || 'No submission notes provided.'}
+                            </p>
+                            {sub.files && sub.files.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {sub.files.map((f, fIdx) => (
+                                  <div
+                                    key={fIdx}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '8px 12px',
+                                      background: 'rgba(0, 0, 0, 0.3)',
+                                      borderRadius: '6px'
+                                    }}
+                                  >
+                                    <span style={{ fontSize: '0.8rem', color: '#F5F5F5' }}>{f.name}</span>
+                                    <a
+                                      href={f.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="portal-btn-secondary"
+                                      style={{ padding: '2px 8px', fontSize: '0.72rem' }}
+                                    >
+                                      Download
+                                    </a>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB 3: JIRA CONVERSATION */}
+                  {activeTicketModalTab === 'chat' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div className="ticket-chat-container" style={{ height: '320px', overflowY: 'auto' }}>
+                        {ticketMessages.length === 0 ? (
+                          <div style={{ textAlign: 'center', color: '#94A3B8', padding: '2rem 1rem', fontSize: '0.85rem' }}>
+                            No messages in this ticket yet.
+                          </div>
+                        ) : (
+                          ticketMessages.map((m) => (
+                            <div key={m._id} className={`chat-bubble ${m.senderRole === 'USER' ? 'client' : 'team'}`}>
+                              <div className="chat-bubble-sender">{m.senderName} ({m.senderRole})</div>
+                              <div>{m.text}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 4: AUDIT ACTIVITY TIMELINE */}
+                  {activeTicketModalTab === 'activity' && (
+                    <div>
+                      <ActivityTimeline activity={ticketActivity} />
+                    </div>
+                  )}
+                </div>
+
+                <div className="portal-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {selectedTicket.status !== 'COMPLETED' && (
+                      <button
+                        type="button"
+                        className="portal-btn-secondary"
+                        style={{ fontSize: '0.8rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#EF4444' }}
+                        onClick={() => handleOpenOverrideModal(selectedTicket)}
+                        title="Administrative override to force mark ticket as COMPLETED"
+                      >
+                        <ShieldCheck size={14} /> Admin Override: Complete
+                      </button>
+                    )}
+                  </div>
+                  <button className="portal-btn-secondary" onClick={() => setSelectedTicket(null)}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : isAddTeamUserModalOpen ? (
+            <div className="portal-ticket-detail-view">
+              <div className="portal-ticket-breadcrumb">
+                <button
+                  type="button"
+                  className="portal-breadcrumb-back-btn"
+                  onClick={() => setIsAddTeamUserModalOpen(false)}
+                >
+                  <ChevronLeft size={16} />
+                  <span>Back to Team & Permissions</span>
+                </button>
+                <div className="portal-breadcrumb-trail">
+                  <span>CreativeGini Admin</span>
+                  <span className="portal-breadcrumb-sep">/</span>
+                  <span>Team & Permissions</span>
+                  <span className="portal-breadcrumb-sep">/</span>
+                  <span className="portal-breadcrumb-current">Add Team Member</span>
+                </div>
+              </div>
+
+              <div className="portal-ticket-detail-card" style={{ maxWidth: '680px', margin: '0 auto' }}>
+                <div className="portal-modal-header portal-ticket-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '8px',
+                      background: 'rgba(0, 217, 255, 0.1)',
+                      border: '1px solid rgba(0, 217, 255, 0.25)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#00D9FF'
+                    }}>
+                      <UserPlus size={20} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: '700', margin: 0, color: '#F5F5F5' }}>
+                        Add Team Member
+                      </h3>
+                      <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: '2px 0 0 0' }}>
+                        Create an internal specialist account with granular dashboard access
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="portal-btn-secondary"
+                    style={{ padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                    onClick={() => setIsAddTeamUserModalOpen(false)}
+                  >
+                    <X size={16} />
+                    <span>Cancel</span>
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateTeamUser}>
+                  <div className="portal-modal-body">
+                    {/* Important Role Rule Guardrail Notice */}
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        background: 'rgba(0, 217, 255, 0.05)',
+                        border: '1px solid rgba(0, 217, 255, 0.2)',
+                        marginBottom: '1.5rem',
+                        fontSize: '0.84rem',
+                        color: '#CBD5E1',
+                        lineHeight: '1.5'
+                      }}
+                    >
+                      <strong style={{ color: '#00D9FF' }}>Strict Security Guardrail:</strong> This form creates internal specialist accounts. The new user will <strong style={{ color: '#F87171' }}>NEVER</strong> receive Admin Dashboard, Super Admin, or user management permissions. Their platform access is strictly scoped to the checked service dashboards below.
+                    </div>
+
+                    <div className="portal-form-group" style={{ marginBottom: '1.25rem' }}>
+                      <label className="portal-form-label">Full Name *</label>
+                      <input
+                        type="text"
+                        className="portal-form-input"
+                        placeholder="e.g. Alex Morgan"
+                        value={newTeamUserData.name}
+                        onChange={(e) => setNewTeamUserData({ ...newTeamUserData, name: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div className="portal-form-group" style={{ marginBottom: '1.25rem' }}>
+                      <label className="portal-form-label">Email Address *</label>
+                      <input
+                        type="email"
+                        className="portal-form-input"
+                        placeholder="e.g. alex@creativegini.com"
+                        value={newTeamUserData.email}
+                        onChange={(e) => setNewTeamUserData({ ...newTeamUserData, email: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                      <div className="portal-form-group">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <label className="portal-form-label" style={{ margin: 0 }}>Password *</label>
+                          <button
+                            type="button"
+                            onClick={handleGenerateTeamPassword}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#00D9FF',
+                              fontSize: '0.8rem',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '0 4px'
+                            }}
+                            title="Generate a secure random password"
+                          >
+                            <KeyRound size={13} />
+                            <span>Generate</span>
+                          </button>
+                        </div>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <input
+                            type={showTeamPassword ? 'text' : 'password'}
+                            className="portal-form-input"
+                            placeholder="Minimum 6 characters"
+                            value={newTeamUserData.password}
+                            onChange={(e) => setNewTeamUserData({ ...newTeamUserData, password: e.target.value })}
+                            style={{ paddingRight: '120px', fontFamily: showTeamPassword ? 'inherit' : 'monospace' }}
+                            required
+                          />
+                          <div style={{ position: 'absolute', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {/* Show/Hide Password Toggle */}
+                            <button
+                              type="button"
+                              className="portal-btn-secondary"
+                              onClick={() => setShowTeamPassword(prev => !prev)}
+                              title={showTeamPassword ? "Hide Password" : "Show Password"}
+                              aria-label={showTeamPassword ? "Hide Password" : "Show Password"}
+                              style={{
+                                padding: '4px 8px',
+                                height: '30px',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                borderRadius: '6px',
+                                color: showTeamPassword ? '#00D9FF' : '#94A3B8',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {showTeamPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                            </button>
+
+                            {/* Copy Password Button */}
+                            <button
+                              type="button"
+                              className="portal-btn-secondary"
+                              onClick={handleCopyTeamPassword}
+                              title="Copy Password"
+                              aria-label="Copy Password"
+                              style={{
+                                padding: '4px 10px',
+                                height: '30px',
+                                background: teamPasswordCopied ? 'rgba(52, 211, 153, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                                border: teamPasswordCopied ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+                                borderRadius: '6px',
+                                color: teamPasswordCopied ? '#34D399' : '#CBD5E1',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontSize: '0.78rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.18s ease'
+                              }}
+                            >
+                              {teamPasswordCopied ? <Check size={14} /> : <Copy size={14} />}
+                              <span>{teamPasswordCopied ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="portal-form-group">
+                        <label className="portal-form-label">Account Status</label>
+                        <select
+                          className="portal-form-select"
+                          value={newTeamUserData.status}
+                          onChange={(e) => setNewTeamUserData({ ...newTeamUserData, status: e.target.value })}
+                        >
+                          <option value="ACTIVE">ACTIVE</option>
+                          <option value="DISABLED">DISABLED</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="portal-form-group" style={{ marginBottom: '1.5rem' }}>
+                      <label className="portal-form-label" style={{ marginBottom: '10px', display: 'block' }}>
+                        Dashboard Access Permissions *
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {/* Company Boost */}
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            borderRadius: '8px',
+                            background: newTeamUserData.dashboardAccess.companyBoost ? 'rgba(0, 217, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                            border: newTeamUserData.dashboardAccess.companyBoost ? '1px solid rgba(0, 217, 255, 0.35)' : '1px solid rgba(255, 255, 255, 0.07)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <input
+                              type="checkbox"
+                              checked={newTeamUserData.dashboardAccess.companyBoost}
+                              onChange={(e) => setNewTeamUserData({
+                                ...newTeamUserData,
+                                dashboardAccess: { ...newTeamUserData.dashboardAccess, companyBoost: e.target.checked }
+                              })}
+                              style={{ accentColor: '#00D9FF', width: '18px', height: '18px', cursor: 'pointer' }}
+                            />
+                            <div>
+                              <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#F5F5F5' }}>
+                                Company Boost
+                              </div>
+                              <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
+                                SEO, Organic Traffic, Content, Brand Architecture
+                              </div>
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: newTeamUserData.dashboardAccess.companyBoost ? '#00D9FF' : '#64748B' }}>
+                            {newTeamUserData.dashboardAccess.companyBoost ? 'GRANTED' : 'RESTRICTED'}
+                          </span>
+                        </label>
+
+                        {/* Company Lead */}
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            borderRadius: '8px',
+                            background: newTeamUserData.dashboardAccess.companyLead ? 'rgba(0, 217, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                            border: newTeamUserData.dashboardAccess.companyLead ? '1px solid rgba(0, 217, 255, 0.35)' : '1px solid rgba(255, 255, 255, 0.07)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <input
+                              type="checkbox"
+                              checked={newTeamUserData.dashboardAccess.companyLead}
+                              onChange={(e) => setNewTeamUserData({
+                                ...newTeamUserData,
+                                dashboardAccess: { ...newTeamUserData.dashboardAccess, companyLead: e.target.checked }
+                              })}
+                              style={{ accentColor: '#00D9FF', width: '18px', height: '18px', cursor: 'pointer' }}
+                            />
+                            <div>
+                              <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#F5F5F5' }}>
+                                Company Lead
+                              </div>
+                              <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
+                                B2B Lead Generation, Prospecting, Outreach Pipeline
+                              </div>
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: newTeamUserData.dashboardAccess.companyLead ? '#00D9FF' : '#64748B' }}>
+                            {newTeamUserData.dashboardAccess.companyLead ? 'GRANTED' : 'RESTRICTED'}
+                          </span>
+                        </label>
+
+                        {/* Company UI */}
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            borderRadius: '8px',
+                            background: newTeamUserData.dashboardAccess.companyUI ? 'rgba(0, 217, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                            border: newTeamUserData.dashboardAccess.companyUI ? '1px solid rgba(0, 217, 255, 0.35)' : '1px solid rgba(255, 255, 255, 0.07)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <input
+                              type="checkbox"
+                              checked={newTeamUserData.dashboardAccess.companyUI}
+                              onChange={(e) => setNewTeamUserData({
+                                ...newTeamUserData,
+                                dashboardAccess: { ...newTeamUserData.dashboardAccess, companyUI: e.target.checked }
+                              })}
+                              style={{ accentColor: '#00D9FF', width: '18px', height: '18px', cursor: 'pointer' }}
+                            />
+                            <div>
+                              <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#F5F5F5' }}>
+                                Company UI
+                              </div>
+                              <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
+                                Landing Page Enhancement, Conversion Rate Optimization
+                              </div>
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: newTeamUserData.dashboardAccess.companyUI ? '#00D9FF' : '#64748B' }}>
+                            {newTeamUserData.dashboardAccess.companyUI ? 'GRANTED' : 'RESTRICTED'}
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="portal-modal-footer" style={{ padding: '16px 28px', background: 'rgba(4, 12, 18, 0.98)', borderTop: '1px solid var(--portal-border)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                    <button
+                      type="button"
+                      className="portal-btn-secondary"
+                      onClick={() => setIsAddTeamUserModalOpen(false)}
+                      disabled={isCreatingTeamUser}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="portal-btn-primary"
+                      disabled={isCreatingTeamUser}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                      <UserPlus size={16} />
+                      <span>{isCreatingTeamUser ? 'Creating User...' : 'Save Team Member'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* TAB 1: ADMIN CENTRAL OVERVIEW */}
+              {activeTab === 'overview' && (
             <>
               {/* Overview Metrics with Clickable 'Total Clients' - 3 Column Layout for Perfect 2-Row Symmetry */}
               <div className="portal-metrics-grid cols-3">
@@ -1178,7 +1969,7 @@ export default function AdminDashboard({ user, onLogout }) {
                       style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '0.88rem' }}
                     >
                       <UserPlus size={16} />
-                      <span>Add User</span>
+                      <span>Add Team Member</span>
                     </button>
                   </div>
                 </div>
@@ -1205,7 +1996,7 @@ export default function AdminDashboard({ user, onLogout }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {teamMembers.map((member) => {
                   const isEditing = editingPermissionsUserId === member._id;
-                  const isMemberAdmin = member.role === 'ADMIN';
+                  const isMemberAdmin = member.role === 'ADMIN' || member.email === 'admin@creativegini.com' || String(member._id || member.id) === String(user?.id || user?._id);
                   const da = member.dashboardAccess || {};
 
                   return (
@@ -1848,7 +2639,82 @@ export default function AdminDashboard({ user, onLogout }) {
               </div>
             </div>
           )}
+            </>
+          )}
         </div>
+
+        {/* DELETE TEAM MEMBER CONFIRMATION (SCOPED INSIDE DASHBOARD SHELL - PRESERVES TOPBAR & SIDEBAR) */}
+        {deletingTeamMember && (
+          <div className="portal-shell-modal-overlay" onClick={() => setDeletingTeamMember(null)}>
+            <div className="portal-modal-card" style={{ maxWidth: '480px', borderTop: '4px solid #ef4444' }} onClick={(e) => e.stopPropagation()}>
+              <div className="portal-modal-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#EF4444' }}>
+                  <AlertTriangle size={22} />
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: '700', margin: 0, color: '#F5F5F5' }}>
+                    Delete Team Member?
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
+                  onClick={() => setDeletingTeamMember(null)}
+                  title="Close dialog"
+                  aria-label="Close dialog"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="portal-modal-body">
+                <p style={{ color: '#CBD5E1', fontSize: '0.92rem', margin: '0 0 1.25rem 0', lineHeight: 1.5 }}>
+                  This team member will be deactivated and will no longer have access to CreativeGini service dashboards.
+                </p>
+
+                <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '8px', padding: '1rem', fontSize: '0.9rem', color: '#CBD5E1' }}>
+                  <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94A3B8' }}>Team Member:</span>
+                    <span style={{ fontWeight: '700', color: '#F5F5F5' }}>{deletingTeamMember.name}</span>
+                  </div>
+                  <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94A3B8' }}>Email:</span>
+                    <span style={{ fontWeight: '600', color: '#00D9FF' }}>{deletingTeamMember.email}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94A3B8' }}>Role:</span>
+                    <span style={{ fontWeight: '600', color: '#CBD5E1' }}>
+                      {deletingTeamMember.role === 'ADMIN' ? 'Super Admin' : deletingTeamMember.role === 'COMPANY_LEAD' ? 'Company Lead Specialist' : deletingTeamMember.role === 'COMPANY_BOOST' ? 'Growth Strategist' : deletingTeamMember.role === 'LANDING_PAGE' ? 'UI/UX Architect' : deletingTeamMember.role}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="portal-modal-footer">
+                <button
+                  type="button"
+                  className="portal-btn-secondary"
+                  onClick={() => setDeletingTeamMember(null)}
+                  disabled={isDeletingTeamMember}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="portal-btn-primary"
+                  style={{
+                    background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
+                    borderColor: 'rgba(239, 68, 68, 0.5)',
+                    color: '#FFFFFF', fontWeight: '700',
+                    boxShadow: '0 0 15px rgba(239, 68, 68, 0.35)'
+                  }}
+                  onClick={handleConfirmDeleteTeamMember}
+                  disabled={isDeletingTeamMember}
+                >
+                  {isDeletingTeamMember ? 'Deleting...' : 'Delete Team Member'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* MODAL 1: CREATE CLIENT USER FORM */}
@@ -2556,353 +3422,6 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       )}
 
-      {/* MODAL 6: TICKET INSPECTION & WORKFLOW OVERSIGHT MODAL */}
-      {selectedTicket && (
-        <div className="portal-modal-overlay" onClick={() => setSelectedTicket(null)}>
-          <div className="portal-modal-card wide" onClick={(e) => e.stopPropagation()}>
-            <div className="portal-modal-header">
-              <div>
-                <div className="portal-modal-header-badges">
-                  <span style={{ fontFamily: 'monospace', fontWeight: '800', color: '#00D9FF', fontSize: '1.15rem' }}>
-                    {selectedTicket.ticketId}
-                  </span>
-                  <span className={`status-pill ${selectedTicket.status}`}>
-                    {selectedTicket.status.replace(/_/g, ' ')}
-                  </span>
-                  <span className={`priority-pill ${selectedTicket.priority}`}>
-                    {selectedTicket.priority}
-                  </span>
-                  {selectedTicket.currentSubmissionVersion ? (
-                    <span style={{ background: 'rgba(0, 217, 255, 0.15)', color: '#00D9FF', fontWeight: '700', fontSize: '0.74rem', padding: '2px 8px', borderRadius: '4px' }}>
-                      Deliverables v{selectedTicket.currentSubmissionVersion}
-                    </span>
-                  ) : null}
-                </div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginTop: '4px', marginBottom: 0, color: '#F5F5F5' }}>
-                  {selectedTicket.title}
-                </h3>
-              </div>
-              <button
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
-                onClick={() => setSelectedTicket(null)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="portal-modal-body">
-              {/* Modal Navigation Tabs */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '8px',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                  marginBottom: '1rem',
-                  paddingBottom: '8px',
-                  overflowX: 'auto',
-                  whiteSpace: 'nowrap',
-                  WebkitOverflowScrolling: 'touch'
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setActiveTicketModalTab('scope')}
-                  style={{
-                    background: activeTicketModalTab === 'scope' ? 'rgba(0, 217, 255, 0.15)' : 'transparent',
-                    color: activeTicketModalTab === 'scope' ? '#00D9FF' : '#94A3B8',
-                    border: activeTicketModalTab === 'scope' ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
-                    borderRadius: '6px',
-                    padding: '6px 14px',
-                    fontSize: '0.82rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <TicketCheck size={15} /> Scope & Assignment
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTicketModalTab('deliverables')}
-                  style={{
-                    background: activeTicketModalTab === 'deliverables' ? 'rgba(0, 217, 255, 0.15)' : 'transparent',
-                    color: activeTicketModalTab === 'deliverables' ? '#00D9FF' : '#94A3B8',
-                    border: activeTicketModalTab === 'deliverables' ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
-                    borderRadius: '6px',
-                    padding: '6px 14px',
-                    fontSize: '0.82rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <FileCheck size={15} /> Deliverables & Submissions ({ticketSubmissions.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTicketModalTab('chat')}
-                  style={{
-                    background: activeTicketModalTab === 'chat' ? 'rgba(0, 217, 255, 0.15)' : 'transparent',
-                    color: activeTicketModalTab === 'chat' ? '#00D9FF' : '#94A3B8',
-                    border: activeTicketModalTab === 'chat' ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
-                    borderRadius: '6px',
-                    padding: '6px 14px',
-                    fontSize: '0.82rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <MessageSquare size={15} /> Conversation ({ticketMessages.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTicketModalTab('activity')}
-                  style={{
-                    background: activeTicketModalTab === 'activity' ? 'rgba(0, 217, 255, 0.15)' : 'transparent',
-                    color: activeTicketModalTab === 'activity' ? '#00D9FF' : '#94A3B8',
-                    border: activeTicketModalTab === 'activity' ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
-                    borderRadius: '6px',
-                    padding: '6px 14px',
-                    fontSize: '0.82rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <Activity size={15} /> Audit Activity Timeline
-                </button>
-              </div>
-
-              {/* TAB 1: SCOPE & ASSIGNMENT */}
-              {activeTicketModalTab === 'scope' && (
-                <div>
-                  <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '1rem', borderRadius: '8px', marginBottom: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem', fontSize: '0.85rem' }}>
-                    <div>
-                      <span style={{ color: '#94A3B8' }}>Client:</span>
-                      <div style={{ color: '#F5F5F5', fontWeight: '700' }}>{selectedTicket.companyId?.name || 'Client'}</div>
-                    </div>
-                    <div>
-                      <span style={{ color: '#94A3B8' }}>Service:</span>
-                      <div style={{ color: '#00D9FF', fontWeight: '700' }}>{selectedTicket.serviceType.replace('_', ' ')}</div>
-                    </div>
-                    <div>
-                      <span style={{ color: '#94A3B8' }}>Assigned Specialist:</span>
-                      <div style={{ color: '#34D399', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <UserCheck size={14} />
-                        {selectedTicket.assignedTo?.name || (selectedTicket.assignedTeam ? `${selectedTicket.assignedTeam} (Unassigned)` : 'Not Assigned')}
-                      </div>
-                    </div>
-                    <div>
-                      <span style={{ color: '#94A3B8' }}>Price & Payment:</span>
-                      <div style={{ color: '#34D399', fontWeight: '700' }}>
-                        ${selectedTicket.price || 0}.00 ({selectedTicket.paymentStatus || 'PAID'})
-                      </div>
-                    </div>
-                  </div>
-
-                  <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: '#00D9FF', marginBottom: '6px', letterSpacing: '0.04em' }}>Requirement Scope</h5>
-                  <p style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '0.85rem', borderRadius: '8px', fontSize: '0.88rem', margin: '0 0 1rem 0', color: '#CBD5E1', lineHeight: 1.5 }}>
-                    {selectedTicket.description}
-                  </p>
-
-                  {/* Override Warning or Notification if Overridden */}
-                  {selectedTicket.adminOverride?.isOverridden && (
-                    <div
-                      style={{
-                        padding: '12px 14px',
-                        borderRadius: '8px',
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        marginBottom: '1rem'
-                      }}
-                    >
-                      <div style={{ color: '#ef4444', fontWeight: '700', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <AlertTriangle size={15} /> Administratively Overridden to COMPLETED
-                      </div>
-                      <div style={{ color: '#CBD5E1', fontSize: '0.8rem', marginTop: '4px' }}>
-                        Reason logged: "{selectedTicket.adminOverride.reason}"
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TAB 2: DELIVERABLES & SUBMISSIONS */}
-              {activeTicketModalTab === 'deliverables' && (
-                <div>
-                  <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 10px 0', letterSpacing: '0.04em' }}>
-                    All Submitted Deliverables ({ticketSubmissions.length})
-                  </h5>
-                  {ticketSubmissions.length === 0 ? (
-                    <div style={{ color: '#94A3B8', fontSize: '0.85rem', padding: '2rem', textAlign: 'center', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px' }}>
-                      No formal deliverables submitted through the portal yet.
-                    </div>
-                  ) : (
-                    ticketSubmissions.map((sub) => (
-                      <div
-                        key={sub._id}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid rgba(255, 255, 255, 0.08)',
-                          borderRadius: '8px',
-                          padding: '14px',
-                          marginBottom: '10px'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ background: 'rgba(0, 217, 255, 0.15)', color: '#00D9FF', fontWeight: '700', fontSize: '0.74rem', padding: '2px 8px', borderRadius: '4px' }}>
-                                Version v{sub.version}
-                              </span>
-                              <span style={{ fontSize: '0.88rem', fontWeight: '600', color: '#F5F5F5' }}>
-                                {sub.title}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: '0.76rem', color: '#94A3B8', marginTop: '4px' }}>
-                              Submitted by {sub.submittedByName || 'Specialist'} on{' '}
-                              {new Date(sub.submittedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </div>
-                          </div>
-                          <div>
-                            {sub.status === 'APPROVED' && (
-                              <span className="status-pill COMPLETED" style={{ fontSize: '0.7rem' }}>Approved by Client</span>
-                            )}
-                            {sub.status === 'CHANGES_REQUESTED' && (
-                              <span className="status-pill CHANGES_REQUESTED" style={{ fontSize: '0.7rem' }}>Changes Requested</span>
-                            )}
-                            {sub.status === 'PENDING_REVIEW' && (
-                              <span className="status-pill CLIENT_REVIEW" style={{ fontSize: '0.7rem' }}>Under Client Review</span>
-                            )}
-                          </div>
-                        </div>
-
-                        <p style={{ color: '#CBD5E1', fontSize: '0.84rem', lineHeight: '1.5', margin: '8px 0', background: 'rgba(255, 255, 255, 0.02)', padding: '10px', borderRadius: '6px' }}>
-                          {sub.description}
-                        </p>
-
-                        {sub.files && sub.files.length > 0 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
-                            {sub.files.map((file, fIdx) => (
-                              <div
-                                key={fIdx}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '6px 10px',
-                                  borderRadius: '6px',
-                                  background: 'rgba(255, 255, 255, 0.03)',
-                                  border: '1px solid rgba(255, 255, 255, 0.08)'
-                                }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <FileText size={15} color="#00D9FF" />
-                                  <span style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>{file.name}</span>
-                                </div>
-                                <a
-                                  href={file.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="portal-btn-secondary"
-                                  style={{ padding: '3px 8px', fontSize: '0.74rem', textDecoration: 'none' }}
-                                >
-                                  View / Download
-                                </a>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {sub.externalLink && (
-                          <div style={{ marginTop: '8px', fontSize: '0.8rem' }}>
-                            <span style={{ color: '#94A3B8' }}>External Link: </span>
-                            <a href={sub.externalLink} target="_blank" rel="noopener noreferrer" style={{ color: '#00D9FF', textDecoration: 'none' }}>
-                              {sub.externalLink}
-                            </a>
-                          </div>
-                        )}
-
-                        {sub.review && (
-                          <div
-                            style={{
-                              marginTop: '10px',
-                              padding: '8px 10px',
-                              borderRadius: '6px',
-                              background: sub.review.status === 'APPROVED' ? 'rgba(52, 211, 153, 0.08)' : 'rgba(245, 158, 11, 0.08)',
-                              border: sub.review.status === 'APPROVED' ? '1px solid rgba(52, 211, 153, 0.25)' : '1px solid rgba(245, 158, 11, 0.25)'
-                            }}
-                          >
-                            <div style={{ fontWeight: '700', fontSize: '0.78rem', color: sub.review.status === 'APPROVED' ? '#34D399' : '#FFB000' }}>
-                              Client Review Feedback ({sub.review.reviewerName || 'Client'}):
-                            </div>
-                            <div style={{ fontSize: '0.82rem', color: '#CBD5E1', marginTop: '2px' }}>
-                              "{sub.review.feedback}"
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-              {/* TAB 3: CONVERSATION */}
-              {activeTicketModalTab === 'chat' && (
-                <div className="ticket-chat-container" style={{ height: '300px', overflowY: 'auto' }}>
-                  {ticketMessages.length === 0 ? (
-                    <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem 1rem', fontSize: '0.85rem' }}>
-                      No messages recorded yet.
-                    </div>
-                  ) : (
-                    ticketMessages.map(m => (
-                      <div key={m._id} className={`chat-bubble ${m.senderRole === 'USER' ? 'client' : 'team'}`}>
-                        <div className="chat-bubble-sender">{m.senderName} ({m.senderRole})</div>
-                        <div>{m.text}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-              {/* TAB 4: AUDIT ACTIVITY TIMELINE */}
-              {activeTicketModalTab === 'activity' && (
-                <div>
-                  <ActivityTimeline activity={ticketActivity} />
-                </div>
-              )}
-            </div>
-
-            <div className="portal-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {selectedTicket.status !== 'COMPLETED' && (
-                  <button
-                    type="button"
-                    className="portal-btn-secondary"
-                    style={{ fontSize: '0.8rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#EF4444' }}
-                    onClick={() => handleOpenOverrideModal(selectedTicket)}
-                    title="Administrative override to force mark ticket as COMPLETED"
-                  >
-                    <ShieldCheck size={14} /> Admin Override: Complete
-                  </button>
-                )}
-              </div>
-              <button className="portal-btn-secondary" onClick={() => setSelectedTicket(null)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* MODAL: ADMIN OVERRIDE TO FORCE COMPLETE */}
       {overrideModalTicket && (
@@ -3055,301 +3574,9 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       )}
 
-      {/* MODAL 8: ADD NEW INTERNAL TEAM USER (REQUIREMENTS 2, 3, 4, 5) */}
-      {isAddTeamUserModalOpen && (
-        <div className="portal-modal-overlay" onClick={() => setIsAddTeamUserModalOpen(false)}>
-          <div className="portal-modal-card" style={{ maxWidth: '560px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="portal-modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#00D9FF' }}>
-                <UserPlus size={22} />
-                <h3 style={{ fontSize: '1.2rem', fontWeight: '700', margin: 0, color: '#F5F5F5' }}>
-                  Add New Team User
-                </h3>
-              </div>
-              <button
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
-                onClick={() => setIsAddTeamUserModalOpen(false)}
-              >
-                <X size={20} />
-              </button>
-            </div>
 
-            <form onSubmit={handleCreateTeamUser}>
-              <div className="portal-modal-body">
-                {/* Important Role Rule Guardrail Notice */}
-                <div
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    background: 'rgba(0, 217, 255, 0.05)',
-                    border: '1px solid rgba(0, 217, 255, 0.2)',
-                    marginBottom: '1.25rem',
-                    fontSize: '0.84rem',
-                    color: '#CBD5E1',
-                    lineHeight: '1.45'
-                  }}
-                >
-                  <strong style={{ color: '#00D9FF' }}>Strict Security Guardrail:</strong> This form creates internal specialist accounts. The new user will <strong style={{ color: '#F87171' }}>NEVER</strong> receive Admin Dashboard, Super Admin, or user management permissions. Their platform access is strictly scoped to the checked service dashboards below.
-                </div>
 
-                <div className="portal-form-group" style={{ marginBottom: '1rem' }}>
-                  <label className="portal-form-label">Full Name *</label>
-                  <input
-                    type="text"
-                    className="portal-form-input"
-                    placeholder="e.g. Alex Morgan"
-                    value={newTeamUserData.name}
-                    onChange={(e) => setNewTeamUserData({ ...newTeamUserData, name: e.target.value })}
-                    required
-                  />
-                </div>
 
-                <div className="portal-form-group" style={{ marginBottom: '1rem' }}>
-                  <label className="portal-form-label">Email Address *</label>
-                  <input
-                    type="email"
-                    className="portal-form-input"
-                    placeholder="e.g. alex@creativegini.com"
-                    value={newTeamUserData.email}
-                    onChange={(e) => setNewTeamUserData({ ...newTeamUserData, email: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-                  <div className="portal-form-group">
-                    <label className="portal-form-label">Password *</label>
-                    <input
-                      type="password"
-                      className="portal-form-input"
-                      placeholder="Minimum 6 characters"
-                      value={newTeamUserData.password}
-                      onChange={(e) => setNewTeamUserData({ ...newTeamUserData, password: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="portal-form-group">
-                    <label className="portal-form-label">Account Status</label>
-                    <select
-                      className="portal-form-select"
-                      value={newTeamUserData.status}
-                      onChange={(e) => setNewTeamUserData({ ...newTeamUserData, status: e.target.value })}
-                    >
-                      <option value="ACTIVE">ACTIVE</option>
-                      <option value="DISABLED">DISABLED</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="portal-form-group">
-                  <label className="portal-form-label" style={{ marginBottom: '8px', display: 'block' }}>
-                    Dashboard Access Permissions *
-                  </label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {/* Company Boost */}
-                    <label
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
-                        background: newTeamUserData.dashboardAccess.companyBoost ? 'rgba(0, 217, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                        border: newTeamUserData.dashboardAccess.companyBoost ? '1px solid rgba(0, 217, 255, 0.35)' : '1px solid rgba(255, 255, 255, 0.07)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <input
-                          type="checkbox"
-                          checked={newTeamUserData.dashboardAccess.companyBoost}
-                          onChange={(e) => setNewTeamUserData({
-                            ...newTeamUserData,
-                            dashboardAccess: { ...newTeamUserData.dashboardAccess, companyBoost: e.target.checked }
-                          })}
-                          style={{ accentColor: '#00D9FF', width: '16px', height: '16px', cursor: 'pointer' }}
-                        />
-                        <div>
-                          <div style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5' }}>
-                            Company Boost
-                          </div>
-                          <div style={{ fontSize: '0.76rem', color: '#94A3B8' }}>
-                            SEO, Organic Traffic, Content, Brand Architecture
-                          </div>
-                        </div>
-                      </div>
-                      <span style={{ fontSize: '0.75rem', fontWeight: '700', color: newTeamUserData.dashboardAccess.companyBoost ? '#00D9FF' : '#64748B' }}>
-                        {newTeamUserData.dashboardAccess.companyBoost ? 'GRANTED' : 'RESTRICTED'}
-                      </span>
-                    </label>
-
-                    {/* Company Lead */}
-                    <label
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
-                        background: newTeamUserData.dashboardAccess.companyLead ? 'rgba(0, 217, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                        border: newTeamUserData.dashboardAccess.companyLead ? '1px solid rgba(0, 217, 255, 0.35)' : '1px solid rgba(255, 255, 255, 0.07)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <input
-                          type="checkbox"
-                          checked={newTeamUserData.dashboardAccess.companyLead}
-                          onChange={(e) => setNewTeamUserData({
-                            ...newTeamUserData,
-                            dashboardAccess: { ...newTeamUserData.dashboardAccess, companyLead: e.target.checked }
-                          })}
-                          style={{ accentColor: '#00D9FF', width: '16px', height: '16px', cursor: 'pointer' }}
-                        />
-                        <div>
-                          <div style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5' }}>
-                            Company Lead
-                          </div>
-                          <div style={{ fontSize: '0.76rem', color: '#94A3B8' }}>
-                            B2B Lead Generation, Prospecting, Outreach Pipeline
-                          </div>
-                        </div>
-                      </div>
-                      <span style={{ fontSize: '0.75rem', fontWeight: '700', color: newTeamUserData.dashboardAccess.companyLead ? '#00D9FF' : '#64748B' }}>
-                        {newTeamUserData.dashboardAccess.companyLead ? 'GRANTED' : 'RESTRICTED'}
-                      </span>
-                    </label>
-
-                    {/* Company UI */}
-                    <label
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
-                        background: newTeamUserData.dashboardAccess.companyUI ? 'rgba(0, 217, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                        border: newTeamUserData.dashboardAccess.companyUI ? '1px solid rgba(0, 217, 255, 0.35)' : '1px solid rgba(255, 255, 255, 0.07)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <input
-                          type="checkbox"
-                          checked={newTeamUserData.dashboardAccess.companyUI}
-                          onChange={(e) => setNewTeamUserData({
-                            ...newTeamUserData,
-                            dashboardAccess: { ...newTeamUserData.dashboardAccess, companyUI: e.target.checked }
-                          })}
-                          style={{ accentColor: '#00D9FF', width: '16px', height: '16px', cursor: 'pointer' }}
-                        />
-                        <div>
-                          <div style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5' }}>
-                            Company UI
-                          </div>
-                          <div style={{ fontSize: '0.76rem', color: '#94A3B8' }}>
-                            Landing Page Enhancement, Conversion Rate Optimization
-                          </div>
-                        </div>
-                      </div>
-                      <span style={{ fontSize: '0.75rem', fontWeight: '700', color: newTeamUserData.dashboardAccess.companyUI ? '#00D9FF' : '#64748B' }}>
-                        {newTeamUserData.dashboardAccess.companyUI ? 'GRANTED' : 'RESTRICTED'}
-                      </span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="portal-modal-footer">
-                <button
-                  type="button"
-                  className="portal-btn-secondary"
-                  onClick={() => setIsAddTeamUserModalOpen(false)}
-                  disabled={isCreatingTeamUser}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="portal-btn-primary"
-                  disabled={isCreatingTeamUser}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                >
-                  <UserPlus size={16} />
-                  <span>{isCreatingTeamUser ? 'Creating User...' : 'Create Team User'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 9: DELETE TEAM USER CONFIRMATION (REQUIREMENT 4) */}
-      {deletingTeamMember && (
-        <div className="portal-modal-overlay" onClick={() => setDeletingTeamMember(null)}>
-          <div className="portal-modal-card" style={{ maxWidth: '480px', borderTop: '4px solid #ef4444' }} onClick={(e) => e.stopPropagation()}>
-            <div className="portal-modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#EF4444' }}>
-                <AlertTriangle size={22} />
-                <h3 style={{ fontSize: '1.2rem', fontWeight: '700', margin: 0, color: '#F5F5F5' }}>
-                  Delete User?
-                </h3>
-              </div>
-              <button
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
-                onClick={() => setDeletingTeamMember(null)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="portal-modal-body">
-              <p style={{ color: '#CBD5E1', fontSize: '0.92rem', margin: '0 0 1.25rem 0', lineHeight: 1.5 }}>
-                This user will no longer have access to CreativeGini service dashboards.
-              </p>
-
-              <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '8px', padding: '1rem', fontSize: '0.9rem', color: '#CBD5E1' }}>
-                <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#94A3B8' }}>User Name:</span>
-                  <span style={{ fontWeight: '700', color: '#F5F5F5' }}>{deletingTeamMember.name}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#94A3B8' }}>User Email:</span>
-                  <span style={{ fontWeight: '600', color: '#00D9FF' }}>{deletingTeamMember.email}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="portal-modal-footer">
-              <button
-                type="button"
-                className="portal-btn-secondary"
-                onClick={() => setDeletingTeamMember(null)}
-                disabled={isDeletingTeamMember}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="portal-btn-primary"
-                style={{
-                  background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
-                  borderColor: 'rgba(239, 68, 68, 0.5)',
-                  color: '#FFFFFF', fontWeight: '700',
-                  boxShadow: '0 0 15px rgba(239, 68, 68, 0.35)'
-                }}
-                onClick={handleConfirmDeleteTeamMember}
-                disabled={isDeletingTeamMember}
-              >
-                {isDeletingTeamMember ? 'Deleting...' : 'Delete User'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
 
     </div>

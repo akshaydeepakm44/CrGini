@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch-path=src src/server.js",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "test:email": "node test-email-system.js",
+    "test:workflow": "node test-integration-workflow.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -16,6 +18,7 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.2",
+    "nodemailer": "^10.0.10",
     "pg": "^8.23.0"
   }
 }
