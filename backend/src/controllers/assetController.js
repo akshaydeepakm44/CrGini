@@ -44,6 +44,11 @@ const groupAssetsByTicket = (assets) => {
         ticketCode: asset.ticketCode,
         requestTitle: asset.requestTitle,
         serviceType: asset.serviceType,
+        companyId: asset.companyId,
+        companyName: asset.companyName || 'Client Workspace',
+        userId: asset.userId,
+        clientName: asset.clientName || 'Client User',
+        clientEmail: asset.clientEmail || null,
         latestSubmittedAt: asset.submittedAt,
         totalFiles: 0,
         submissionMap: new Map(),
@@ -77,6 +82,11 @@ const groupAssetsByTicket = (assets) => {
     ticketCode: ticket.ticketCode,
     requestTitle: ticket.requestTitle,
     serviceType: ticket.serviceType,
+    companyId: ticket.companyId,
+    companyName: ticket.companyName,
+    userId: ticket.userId,
+    clientName: ticket.clientName,
+    clientEmail: ticket.clientEmail,
     latestSubmittedAt: ticket.latestSubmittedAt,
     totalFiles: ticket.totalFiles,
     submissions: Array.from(ticket.submissionMap.values()).sort(
@@ -94,7 +104,11 @@ export const getAssets = async (req, res) => {
     const userCompanyId = req.user.companyId || (req.user.company && (req.user.company._id || req.user.company.id));
     const userId = req.user._id || req.user.id;
 
-    const { search, requestId, type, sort } = req.query;
+    const { search, requestId, type, sort, companyId } = req.query;
+
+    const effectiveCompanyId = req.user.role === 'ADMIN'
+      ? (companyId || null)
+      : userCompanyId;
 
     let serviceTypes = [];
     if (['COMPANY_LEAD', 'COMPANY_BOOST', 'LANDING_PAGE'].includes(req.user.role)) {
@@ -103,7 +117,7 @@ export const getAssets = async (req, res) => {
 
     const assets = await findAssets({
       userId,
-      companyId: userCompanyId,
+      companyId: effectiveCompanyId,
       role: req.user.role,
       serviceTypes,
       search,

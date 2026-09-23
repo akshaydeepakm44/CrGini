@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { query } from '../config/postgres.js';
 import {
   findUserById,
   findUserByEmail,
@@ -14,15 +15,64 @@ import {
   createCompany,
   updateCompany,
 } from '../repositories/companyRepository.js';
-import { query } from '../config/postgres.js';
+import path from 'path';
 import {
   createActivityLog,
   listActivityLogs,
 } from '../repositories/activityLogRepository.js';
 import {
+  createRequest,
+} from '../repositories/requestRepository.js';
+import {
+  createSubmission,
+} from '../repositories/submissionRepository.js';
+import {
+  findOnboardingTicketByUserId,
+  replaceSubmissionFiles,
+} from '../repositories/assetRepository.js';
+import {
+  generateTicketId,
+} from './requestController.js';
+import {
   buildWelcomeEmailTemplate,
   sendWelcomeEmail,
 } from '../services/emailService.js';
+
+const DANGEROUS_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.vbs', '.msi', '.com', '.scr', '.pif'];
+
+const validatePosterFile = (file) => {
+  if (!file) return { valid: false, error: 'Poster file is required.' };
+  const fileName = file.name || file.fileName;
+  const fileData = file.url || file.dataUrl;
+  if (!fileName || !fileData) return { valid: false, error: 'Poster file must include filename and file data.' };
+  const ext = path.extname(fileName).toLowerCase();
+  if (DANGEROUS_EXTENSIONS.includes(ext)) {
+    return { valid: false, error: `Dangerous file extension "${ext}" is not permitted.` };
+  }
+  const mime = (file.type || file.mimeType || '').toLowerCase();
+  const validImageExts = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg'];
+  if (!mime.startsWith('image/') && !validImageExts.includes(ext)) {
+    return { valid: false, error: 'Poster must be a valid image file (PNG, JPG, WEBP).' };
+  }
+  return { valid: true };
+};
+
+const validateVideoFile = (file) => {
+  if (!file) return { valid: false, error: 'Video file is required.' };
+  const fileName = file.name || file.fileName;
+  const fileData = file.url || file.dataUrl;
+  if (!fileName || !fileData) return { valid: false, error: 'Video file must include filename and file data.' };
+  const ext = path.extname(fileName).toLowerCase();
+  if (DANGEROUS_EXTENSIONS.includes(ext)) {
+    return { valid: false, error: `Dangerous file extension "${ext}" is not permitted.` };
+  }
+  const mime = (file.type || file.mimeType || '').toLowerCase();
+  const validVideoExts = ['.mp4', '.webm', '.mov', '.mkv'];
+  if (!mime.startsWith('video/') && !validVideoExts.includes(ext)) {
+    return { valid: false, error: 'Video must be a valid video file (MP4, WebM, MOV).' };
+  }
+  return { valid: true };
+};
 
 // Helper to generate a friendly secure temporary password
 const generateTempPassword = () => {
@@ -57,7 +107,10 @@ export const createClientUser = async (req, res) => {
       researchSummary,
       initialLeads,
       initialKeyPeople,
-      password
+      password,
+      poster,
+      video,
+      existingUserId
     } = req.body;
 
     const clientName = (contactPerson || name || '').trim();
@@ -71,6 +124,136 @@ export const createClientUser = async (req, res) => {
       });
     }
 
+    // Validate Poster if provided
+    if (poster) {
+      const v = validatePosterFile(poster);
+      if (!v.valid) {
+        return res.status(400).json({ success: false, message: v.error });
+      }
+    }
+
+    // Validate Video if provided
+    if (video) {
+      const v = validateVideoFile(video);
+      if (!v.valid) {
+        return res.status(400).json({ success: false, message: v.error });
+      }
+    }
+
+    const normalizeAsset = (f) => {
+      if (!f) return null;
+      return {
+        name: f.name || f.fileName,
+        url: f.url || f.dataUrl,
+        size: f.size || null,
+        type: f.type || f.mimeType || null,
+      };
+    };
+
+    const assetsList = [normalizeAsset(poster), normalizeAsset(video)].filter(Boolean);
+
+    // =========================================================================
+    // CASE A: UPDATE EXISTING CLIENT USER & ONBOARDING ASSETS (PREVIOUS -> CONTINUE)
+    // =========================================================================
+    if (existingUserId) {
+      const user = await findUserById(existingUserId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Client user not found for update.'
+        });
+      }
+
+      // Update Company
+      let company = user.companyId ? await findCompanyById(user.companyId) : null;
+      if (company) {
+        company = await updateCompany(company.id, {
+          name: compName,
+          contactPerson: clientName,
+          email: userEmail,
+          phone: phone || null,
+          website: website || null,
+          industry: industry || 'Technology / SaaS',
+          companyInfo: companyInfo || description || null,
+          researchSummary: researchSummary || 'Pre-researched market positioning and initial leads provided by CreativeGini.',
+        });
+      }
+
+      // Update User
+      const updatedUser = await updateUserInDB(user.id, {
+        name: clientName,
+        email: userEmail,
+        phone: phone || null,
+      });
+
+      // Update or Create Onboarding Assets cleanly
+      let onboardingTicket = await findOnboardingTicketByUserId(user.id);
+
+      if (onboardingTicket && onboardingTicket.submission_id) {
+        if (assetsList.length > 0) {
+          await replaceSubmissionFiles(onboardingTicket.submission_id, assetsList);
+        }
+      } else if (assetsList.length > 0) {
+        const ticketCode = await generateTicketId();
+        const reqResult = await createRequest({
+          ticketId: ticketCode,
+          userId: user.id,
+          companyId: company ? company.id : null,
+          serviceType: 'COMPANY_LEAD',
+          title: 'Welcome / Initial Marketing Assets',
+          description: 'Initial marketing poster and motion video deliverables provided upon onboarding.',
+          priority: 'MEDIUM',
+          status: 'COMPLETED',
+          price: 0,
+          paymentStatus: 'PAID',
+          assignedTeam: 'CreativeGini Core Team',
+          completedAt: new Date(),
+        });
+
+        const submission = await createSubmission({
+          ticketId: reqResult.id,
+          ticketCode,
+          version: 1,
+          title: 'Initial Deliverables V1 - Welcome Assets',
+          description: 'Initial welcome campaign poster and motion demo video.',
+          submittedBy: req.user.id || req.user._id,
+          submittedByName: req.user.name || 'CreativeGini Admin',
+          status: 'APPROVED',
+          files: assetsList,
+        });
+
+        onboardingTicket = {
+          id: reqResult.id,
+          ticketId: ticketCode,
+          title: 'Welcome / Initial Marketing Assets',
+          submission_id: submission._id || submission.id,
+        };
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Client user and onboarding assets updated successfully.',
+        user: {
+          _id: updatedUser.id,
+          id: updatedUser.id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          role: updatedUser.role,
+          status: updatedUser.status,
+          company: company
+        },
+        onboardingTicket: onboardingTicket ? {
+          id: onboardingTicket.id,
+          ticketId: onboardingTicket.ticketId || onboardingTicket.ticket_id,
+          title: onboardingTicket.title
+        } : null,
+        initialAssets: assetsList
+      });
+    }
+
+    // =========================================================================
+    // CASE B: NEW CLIENT USER PROVISIONING & INITIAL ASSETS CREATION
+    // =========================================================================
     const existingUser = await findUserByEmail(userEmail);
     if (existingUser) {
       return res.status(400).json({
@@ -112,18 +295,57 @@ export const createClientUser = async (req, res) => {
       status: 'ACTIVE'
     });
 
-    // 3. Log action in audit trail
+    // 3. Create Initial Onboarding Ticket & Submission V1 if poster or video provided
+    let onboardingTicket = null;
+    if (assetsList.length > 0) {
+      const ticketCode = await generateTicketId();
+      const reqResult = await createRequest({
+        ticketId: ticketCode,
+        userId: user.id,
+        companyId: company.id,
+        serviceType: 'COMPANY_LEAD',
+        title: 'Welcome / Initial Marketing Assets',
+        description: 'Initial marketing poster and motion video deliverables provided upon onboarding.',
+        priority: 'MEDIUM',
+        status: 'COMPLETED',
+        price: 0,
+        paymentStatus: 'PAID',
+        assignedTeam: 'CreativeGini Core Team',
+        completedAt: new Date(),
+      });
+
+      const submission = await createSubmission({
+        ticketId: reqResult.id,
+        ticketCode,
+        version: 1,
+        title: 'Initial Deliverables V1 - Welcome Assets',
+        description: 'Initial welcome campaign poster and motion demo video.',
+        submittedBy: req.user.id || req.user._id,
+        submittedByName: req.user.name || 'CreativeGini Admin',
+        status: 'APPROVED',
+        files: assetsList,
+      });
+
+      onboardingTicket = {
+        id: reqResult.id,
+        ticketId: ticketCode,
+        title: 'Welcome / Initial Marketing Assets',
+        submission_id: submission._id || submission.id,
+      };
+    }
+
+    // 4. Log action in audit trail
     await createActivityLog({
       userId: req.user.id || req.user._id,
       userName: req.user.name,
       companyId: company.id,
       action: 'CLIENT_CREATED',
-      details: `Admin ${req.user.name} created client user ${clientName} for company ${compName} (${userEmail}).`
+      details: `Admin ${req.user.name} created client user ${clientName} for company ${compName} (${userEmail}) with initial assets.`
     });
 
     return res.status(201).json({
       success: true,
-      message: 'Client user created successfully.',
+      message: 'Client user and onboarding assets created successfully.',
       temporaryPassword: tempPassword,
       user: {
         _id: user.id,
@@ -133,7 +355,13 @@ export const createClientUser = async (req, res) => {
         role: user.role,
         status: user.status,
         company: company
-      }
+      },
+      onboardingTicket: onboardingTicket ? {
+        id: onboardingTicket.id,
+        ticketId: onboardingTicket.ticketId || onboardingTicket.ticket_id,
+        title: onboardingTicket.title
+      } : null,
+      initialAssets: assetsList
     });
   } catch (error) {
     console.error('Create client user error:', error);

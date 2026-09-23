@@ -51,10 +51,10 @@ import { query } from '../config/postgres.js';
 export { hasServiceTypeAccess, resolveRequest };
 
 // Helper to generate unique Ticket ID
-const generateTicketId = async () => {
+export const generateTicketId = async () => {
   const result = await query(`
     SELECT ticket_id FROM requests
-    WHERE ticket_id LIKE 'CG-%'
+    WHERE ticket_id ~ '^CG-[0-9]+$'
     ORDER BY created_at DESC
     LIMIT 1
   `);
@@ -64,8 +64,12 @@ const generateTicketId = async () => {
     if (!isNaN(num) && num > maxNum) maxNum = num;
   }
   // Check for highest ticket number overall
-  const allResult = await query(`SELECT MAX(CAST(SUBSTRING(ticket_id FROM 4) AS INTEGER)) FROM requests WHERE ticket_id LIKE 'CG-%'`);
-  if (allResult.rows[0].max && allResult.rows[0].max > maxNum) {
+  const allResult = await query(`
+    SELECT MAX(CAST(SUBSTRING(ticket_id FROM 4) AS INTEGER)) 
+    FROM requests 
+    WHERE ticket_id ~ '^CG-[0-9]+$'
+  `);
+  if (allResult.rows[0]?.max && allResult.rows[0].max > maxNum) {
     maxNum = allResult.rows[0].max;
   }
   return `CG-${maxNum + 1}`;

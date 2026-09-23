@@ -39,6 +39,9 @@ const mapAssetRow = (row) => {
     serviceType: row.service_type,
     userId: row.user_id,
     companyId: row.company_id,
+    companyName: row.company_name || 'Client Workspace',
+    clientName: row.client_name || 'Client User',
+    clientEmail: row.client_email || null,
   };
 };
 
@@ -60,7 +63,11 @@ export const findAssets = async ({
 
   // Authorization filter
   if (role === 'ADMIN') {
-    // Admin has access to all assets
+    // Admin has access to all assets, but can optionally filter by companyId
+    if (companyId && companyId.trim() && companyId !== 'ALL') {
+      params.push(companyId.trim());
+      conditions.push(`r.company_id::text = $${params.length}`);
+    }
   } else if (['COMPANY_LEAD', 'COMPANY_BOOST', 'LANDING_PAGE'].includes(role)) {
     // Team specialist has access to assets matching their service types
     if (serviceTypes.length > 0) {
@@ -90,14 +97,16 @@ export const findAssets = async ({
     conditions.push(`(r.id::text = $${params.length} OR r.ticket_id ILIKE $${params.length})`);
   }
 
-  // Search filter (searches file name, ticket code, request title, submission title)
+  // Search filter (searches file name, ticket code, request title, submission title, company name, client name)
   if (search && search.trim()) {
     params.push(`%${search.trim()}%`);
     conditions.push(`(
       sf.name ILIKE $${params.length} OR
       r.ticket_id ILIKE $${params.length} OR
       r.title ILIKE $${params.length} OR
-      s.title ILIKE $${params.length}
+      s.title ILIKE $${params.length} OR
+      c.name ILIKE $${params.length} OR
+      u.name ILIKE $${params.length}
     )`);
   }
 
@@ -152,10 +161,15 @@ export const findAssets = async ({
       r.title AS request_title,
       r.service_type,
       r.user_id,
-      r.company_id
+      r.company_id,
+      c.name AS company_name,
+      u.name AS client_name,
+      u.email AS client_email
     FROM submission_files sf
     JOIN submissions s ON s.id = sf.submission_id
     JOIN requests r ON r.id = s.request_id
+    LEFT JOIN companies c ON c.id = r.company_id
+    LEFT JOIN users u ON u.id = r.user_id
     ${whereClause}
     ${orderClause}
   `;
@@ -188,10 +202,15 @@ export const findAssetById = async (assetId) => {
       r.title AS request_title,
       r.service_type,
       r.user_id,
-      r.company_id
+      r.company_id,
+      c.name AS company_name,
+      u.name AS client_name,
+      u.email AS client_email
     FROM submission_files sf
     JOIN submissions s ON s.id = sf.submission_id
     JOIN requests r ON r.id = s.request_id
+    LEFT JOIN companies c ON c.id = r.company_id
+    LEFT JOIN users u ON u.id = r.user_id
     WHERE sf.id = $1
     LIMIT 1
   `;
@@ -200,4 +219,62 @@ export const findAssetById = async (assetId) => {
   if (!result.rows || result.rows.length === 0) return null;
 
   return mapAssetRow(result.rows[0]);
+};
+
+/**
+ * Find onboarding ticket for a given user (if already created)
+ */
+export const findOnboardingTicketByUserId = async (userId) => {
+  if (!userId) return null;
+
+  const res = await query(`
+    SELECT r.*, s.id AS submission_id
+    FROM requests r
+    LEFT JOIN submissions s ON s.request_id = r.id AND s.version = 1
+    WHERE r.user_id = $1 AND (r.title ILIKE '%Welcome%' OR r.title ILIKE '%Initial Marketing Assets%')
+    ORDER BY r.created_at DESC
+    LIMIT 1
+  `, [userId]);
+
+  return res.rows[0] || null;
+};
+
+/**
+ * Replace all submission files for a given submission cleanly without duplicates or orphans
+ */
+export const replaceSubmissionFiles = async (submissionId, files = []) => {
+  if (!submissionId) return [];
+
+  // Remove previous files for this submission
+  await query(`DELETE FROM submission_files WHERE submission_id = $1`, [submissionId]);
+
+  const inserted = [];
+  for (const file of files) {
+    if (!file) continue;
+    const fileName = file.name || file.fileName;
+    const fileUrl = file.url || file.dataUrl;
+    if (!fileName || !fileUrl) continue;
+
+    const res = await query(`
+      INSERT INTO submission_files (
+        submission_id,
+        name,
+        url,
+        size,
+        type
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, name, url, size, type, created_at
+    `, [
+      submissionId,
+      fileName,
+      fileUrl,
+      file.size || null,
+      file.type || file.mimeType || null
+    ]);
+
+    inserted.push(res.rows[0]);
+  }
+
+  return inserted;
 };

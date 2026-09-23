@@ -23,7 +23,8 @@ import {
   AlertCircle,
   Eye,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Building
 } from 'lucide-react';
 import { api } from '../../../services/api';
 
@@ -106,7 +107,7 @@ const convertBlobToPng = (blob) => {
   });
 };
 
-export default function AssetsView({ user, company, onNavigate }) {
+export default function AssetsView({ user, company, onNavigate, isAdmin = false }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [assets, setAssets] = useState([]);
@@ -114,6 +115,7 @@ export default function AssetsView({ user, company, onNavigate }) {
 
   // Filter & Search Controls
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState('ALL');
   const [selectedTicketFilter, setSelectedTicketFilter] = useState('ALL');
   const [activeTypeTab, setActiveTypeTab] = useState('all'); // 'all', 'images', 'videos', 'documents'
   const [sortOrder, setSortOrder] = useState('newest'); // 'newest', 'oldest'
@@ -167,11 +169,26 @@ export default function AssetsView({ user, company, onNavigate }) {
     loadAssets();
   }, [sortOrder]);
 
+  // List of distinct companies for Admin filter dropdown
+  const companyOptions = useMemo(() => {
+    if (!isAdmin) return [];
+    const seen = new Map();
+    for (const a of assets) {
+      if (a.companyId && !seen.has(a.companyId)) {
+        seen.set(a.companyId, a.companyName || 'Client');
+      }
+    }
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+  }, [isAdmin, assets]);
+
   // List of distinct tickets for filter dropdown
   const ticketOptions = useMemo(() => {
     const seen = new Set();
     const options = [];
     for (const a of assets) {
+      if (isAdmin && selectedCompanyFilter !== 'ALL' && a.companyId !== selectedCompanyFilter) {
+        continue;
+      }
       const code = a.ticketCode || a.requestId;
       if (code && !seen.has(code)) {
         seen.add(code);
@@ -183,7 +200,7 @@ export default function AssetsView({ user, company, onNavigate }) {
       }
     }
     return options;
-  }, [assets]);
+  }, [assets, isAdmin, selectedCompanyFilter]);
 
   // Filtered Assets & Filtered Ticket Groups
   const filteredTicketGroups = useMemo(() => {
@@ -191,6 +208,13 @@ export default function AssetsView({ user, company, onNavigate }) {
 
     return groupedAssets
       .map(ticketGroup => {
+        // Admin Company filter check
+        if (isAdmin && selectedCompanyFilter !== 'ALL') {
+          if (ticketGroup.companyId !== selectedCompanyFilter) {
+            return null;
+          }
+        }
+
         // Request filter check
         if (selectedTicketFilter !== 'ALL') {
           if (ticketGroup.ticketCode !== selectedTicketFilter && ticketGroup.requestId !== selectedTicketFilter) {
@@ -210,13 +234,15 @@ export default function AssetsView({ user, company, onNavigate }) {
                 if (activeTypeTab === 'documents' && category !== 'document') return false;
               }
 
-              // Search query check (filename, ticket code, request title, submission title)
+              // Search query check (filename, ticket code, request title, submission title, client/company)
               if (query) {
                 const matchName = (file.fileName || '').toLowerCase().includes(query);
                 const matchTicket = (ticketGroup.ticketCode || '').toLowerCase().includes(query);
                 const matchTitle = (ticketGroup.requestTitle || '').toLowerCase().includes(query);
                 const matchSub = (sub.submissionTitle || '').toLowerCase().includes(query);
-                if (!matchName && !matchTicket && !matchTitle && !matchSub) return false;
+                const matchCompany = (ticketGroup.companyName || '').toLowerCase().includes(query);
+                const matchClient = (ticketGroup.clientName || '').toLowerCase().includes(query);
+                if (!matchName && !matchTicket && !matchTitle && !matchSub && !matchCompany && !matchClient) return false;
               }
 
               return true;
@@ -241,7 +267,7 @@ export default function AssetsView({ user, company, onNavigate }) {
         };
       })
       .filter(Boolean);
-  }, [groupedAssets, selectedTicketFilter, activeTypeTab, searchQuery]);
+  }, [groupedAssets, isAdmin, selectedCompanyFilter, selectedTicketFilter, activeTypeTab, searchQuery]);
 
   // Handle direct file download
   const handleDownload = (asset) => {
@@ -348,6 +374,29 @@ export default function AssetsView({ user, company, onNavigate }) {
 
         {/* Filter Controls Row */}
         <div className="assets-filters-row">
+          {/* Admin Company Filter Dropdown */}
+          {isAdmin && companyOptions.length > 0 && (
+            <div className="assets-select-wrapper company-filter-wrapper">
+              <Building size={14} className="assets-select-icon" />
+              <select
+                className="assets-select-input"
+                value={selectedCompanyFilter}
+                onChange={(e) => {
+                  setSelectedCompanyFilter(e.target.value);
+                  setSelectedTicketFilter('ALL');
+                }}
+              >
+                <option value="ALL">All Clients ({companyOptions.length})</option>
+                {companyOptions.map((comp) => (
+                  <option key={comp.id} value={comp.id}>
+                    {comp.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="assets-select-arrow" />
+            </div>
+          )}
+
           {/* Request Filter Dropdown */}
           <div className="assets-select-wrapper">
             <Filter size={14} className="assets-select-icon" />
@@ -450,22 +499,24 @@ export default function AssetsView({ user, company, onNavigate }) {
           </button>
         </div>
       ) : assets.length === 0 ? (
-        /* EMPTY STATE: User has no completed work submitted yet */
+        /* EMPTY STATE: User or Admin has no completed work submitted yet */
         <div className="assets-empty-state">
           <div className="assets-empty-icon-circle">
             <FolderArchive size={40} color="#00D9FF" />
           </div>
           <h3 className="assets-empty-title">No assets yet</h3>
           <p className="assets-empty-desc">
-            Completed work submitted by our team will appear here automatically.
+            {isAdmin
+              ? 'Onboarding assets uploaded during client creation and deliverables submitted by team specialists will appear here automatically.'
+              : 'Completed work submitted by our team will appear here automatically.'}
           </p>
           {onNavigate && (
             <button
               className="portal-btn-primary"
               style={{ marginTop: '16px' }}
-              onClick={() => onNavigate('requests')}
+              onClick={() => onNavigate(isAdmin ? 'tickets' : 'requests')}
             >
-              View Active Requests
+              View Active {isAdmin ? 'Tickets' : 'Requests'}
             </button>
           )}
         </div>
@@ -503,6 +554,15 @@ export default function AssetsView({ user, company, onNavigate }) {
                   <h2 className="assets-ticket-title">
                     {ticketGroup.requestTitle || 'Creative Deliverable Request'}
                   </h2>
+                  {isAdmin && ticketGroup.companyName && (
+                    <span className="assets-admin-company-pill" title={`Client: ${ticketGroup.clientName || ''} (${ticketGroup.clientEmail || ''})`}>
+                      <Building size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: '-1px' }} />
+                      {ticketGroup.companyName}
+                      {ticketGroup.clientName && (
+                        <span className="assets-admin-client-name"> • {ticketGroup.clientName}</span>
+                      )}
+                    </span>
+                  )}
                 </div>
 
                 <div className="assets-ticket-meta-secondary">

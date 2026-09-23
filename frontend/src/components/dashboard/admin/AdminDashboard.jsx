@@ -47,13 +47,17 @@ import {
   ChevronDown,
   Menu,
   Bell,
-  Paperclip
+  Paperclip,
+  FolderArchive,
+  Film,
+  Image as ImageIcon
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import PortalCosmicBackground from '../common/PortalCosmicBackground';
 import ActionMenu from '../common/ActionMenu';
 import NotificationPanel from '../common/NotificationPanel';
 import ActivityTimeline from '../common/ActivityTimeline';
+import AssetsView from '../user/AssetsView';
 
 export default function AdminDashboard({ user, onLogout }) {
   const navigate = useNavigate();
@@ -141,12 +145,17 @@ export default function AdminDashboard({ user, onLogout }) {
     isLoadingPreview: false,
     attachments: [],
     attachmentError: null,
+    poster: null,
+    video: null,
+    initialAssetError: null,
     isSubmittingStep1: false,
     isSendingEmail: false,
     sendError: null,
     successData: null
   });
   const fileInputRef = useRef(null);
+  const posterInputRef = useRef(null);
+  const videoInputRef = useRef(null);
 
   const [toastNotice, setToastNotice] = useState(null);
   const [copiedKey, setCopiedKey] = useState(false);
@@ -260,6 +269,9 @@ export default function AdminDashboard({ user, onLogout }) {
       isLoadingPreview: false,
       attachments: [],
       attachmentError: null,
+      poster: null,
+      video: null,
+      initialAssetError: null,
       isSubmittingStep1: false,
       isSendingEmail: false,
       sendError: null,
@@ -267,8 +279,95 @@ export default function AdminDashboard({ user, onLogout }) {
     });
   };
 
+  // Initial Onboarding Assets selection handlers
+  const handlePosterSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    const validMimes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
+    const validExts = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
+    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+
+    if (!validMimes.includes(file.type.toLowerCase()) && !validExts.includes(ext)) {
+      setCreateWorkflow(prev => ({ ...prev, initialAssetError: `Poster must be an image (${validExts.join(', ')}). Received "${file.name}".` }));
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setCreateWorkflow(prev => ({ ...prev, initialAssetError: `Poster exceeds the 10 MB limit (${formatFileSize(file.size)}).` }));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCreateWorkflow(prev => ({
+        ...prev,
+        poster: {
+          name: file.name,
+          size: file.size,
+          mimeType: file.type || 'image/png',
+          dataUrl: reader.result,
+          previewUrl: reader.result
+        },
+        initialAssetError: null
+      }));
+    };
+    reader.onerror = () => {
+      setCreateWorkflow(prev => ({ ...prev, initialAssetError: 'Failed to read poster image file.' }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleVideoSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    const validExts = ['.mp4', '.mov', '.webm', '.mkv'];
+    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+    const isVideoMime = file.type.toLowerCase().startsWith('video/');
+
+    if (!isVideoMime && !validExts.includes(ext)) {
+      setCreateWorkflow(prev => ({ ...prev, initialAssetError: `Video must be a valid video format (${validExts.join(', ')}). Received "${file.name}".` }));
+      return;
+    }
+
+    if (file.size > 100 * 1024 * 1024) {
+      setCreateWorkflow(prev => ({ ...prev, initialAssetError: `Video exceeds the 100 MB limit (${formatFileSize(file.size)}).` }));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCreateWorkflow(prev => ({
+        ...prev,
+        video: {
+          name: file.name,
+          size: file.size,
+          mimeType: file.type || 'video/mp4',
+          dataUrl: reader.result,
+          previewUrl: reader.result
+        },
+        initialAssetError: null
+      }));
+    };
+    reader.onerror = () => {
+      setCreateWorkflow(prev => ({ ...prev, initialAssetError: 'Failed to read video file.' }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePoster = () => {
+    setCreateWorkflow(prev => ({ ...prev, poster: null }));
+  };
+
+  const handleRemoveVideo = () => {
+    setCreateWorkflow(prev => ({ ...prev, video: null }));
+  };
+
   // STEP 1: Continue to Email
-  // If createdUserId does not exist, provision client. If createdUserId exists, PATCH existing user.
+  // If createdUserId does not exist, provision client. If createdUserId exists, update existing user and replace onboarding files.
   const handleStep1Continue = async (e) => {
     e.preventDefault();
     if (!createWorkflow.companyName?.trim() || !createWorkflow.contactPerson?.trim() || !createWorkflow.email?.trim() || !createWorkflow.password?.trim()) {
@@ -276,70 +375,103 @@ export default function AdminDashboard({ user, onLogout }) {
       return;
     }
 
+    if (!createWorkflow.poster) {
+      alert('Please upload an initial marketing Poster (image) before continuing.');
+      return;
+    }
+
+    if (!createWorkflow.video) {
+      alert('Please upload an initial marketing Video before continuing.');
+      return;
+    }
+
     try {
-      setCreateWorkflow(prev => ({ ...prev, isSubmittingStep1: true, sendError: null }));
+      setCreateWorkflow(prev => ({ ...prev, isSubmittingStep1: true, sendError: null, initialAssetError: null }));
 
       let userId = createWorkflow.createdUserId;
       let compId = createWorkflow.companyId;
 
-      if (!userId) {
-        // Provision new client
-        const res = await api.adminCreateClient({
-          companyName: createWorkflow.companyName.trim(),
-          contactPerson: createWorkflow.contactPerson.trim(),
-          email: createWorkflow.email.trim(),
-          phone: createWorkflow.phone?.trim() || '',
-          website: createWorkflow.website?.trim() || '',
-          industry: createWorkflow.industry?.trim() || 'Enterprise SaaS / AI',
-          companyInfo: createWorkflow.companyInfo?.trim() || '',
-          researchSummary: createWorkflow.companyInfo?.trim() || '',
-          password: createWorkflow.password.trim(),
-          initialLeads: [
-            {
-              name: 'Senior Decision Maker (Sample)',
-              title: 'VP of Engineering / CTO',
-              company: createWorkflow.companyName.trim(),
-              email: `executive@${createWorkflow.email.split('@')[1] || 'client.com'}`,
-              location: 'Global',
-              status: 'Verified'
-            }
-          ],
-          initialKeyPeople: [
-            {
-              name: createWorkflow.contactPerson.trim(),
-              role: 'Executive Sponsor',
-              department: 'Management',
-              contact: createWorkflow.email.trim()
-            }
-          ]
-        });
+      const payload = {
+        existingUserId: userId || undefined,
+        companyName: createWorkflow.companyName.trim(),
+        contactPerson: createWorkflow.contactPerson.trim(),
+        email: createWorkflow.email.trim(),
+        phone: createWorkflow.phone?.trim() || '',
+        website: createWorkflow.website?.trim() || '',
+        industry: createWorkflow.industry?.trim() || 'Enterprise SaaS / AI',
+        companyInfo: createWorkflow.companyInfo?.trim() || '',
+        researchSummary: createWorkflow.companyInfo?.trim() || '',
+        password: createWorkflow.password.trim(),
+        poster: createWorkflow.poster ? {
+          name: createWorkflow.poster.name,
+          size: createWorkflow.poster.size,
+          mimeType: createWorkflow.poster.mimeType,
+          dataUrl: createWorkflow.poster.dataUrl
+        } : null,
+        video: createWorkflow.video ? {
+          name: createWorkflow.video.name,
+          size: createWorkflow.video.size,
+          mimeType: createWorkflow.video.mimeType,
+          dataUrl: createWorkflow.video.dataUrl
+        } : null,
+        initialLeads: [
+          {
+            name: 'Senior Decision Maker (Sample)',
+            title: 'VP of Engineering / CTO',
+            company: createWorkflow.companyName.trim(),
+            email: `executive@${createWorkflow.email.split('@')[1] || 'client.com'}`,
+            location: 'Global',
+            status: 'Verified'
+          }
+        ],
+        initialKeyPeople: [
+          {
+            name: createWorkflow.contactPerson.trim(),
+            role: 'Executive Sponsor',
+            department: 'Management',
+            contact: createWorkflow.email.trim()
+          }
+        ]
+      };
 
-        userId = res.user?.id || res.user?._id;
-        compId = res.company?.id || res.user?.companyId || null;
-      } else {
-        // Update existing client and company without duplicating
-        const res = await api.adminUpdateUser(userId, {
-          name: createWorkflow.contactPerson.trim(),
-          contactPerson: createWorkflow.contactPerson.trim(),
-          email: createWorkflow.email.trim(),
-          password: createWorkflow.password.trim(),
-          phone: createWorkflow.phone?.trim() || '',
-          companyName: createWorkflow.companyName.trim(),
-          website: createWorkflow.website?.trim() || '',
-          industry: createWorkflow.industry?.trim() || 'Enterprise SaaS / AI',
-          companyInfo: createWorkflow.companyInfo?.trim() || '',
-          description: createWorkflow.companyInfo?.trim() || ''
-        });
-        if (res.user?.companyId) {
-          compId = res.user.companyId;
+      const res = await api.adminCreateClient(payload);
+      userId = res.user?.id || res.user?._id || userId;
+      compId = res.company?.id || res.user?.companyId || compId;
+
+      // Automatically attach initial assets to welcome email
+      const initialAttachments = [
+        {
+          id: 'initial-poster',
+          isInitialAsset: true,
+          assetType: 'Poster',
+          name: createWorkflow.poster.name,
+          filename: createWorkflow.poster.name,
+          size: createWorkflow.poster.size,
+          sizeFormatted: formatFileSize(createWorkflow.poster.size),
+          mimeType: createWorkflow.poster.mimeType,
+          dataUrl: createWorkflow.poster.dataUrl,
+        },
+        {
+          id: 'initial-video',
+          isInitialAsset: true,
+          assetType: 'Video',
+          name: createWorkflow.video.name,
+          filename: createWorkflow.video.name,
+          size: createWorkflow.video.size,
+          sizeFormatted: formatFileSize(createWorkflow.video.size),
+          mimeType: createWorkflow.video.mimeType,
+          dataUrl: createWorkflow.video.dataUrl,
         }
-      }
+      ];
+      const nonInitialAttachments = (createWorkflow.attachments || []).filter(a => !a.isInitialAsset);
+      const combinedAttachments = [...initialAttachments, ...nonInitialAttachments];
 
       setCreateWorkflow(prev => ({
         ...prev,
         createdUserId: userId,
         companyId: compId,
         step: 2,
+        attachments: combinedAttachments,
         isSubmittingStep1: false,
         isLoadingPreview: true
       }));
@@ -353,7 +485,7 @@ export default function AdminDashboard({ user, onLogout }) {
           temporaryPassword: createWorkflow.password.trim(),
           subject: createWorkflow.emailSubject,
           customBody: createWorkflow.emailBody,
-          attachments: createWorkflow.attachments
+          attachments: combinedAttachments
         });
         if (prevRes?.html) {
           setCreateWorkflow(curr => (curr.isOpen && curr.createdUserId === userId ? { ...curr, previewHtml: prevRes.html, isLoadingPreview: false } : curr));
@@ -1079,6 +1211,15 @@ export default function AdminDashboard({ user, onLogout }) {
           </button>
 
           <button 
+            className={`portal-nav-btn ${activeTab === 'assets' ? 'active' : ''}`}
+            onClick={() => handleNavigateTab('assets')}
+            title="Assets & Media Library"
+          >
+            <FolderArchive size={18} />
+            <span>Assets</span>
+          </button>
+
+          <button 
             className={`portal-nav-btn ${activeTab === 'payments' ? 'active' : ''}`}
             onClick={() => handleNavigateTab('payments')}
             title="Payments"
@@ -1145,6 +1286,7 @@ export default function AdminDashboard({ user, onLogout }) {
                     {activeTab === 'teams' && 'Internal Team Members & Dashboard Permissions'}
                     {activeTab === 'services' && 'Service Requests Breakdown'}
                     {activeTab === 'tickets' && 'Request & Ticket Center'}
+                    {activeTab === 'assets' && 'Assets & Media Library'}
                     {activeTab === 'payments' && 'Payment & Revenue Ledger'}
                     {activeTab === 'settings' && 'Global Administration Settings'}
                   </>
@@ -2738,6 +2880,11 @@ export default function AdminDashboard({ user, onLogout }) {
             </div>
           )}
 
+          {/* TAB: ASSETS & MEDIA LIBRARY */}
+          {activeTab === 'assets' && (
+            <AssetsView user={user} isAdmin={true} onNavigate={setActiveTab} />
+          )}
+
           {/* TAB 5: PAYMENTS */}
           {activeTab === 'payments' && (
             <>
@@ -3013,7 +3160,7 @@ export default function AdminDashboard({ user, onLogout }) {
           <div
             className="portal-modal-card"
             style={{
-              maxWidth: createWorkflow.step === 2 ? '840px' : createWorkflow.step === 3 ? '580px' : '640px',
+              maxWidth: createWorkflow.step === 2 ? '840px' : createWorkflow.step === 3 ? '580px' : '720px',
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
@@ -3166,6 +3313,153 @@ export default function AdminDashboard({ user, onLogout }) {
                       onChange={e => setCreateWorkflow({ ...createWorkflow, companyInfo: e.target.value })}
                       placeholder="Initial details and market positioning..."
                     />
+                  </div>
+
+                  {/* INITIAL ASSETS SECTION (POSTER & VIDEO) */}
+                  <div className="onboarding-assets-section">
+                    <div className="onboarding-assets-header">
+                      <div className="onboarding-assets-title-group">
+                        <FolderArchive size={16} color="#00D9FF" />
+                        <span className="onboarding-assets-title">Initial Deliverables / Marketing Assets</span>
+                        <span className="onboarding-assets-badge">Required</span>
+                      </div>
+                      <p className="onboarding-assets-subtitle">
+                        Upload 1 Poster and 1 Video. These are permanently saved into the client's Media Library and automatically attached to the Welcome Email.
+                      </p>
+                    </div>
+
+                    {createWorkflow.initialAssetError && (
+                      <div className="email-attachment-error" style={{ marginBottom: '10px' }}>
+                        <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                        <span>{createWorkflow.initialAssetError}</span>
+                      </div>
+                    )}
+
+                    <div className="onboarding-assets-grid">
+                      {/* POSTER (IMAGE) DROPZONE */}
+                      <div className="onboarding-asset-card">
+                        <div className="onboarding-asset-card-header">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <ImageIcon size={15} color="#38BDF8" />
+                            <strong>Marketing Poster (Image)</strong>
+                          </div>
+                          <span className="asset-card-format-tag">PNG, JPG, WEBP &bull; Max 10MB</span>
+                        </div>
+
+                        <input
+                          type="file"
+                          ref={posterInputRef}
+                          accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                          onChange={handlePosterSelect}
+                          style={{ display: 'none' }}
+                        />
+
+                        {createWorkflow.poster ? (
+                          <div className="onboarding-asset-preview-box">
+                            <div className="onboarding-asset-thumb-wrap">
+                              <img
+                                src={createWorkflow.poster.previewUrl || createWorkflow.poster.dataUrl}
+                                alt="Poster Preview"
+                                className="onboarding-asset-thumb"
+                              />
+                            </div>
+                            <div className="onboarding-asset-info">
+                              <span className="onboarding-asset-name" title={createWorkflow.poster.name}>
+                                {createWorkflow.poster.name}
+                              </span>
+                              <span className="onboarding-asset-size">
+                                {formatFileSize(createWorkflow.poster.size)}
+                              </span>
+                              <div className="onboarding-asset-actions">
+                                <button
+                                  type="button"
+                                  className="onboarding-asset-action-btn"
+                                  onClick={() => posterInputRef.current?.click()}
+                                >
+                                  Replace
+                                </button>
+                                <button
+                                  type="button"
+                                  className="onboarding-asset-action-btn delete"
+                                  onClick={handleRemovePoster}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className="onboarding-asset-dropzone"
+                            onClick={() => posterInputRef.current?.click()}
+                          >
+                            <Upload size={22} color="#00D9FF" />
+                            <span>Click to upload Poster</span>
+                            <span className="dropzone-hint">PNG, JPG, JPEG, WEBP up to 10MB</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* VIDEO DROPZONE */}
+                      <div className="onboarding-asset-card">
+                        <div className="onboarding-asset-card-header">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Film size={15} color="#A78BFA" />
+                            <strong>Welcome / Demo Video</strong>
+                          </div>
+                          <span className="asset-card-format-tag">MP4, MOV, WEBM &bull; Max 100MB</span>
+                        </div>
+
+                        <input
+                          type="file"
+                          ref={videoInputRef}
+                          accept="video/mp4,video/quicktime,video/webm,video/x-matroska,.mp4,.mov,.webm,.mkv"
+                          onChange={handleVideoSelect}
+                          style={{ display: 'none' }}
+                        />
+
+                        {createWorkflow.video ? (
+                          <div className="onboarding-asset-preview-box">
+                            <div className="onboarding-asset-thumb-wrap video-placeholder">
+                              <Film size={26} color="#A78BFA" />
+                            </div>
+                            <div className="onboarding-asset-info">
+                              <span className="onboarding-asset-name" title={createWorkflow.video.name}>
+                                {createWorkflow.video.name}
+                              </span>
+                              <span className="onboarding-asset-size">
+                                {formatFileSize(createWorkflow.video.size)}
+                              </span>
+                              <div className="onboarding-asset-actions">
+                                <button
+                                  type="button"
+                                  className="onboarding-asset-action-btn"
+                                  onClick={() => videoInputRef.current?.click()}
+                                >
+                                  Replace
+                                </button>
+                                <button
+                                  type="button"
+                                  className="onboarding-asset-action-btn delete"
+                                  onClick={handleRemoveVideo}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className="onboarding-asset-dropzone"
+                            onClick={() => videoInputRef.current?.click()}
+                          >
+                            <Upload size={22} color="#A78BFA" />
+                            <span>Click to upload Video</span>
+                            <span className="dropzone-hint">MP4, MOV, WEBM up to 100MB</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -3396,6 +3690,9 @@ export default function AdminDashboard({ user, onLogout }) {
                             <span>📎</span>
                             <span className="email-attachment-name" title={att.filename}>{att.filename}</span>
                             <span className="email-attachment-size">{att.sizeFormatted}</span>
+                            {att.isInitialAsset && (
+                              <span className="email-attachment-asset-badge">Saved to Assets</span>
+                            )}
                             <button
                               type="button"
                               className="email-attachment-remove"

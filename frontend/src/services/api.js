@@ -509,6 +509,7 @@ export const api = {
     const query = new URLSearchParams();
     if (params.search) query.append('search', params.search);
     if (params.requestId) query.append('requestId', params.requestId);
+    if (params.companyId) query.append('companyId', params.companyId);
     if (params.type && params.type !== 'all') query.append('type', params.type);
     if (params.sort) query.append('sort', params.sort);
 

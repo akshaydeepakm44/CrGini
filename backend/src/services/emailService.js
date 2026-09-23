@@ -1203,14 +1203,30 @@ export const sendWelcomeEmail = async ({
 
     // Securely prepare attachments for Nodemailer
     const formattedAttachments = (attachments || []).map((att) => {
+      const filename = att.filename || att.name;
+      const contentType = att.contentType || att.type || 'application/octet-stream';
+
       if (att.base64) {
         return {
-          filename: att.filename,
+          filename,
           content: Buffer.from(att.base64, 'base64'),
-          contentType: att.contentType || 'application/octet-stream'
+          contentType
         };
       }
-      return att;
+      if (att.url && typeof att.url === 'string' && att.url.startsWith('data:')) {
+        const commaIndex = att.url.indexOf(',');
+        const base64Data = commaIndex !== -1 ? att.url.slice(commaIndex + 1) : att.url;
+        return {
+          filename,
+          content: Buffer.from(base64Data, 'base64'),
+          contentType
+        };
+      }
+      return {
+        ...att,
+        filename,
+        contentType
+      };
     });
 
     return await sendEmail({
