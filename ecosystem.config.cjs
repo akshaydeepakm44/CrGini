@@ -14,7 +14,7 @@ module.exports = {
         POSTGRES_USER: 'creativegini_app',
         POSTGRES_PASSWORD: 'Akhil@08082004hema',
         JWT_SECRET: 'creativegini_jwt_secret_2026_production_key_secure',
-        CLIENT_URL: 'http://57.128.31.115,http://57.128.31.115:5174,http://localhost:5173,http://localhost:5174'
+        CLIENT_URL: 'https://www.creativegini.com,https://creativegini.com,http://57.128.31.115,http://localhost:5173,http://localhost:5174'
       },
       watch: false,
       max_memory_restart: '512M',
