@@ -46,7 +46,7 @@ frontend/
     │   │   │
     │   │   └── common/                      # Shared portal widgets
     │   │       ├── ActionMenu.jsx           # Dropdown table row actions for clients
-    │   │       ├── ActivityTimeline.jsx     # Jira-style audit history timeline component
+    │   │       ├── ActivityTimeline.jsx     # Audit history timeline component
     │   │       ├── ClientReviewSection.jsx  # Deliverables viewer, approval & change request modal
     │   │       ├── NotificationPanel.jsx    # Topbar notification drawer with mark-read & routing
     │   │       ├── PortalCosmicBackground.jsx # Fixed ambient glowing background

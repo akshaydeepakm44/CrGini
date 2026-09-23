@@ -46,6 +46,58 @@ export const api = {
     localStorage.removeItem('cg_auth_token');
   },
 
+  // Password Recovery Flow
+  async forgotPassword(email) {
+    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+      method: 'POST',
+      headers: getHeaders(false),
+      body: JSON.stringify({ email: email?.trim() })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || 'Unable to request password reset. Please try again.');
+    }
+    return data;
+  },
+
+  async verifyResetToken(token) {
+    const res = await fetch(`${API_BASE}/auth/verify-reset-token?token=${encodeURIComponent(token || '')}`, {
+      method: 'GET',
+      headers: getHeaders(false)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.valid) {
+      throw new Error(data.message || 'This password reset link is invalid or has expired.');
+    }
+    return data;
+  },
+
+  async resetPassword(token, password) {
+    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+      method: 'POST',
+      headers: getHeaders(false),
+      body: JSON.stringify({ token: token?.trim(), password })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Unable to reset password. Please check requirements and try again.');
+    }
+    return data;
+  },
+
+  async changePassword(currentPassword, newPassword) {
+    const res = await fetch(`${API_BASE}/auth/change-password`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to change password. Please check your current password and try again.');
+    }
+    return data;
+  },
+
   // Company Information (Pre-researched leads and company profile)
   async getMyCompany() {
     const res = await fetch(`${API_BASE}/company/my-company`, {
@@ -426,4 +478,71 @@ export const api = {
     return data;
   },
 
+  async adminPreviewWelcomeEmail(userId, payload) {
+    const res = await fetch(`${API_BASE}/admin/users/${userId}/preview-welcome-email`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to generate email preview');
+    }
+    return data;
+  },
+
+  async adminSendWelcomeEmail(userId, payload) {
+    const res = await fetch(`${API_BASE}/admin/users/${userId}/send-welcome-email`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to send welcome email');
+    }
+    return data;
+  },
+
+  // User Assets / Media Library
+  async getAssets(params = {}) {
+    const query = new URLSearchParams();
+    if (params.search) query.append('search', params.search);
+    if (params.requestId) query.append('requestId', params.requestId);
+    if (params.type && params.type !== 'all') query.append('type', params.type);
+    if (params.sort) query.append('sort', params.sort);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    const res = await fetch(`${API_BASE}/assets${queryString}`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch media assets');
+    }
+    return data;
+  },
+
+  async getAsset(assetId) {
+    const res = await fetch(`${API_BASE}/assets/${assetId}`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch asset metadata');
+    }
+    return data.asset;
+  },
+
+  getAssetStreamUrl(assetId) {
+    const token = localStorage.getItem('cg_auth_token') || '';
+    return `${API_BASE}/assets/${assetId}/stream?token=${encodeURIComponent(token)}`;
+  },
+
+  getAssetDownloadUrl(assetId) {
+    const token = localStorage.getItem('cg_auth_token') || '';
+    return `${API_BASE}/assets/${assetId}/download?token=${encodeURIComponent(token)}`;
+  },
+
 };
+

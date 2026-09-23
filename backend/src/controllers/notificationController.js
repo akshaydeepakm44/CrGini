@@ -22,7 +22,7 @@ export const getNotifications = async (req, res) => {
     });
   } catch (error) {
     console.error('Get notifications error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to load notifications. Please try again later.' });
   }
 };
 
@@ -43,7 +43,7 @@ export const markNotificationAsRead = async (req, res) => {
     return res.json({ success: true, notification, unreadCount });
   } catch (error) {
     console.error('Mark notification read error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to update notification. Please try again later.' });
   }
 };
 
@@ -58,6 +58,6 @@ export const markAllNotificationsAsRead = async (req, res) => {
     return res.json({ success: true, message: 'All notifications marked as read', unreadCount: 0 });
   } catch (error) {
     console.error('Mark all notifications read error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to update notifications. Please try again later.' });
   }
 };

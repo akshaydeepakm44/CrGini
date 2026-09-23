@@ -1,6 +1,6 @@
 # CreativeGini — Autonomous AI Growth Engine & Delivery Portal
 
-CreativeGini is an enterprise full-stack platform combining a futuristic public marketing experience with a role-based B2B service delivery portal. The platform automates service fulfillment, Jira-style ticket tracking, revision workflows, client approvals, team permission administration, and real-time notifications.
+CreativeGini is an enterprise full-stack platform combining a futuristic public marketing experience with a role-based B2B service delivery portal. The platform automates service fulfillment, structured ticket tracking, revision workflows, client approvals, team permission administration, and real-time notifications.
 
 ---
 
@@ -31,7 +31,7 @@ creativegini-main/
 │       ├── models/               # Mongoose schema definitions
 │       │   ├── ActivityLog.js    # Audit trail for ticket lifecycle events
 │       │   ├── Company.js        # Client company profiles & intelligence records
-│       │   ├── Message.js        # Ticket-specific Jira conversation messages
+│       │   ├── Message.js        # Ticket-specific request conversation messages
 │       │   ├── Notification.js   # In-app notifications with read/unread tracking
 │       │   ├── Payment.js        # Payment records & invoice transaction ledger
 │       │   ├── Request.js        # Service requests & tickets (status, pricing, assignments)
@@ -71,7 +71,7 @@ creativegini-main/
 │       │   │   │   └── AdminDashboard.jsx       # Client management, users, team permissions, tickets
 │       │   │   ├── common/                      # Shared portal widgets & modals
 │       │   │   │   ├── ActionMenu.jsx           # Dropdown actions for client user rows
-│       │   │   │   ├── ActivityTimeline.jsx     # Embedded Jira-style audit history timeline
+│       │   │   │   ├── ActivityTimeline.jsx     # Embedded audit history timeline
 │       │   │   │   ├── ClientReviewSection.jsx  # Deliverable inspection, approval & change requests
 │       │   │   │   ├── NotificationPanel.jsx    # Dedicated notification bell drawer
 │       │   │   │   ├── PortalCosmicBackground.jsx # Unified dark cosmic theme backdrop
@@ -148,8 +148,8 @@ creativegini-main/
   - Newly created team members can never be granted `ADMIN` privileges.
   - Backend endpoints strictly verify service-level authorization (`hasServiceTypeAccess`) on all mutating actions.
 
-### 4. Ticket-Specific Jira Conversation & Activity Timeline
-- **Ticket-Specific Jira Conversation**: All communications are tied strictly to the ticket (e.g. `CG-1001`). There are no permanent service-level cross-ticket chats.
+### 4. Ticket-Specific Request Conversation & Activity Timeline
+- **Ticket-Specific Request Conversation**: All communications are tied strictly to the ticket (e.g. `CG-1001`). There are no permanent service-level cross-ticket chats.
 - **Activity Timeline**: An audit timeline is embedded inside each ticket detailing every lifecycle action (`REQUEST_CREATED`, `PAYMENT_SUCCESS`, `WORK_STARTED`, `WORK_SUBMITTED`, `CHANGES_REQUESTED`, `WORK_RESUBMITTED`, `WORK_APPROVED`).
 - **No Standalone Activity Page**: Standalone activity views have been deprecated in favor of ticket-embedded audit logs.
 
@@ -157,7 +157,7 @@ creativegini-main/
 - **Clean Notification Bell**: The notification dropdown strictly houses notifications (separated from messaging UI).
 - **Direct Ticket Routing**:
   - Clicking a deliverable notification routes directly to the ticket's review tab.
-  - Clicking a message notification routes directly to the ticket's Jira conversation (`chat`) tab.
+  - Clicking a message notification routes directly to the ticket's request conversation (`chat`) tab.
 
 ---
 

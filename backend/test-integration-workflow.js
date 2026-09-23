@@ -45,7 +45,10 @@ async function runIntegrationTest() {
 
     // 1. Resolve users from DB and generate tokens
     console.log('STEP 1: Resolving Users and Generating Auth Tokens...');
-    const clientUser = await findUserByEmail('client@acmecorp.com');
+    const clientUser = (await findUserByEmail('client@acmecorp.com'))
+      || (await findUserByEmail('bheemesh9392@gmail.com'))
+      || (await findUserByEmail('likitha.datai2i@gmail.com'))
+      || (await findUserByEmail('bheem@datai2i.com'));
     const specialistUser = (await findUserByEmail('akhilkallepalli8@gmail.com'))
       || (await findUserByEmail('akhil.k@datai2i.com'))
       || (await findActiveSpecialists('COMPANY_BOOST')).find(u => u.role === 'COMPANY_BOOST');

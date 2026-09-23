@@ -152,8 +152,7 @@ export const createRequest = async (req, res) => {
     console.error('Create request error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to create request',
-      error: error.message
+      message: 'Failed to create request. Please try again.'
     });
   }
 };
@@ -197,8 +196,7 @@ export const getRequests = async (req, res) => {
     console.error('Get requests error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to fetch requests',
-      error: error.message
+      message: 'Failed to fetch requests. Please try again.'
     });
   }
 };
@@ -244,7 +242,7 @@ export const getRequestById = async (req, res) => {
     });
   } catch (error) {
     console.error('Get request by id error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to fetch request details. Please try again.' });
   }
 };
 
@@ -321,7 +319,7 @@ export const assignTicket = async (req, res) => {
     });
   } catch (error) {
     console.error('Assign ticket error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to assign ticket. Please try again.' });
   }
 };
 
@@ -375,7 +373,7 @@ export const startWork = async (req, res) => {
     });
   } catch (error) {
     console.error('Start work error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to update ticket status. Please try again.' });
   }
 };
 
@@ -446,7 +444,7 @@ export const adminOverride = async (req, res) => {
     });
   } catch (error) {
     console.error('Admin override error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to complete administrative override. Please try again.' });
   }
 };
 
@@ -469,7 +467,7 @@ export const getTicketActivity = async (req, res) => {
     });
   } catch (error) {
     console.error('Get ticket activity error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to load ticket activity. Please try again.' });
   }
 };
 
@@ -541,7 +539,7 @@ export const updateRequestStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('Update request status error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to update request status. Please try again.' });
   }
 };
 
@@ -622,7 +620,7 @@ export const processPayment = async (req, res) => {
     });
   } catch (error) {
     console.error('Process payment error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to process payment. Please try again.' });
   }
 };
 
@@ -675,7 +673,7 @@ export const getMessages = async (req, res) => {
     });
   } catch (error) {
     console.error('Get messages error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to load messages. Please try again.' });
   }
 };
 
@@ -785,6 +783,6 @@ export const sendMessage = async (req, res) => {
     });
   } catch (error) {
     console.error('Send message error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to send message. Please try again.' });
   }
 };

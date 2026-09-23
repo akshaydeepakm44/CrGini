@@ -623,7 +623,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                     onClick={() => setActiveTicketModalTab('chat')}
                   >
                     <MessageSquare size={15} />
-                    <span>Jira Conversation</span>
+                    <span>Request Conversation</span>
                     {ticketMessages.length > 0 && (
                       <span style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#CBD5E1', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
                         {ticketMessages.length}
@@ -819,11 +819,11 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                         </div>
                       )}
 
-                      {/* TAB 3: Jira Conversation */}
+                      {/* TAB 3: Request Conversation */}
                       {activeTicketModalTab === 'chat' && (
                         <div>
                           <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '6px', letterSpacing: '0.04em' }}>
-                            <MessageSquare size={14} /> Jira Conversation Stream
+                            <MessageSquare size={14} /> Request Conversation Stream
                           </h5>
 
                           <div className="ticket-chat-container" style={{ height: '300px', overflowY: 'auto' }}>
@@ -1381,9 +1381,9 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                 </div>
               </div>
 
-              {/* Jira Table */}
-              <div className="jira-table-wrapper table-container" style={{ overflowX: 'auto' }}>
-                <table className="jira-table">
+              {/* Requests Table */}
+              <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                <table className="request-table">
                   <thead>
                     <tr>
                       <th style={{ width: '120px' }}>Ticket ID</th>
@@ -1490,7 +1490,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                   Company Lead Ticket Conversations
                 </h2>
                 <p style={{ color: '#8fa0b5', margin: 0, fontSize: '0.88rem' }}>
-                  Isolated Jira conversation channels for your Company Lead tickets. Select any ticket to communicate directly with the client.
+                  Direct conversation channels for your Company Lead tickets. Select any ticket to communicate directly with the client.
                 </p>
               </div>
 
@@ -1503,8 +1503,8 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                   </p>
                 </div>
               ) : (
-                <div className="jira-table-wrapper table-container" style={{ overflowX: 'auto' }}>
-                  <table className="jira-table">
+                <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                  <table className="request-table">
                     <thead>
                       <tr>
                         <th style={{ width: '120px' }}>Ticket ID</th>
@@ -1556,7 +1556,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                 handleOpenTicket(r, 'chat');
                               }}
                             >
-                              <MessageSquare size={13} /> Open Jira Conversation
+                              <MessageSquare size={13} /> Open Conversation
                             </button>
                           </td>
                         </tr>

@@ -32,13 +32,16 @@ import {
   Menu,
   User,
   FileCheck,
-  FileText
+  FileText,
+  FolderArchive
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import PortalCosmicBackground from '../common/PortalCosmicBackground';
 import NotificationPanel from '../common/NotificationPanel';
 import ClientReviewSection from '../common/ClientReviewSection';
 import ActivityTimeline from '../common/ActivityTimeline';
+import ChangePasswordSection from '../../common/ChangePasswordSection';
+import AssetsView from './AssetsView';
 
 export default function UserDashboard({ user, onLogout }) {
   const [activeNav, setActiveNav] = useState('dashboard');
@@ -107,7 +110,7 @@ export default function UserDashboard({ user, onLogout }) {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSavedNotice, setProfileSavedNotice] = useState(false);
 
-  // Load Company, Requests, and Notifications from MongoDB
+  // Load Company, Requests, and Notifications
   const loadData = async () => {
     try {
       setLoading(true);
@@ -557,6 +560,15 @@ export default function UserDashboard({ user, onLogout }) {
           </button>
 
           <button
+            className={`portal-nav-btn ${activeNav === 'assets' ? 'active' : ''}`}
+            onClick={() => handleNavigate('assets')}
+            title="Assets & Media Library"
+          >
+            <FolderArchive size={18} />
+            <span>Assets</span>
+          </button>
+
+          <button
             className={`portal-nav-btn ${activeNav === 'billing' ? 'active' : ''}`}
             onClick={() => handleNavigate('billing')}
             title="Invoices & Payments"
@@ -638,6 +650,7 @@ export default function UserDashboard({ user, onLogout }) {
                     {activeNav === 'company-lead' && 'Pre-Researched Lead Intelligence'}
                     {activeNav === 'landing-page' && 'Landing Page Sprint Queue'}
                     {activeNav === 'requests' && 'Service Requests & Deliverable Approvals'}
+                    {activeNav === 'assets' && 'Assets Media Library'}
                     {activeNav === 'billing' && 'Invoices & Transaction Ledger'}
                     {activeNav === 'settings' && 'Company Profile & Security Settings'}
                   </>
@@ -822,7 +835,7 @@ export default function UserDashboard({ user, onLogout }) {
                 onClick={() => setActiveTicketModalTab('chat')}
               >
                 <MessageSquare size={15} />
-                <span>Jira Conversation</span>
+                <span>Request Conversation</span>
                 {ticketMessages.length > 0 && (
                   <span style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#CBD5E1', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
                     {ticketMessages.length}
@@ -909,11 +922,11 @@ export default function UserDashboard({ user, onLogout }) {
                     </div>
                   )}
 
-                  {/* TAB 3: Jira Conversation */}
+                  {/* TAB 3: Request Conversation */}
                   {activeTicketModalTab === 'chat' && (
                     <div>
                       <h5 style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#00D9FF', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '6px', letterSpacing: '0.04em' }}>
-                        <MessageSquare size={14} /> Jira Conversation Stream
+                        <MessageSquare size={14} /> Request Conversation Stream
                       </h5>
 
                       <div className="ticket-chat-container" style={{ height: '300px', overflowY: 'auto' }}>
@@ -1085,7 +1098,7 @@ export default function UserDashboard({ user, onLogout }) {
                   <div className="portal-modal-body" style={{ maxHeight: 'none', overflow: 'visible' }}>
                     <div style={{ background: 'rgba(0, 217, 255, 0.08)', border: '1px solid rgba(0, 217, 255, 0.25)', padding: '0.85rem 1rem', borderRadius: '8px', fontSize: '0.84rem', color: '#CBD5E1', marginBottom: '1.25rem' }}>
                       <Building size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px', color: '#00D9FF' }} />
-                      Your company background for <strong>{company?.name}</strong> is already stored. Only specify your new requirements below.
+                      Your company background for <strong>{company?.name}</strong> is already on file. Only specify your new requirements below.
                     </div>
 
                     <div className="portal-form-group">
@@ -1313,7 +1326,7 @@ export default function UserDashboard({ user, onLogout }) {
                     </span>
                     <h4 className="portal-service-title">Company Lead</h4>
                     <p className="portal-service-desc">
-                      Custom curated and verified decision maker databases (CTOs, VPs, Directors) with high intent in your target regions.
+                      Custom curated and verified decision-maker prospect intelligence lists (CTOs, VPs, Directors) with high intent in your target regions.
                     </p>
                     <div className="portal-service-actions">
                       <button
@@ -1388,15 +1401,15 @@ export default function UserDashboard({ user, onLogout }) {
               <div style={{ marginBottom: '2.25rem' }}>
                 <div className="portal-section-header">
                   <h3 className="portal-section-title">
-                    Active Requests & Jira Tickets
+                    Active Requests & Tickets
                   </h3>
                   <button className="portal-btn-secondary" onClick={() => handleNavigate('requests')}>
                     View All Tickets ({requests.length})
                   </button>
                 </div>
 
-                <div className="jira-table-wrapper">
-                  <table className="jira-table">
+                <div className="request-table-wrapper">
+                  <table className="request-table">
                     <thead>
                       <tr>
                         <th>Ticket ID</th>
@@ -1493,7 +1506,7 @@ export default function UserDashboard({ user, onLogout }) {
               <div style={{ background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(52, 211, 153, 0.3)', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <CheckCircle2 size={20} color="#34d399" />
                 <div style={{ fontSize: '0.875rem', color: '#a7f3d0' }}>
-                  <strong>Company Details Pre-Verified:</strong> Your company profile, domain, and market research are already loaded into our database. When creating a new lead request, you do NOT need to re-enter your company background.
+                  <strong>Company Details Pre-Verified:</strong> Your company profile, domain, and market research are already on file in your workspace. When creating a new lead request, you do NOT need to re-enter your company background.
                 </div>
               </div>
 
@@ -1518,8 +1531,8 @@ export default function UserDashboard({ user, onLogout }) {
                   </span>
                 </div>
 
-                <div className="jira-table-wrapper">
-                  <table className="jira-table">
+                <div className="request-table-wrapper">
+                  <table className="request-table">
                     <thead>
                       <tr>
                         <th>Lead Name</th>
@@ -1577,8 +1590,8 @@ export default function UserDashboard({ user, onLogout }) {
                 <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '1rem' }}>
                   Identified Key Stakeholders ({company?.initialKeyPeople?.length || 0})
                 </h4>
-                <div className="jira-table-wrapper">
-                  <table className="jira-table">
+                <div className="request-table-wrapper">
+                  <table className="request-table">
                     <thead>
                       <tr>
                         <th>Stakeholder</th>
@@ -1618,8 +1631,8 @@ export default function UserDashboard({ user, onLogout }) {
                 <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '1rem', color: '#F5F5F5' }}>
                   Company Lead Sprints & Requests
                 </h4>
-                <div className="jira-table-wrapper">
-                  <table className="jira-table">
+                <div className="request-table-wrapper">
+                  <table className="request-table">
                     <thead>
                       <tr>
                         <th>Ticket ID</th>
@@ -1695,10 +1708,10 @@ export default function UserDashboard({ user, onLogout }) {
                 </button>
               </div>
 
-              {/* Stored Company Profile Card */}
+              {/* Verified Company Profile Card */}
               <div className="portal-card" style={{ marginBottom: '1.75rem' }}>
                 <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '1rem' }}>
-                  Target Company Profile (Stored in Database)
+                  Target Company Profile (Verified on File)
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                   <div>
@@ -1729,8 +1742,8 @@ export default function UserDashboard({ user, onLogout }) {
                 <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '1rem' }}>
                   Company Boost Sprint History
                 </h4>
-                <div className="jira-table-wrapper">
-                  <table className="jira-table">
+                <div className="request-table-wrapper">
+                  <table className="request-table">
                     <thead>
                       <tr>
                         <th>Ticket ID</th>
@@ -1826,8 +1839,8 @@ export default function UserDashboard({ user, onLogout }) {
                 <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '1rem' }}>
                   Enhancement Sprints
                 </h4>
-                <div className="jira-table-wrapper">
-                  <table className="jira-table">
+                <div className="request-table-wrapper">
+                  <table className="request-table">
                     <thead>
                       <tr>
                         <th>Ticket ID</th>
@@ -1884,15 +1897,15 @@ export default function UserDashboard({ user, onLogout }) {
             </div>
           )}
 
-          {/* VIEW: MY REQUESTS (JIRA-STYLE SYSTEM) */}
+          {/* VIEW: MY REQUESTS (TICKET SYSTEM) */}
           {activeNav === 'requests' && (
             <div>
               <div style={{ marginBottom: '1.5rem' }}>
                 <h2 style={{ fontSize: '1.4rem', fontWeight: '800', margin: '0 0 0.35rem 0' }}>
-                  My Requests & Jira Ticket Center
+                  My Requests & Ticket Center
                 </h2>
                 <p style={{ color: '#64748b', margin: 0, fontSize: '0.9rem' }}>
-                  All paid requests are tracked as Jira-style tickets with status lifecycle, activity history, and direct team conversation.
+                  All paid requests are tracked as tickets with status lifecycle, activity history, and direct team conversation.
                 </p>
               </div>
 
@@ -1939,8 +1952,8 @@ export default function UserDashboard({ user, onLogout }) {
               </div>
 
               {/* Tickets Table */}
-              <div className="jira-table-wrapper">
-                <table className="jira-table">
+              <div className="request-table-wrapper">
+                <table className="request-table">
                   <thead>
                     <tr>
                       <th>Ticket ID</th>
@@ -2007,15 +2020,24 @@ export default function UserDashboard({ user, onLogout }) {
             </div>
           )}
 
+          {/* VIEW: ASSETS MEDIA LIBRARY */}
+          {activeNav === 'assets' && (
+            <AssetsView
+              user={user}
+              company={company}
+              onNavigate={handleNavigate}
+            />
+          )}
+
           {/* VIEW: INVOICES & PAYMENTS */}
           {activeNav === 'billing' && (
             <div>
               <h2 style={{ fontSize: '1.4rem', fontWeight: '800', marginBottom: '1.5rem' }}>
-                Invoices & Payment Records
+                Invoices & Payment History
               </h2>
 
-              <div className="jira-table-wrapper">
-                <table className="jira-table">
+              <div className="request-table-wrapper">
+                <table className="request-table">
                   <thead>
                     <tr>
                       <th>Invoice ID</th>
@@ -2119,93 +2141,98 @@ export default function UserDashboard({ user, onLogout }) {
 
           {/* VIEW: SETTINGS */}
           {activeNav === 'settings' && (
-            <div className="portal-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: '700', margin: '0 0 4px 0' }}>
-                    Company & Account Profile
-                  </h3>
-                  <p style={{ fontSize: '0.82rem', color: '#64748B', margin: 0 }}>
-                    Manage contact person, telephone number, and view your verified company details.
-                  </p>
-                </div>
-                {!isEditingProfile ? (
-                  <button
-                    type="button"
-                    className="portal-btn-primary"
-                    onClick={() => setIsEditingProfile(true)}
-                  >
-                    Edit Profile
-                  </button>
-                ) : (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      type="button"
-                      className="portal-btn-secondary"
-                      onClick={() => {
-                        setIsEditingProfile(false);
-                        setProfileName(user?.name || '');
-                        setProfilePhone(user?.phone || '');
-                      }}
-                    >
-                      Cancel
-                    </button>
+            <>
+              <div className="portal-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: '700', margin: '0 0 4px 0' }}>
+                      Company & Account Profile
+                    </h3>
+                    <p style={{ fontSize: '0.82rem', color: '#64748B', margin: 0 }}>
+                      Manage contact person, telephone number, and view your verified company details.
+                    </p>
+                  </div>
+                  {!isEditingProfile ? (
                     <button
                       type="button"
                       className="portal-btn-primary"
-                      onClick={handleSaveProfile}
-                      disabled={isSavingProfile}
+                      onClick={() => setIsEditingProfile(true)}
                     >
-                      {isSavingProfile ? 'Saving...' : 'Save Changes'}
+                      Edit Profile
                     </button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        className="portal-btn-secondary"
+                        onClick={() => {
+                          setIsEditingProfile(false);
+                          setProfileName(user?.name || '');
+                          setProfilePhone(user?.phone || '');
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="portal-btn-primary"
+                        onClick={handleSaveProfile}
+                        disabled={isSavingProfile}
+                      >
+                        {isSavingProfile ? 'Saving...' : 'Save Changes'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {profileSavedNotice && (
+                  <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(52, 211, 153, 0.35)', color: '#16A34A', fontSize: '0.85rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle2 size={16} /> Profile preferences saved successfully.
                   </div>
                 )}
+
+                <form onSubmit={handleSaveProfile}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem' }}>
+                    <div>
+                      <label className="portal-form-label">Company Name</label>
+                      <input className="portal-form-input" value={company?.name || ''} readOnly style={{ opacity: 0.85 }} />
+                    </div>
+                    <div>
+                      <label className="portal-form-label">Contact Person</label>
+                      <input
+                        className="portal-form-input"
+                        value={isEditingProfile ? profileName : (user?.name || '')}
+                        onChange={(e) => setProfileName(e.target.value)}
+                        readOnly={!isEditingProfile}
+                        style={{ borderColor: isEditingProfile ? '#2563EB' : undefined }}
+                      />
+                    </div>
+                    <div>
+                      <label className="portal-form-label">Email</label>
+                      <input className="portal-form-input" value={user?.email || ''} readOnly style={{ opacity: 0.85 }} />
+                    </div>
+                    <div>
+                      <label className="portal-form-label">Contact Phone</label>
+                      <input
+                        className="portal-form-input"
+                        value={isEditingProfile ? profilePhone : (user?.phone || '+1 (555) 019-2834')}
+                        onChange={(e) => setProfilePhone(e.target.value)}
+                        readOnly={!isEditingProfile}
+                        style={{ borderColor: isEditingProfile ? '#2563EB' : undefined }}
+                        placeholder="e.g. +1 (555) 019-2834"
+                      />
+                    </div>
+                    <div>
+                      <label className="portal-form-label">Website</label>
+                      <input className="portal-form-input" value={company?.website || ''} readOnly style={{ opacity: 0.85 }} />
+                    </div>
+                  </div>
+                </form>
               </div>
 
-              {profileSavedNotice && (
-                <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(52, 211, 153, 0.35)', color: '#16A34A', fontSize: '0.85rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle2 size={16} /> Profile preferences saved successfully.
-                </div>
-              )}
-
-              <form onSubmit={handleSaveProfile}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem' }}>
-                  <div>
-                    <label className="portal-form-label">Company Name</label>
-                    <input className="portal-form-input" value={company?.name || ''} readOnly style={{ opacity: 0.85 }} />
-                  </div>
-                  <div>
-                    <label className="portal-form-label">Contact Person</label>
-                    <input
-                      className="portal-form-input"
-                      value={isEditingProfile ? profileName : (user?.name || '')}
-                      onChange={(e) => setProfileName(e.target.value)}
-                      readOnly={!isEditingProfile}
-                      style={{ borderColor: isEditingProfile ? '#2563EB' : undefined }}
-                    />
-                  </div>
-                  <div>
-                    <label className="portal-form-label">Email</label>
-                    <input className="portal-form-input" value={user?.email || ''} readOnly style={{ opacity: 0.85 }} />
-                  </div>
-                  <div>
-                    <label className="portal-form-label">Contact Phone</label>
-                    <input
-                      className="portal-form-input"
-                      value={isEditingProfile ? profilePhone : (user?.phone || '+1 (555) 019-2834')}
-                      onChange={(e) => setProfilePhone(e.target.value)}
-                      readOnly={!isEditingProfile}
-                      style={{ borderColor: isEditingProfile ? '#2563EB' : undefined }}
-                      placeholder="e.g. +1 (555) 019-2834"
-                    />
-                  </div>
-                  <div>
-                    <label className="portal-form-label">Website</label>
-                    <input className="portal-form-input" value={company?.website || ''} readOnly style={{ opacity: 0.85 }} />
-                  </div>
-                </div>
-              </form>
-            </div>
+              {/* Change Password Section */}
+              <ChangePasswordSection />
+            </>
           )}
             </>
           )}

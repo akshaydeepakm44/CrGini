@@ -240,7 +240,7 @@ export const createSubmission = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Failed to submit work deliverables. Please try again.',
     });
   }
 };
@@ -280,7 +280,7 @@ export const getSubmissions = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Failed to fetch submissions. Please try again.',
     });
   }
 };
@@ -338,7 +338,7 @@ export const getSubmissionByVersion = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Failed to fetch submission version. Please try again.',
     });
   }
 };
@@ -497,7 +497,7 @@ export const approveSubmission = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Failed to approve submission. Please try again.',
     });
   }
 };
@@ -653,7 +653,7 @@ export const requestChanges = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Failed to submit change request. Please try again.',
     });
   }
 };

@@ -12,6 +12,7 @@ import Footer from './components/landing/Footer';
 import Toast from './components/common/Toast';
 import CosmicSpaceCanvas from './components/common/CosmicSpaceCanvas';
 import SignInPage from './components/auth/SignInPage';
+import ResetPasswordPage from './components/auth/ResetPasswordPage';
 import ProtectedRoute, { getRoleHome } from './components/common/ProtectedRoute';
 import UserDashboard from './components/dashboard/user/UserDashboard';
 import AdminDashboard from './components/dashboard/admin/AdminDashboard';
@@ -208,7 +209,40 @@ export default function App() {
               <Navigate to={getRoleHome(user)} replace />
             ) : (
               <SignInPage
+                initialView="signin"
                 onLogin={handleLogin}
+                onBackHome={() => navigate('/')}
+                showToast={showToast}
+              />
+            )
+          }
+        />
+
+        {/* 2a. Forgot Password Route */}
+        <Route
+          path="/forgot-password"
+          element={
+            user ? (
+              <Navigate to={getRoleHome(user)} replace />
+            ) : (
+              <SignInPage
+                initialView="forgot"
+                onLogin={handleLogin}
+                onBackHome={() => navigate('/')}
+                showToast={showToast}
+              />
+            )
+          }
+        />
+
+        {/* 2b. Reset Password Route */}
+        <Route
+          path="/reset-password"
+          element={
+            user ? (
+              <Navigate to={getRoleHome(user)} replace />
+            ) : (
+              <ResetPasswordPage
                 onBackHome={() => navigate('/')}
                 showToast={showToast}
               />

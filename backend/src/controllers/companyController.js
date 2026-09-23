@@ -34,8 +34,7 @@ export const getMyCompany = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: 'Failed to fetch company details',
-      error: error.message,
+      message: 'Failed to fetch company details. Please try again later.',
     });
   }
 };
@@ -63,7 +62,7 @@ export const getCompanyById = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Failed to fetch company details. Please try again later.',
     });
   }
 };

@@ -885,7 +885,7 @@ export default function LandingPageDashboard({ user, onLogout }) {
                       All Landing Page Requests & Tickets
                     </h3>
                     <p style={{ fontSize: '0.85rem', color: '#CBD5E1', margin: 0 }}>
-                      Manage, filter, and track all landing page enhancement sprints. Click any row to inspect Jira details, chat with client, and submit deliverables.
+                      Manage, filter, and track all landing page enhancement sprints. Click any row to inspect request details, chat with client, and submit deliverables.
                     </p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -955,9 +955,9 @@ export default function LandingPageDashboard({ user, onLogout }) {
                 </div>
               </div>
 
-              {/* High-Contrast Jira Table */}
-              <div className="jira-table-wrapper table-container" style={{ overflowX: 'auto' }}>
-                <table className="jira-table">
+              {/* High-Contrast Requests Table */}
+              <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                <table className="request-table">
                   <thead>
                     <tr>
                       <th style={{ width: '110px', color: '#CBD5E1' }}>Ticket ID</th>
@@ -1096,7 +1096,7 @@ export default function LandingPageDashboard({ user, onLogout }) {
                   Landing Page UI Ticket Conversations
                 </h2>
                 <p style={{ color: '#8fa0b5', margin: 0, fontSize: '0.88rem' }}>
-                  Isolated Jira conversation channels for your Landing Page tickets. Select any ticket to communicate directly with the client.
+                  Direct conversation channels for your Landing Page tickets. Select any ticket to communicate directly with the client.
                 </p>
               </div>
 
@@ -1109,8 +1109,8 @@ export default function LandingPageDashboard({ user, onLogout }) {
                   </p>
                 </div>
               ) : (
-                <div className="jira-table-wrapper table-container" style={{ overflowX: 'auto' }}>
-                  <table className="jira-table">
+                <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                  <table className="request-table">
                     <thead>
                       <tr>
                         <th style={{ width: '120px' }}>Ticket ID</th>
@@ -1162,7 +1162,7 @@ export default function LandingPageDashboard({ user, onLogout }) {
                                 handleOpenTicket(r, 'chat');
                               }}
                             >
-                              <MessageSquare size={13} /> Open Jira Conversation
+                              <MessageSquare size={13} /> Open Conversation
                             </button>
                           </td>
                         </tr>

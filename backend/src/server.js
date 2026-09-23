@@ -7,6 +7,7 @@ import companyRoutes from './routes/companyRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import assetRoutes from './routes/assetRoutes.js';
 
 dotenv.config();
 
@@ -38,8 +39,8 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -47,6 +48,7 @@ app.use('/api/company', companyRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/assets', assetRoutes);
 
 // Health Check with PostgreSQL Connectivity Diagnostics
 app.get('/api/health', async (req, res) => {

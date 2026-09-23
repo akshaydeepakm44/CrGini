@@ -996,9 +996,9 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                 </div>
               </div>
 
-              {/* Jira Table */}
-              <div className="jira-table-wrapper table-container" style={{ overflowX: 'auto' }}>
-                <table className="jira-table">
+              {/* Requests Table */}
+              <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                <table className="request-table">
                   <thead>
                     <tr>
                       <th style={{ width: '120px' }}>Ticket ID</th>
@@ -1105,7 +1105,7 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                   Company Boost Ticket Conversations
                 </h2>
                 <p style={{ color: '#8fa0b5', margin: 0, fontSize: '0.88rem' }}>
-                  Isolated Jira conversation channels for your Company Boost tickets. Select any ticket to communicate directly with the client.
+                  Direct conversation channels for your Company Boost tickets. Select any ticket to communicate directly with the client.
                 </p>
               </div>
 
@@ -1118,8 +1118,8 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                   </p>
                 </div>
               ) : (
-                <div className="jira-table-wrapper table-container" style={{ overflowX: 'auto' }}>
-                  <table className="jira-table">
+                <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                  <table className="request-table">
                     <thead>
                       <tr>
                         <th style={{ width: '120px' }}>Ticket ID</th>
@@ -1171,7 +1171,7 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                                 handleOpenTicket(r, 'chat');
                               }}
                             >
-                              <MessageSquare size={13} /> Open Jira Conversation
+                              <MessageSquare size={13} /> Open Conversation
                             </button>
                           </td>
                         </tr>

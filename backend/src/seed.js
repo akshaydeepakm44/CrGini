@@ -371,7 +371,7 @@ const seedData = async () => {
       }
     ]);
 
-    // 5. Create Sample Jira Conversation for CG-1024
+    // 5. Create Sample Request Conversation for CG-1024
     await Message.create([
       {
         requestId: ticket1._id,

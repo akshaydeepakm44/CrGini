@@ -94,7 +94,7 @@ export default class ErrorBoundary extends React.Component {
                 overflowX: 'auto',
                 maxHeight: '100px'
               }}>
-                {this.state.error.message}
+                {import.meta.env.DEV ? this.state.error.message : 'An unexpected application error occurred. Please reload the view.'}
               </div>
             )}
 

@@ -19,6 +19,10 @@ import {
   createActivityLog,
   listActivityLogs,
 } from '../repositories/activityLogRepository.js';
+import {
+  buildWelcomeEmailTemplate,
+  sendWelcomeEmail,
+} from '../services/emailService.js';
 
 // Helper to generate a friendly secure temporary password
 const generateTempPassword = () => {
@@ -135,8 +139,7 @@ export const createClientUser = async (req, res) => {
     console.error('Create client user error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to create client user',
-      error: error.message
+      message: 'Failed to create client user. Please try again.'
     });
   }
 };
@@ -214,7 +217,7 @@ export const getAllUsers = async (req, res) => {
     });
   } catch (error) {
     console.error('Get all users error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to fetch users. Please try again.' });
   }
 };
 
@@ -336,7 +339,7 @@ export const getUserById = async (req, res) => {
     });
   } catch (error) {
     console.error('Get user by id error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to fetch user details. Please try again.' });
   }
 };
 
@@ -345,7 +348,20 @@ export const getUserById = async (req, res) => {
 // @access  Private (ADMIN only)
 export const updateUserHandler = async (req, res) => {
   try {
-    const { name, email, phone, status, companyName, website, industry, companyInfo } = req.body;
+    const {
+      name,
+      contactPerson,
+      email,
+      phone,
+      password,
+      status,
+      companyName,
+      website,
+      industry,
+      companyInfo,
+      description,
+      researchSummary
+    } = req.body;
 
     const user = await findUserById(req.params.id);
     if (!user) {
@@ -353,8 +369,13 @@ export const updateUserHandler = async (req, res) => {
     }
 
     const userUpdates = {};
-    if (name) userUpdates.name = name.trim();
+    const effectiveName = name || contactPerson;
+    if (effectiveName) userUpdates.name = effectiveName.trim();
     if (phone !== undefined) userUpdates.phone = phone.trim();
+    if (password && password.trim()) {
+      const salt = await bcrypt.genSalt(10);
+      userUpdates.password = await bcrypt.hash(password.trim(), salt);
+    }
     if (status && ['ACTIVE', 'DISABLED', 'INACTIVE', 'SUSPENDED'].includes(status)) {
       userUpdates.status = status;
     }
@@ -375,7 +396,13 @@ export const updateUserHandler = async (req, res) => {
       if (companyName) companyUpdates.name = companyName.trim();
       if (website !== undefined) companyUpdates.website = website.trim();
       if (industry !== undefined) companyUpdates.industry = industry.trim();
-      if (companyInfo !== undefined) companyUpdates.companyInfo = companyInfo.trim();
+      const effectiveInfo = companyInfo !== undefined ? companyInfo : description;
+      if (effectiveInfo !== undefined) companyUpdates.companyInfo = effectiveInfo.trim();
+      if (researchSummary !== undefined) companyUpdates.researchSummary = researchSummary.trim();
+      if (effectiveName) companyUpdates.contactPerson = effectiveName.trim();
+      if (email) companyUpdates.email = email.toLowerCase().trim();
+      if (phone !== undefined) companyUpdates.phone = phone.trim();
+
       if (Object.keys(companyUpdates).length > 0) {
         await updateCompany(user.companyId, companyUpdates);
       }
@@ -386,7 +413,7 @@ export const updateUserHandler = async (req, res) => {
       userName: req.user.name,
       companyId: user.companyId || null,
       action: 'CLIENT_UPDATED',
-      details: `Admin ${req.user.name} updated client account for ${user.name} (${user.email}).`
+      details: `Admin ${req.user.name} updated client account for ${userUpdates.name || user.name} (${userUpdates.email || user.email}).`
     });
 
     const finalUser = await findUserById(user.id);
@@ -401,7 +428,7 @@ export const updateUserHandler = async (req, res) => {
     });
   } catch (error) {
     console.error('Update user error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to update user profile. Please try again.' });
   }
 };
 
@@ -436,7 +463,7 @@ export const resetUserPassword = async (req, res) => {
     });
   } catch (error) {
     console.error('Reset password error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to reset password. Please try again.' });
   }
 };
 
@@ -475,7 +502,7 @@ export const updateUserStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('Update user status error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to update user status. Please try again.' });
   }
 };
 
@@ -515,7 +542,7 @@ export const getActivityLogs = async (req, res) => {
     });
   } catch (error) {
     console.error('Get activity logs error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to load activity logs. Please try again.' });
   }
 };
 
@@ -557,7 +584,7 @@ export const deleteTeamUser = async (req, res) => {
     });
   } catch (error) {
     console.error('Delete team user error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to delete team member. Please try again.' });
   }
 };
 
@@ -599,7 +626,7 @@ export const deleteUserHandler = async (req, res) => {
     }
   } catch (error) {
     console.error('Delete user error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to delete user. Please try again.' });
   }
 };
 
@@ -660,7 +687,7 @@ export const getTeamMembers = async (req, res) => {
     });
   } catch (error) {
     console.error('Get team members error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to fetch team members. Please try again.' });
   }
 };
 
@@ -740,7 +767,7 @@ export const updateUserPermissions = async (req, res) => {
     });
   } catch (error) {
     console.error('Update permissions error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to update permissions. Please try again.' });
   }
 };
 
@@ -843,14 +870,135 @@ export const createTeamUser = async (req, res) => {
     if (error.code === '23505') {
       return res.status(400).json({
         success: false,
-        message: 'A user with this email already exists.',
-        error: error.message
+        message: 'A user with this email already exists.'
       });
     }
     return res.status(500).json({
       success: false,
-      message: error.message || 'Failed to create team user',
-      error: error.message
+      message: 'Failed to create team user. Please try again.'
+    });
+  }
+};
+
+// @desc    Admin preview the welcome email with live edits
+// @route   POST /api/admin/users/:id/preview-welcome-email
+// @access  Private (ADMIN only)
+export const previewWelcomeEmailHandler = async (req, res) => {
+  try {
+    let user = null;
+    let company = null;
+
+    if (req.params.id && req.params.id !== 'draft') {
+      user = await findUserById(req.params.id);
+      if (user?.companyId) {
+        company = await findCompanyById(user.companyId);
+      }
+    }
+
+    const {
+      name,
+      contactPerson,
+      email,
+      companyName,
+      subject,
+      customBody,
+      temporaryPassword,
+      attachments
+    } = req.body;
+
+    const clientName = (name || contactPerson || user?.name || user?.contactPerson || 'Valued Client').trim();
+    const recipientEmail = (email || user?.email || '').trim();
+    const resolvedCompanyName = (companyName || company?.name || 'Client Workspace').trim();
+    const emailSubject = subject?.trim() || 'Welcome to CreativeGini - Your Account & Workspace Access';
+    const attachmentsList = Array.isArray(attachments) ? attachments : [];
+
+    const html = buildWelcomeEmailTemplate({
+      clientName,
+      companyName: resolvedCompanyName,
+      email: recipientEmail,
+      temporaryPassword: temporaryPassword || '',
+      subject: emailSubject,
+      customBody,
+      portalUrl: 'https://creativegini.com/signin',
+      attachments: attachmentsList
+    });
+
+    return res.json({
+      success: true,
+      html,
+      recipient: recipientEmail,
+      clientName,
+      companyName: resolvedCompanyName,
+      subject: emailSubject,
+      attachmentCount: attachmentsList.length
+    });
+  } catch (error) {
+    console.error('Preview welcome email error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate email preview. Please try again.'
+    });
+  }
+};
+
+// @desc    Admin send the welcome email to newly created client user
+// @route   POST /api/admin/users/:id/send-welcome-email
+// @access  Private (ADMIN only)
+export const sendWelcomeEmailHandler = async (req, res) => {
+  try {
+    const user = await findUserById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Client user not found' });
+    }
+
+    const company = user.companyId ? await findCompanyById(user.companyId) : null;
+    const { subject, customBody, temporaryPassword, attachments } = req.body;
+    const attachmentsList = Array.isArray(attachments) ? attachments : [];
+
+    const result = await sendWelcomeEmail({
+      client: user,
+      company,
+      temporaryPassword,
+      subject,
+      customBody,
+      attachments: attachmentsList
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Unable to send the welcome email. Please review the email and try again.'
+      });
+    }
+
+    // Log the event in activity logs
+    try {
+      const attCount = attachmentsList.length;
+      await createActivityLog({
+        userId: req.user.id || req.user._id,
+        userName: req.user.name,
+        companyId: user.companyId || null,
+        action: 'WELCOME_EMAIL_SENT',
+        details: `Admin ${req.user.name} dispatched welcome email with credentials to ${user.name} (${user.email})${attCount > 0 ? ` with ${attCount} attachment(s)` : ''}.`
+      });
+    } catch (logErr) {
+      console.warn('Failed to log welcome email activity:', logErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message: 'User account created and welcome email sent successfully.',
+      messageId: result.messageId,
+      recipient: user.email,
+      clientName: user.name,
+      companyName: company?.name || '',
+      attachmentCount: attachmentsList.length
+    });
+  } catch (error) {
+    console.error('Send welcome email error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to send the welcome email. Please review the email and try again.'
     });
   }
 };

@@ -11,7 +11,9 @@ import {
   deleteTeamUser,
   getActivityLogs,
   getTeamMembers,
-  updateUserPermissions
+  updateUserPermissions,
+  previewWelcomeEmailHandler,
+  sendWelcomeEmailHandler
 } from '../controllers/userController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -28,6 +30,8 @@ router.get('/users/:id', getUserById);
 router.patch('/users/:id', updateUserHandler);
 router.patch('/users/:id/permissions', updateUserPermissions);
 router.post('/users/:id/reset-password', resetUserPassword);
+router.post('/users/:id/preview-welcome-email', previewWelcomeEmailHandler);
+router.post('/users/:id/send-welcome-email', sendWelcomeEmailHandler);
 router.patch('/users/:id/status', updateUserStatus);
 router.delete('/users/:id', deleteUserHandler);
 router.get('/activity-logs', getActivityLogs);

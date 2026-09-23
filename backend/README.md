@@ -1,6 +1,6 @@
 # CreativeGini Backend API Service
 
-The CreativeGini backend is a RESTful API built with **Node.js (ES Modules)**, **Express**, and **MongoDB (Mongoose)**. It provides authentication, role-based access control, service request tracking, payment simulation, versioned deliverable submissions, Jira-style ticket conversations, and in-app notifications.
+The CreativeGini backend is a RESTful API built with **Node.js (ES Modules)**, **Express**, and **MongoDB (Mongoose)**. It provides authentication, role-based access control, service request tracking, payment simulation, versioned deliverable submissions, ticket conversations, and in-app notifications.
 
 ---
 
@@ -67,7 +67,7 @@ backend/
 - `POST /api/requests/:id/assign` — Admin or Lead manual ticket assignment.
 - `POST /api/requests/:id/admin-override` — Admin emergency override to mark ticket `COMPLETED` with mandatory audit reason.
 - `GET /api/requests/:id/activity` — Returns the audit timeline for an individual ticket.
-- `GET /api/requests/:id/messages` — Returns the Jira conversation stream for the ticket.
+- `GET /api/requests/:id/messages` — Returns the request conversation stream for the ticket.
 - `POST /api/requests/:id/messages` — Appends a new message to the ticket conversation and alerts the counterparty.
 
 ### Work Submissions & Client Review (`/api/requests/:id/submissions`)

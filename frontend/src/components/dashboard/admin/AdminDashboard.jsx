@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ShieldCheck,
@@ -40,12 +40,14 @@ import {
   ExternalLink,
   Trash2,
   Server,
-  Database,
+  Send,
+  RefreshCw,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   Menu,
-  Bell
+  Bell,
+  Paperclip
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import PortalCosmicBackground from '../common/PortalCosmicBackground';
@@ -103,7 +105,6 @@ export default function AdminDashboard({ user, onLogout }) {
   const ITEMS_PER_PAGE = 10;
 
   // Modals
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [creationSuccessData, setCreationSuccessData] = useState(null); // shows created user + temp pass
   const [viewingUser, setViewingUser] = useState(null); // user detail modal
   const [viewUserData, setViewUserData] = useState(null); // full populated details
@@ -115,22 +116,38 @@ export default function AdminDashboard({ user, onLogout }) {
   const [deletingUser, setDeletingUser] = useState(null); // delete confirmation modal
   const [deletingTeamMember, setDeletingTeamMember] = useState(null);
   const [isDeletingTeamMember, setIsDeletingTeamMember] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [ticketMessages, setTicketMessages] = useState([]);
 
-  // Form State for creating new client user
-  const [createFormData, setCreateFormData] = useState({
-    companyName: '',
+  // 3-Step Create Client User + Welcome Email Workflow State
+  const [createWorkflow, setCreateWorkflow] = useState({
+    isOpen: false,
+    step: 1, // 1: User Details, 2: Welcome Email & Attachments, 3: Success Confirmation
+    createdUserId: null,
+    companyId: null,
     contactPerson: '',
     email: '',
+    companyName: '',
+    password: 'Client@123',
     phone: '',
     website: '',
     industry: 'Enterprise SaaS / AI',
     companyInfo: '',
-    researchSummary: '',
-    password: 'Client@123'
+    emailSubject: 'Welcome to CreativeGini - Your Account & Workspace Access',
+    emailBody: 'We are pleased to welcome you to CreativeGini. Your dedicated client workspace has been provisioned and is ready for use. Below are your account credentials and access instructions to review your performance dashboards, prospect intelligence, and active deliverables.',
+    activeEmailTab: 'edit', // 'edit' | 'preview'
+    previewHtml: '',
+    isLoadingPreview: false,
+    attachments: [],
+    attachmentError: null,
+    isSubmittingStep1: false,
+    isSendingEmail: false,
+    sendError: null,
+    successData: null
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef(null);
+
   const [toastNotice, setToastNotice] = useState(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
@@ -163,14 +180,6 @@ export default function AdminDashboard({ user, onLogout }) {
 
   useEffect(() => {
     loadAdminData();
-    const origHtmlOverflow = document.documentElement.style.overflow;
-    const origBodyOverflow = document.body.style.overflow;
-    document.documentElement.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.documentElement.style.overflow = origHtmlOverflow;
-      document.body.style.overflow = origBodyOverflow;
-    };
   }, []);
 
   useEffect(() => {
@@ -200,8 +209,8 @@ export default function AdminDashboard({ user, onLogout }) {
           setViewUserData(null);
         } else if (creationSuccessData) {
           setCreationSuccessData(null);
-        } else if (isCreateModalOpen) {
-          setIsCreateModalOpen(false);
+        } else if (createWorkflow.isOpen) {
+          setCreateWorkflow(prev => ({ ...prev, isOpen: false }));
         } else if (selectedTicket) {
           setSelectedTicket(null);
         } else if (isNotificationsOpen) {
@@ -215,78 +224,359 @@ export default function AdminDashboard({ user, onLogout }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     isMobileDrawerOpen, overrideModalTicket, deletingTeamMember, deletingUser, statusConfirmUser, resetSuccessPass,
-    resettingUser, editingUser, viewingUser, creationSuccessData, isCreateModalOpen,
+    resettingUser, editingUser, viewingUser, creationSuccessData, createWorkflow.isOpen,
     selectedTicket, isNotificationsOpen, isProfileMenuOpen
   ]);
 
-  // 1. CREATE CLIENT USER
-  const handleCreateSubmit = async (e) => {
+  // Format file size utility
+  const formatFileSize = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const BLOCKED_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.vbs', '.msi', '.js', '.scr', '.pif', '.com', '.jar', '.vbe', '.wsf', '.jse'];
+
+  // Open the 3-step create client workflow
+  const handleOpenCreateWorkflow = () => {
+    setCreateWorkflow({
+      isOpen: true,
+      step: 1,
+      createdUserId: null,
+      companyId: null,
+      contactPerson: '',
+      email: '',
+      companyName: '',
+      password: 'Client@123',
+      phone: '',
+      website: '',
+      industry: 'Enterprise SaaS / AI',
+      companyInfo: '',
+      emailSubject: 'Welcome to CreativeGini - Your Account & Workspace Access',
+      emailBody: 'We are pleased to welcome you to CreativeGini. Your dedicated client workspace has been provisioned and is ready for use. Below are your account credentials and access instructions to review your performance dashboards, prospect intelligence, and active deliverables.',
+      activeEmailTab: 'edit',
+      previewHtml: '',
+      isLoadingPreview: false,
+      attachments: [],
+      attachmentError: null,
+      isSubmittingStep1: false,
+      isSendingEmail: false,
+      sendError: null,
+      successData: null
+    });
+  };
+
+  // STEP 1: Continue to Email
+  // If createdUserId does not exist, provision client. If createdUserId exists, PATCH existing user.
+  const handleStep1Continue = async (e) => {
     e.preventDefault();
-    if (!createFormData.companyName || !createFormData.contactPerson || !createFormData.email) {
-      alert('Please provide Company Name, Client Name, and Email.');
+    if (!createWorkflow.companyName?.trim() || !createWorkflow.contactPerson?.trim() || !createWorkflow.email?.trim() || !createWorkflow.password?.trim()) {
+      alert('Please provide Company Name, Client Name, Email, and Temporary Password.');
       return;
     }
 
     try {
-      setIsSubmitting(true);
-      const res = await api.adminCreateClient({
-        companyName: createFormData.companyName.trim(),
-        contactPerson: createFormData.contactPerson.trim(),
-        email: createFormData.email.trim(),
-        phone: createFormData.phone.trim(),
-        website: createFormData.website.trim(),
-        industry: createFormData.industry.trim(),
-        companyInfo: createFormData.companyInfo.trim(),
-        researchSummary: createFormData.researchSummary.trim(),
-        password: createFormData.password.trim(),
-        initialLeads: [
-          {
-            name: 'Senior Decision Maker (Sample)',
-            title: 'VP of Engineering / CTO',
-            company: createFormData.companyName.trim(),
-            email: `executive@${createFormData.email.split('@')[1] || 'client.com'}`,
-            location: 'Global',
-            status: 'Verified'
-          }
-        ],
-        initialKeyPeople: [
-          {
-            name: createFormData.contactPerson.trim(),
-            role: 'Executive Sponsor',
-            department: 'Management',
-            contact: createFormData.email.trim()
-          }
-        ]
-      });
+      setCreateWorkflow(prev => ({ ...prev, isSubmittingStep1: true, sendError: null }));
 
-      setIsCreateModalOpen(false);
-      setCreationSuccessData({
-        name: createFormData.contactPerson,
-        email: createFormData.email,
-        company: createFormData.companyName,
-        role: 'USER',
-        temporaryPassword: res.temporaryPassword || createFormData.password,
-        id: res.user?.id
-      });
+      let userId = createWorkflow.createdUserId;
+      let compId = createWorkflow.companyId;
 
-      setCreateFormData({
-        companyName: '',
-        contactPerson: '',
-        email: '',
-        phone: '',
-        website: '',
-        industry: 'Enterprise SaaS / AI',
-        companyInfo: '',
-        researchSummary: '',
-        password: 'Client@123'
-      });
+      if (!userId) {
+        // Provision new client
+        const res = await api.adminCreateClient({
+          companyName: createWorkflow.companyName.trim(),
+          contactPerson: createWorkflow.contactPerson.trim(),
+          email: createWorkflow.email.trim(),
+          phone: createWorkflow.phone?.trim() || '',
+          website: createWorkflow.website?.trim() || '',
+          industry: createWorkflow.industry?.trim() || 'Enterprise SaaS / AI',
+          companyInfo: createWorkflow.companyInfo?.trim() || '',
+          researchSummary: createWorkflow.companyInfo?.trim() || '',
+          password: createWorkflow.password.trim(),
+          initialLeads: [
+            {
+              name: 'Senior Decision Maker (Sample)',
+              title: 'VP of Engineering / CTO',
+              company: createWorkflow.companyName.trim(),
+              email: `executive@${createWorkflow.email.split('@')[1] || 'client.com'}`,
+              location: 'Global',
+              status: 'Verified'
+            }
+          ],
+          initialKeyPeople: [
+            {
+              name: createWorkflow.contactPerson.trim(),
+              role: 'Executive Sponsor',
+              department: 'Management',
+              contact: createWorkflow.email.trim()
+            }
+          ]
+        });
+
+        userId = res.user?.id || res.user?._id;
+        compId = res.company?.id || res.user?.companyId || null;
+      } else {
+        // Update existing client and company without duplicating
+        const res = await api.adminUpdateUser(userId, {
+          name: createWorkflow.contactPerson.trim(),
+          contactPerson: createWorkflow.contactPerson.trim(),
+          email: createWorkflow.email.trim(),
+          password: createWorkflow.password.trim(),
+          phone: createWorkflow.phone?.trim() || '',
+          companyName: createWorkflow.companyName.trim(),
+          website: createWorkflow.website?.trim() || '',
+          industry: createWorkflow.industry?.trim() || 'Enterprise SaaS / AI',
+          companyInfo: createWorkflow.companyInfo?.trim() || '',
+          description: createWorkflow.companyInfo?.trim() || ''
+        });
+        if (res.user?.companyId) {
+          compId = res.user.companyId;
+        }
+      }
+
+      setCreateWorkflow(prev => ({
+        ...prev,
+        createdUserId: userId,
+        companyId: compId,
+        step: 2,
+        isSubmittingStep1: false,
+        isLoadingPreview: true
+      }));
+
+      // Preload preview in background
+      try {
+        const prevRes = await api.adminPreviewWelcomeEmail(userId, {
+          name: createWorkflow.contactPerson.trim(),
+          email: createWorkflow.email.trim(),
+          companyName: createWorkflow.companyName.trim(),
+          temporaryPassword: createWorkflow.password.trim(),
+          subject: createWorkflow.emailSubject,
+          customBody: createWorkflow.emailBody,
+          attachments: createWorkflow.attachments
+        });
+        if (prevRes?.html) {
+          setCreateWorkflow(curr => (curr.isOpen && curr.createdUserId === userId ? { ...curr, previewHtml: prevRes.html, isLoadingPreview: false } : curr));
+        } else {
+          setCreateWorkflow(curr => ({ ...curr, isLoadingPreview: false }));
+        }
+      } catch (prevErr) {
+        console.warn('Background preview load notice:', prevErr.message);
+        setCreateWorkflow(curr => ({ ...curr, isLoadingPreview: false }));
+      }
 
       await loadAdminData();
     } catch (err) {
-      alert('Failed to create client user: ' + err.message);
-    } finally {
-      setIsSubmitting(false);
+      alert('Failed to save client user details: ' + (err.message || 'Unknown error'));
+      setCreateWorkflow(prev => ({ ...prev, isSubmittingStep1: false }));
     }
+  };
+
+  // STEP 2: Previous button back to Step 1
+  const handleBackToStep1 = () => {
+    setCreateWorkflow(prev => ({
+      ...prev,
+      step: 1,
+      sendError: null
+    }));
+  };
+
+  // Switch between Edit Message and Live Preview
+  const handleSwitchEmailTab = async (tab) => {
+    if (tab === 'preview') {
+      setCreateWorkflow(prev => ({ ...prev, activeEmailTab: 'preview', isLoadingPreview: true, sendError: null }));
+      try {
+        const res = await api.adminPreviewWelcomeEmail(createWorkflow.createdUserId || 'draft', {
+          name: createWorkflow.contactPerson.trim(),
+          email: createWorkflow.email.trim(),
+          companyName: createWorkflow.companyName.trim(),
+          temporaryPassword: createWorkflow.password.trim(),
+          subject: createWorkflow.emailSubject,
+          customBody: createWorkflow.emailBody,
+          attachments: createWorkflow.attachments
+        });
+        setCreateWorkflow(prev => ({
+          ...prev,
+          previewHtml: res.html || '',
+          isLoadingPreview: false
+        }));
+      } catch (err) {
+        console.error('Failed to load email preview:', err);
+        setCreateWorkflow(prev => ({
+          ...prev,
+          isLoadingPreview: false,
+          sendError: 'Failed to generate live preview. Please check connection and try again.'
+        }));
+      }
+    } else {
+      setCreateWorkflow(prev => ({ ...prev, activeEmailTab: 'edit', sendError: null }));
+    }
+  };
+
+  // Gmail-like attachment selector with validation
+  const handleFileSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    e.target.value = ''; // Reset input to allow selecting same file if re-added
+
+    let currentAttachments = [...createWorkflow.attachments];
+    let currentTotalSize = currentAttachments.reduce((sum, a) => sum + (a.size || 0), 0);
+    let errorMessage = null;
+
+    for (const file of files) {
+      const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+
+      if (file.size === 0) {
+        errorMessage = `File "${file.name}" is empty (0 bytes) and cannot be attached.`;
+        break;
+      }
+
+      if (BLOCKED_EXTENSIONS.includes(ext)) {
+        errorMessage = `File "${file.name}" has an unsafe extension (${ext}) and was blocked for security.`;
+        break;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        errorMessage = `File "${file.name}" exceeds the maximum 10 MB limit per file (${formatFileSize(file.size)}).`;
+        break;
+      }
+
+      if (currentTotalSize + file.size > 15 * 1024 * 1024) {
+        errorMessage = `Total attachments cannot exceed 15 MB. Adding "${file.name}" would exceed this limit.`;
+        break;
+      }
+
+      try {
+        const base64Data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result;
+            const commaIdx = result.indexOf(',');
+            resolve(commaIdx !== -1 ? result.substring(commaIdx + 1) : result);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const newAtt = {
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          filename: file.name,
+          contentType: file.type || 'application/octet-stream',
+          size: file.size,
+          sizeFormatted: formatFileSize(file.size),
+          base64: base64Data
+        };
+
+        currentAttachments.push(newAtt);
+        currentTotalSize += file.size;
+      } catch (readErr) {
+        errorMessage = `Failed to process "${file.name}". Please try another file.`;
+        break;
+      }
+    }
+
+    setCreateWorkflow(prev => {
+      const updated = {
+        ...prev,
+        attachments: currentAttachments,
+        attachmentError: errorMessage
+      };
+
+      if (updated.activeEmailTab === 'preview' && updated.createdUserId) {
+        api.adminPreviewWelcomeEmail(updated.createdUserId, {
+          name: updated.contactPerson.trim(),
+          email: updated.email.trim(),
+          companyName: updated.companyName.trim(),
+          temporaryPassword: updated.password.trim(),
+          subject: updated.emailSubject,
+          customBody: updated.emailBody,
+          attachments: currentAttachments
+        }).then(res => {
+          if (res?.html) {
+            setCreateWorkflow(c => ({ ...c, previewHtml: res.html }));
+          }
+        }).catch(console.warn);
+      }
+
+      return updated;
+    });
+  };
+
+  // Remove attachment
+  const handleRemoveAttachment = (attId) => {
+    setCreateWorkflow(prev => {
+      const filtered = prev.attachments.filter(a => a.id !== attId);
+      const updated = {
+        ...prev,
+        attachments: filtered,
+        attachmentError: null
+      };
+
+      if (updated.activeEmailTab === 'preview' && updated.createdUserId) {
+        api.adminPreviewWelcomeEmail(updated.createdUserId, {
+          name: updated.contactPerson.trim(),
+          email: updated.email.trim(),
+          companyName: updated.companyName.trim(),
+          temporaryPassword: updated.password.trim(),
+          subject: updated.emailSubject,
+          customBody: updated.emailBody,
+          attachments: filtered
+        }).then(res => {
+          if (res?.html) {
+            setCreateWorkflow(c => ({ ...c, previewHtml: res.html }));
+          }
+        }).catch(console.warn);
+      }
+
+      return updated;
+    });
+  };
+
+  // STEP 2: Send Welcome Email
+  const handleSendWelcomeEmail = async () => {
+    if (!createWorkflow.createdUserId) return;
+
+    try {
+      setCreateWorkflow(prev => ({ ...prev, isSendingEmail: true, sendError: null }));
+
+      await api.adminSendWelcomeEmail(createWorkflow.createdUserId, {
+        subject: createWorkflow.emailSubject,
+        customBody: createWorkflow.emailBody,
+        temporaryPassword: createWorkflow.password,
+        attachments: createWorkflow.attachments
+      });
+
+      setCreateWorkflow(prev => ({
+        ...prev,
+        isSendingEmail: false,
+        step: 3,
+        sendError: null,
+        successData: {
+          clientName: createWorkflow.contactPerson,
+          email: createWorkflow.email,
+          company: createWorkflow.companyName,
+          attachmentCount: createWorkflow.attachments.length
+        }
+      }));
+
+      showNotice(`Welcome email sent successfully to ${createWorkflow.email}.`);
+      await loadAdminData();
+    } catch (err) {
+      console.error('Failed to send welcome email:', err);
+      // User is NOT deleted!
+      setCreateWorkflow(prev => ({
+        ...prev,
+        isSendingEmail: false,
+        sendError: 'Unable to send the welcome email. Please review the email and try again.'
+      }));
+    }
+  };
+
+  // Finish Workflow (Step 3 Done)
+  const handleFinishWorkflow = async () => {
+    setCreateWorkflow(prev => ({ ...prev, isOpen: false }));
+    await loadAdminData();
   };
 
   // 2. VIEW USER
@@ -854,7 +1144,7 @@ export default function AdminDashboard({ user, onLogout }) {
                     {activeTab === 'clients' && 'Client Users Management'}
                     {activeTab === 'teams' && 'Internal Team Members & Dashboard Permissions'}
                     {activeTab === 'services' && 'Service Requests Breakdown'}
-                    {activeTab === 'tickets' && 'Jira-Style Ticket Center'}
+                    {activeTab === 'tickets' && 'Request & Ticket Center'}
                     {activeTab === 'payments' && 'Payment & Revenue Ledger'}
                     {activeTab === 'settings' && 'Global Administration Settings'}
                   </>
@@ -889,7 +1179,7 @@ export default function AdminDashboard({ user, onLogout }) {
             {['overview', 'clients'].includes(activeTab) && (
               <button
                 className="portal-btn-primary"
-                onClick={() => setIsCreateModalOpen(true)}
+                onClick={handleOpenCreateWorkflow}
               >
                 <UserPlus size={16} />
                 <span>Create Client User</span>
@@ -1082,7 +1372,7 @@ export default function AdminDashboard({ user, onLogout }) {
                         gap: '6px'
                       }}
                     >
-                      <MessageSquare size={15} /> Jira Conversation Stream ({ticketMessages.length})
+                      <MessageSquare size={15} /> Request Conversation Stream ({ticketMessages.length})
                     </button>
                     <button
                       type="button"
@@ -1261,7 +1551,7 @@ export default function AdminDashboard({ user, onLogout }) {
                     </div>
                   )}
 
-                  {/* TAB 3: JIRA CONVERSATION */}
+                  {/* TAB 3: REQUEST CONVERSATION */}
                   {activeTicketModalTab === 'chat' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div className="ticket-chat-container" style={{ height: '320px', overflowY: 'auto' }}>
@@ -1733,7 +2023,7 @@ export default function AdminDashboard({ user, onLogout }) {
                   <div>
                     <h3 style={{ fontSize: '1.15rem', fontWeight: '700', margin: '0 0 4px 0', color: '#F5F5F5' }}>Client User Quick Access</h3>
                     <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: 0 }}>
-                      Provisioned client accounts linked to pre-researched companies in MongoDB.
+                      Provisioned client accounts linked to verified company profiles.
                     </p>
                   </div>
                   <button className="portal-btn-primary" onClick={() => setActiveTab('clients')}>
@@ -1741,8 +2031,8 @@ export default function AdminDashboard({ user, onLogout }) {
                   </button>
                 </div>
 
-                <div className="jira-table-wrapper table-container">
-                  <table className="jira-table">
+                <div className="request-table-wrapper table-container">
+                  <table className="request-table">
                     <thead>
                       <tr>
                         <th>Client Name</th>
@@ -1802,7 +2092,7 @@ export default function AdminDashboard({ user, onLogout }) {
                 <div>
                   <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: '0 0 4px 0', color: '#F5F5F5' }}>Client Users Management</h3>
                   <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: 0 }}>
-                    Manage client profiles, passwords, account statuses, and linked companies in MongoDB.
+                    Manage client profiles, passwords, account statuses, and linked company accounts.
                   </p>
                 </div>
 
@@ -1835,8 +2125,8 @@ export default function AdminDashboard({ user, onLogout }) {
               </div>
 
               {/* Client Users Table with ActionMenu Popover (Zero Clipping) */}
-              <div className="jira-table-wrapper table-container" style={{ overflowX: 'auto', overflowY: 'hidden' }}>
-                <table className="jira-table client-users-table" style={{ width: '100%', minWidth: '880px' }}>
+              <div className="request-table-wrapper table-container" style={{ overflowX: 'auto', overflowY: 'hidden' }}>
+                <table className="request-table client-users-table" style={{ width: '100%', minWidth: '880px' }}>
                   <thead>
                     <tr>
                       <th style={{ width: '130px' }}>Client Name</th>
@@ -2292,8 +2582,8 @@ export default function AdminDashboard({ user, onLogout }) {
                   </div>
                 </div>
 
-                <div className="jira-table-wrapper table-container" style={{ overflowX: 'auto' }}>
-                  <table className="jira-table">
+                <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                  <table className="request-table">
                     <thead>
                       <tr>
                         <th style={{ width: '100px' }}>Sprint ID</th>
@@ -2349,8 +2639,8 @@ export default function AdminDashboard({ user, onLogout }) {
                 </div>
               </div>
 
-              <div className="jira-table-wrapper table-container" style={{ overflowX: 'auto' }}>
-                <table className="jira-table">
+              <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                <table className="request-table">
                   <thead>
                     <tr>
                       <th style={{ width: '100px' }}>Ticket ID</th>
@@ -2495,8 +2785,8 @@ export default function AdminDashboard({ user, onLogout }) {
                   </div>
                 </div>
 
-                <div className="jira-table-wrapper table-container" style={{ overflowX: 'auto' }}>
-                  <table className="jira-table" style={{ minWidth: '950px' }}>
+                <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                  <table className="request-table" style={{ minWidth: '950px' }}>
                     <thead>
                       <tr>
                         <th>Invoice ID</th>
@@ -2548,30 +2838,30 @@ export default function AdminDashboard({ user, onLogout }) {
               <div className="portal-card" style={{ marginBottom: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                   <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'rgba(0, 217, 255, 0.12)', color: '#00D9FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Database size={20} />
+                    <Server size={20} />
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '700', color: '#F5F5F5' }}>Database & Infrastructure</h4>
-                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>MongoDB Atlas Cluster Health</span>
+                    <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '700', color: '#F5F5F5' }}>System & Infrastructure</h4>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Enterprise Platform Health</span>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--portal-border)' }}>
-                    <span style={{ color: '#94a3b8' }}>Cluster Status:</span>
-                    <span style={{ color: '#34D399', fontWeight: '700' }}>ONLINE (Connected)</span>
+                    <span style={{ color: '#94a3b8' }}>Platform Status:</span>
+                    <span style={{ color: '#34D399', fontWeight: '700' }}>ONLINE (Active)</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--portal-border)' }}>
-                    <span style={{ color: '#94a3b8' }}>Cluster Name:</span>
-                    <span style={{ color: '#CBD5E1', fontWeight: '600' }}>CreativeGiniCluster</span>
+                    <span style={{ color: '#94a3b8' }}>Environment:</span>
+                    <span style={{ color: '#CBD5E1', fontWeight: '600' }}>CreativeGini Core Platform</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--portal-border)' }}>
-                    <span style={{ color: '#94a3b8' }}>Multi-Tenant Isolation:</span>
-                    <span style={{ color: '#00D9FF', fontWeight: '600' }}>Company ID Scoped</span>
+                    <span style={{ color: '#94a3b8' }}>Tenant Isolation:</span>
+                    <span style={{ color: '#00D9FF', fontWeight: '600' }}>Workspace Scoped</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#94a3b8' }}>Database Engine:</span>
-                    <span style={{ color: '#F5F5F5' }}>Mongoose ODM 8.x</span>
+                    <span style={{ color: '#94a3b8' }}>Service Architecture:</span>
+                    <span style={{ color: '#F5F5F5' }}>High-Availability API Engine</span>
                   </div>
                 </div>
               </div>
@@ -2643,9 +2933,9 @@ export default function AdminDashboard({ user, onLogout }) {
           )}
         </div>
 
-        {/* DELETE TEAM MEMBER CONFIRMATION (SCOPED INSIDE DASHBOARD SHELL - PRESERVES TOPBAR & SIDEBAR) */}
+        {/* DELETE TEAM MEMBER CONFIRMATION */}
         {deletingTeamMember && (
-          <div className="portal-shell-modal-overlay" onClick={() => setDeletingTeamMember(null)}>
+          <div className="portal-modal-overlay" onClick={() => setDeletingTeamMember(null)}>
             <div className="portal-modal-card" style={{ maxWidth: '480px', borderTop: '4px solid #ef4444' }} onClick={(e) => e.stopPropagation()}>
               <div className="portal-modal-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#EF4444' }}>
@@ -2717,215 +3007,518 @@ export default function AdminDashboard({ user, onLogout }) {
         )}
       </div>
 
-      {/* MODAL 1: CREATE CLIENT USER FORM */}
-      {isCreateModalOpen && (
-        <div className="portal-modal-overlay" onClick={() => setIsCreateModalOpen(false)}>
-          <div className="portal-modal-card" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="portal-modal-header">
-              <div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: '700', margin: 0 }}>
-                  Create Client User
-                </h3>
-                <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '2px 0 0 0' }}>
-                  Role is strictly USER. Client company background and initial research are stored in MongoDB.
-                </p>
+      {/* UNIFIED ADMIN CLIENT ONBOARDING & WELCOME EMAIL WORKFLOW MODAL */}
+      {createWorkflow.isOpen && (
+        <div className="portal-modal-overlay" onClick={() => setCreateWorkflow(prev => ({ ...prev, isOpen: false }))}>
+          <div
+            className="portal-modal-card"
+            style={{
+              maxWidth: createWorkflow.step === 2 ? '840px' : createWorkflow.step === 3 ? '580px' : '640px',
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              maxHeight: '90vh'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="portal-modal-header" style={{ borderBottom: '1px solid var(--portal-border)', paddingBottom: '0.85rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(0, 229, 255, 0.12)', color: '#00D9FF', border: '1px solid rgba(0, 229, 255, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {createWorkflow.step === 1 ? <UserPlus size={20} /> : createWorkflow.step === 2 ? <Mail size={20} /> : <CheckCircle2 size={20} />}
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: '#F5F5F5' }}>
+                    {createWorkflow.step === 1 && 'Create Client User'}
+                    {createWorkflow.step === 2 && 'Welcome Email Review & Composer'}
+                    {createWorkflow.step === 3 && 'Account Provisioning Complete'}
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
+                    {createWorkflow.step === 1 && 'Fill account credentials and company profile • Step 1 of 2'}
+                    {createWorkflow.step === 2 && 'Review branded email, edit message, attach files, and send • Step 2 of 2'}
+                    {createWorkflow.step === 3 && 'Account provisioned and welcome email dispatched successfully'}
+                  </span>
+                </div>
               </div>
               <button
+                type="button"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={() => setCreateWorkflow(prev => ({ ...prev, isOpen: false }))}
+                title="Close"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateSubmit}>
-              <div className="portal-modal-body">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="portal-form-group">
-                    <label className="portal-form-label">Client Name *</label>
-                    <input
-                      className="portal-form-input"
-                      value={createFormData.contactPerson}
-                      onChange={e => setCreateFormData({ ...createFormData, contactPerson: e.target.value })}
-                      placeholder="e.g. John Smith"
-                      required
-                    />
-                  </div>
-
-                  <div className="portal-form-group">
-                    <label className="portal-form-label">Email *</label>
-                    <input
-                      type="email"
-                      className="portal-form-input"
-                      value={createFormData.email}
-                      onChange={e => setCreateFormData({ ...createFormData, email: e.target.value })}
-                      placeholder="john@example.com"
-                      required
-                    />
-                  </div>
+            {/* Step Indicator */}
+            <div style={{ padding: '0.85rem 1.25rem 0' }}>
+              <div className="workflow-step-bar">
+                <div className={`workflow-step-badge ${createWorkflow.step === 1 ? 'active' : createWorkflow.step > 1 ? 'completed' : ''}`}>
+                  <span className="workflow-step-num">{createWorkflow.step > 1 ? '✓' : '1'}</span>
+                  <span>User Details</span>
                 </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="portal-form-group">
-                    <label className="portal-form-label">Company Name *</label>
-                    <input
-                      className="portal-form-input"
-                      value={createFormData.companyName}
-                      onChange={e => setCreateFormData({ ...createFormData, companyName: e.target.value })}
-                      placeholder="e.g. ABC Technologies"
-                      required
-                    />
-                  </div>
-
-                  <div className="portal-form-group">
-                    <label className="portal-form-label">Temporary Password *</label>
-                    <input
-                      className="portal-form-input"
-                      value={createFormData.password}
-                      onChange={e => setCreateFormData({ ...createFormData, password: e.target.value })}
-                      placeholder="Client@123"
-                      required
-                    />
-                  </div>
+                <span className="workflow-step-sep">&rarr;</span>
+                <div className={`workflow-step-badge ${createWorkflow.step === 2 ? 'active' : createWorkflow.step > 2 ? 'completed' : ''}`}>
+                  <span className="workflow-step-num">{createWorkflow.step > 2 ? '✓' : '2'}</span>
+                  <span>Welcome Email & Attachments</span>
                 </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="portal-form-group">
-                    <label className="portal-form-label">Phone (Optional)</label>
-                    <input
-                      className="portal-form-input"
-                      value={createFormData.phone}
-                      onChange={e => setCreateFormData({ ...createFormData, phone: e.target.value })}
-                      placeholder="+1 (555) 019-2834"
-                    />
-                  </div>
-
-                  <div className="portal-form-group">
-                    <label className="portal-form-label">Website (Optional)</label>
-                    <input
-                      className="portal-form-input"
-                      value={createFormData.website}
-                      onChange={e => setCreateFormData({ ...createFormData, website: e.target.value })}
-                      placeholder="https://abctech.com"
-                    />
-                  </div>
-                </div>
-
-                <div className="portal-form-group">
-                  <label className="portal-form-label">Company Description / Research Summary</label>
-                  <textarea
-                    className="portal-form-textarea"
-                    rows="2"
-                    value={createFormData.companyInfo}
-                    onChange={e => setCreateFormData({ ...createFormData, companyInfo: e.target.value })}
-                    placeholder="Initial details and market positioning..."
-                  />
-                </div>
-              </div>
-
-              <div className="portal-modal-footer">
-                <button
-                  type="button"
-                  className="portal-btn-secondary"
-                  onClick={() => setIsCreateModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="portal-btn-primary"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Creating User in MongoDB...' : 'Create Client User'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: CREATION SUCCESS SCREEN (WITH ONE-TIME TEMPORARY PASSWORD) */}
-      {creationSuccessData && (
-        <div className="portal-modal-overlay" onClick={() => setCreationSuccessData(null)}>
-          <div className="portal-modal-card" style={{ maxWidth: '520px', border: '1px solid rgba(16, 185, 129, 0.35)' }} onClick={(e) => e.stopPropagation()}>
-            <div className="portal-modal-header" style={{ borderBottom: '1px solid var(--portal-border)', paddingBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.15)', color: '#34D399', border: '1px solid rgba(52, 211, 153, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <CheckCircle2 size={22} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: '#F5F5F5' }}>
-                    Client User Created
-                  </h3>
-                  <span style={{ fontSize: '0.78rem', color: '#34D399' }}>Provisioned successfully in MongoDB Atlas</span>
+                <span className="workflow-step-sep">&rarr;</span>
+                <div className={`workflow-step-badge ${createWorkflow.step === 3 ? 'active completed' : ''}`}>
+                  <span className="workflow-step-num">{createWorkflow.step === 3 ? '✓' : '3'}</span>
+                  <span>Confirmation</span>
                 </div>
               </div>
             </div>
 
-            <div className="portal-modal-body" style={{ paddingTop: '1rem' }}>
-              <div style={{ background: 'var(--portal-surface-card)', border: '1px solid var(--portal-border)', borderRadius: '10px', padding: '1rem', marginBottom: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem' }}>
-                <div><span style={{ color: '#94a3b8' }}>Client Name:</span> <div style={{ fontWeight: '700', color: '#F5F5F5' }}>{creationSuccessData.name}</div></div>
-                <div><span style={{ color: '#94a3b8' }}>Role:</span> <div><span style={{ fontSize: '0.72rem', fontWeight: '700', background: 'rgba(0, 217, 255, 0.12)', color: '#00D9FF', border: '1px solid rgba(0, 217, 255, 0.3)', padding: '2px 8px', borderRadius: '4px' }}>USER</span></div></div>
-                <div><span style={{ color: '#94a3b8' }}>Email:</span> <div style={{ fontWeight: '600', color: '#00D9FF' }}>{creationSuccessData.email}</div></div>
-                <div><span style={{ color: '#94a3b8' }}>Company:</span> <div style={{ fontWeight: '700', color: '#CBD5E1' }}>{creationSuccessData.company}</div></div>
-              </div>
+            {/* ============================================================ */}
+            {/* STEP 1: USER DETAILS */}
+            {/* ============================================================ */}
+            {createWorkflow.step === 1 && (
+              <form onSubmit={handleStep1Continue} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                <div className="portal-modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="portal-form-group">
+                      <label className="portal-form-label">Client Name *</label>
+                      <input
+                        className="portal-form-input"
+                        value={createWorkflow.contactPerson}
+                        onChange={e => setCreateWorkflow({ ...createWorkflow, contactPerson: e.target.value })}
+                        placeholder="e.g. John Smith"
+                        required
+                      />
+                    </div>
 
-              {/* Temporary Password Box */}
-              <div style={{ background: 'rgba(255, 176, 0, 0.08)', border: '1px solid rgba(255, 176, 0, 0.25)', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: '#FFB000', marginBottom: '6px', letterSpacing: '0.04em' }}>
-                  Temporary Password
+                    <div className="portal-form-group">
+                      <label className="portal-form-label">Email *</label>
+                      <input
+                        type="email"
+                        className="portal-form-input"
+                        value={createWorkflow.email}
+                        onChange={e => setCreateWorkflow({ ...createWorkflow, email: e.target.value })}
+                        placeholder="john@example.com"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="portal-form-group">
+                      <label className="portal-form-label">Company Name *</label>
+                      <input
+                        className="portal-form-input"
+                        value={createWorkflow.companyName}
+                        onChange={e => setCreateWorkflow({ ...createWorkflow, companyName: e.target.value })}
+                        placeholder="e.g. ABC Technologies"
+                        required
+                      />
+                    </div>
+
+                    <div className="portal-form-group">
+                      <label className="portal-form-label">Temporary Password *</label>
+                      <input
+                        className="portal-form-input"
+                        value={createWorkflow.password}
+                        onChange={e => setCreateWorkflow({ ...createWorkflow, password: e.target.value })}
+                        placeholder="Client@123"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="portal-form-group">
+                      <label className="portal-form-label">Phone (Optional)</label>
+                      <input
+                        className="portal-form-input"
+                        value={createWorkflow.phone}
+                        onChange={e => setCreateWorkflow({ ...createWorkflow, phone: e.target.value })}
+                        placeholder="+1 (555) 019-2834"
+                      />
+                    </div>
+
+                    <div className="portal-form-group">
+                      <label className="portal-form-label">Website (Optional)</label>
+                      <input
+                        className="portal-form-input"
+                        value={createWorkflow.website}
+                        onChange={e => setCreateWorkflow({ ...createWorkflow, website: e.target.value })}
+                        placeholder="https://abctech.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="portal-form-group">
+                    <label className="portal-form-label">Industry</label>
+                    <input
+                      className="portal-form-input"
+                      value={createWorkflow.industry}
+                      onChange={e => setCreateWorkflow({ ...createWorkflow, industry: e.target.value })}
+                      placeholder="Enterprise SaaS / AI"
+                    />
+                  </div>
+
+                  <div className="portal-form-group">
+                    <label className="portal-form-label">Company Description / Research Summary</label>
+                    <textarea
+                      className="portal-form-textarea"
+                      rows="2"
+                      value={createWorkflow.companyInfo}
+                      onChange={e => setCreateWorkflow({ ...createWorkflow, companyInfo: e.target.value })}
+                      placeholder="Initial details and market positioning..."
+                    />
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(4, 12, 18, 0.95)', border: '1px solid rgba(255, 176, 0, 0.35)', padding: '0.6rem 0.85rem', borderRadius: '8px' }}>
-                  <code style={{ fontSize: '1.05rem', fontWeight: '800', color: '#FFB000', letterSpacing: '0.05em' }}>
-                    {creationSuccessData.temporaryPassword}
-                  </code>
+
+                <div className="portal-modal-footer">
                   <button
                     type="button"
                     className="portal-btn-secondary"
-                    style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                    onClick={() => handleCopyPassword(creationSuccessData.temporaryPassword)}
+                    onClick={() => setCreateWorkflow(prev => ({ ...prev, isOpen: false }))}
                   >
-                    {copiedKey ? <Check size={14} color="#34d399" /> : <Copy size={14} />}
-                    {copiedKey ? 'Copied' : 'Copy'}
+                    Cancel
                   </button>
-                </div>
-                <div style={{ fontSize: '0.78rem', color: '#FFB000', marginTop: '8px', lineHeight: '1.4' }}>
-                  Make sure you save this temporary password. It will not be shown again.
-                </div>
-              </div>
-            </div>
-
-            <div className="portal-modal-footer" style={{ justifyContent: 'space-between' }}>
-              <button
-                className="portal-btn-secondary"
-                onClick={() => {
-                  setCreationSuccessData(null);
-                  setIsCreateModalOpen(true);
-                }}
-              >
-                Create Another User
-              </button>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  className="portal-btn-secondary"
-                  onClick={() => setCreationSuccessData(null)}
-                >
-                  Close
-                </button>
-                {creationSuccessData.id && (
                   <button
+                    type="submit"
                     className="portal-btn-primary"
-                    onClick={() => {
-                      const id = creationSuccessData.id;
-                      setCreationSuccessData(null);
-                      handleOpenView(id);
-                    }}
+                    disabled={createWorkflow.isSubmittingStep1}
                   >
-                    View User
+                    {createWorkflow.isSubmittingStep1 ? 'Saving & Preparing Email...' : 'Continue to Email →'}
                   </button>
-                )}
+                </div>
+              </form>
+            )}
+
+            {/* ============================================================ */}
+            {/* STEP 2: WELCOME EMAIL REVIEW & COMPOSER */}
+            {/* ============================================================ */}
+            {createWorkflow.step === 2 && (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                <div className="portal-modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+                  {/* Account Summary Strip */}
+                  <div className="workflow-summary-strip">
+                    <div className="workflow-summary-item">
+                      <span>Client Name</span>
+                      <strong>{createWorkflow.contactPerson}</strong>
+                    </div>
+                    <div className="workflow-summary-item">
+                      <span>Company</span>
+                      <strong>{createWorkflow.companyName}</strong>
+                    </div>
+                    <div className="workflow-summary-item">
+                      <span>Recipient Email</span>
+                      <strong style={{ color: '#00D9FF' }}>{createWorkflow.email}</strong>
+                    </div>
+                    <div className="workflow-summary-item">
+                      <span>Temporary Password</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                        <code style={{ fontSize: '0.88rem', fontWeight: '800', color: '#FFB000' }}>
+                          {createWorkflow.password}
+                        </code>
+                        <button
+                          type="button"
+                          className="portal-btn-secondary"
+                          style={{ padding: '2px 6px', fontSize: '0.72rem', height: '22px' }}
+                          onClick={() => handleCopyPassword(createWorkflow.password)}
+                          title="Copy temporary password"
+                        >
+                          {copiedKey ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Send Error Notice with Retry */}
+                  {createWorkflow.sendError && (
+                    <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#FCA5A5', fontSize: '0.84rem' }}>
+                        <AlertTriangle size={18} color="#EF4444" style={{ flexShrink: 0 }} />
+                        <span>{createWorkflow.sendError}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="portal-btn-primary"
+                        style={{ fontSize: '0.78rem', padding: '6px 12px', flexShrink: 0 }}
+                        onClick={handleSendWelcomeEmail}
+                        disabled={createWorkflow.isSendingEmail}
+                      >
+                        <RefreshCw size={13} className={createWorkflow.isSendingEmail ? 'portal-spin' : ''} />
+                        Retry Send
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Email Subject Field */}
+                  <div className="portal-form-group" style={{ marginBottom: '1rem' }}>
+                    <label className="portal-form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Email Subject</span>
+                      <span style={{ fontSize: '0.74rem', color: '#94A3B8' }}>Editable</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="portal-form-input"
+                      value={createWorkflow.emailSubject}
+                      onChange={(e) => setCreateWorkflow(prev => ({ ...prev, emailSubject: e.target.value }))}
+                      placeholder="Enter email subject"
+                    />
+                  </div>
+
+                  {/* Tabs: Edit Message & Live Preview */}
+                  <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--portal-border)', paddingBottom: '8px', marginBottom: '1rem' }}>
+                    <button
+                      type="button"
+                      style={{
+                        background: createWorkflow.activeEmailTab === 'edit' ? 'rgba(0, 217, 255, 0.15)' : 'transparent',
+                        color: createWorkflow.activeEmailTab === 'edit' ? '#00D9FF' : '#94A3B8',
+                        border: createWorkflow.activeEmailTab === 'edit' ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
+                        borderRadius: '6px',
+                        padding: '6px 14px',
+                        fontSize: '0.82rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      onClick={() => handleSwitchEmailTab('edit')}
+                    >
+                      <Edit3 size={14} />
+                      Edit Message
+                    </button>
+
+                    <button
+                      type="button"
+                      style={{
+                        background: createWorkflow.activeEmailTab === 'preview' ? 'rgba(0, 217, 255, 0.15)' : 'transparent',
+                        color: createWorkflow.activeEmailTab === 'preview' ? '#00D9FF' : '#94A3B8',
+                        border: createWorkflow.activeEmailTab === 'preview' ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
+                        borderRadius: '6px',
+                        padding: '6px 14px',
+                        fontSize: '0.82rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      onClick={() => handleSwitchEmailTab('preview')}
+                    >
+                      <Eye size={14} />
+                      Live Email Preview
+                    </button>
+                  </div>
+
+                  {/* TAB 1: EDIT MESSAGE BODY */}
+                  {createWorkflow.activeEmailTab === 'edit' && (
+                    <div>
+                      <div className="portal-form-group">
+                        <label className="portal-form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Welcome Message Body</span>
+                          <span style={{ fontSize: '0.74rem', color: '#94A3B8' }}>Customizable text</span>
+                        </label>
+                        <textarea
+                          rows={6}
+                          className="portal-form-textarea"
+                          value={createWorkflow.emailBody}
+                          onChange={(e) => setCreateWorkflow(prev => ({ ...prev, emailBody: e.target.value }))}
+                          placeholder="Write your custom welcome message..."
+                          style={{ resize: 'vertical' }}
+                        />
+                      </div>
+                      <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--portal-border)', borderRadius: '6px', padding: '0.65rem 0.85rem', fontSize: '0.78rem', color: '#94A3B8', lineHeight: 1.5 }}>
+                        <strong style={{ color: '#CBD5E1' }}>Template Structure:</strong> Official CreativeGini branding, company details, credentials box, direct sign-in instructions, and attached files are automatically styled in the final HTML email.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: LIVE EMAIL PREVIEW */}
+                  {createWorkflow.activeEmailTab === 'preview' && (
+                    <div>
+                      {createWorkflow.isLoadingPreview ? (
+                        <div style={{ height: '360px', maxHeight: '44vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', background: '#060B13', borderRadius: '8px', border: '1px solid var(--portal-border)', color: '#94A3B8', fontSize: '0.85rem' }}>
+                          <RefreshCw size={24} className="portal-spin" color="#00D9FF" />
+                          Rendering branded email template...
+                        </div>
+                      ) : (
+                        <iframe
+                          title="Live Welcome Email Preview"
+                          srcDoc={createWorkflow.previewHtml}
+                          style={{
+                            width: '100%',
+                            height: '360px',
+                            maxHeight: '44vh',
+                            border: '1px solid var(--portal-border)',
+                            borderRadius: '8px',
+                            background: '#060B13',
+                            boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.5)'
+                          }}
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* ATTACHMENT SECTION (GMAIL-LIKE) */}
+                  <div className="email-attachments-zone">
+                    <div className="email-attachments-header">
+                      <div className="email-attachments-title">
+                        <Paperclip size={14} color="#00D9FF" />
+                        <span>Attached Files ({createWorkflow.attachments.length})</span>
+                      </div>
+                      <div>
+                        <input
+                          type="file"
+                          multiple
+                          ref={fileInputRef}
+                          onChange={handleFileSelect}
+                          style={{ display: 'none' }}
+                        />
+                        <button
+                          type="button"
+                          className="email-attachments-add-btn"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <Paperclip size={13} />
+                          {createWorkflow.attachments.length > 0 ? '+ Add another file' : 'Attach files'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {createWorkflow.attachmentError && (
+                      <div className="email-attachment-error">
+                        <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                        <span>{createWorkflow.attachmentError}</span>
+                      </div>
+                    )}
+
+                    {createWorkflow.attachments.length > 0 ? (
+                      <div className="email-attachments-list">
+                        {createWorkflow.attachments.map((att) => (
+                          <div key={att.id} className="email-attachment-chip">
+                            <span>📎</span>
+                            <span className="email-attachment-name" title={att.filename}>{att.filename}</span>
+                            <span className="email-attachment-size">{att.sizeFormatted}</span>
+                            <button
+                              type="button"
+                              className="email-attachment-remove"
+                              onClick={() => handleRemoveAttachment(att.id)}
+                              title="Remove file"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.76rem', color: '#64748B', marginTop: '4px' }}>
+                        No files attached. Attach company profiles, contracts, or onboarding assets (Max 10 MB/file, 15 MB total).
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Step 2 Footer */}
+                <div className="portal-modal-footer" style={{ justifyContent: 'space-between', borderTop: '1px solid var(--portal-border)', paddingTop: '0.85rem' }}>
+                  <button
+                    type="button"
+                    className="portal-btn-secondary"
+                    onClick={handleBackToStep1}
+                  >
+                    ← Back to User Details
+                  </button>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {createWorkflow.activeEmailTab === 'edit' ? (
+                      <button
+                        type="button"
+                        className="portal-btn-secondary"
+                        onClick={() => handleSwitchEmailTab('preview')}
+                      >
+                        <Eye size={14} />
+                        Preview Email
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="portal-btn-secondary"
+                        onClick={() => handleSwitchEmailTab('edit')}
+                      >
+                        <Edit3 size={14} />
+                        Edit Message
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className="portal-btn-primary"
+                      onClick={handleSendWelcomeEmail}
+                      disabled={createWorkflow.isSendingEmail}
+                    >
+                      {createWorkflow.isSendingEmail ? (
+                        <>
+                          <RefreshCw size={14} className="portal-spin" />
+                          Sending Email...
+                        </>
+                      ) : (
+                        <>
+                          <Send size={14} />
+                          Send Email
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* STEP 3: SUCCESS CONFIRMATION */}
+            {/* ============================================================ */}
+            {createWorkflow.step === 3 && (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                <div className="portal-modal-body" style={{ flex: 1, padding: '1.5rem 1.5rem 1rem' }}>
+                  <div className="workflow-success-card">
+                    <div className="workflow-success-icon">
+                      <CheckCircle2 size={32} />
+                    </div>
+                    <h4 className="workflow-success-title">
+                      User Account Created & Welcome Email Sent
+                    </h4>
+                    <p className="workflow-success-subtitle">
+                      The client account and company workspace have been successfully provisioned and the welcome email has been delivered.
+                    </p>
+
+                    <div className="workflow-success-details">
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>Client Name</span>
+                        <strong style={{ color: '#F8FAFC', fontSize: '0.9rem' }}>{createWorkflow.successData?.clientName}</strong>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>Recipient Email</span>
+                        <strong style={{ color: '#00D9FF', fontSize: '0.9rem' }}>{createWorkflow.successData?.email}</strong>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>Company Workspace</span>
+                        <strong style={{ color: '#F8FAFC', fontSize: '0.9rem' }}>{createWorkflow.successData?.company}</strong>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>Attachments Included</span>
+                        <strong style={{ color: '#34D399', fontSize: '0.9rem' }}>{createWorkflow.successData?.attachmentCount || 0} file(s)</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="portal-modal-footer" style={{ justifyContent: 'center', borderTop: '1px solid var(--portal-border)', paddingTop: '0.85rem' }}>
+                  <button
+                    type="button"
+                    className="portal-btn-primary"
+                    style={{ minWidth: '140px' }}
+                    onClick={handleFinishWorkflow}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2933,7 +3526,7 @@ export default function AdminDashboard({ user, onLogout }) {
       {/* MODAL 3: VIEW USER DETAIL MODAL (REQUIREMENT 2) */}
       {viewingUser && (
         <div className="portal-modal-overlay" onClick={() => { setViewingUser(null); setViewUserData(null); }}>
-          <div className="portal-modal-card" style={{ maxWidth: '780px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="portal-modal-card wide" onClick={(e) => e.stopPropagation()}>
             <div className="portal-modal-header">
               <div>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0, color: '#F5F5F5' }}>
@@ -2953,7 +3546,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
             <div className="portal-modal-body">
               {!viewUserData ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Loading user details from MongoDB...</div>
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Loading user details...</div>
               ) : (
                 <>
                   {/* CLIENT INFORMATION */}
@@ -2982,7 +3575,7 @@ export default function AdminDashboard({ user, onLogout }) {
                   {/* COMPANY INFORMATION */}
                   <div style={{ marginBottom: '1.5rem' }}>
                     <h4 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', color: '#00D9FF', borderBottom: '1px solid rgba(0, 217, 255, 0.15)', paddingBottom: '0.4rem', marginBottom: '0.75rem', letterSpacing: '0.04em' }}>
-                      Company Information (Linked via MongoDB)
+                      Company Information (Linked Account)
                     </h4>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', fontSize: '0.875rem' }}>
                       <div><span style={{ color: '#94a3b8' }}>Company Name:</span> <div style={{ fontWeight: '700', color: '#CBD5E1' }}>{viewUserData.user?.companyId?.name || '—'}</div></div>
@@ -3001,7 +3594,7 @@ export default function AdminDashboard({ user, onLogout }) {
                       <div style={{ gridColumn: '1 / -1' }}>
                         <span style={{ color: '#94a3b8' }}>Description:</span> 
                         <div style={{ color: '#CBD5E1', marginTop: '4px', lineHeight: '1.5', background: 'var(--portal-surface-card)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--portal-border)' }}>
-                          {viewUserData.user?.companyId?.companyInfo || viewUserData.user?.companyId?.researchSummary || 'Pre-researched company record provided by CreativeGini.'}
+                          {viewUserData.user?.companyId?.companyInfo || viewUserData.user?.companyId?.researchSummary || 'Pre-researched company profile provided by CreativeGini.'}
                         </div>
                       </div>
                     </div>
@@ -3072,11 +3665,11 @@ export default function AdminDashboard({ user, onLogout }) {
                     </div>
                   </div>
 
-                  {/* CLIENT TICKETS & JIRA CONVERSATIONS */}
+                  {/* CLIENT TICKETS & REQUEST CONVERSATIONS */}
                   <div style={{ marginBottom: '1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(0, 217, 255, 0.15)', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
                       <h4 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', color: '#00D9FF', margin: 0, letterSpacing: '0.04em' }}>
-                        Client Tickets & Jira Conversations
+                        Client Tickets & Request Conversations
                       </h4>
                       <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
                         {(viewUserData.requests || []).length} Total Ticket{(viewUserData.requests || []).length === 1 ? '' : 's'}
@@ -3143,7 +3736,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                   marginTop: '4px'
                                 }}
                               >
-                                <MessageSquare size={13} /> Open Jira Conversation
+                                <MessageSquare size={13} /> Open Conversation
                               </button>
                             </div>
                           );
@@ -3200,7 +3793,7 @@ export default function AdminDashboard({ user, onLogout }) {
       {/* MODAL 4: EDIT USER MODAL (REQUIREMENT 3) */}
       {editingUser && (
         <div className="portal-modal-overlay" onClick={() => setEditingUser(null)}>
-          <div className="portal-modal-card" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="portal-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="portal-modal-header">
               <div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: '700', margin: 0 }}>
@@ -3355,7 +3948,7 @@ export default function AdminDashboard({ user, onLogout }) {
                     <div><strong style={{ color: '#94A3B8' }}>Company:</strong> <span style={{ color: '#CBD5E1', fontWeight: '600' }}>{resettingUser.companyId?.name || '—'}</span></div>
                   </div>
                   <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: 0, lineHeight: 1.5 }}>
-                    A new secure temporary password will be generated and hashed in MongoDB with bcrypt. The temporary password will only be shown to you once so you can provide it to the client.
+                    A new secure temporary password will be generated and securely saved. The temporary password will only be shown to you once so you can provide it to the client.
                   </p>
                 </div>
               ) : (
