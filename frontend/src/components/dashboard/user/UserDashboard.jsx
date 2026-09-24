@@ -33,7 +33,20 @@ import {
   User,
   FileCheck,
   FileText,
-  FolderArchive
+  FolderArchive,
+  Eye,
+  MapPin,
+  Filter,
+  ArrowUpRight,
+  Sparkles,
+  Layers,
+  Compass,
+  Video,
+  Image,
+  Code2,
+  Download,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import PortalCosmicBackground from '../common/PortalCosmicBackground';
@@ -103,6 +116,12 @@ export default function UserDashboard({ user, onLogout }) {
   const [requestsSearch, setRequestsSearch] = useState('');
   const [requestsFilter, setRequestsFilter] = useState('ALL');
 
+  // Company Lead Workspace State
+  const [selectedLeadDetail, setSelectedLeadDetail] = useState(null);
+  const [leadSearchQuery, setLeadSearchQuery] = useState('');
+  const [leadStatusFilter, setLeadStatusFilter] = useState('ALL');
+  const [leadSortBy, setLeadSortBy] = useState('NEWEST');
+
   // Settings profile editing state
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileName, setProfileName] = useState(user?.name || '');
@@ -110,20 +129,47 @@ export default function UserDashboard({ user, onLogout }) {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSavedNotice, setProfileSavedNotice] = useState(false);
 
+  // Company Boost Workspace & Onboarding Assets State
+  const [onboardingAssets, setOnboardingAssets] = useState({
+    poster: null,
+    video: null,
+    strategicPlan: null,
+    devrelPlan: null
+  });
+  const [onboardingStatus, setOnboardingStatus] = useState({
+    poster: 'Pending',
+    video: 'Pending',
+    strategicPlan: 'Pending',
+    devrelPlan: 'Pending'
+  });
+  const [customServices, setCustomServices] = useState({
+    strategicPlan: false,
+    content: false,
+    devrel: false
+  });
+  const [customRequirement, setCustomRequirement] = useState('');
+  const [isSubmittingCustom, setIsSubmittingCustom] = useState(false);
+  const [lightboxPoster, setLightboxPoster] = useState(null);
+
   // Load Company, Requests, and Notifications
   const loadData = async () => {
     try {
       setLoading(true);
-      const [companyData, requestsData, notifsData] = await Promise.all([
+      const [companyData, requestsData, notifsData, onbData] = await Promise.all([
         api.getMyCompany().catch(() => user?.company || null),
         api.getRequests().catch(() => []),
-        api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 }))
+        api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 })),
+        api.getMyOnboardingAssets().catch(() => null)
       ]);
       if (companyData) setCompany(companyData);
       setRequests(requestsData);
       if (notifsData) {
         setNotifications(notifsData.notifications || []);
         setUnreadNotifCount(notifsData.unreadCount || 0);
+      }
+      if (onbData?.assets) {
+        setOnboardingAssets(onbData.assets);
+        setOnboardingStatus(onbData.status || {});
       }
     } catch (err) {
       console.error('Error loading user dashboard data:', err);
@@ -136,6 +182,7 @@ export default function UserDashboard({ user, onLogout }) {
   const handleNavigate = (navKey) => {
     setActiveNav(navKey);
     setSelectedTicket(null);
+    setSelectedLeadDetail(null);
     setIsRequestModalOpen(false);
     setIsMobileDrawerOpen(false);
     if (window.history.state?.modal) {
@@ -157,9 +204,10 @@ export default function UserDashboard({ user, onLogout }) {
     }
   };
 
-  // Reactive safety: whenever activeNav changes, automatically close open tickets and create ticket form
+  // Reactive safety: whenever activeNav changes, automatically close open tickets and lead modals
   useEffect(() => {
     setSelectedTicket(null);
+    setSelectedLeadDetail(null);
     setIsRequestModalOpen(false);
   }, [activeNav]);
 
@@ -172,10 +220,13 @@ export default function UserDashboard({ user, onLogout }) {
       if (selectedTicket) {
         setSelectedTicket(null);
       }
+      if (selectedLeadDetail) {
+        setSelectedLeadDetail(null);
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [isRequestModalOpen, selectedTicket]);
+  }, [isRequestModalOpen, selectedTicket, selectedLeadDetail]);
 
   useEffect(() => {
     loadData();
@@ -188,6 +239,8 @@ export default function UserDashboard({ user, onLogout }) {
           setIsMobileDrawerOpen(false);
         } else if (viewingInvoice) {
           setViewingInvoice(null);
+        } else if (selectedLeadDetail) {
+          setSelectedLeadDetail(null);
         } else if (isRequestModalOpen) {
           setIsRequestModalOpen(false);
         } else if (pendingPaymentTicket) {
@@ -206,7 +259,7 @@ export default function UserDashboard({ user, onLogout }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    isMobileDrawerOpen, viewingInvoice, isRequestModalOpen, pendingPaymentTicket, selectedTicket,
+    isMobileDrawerOpen, viewingInvoice, selectedLeadDetail, isRequestModalOpen, pendingPaymentTicket, selectedTicket,
     isHelpModalOpen, isNotificationsOpen, isProfileMenuOpen
   ]);
 
@@ -423,6 +476,104 @@ export default function UserDashboard({ user, onLogout }) {
     }
   };
 
+  // Company Boost: Request Strategic Plan
+  const handleRequestStrategicPlan = async () => {
+    try {
+      setIsSubmittingRequest(true);
+      const created = await api.createRequest({
+        serviceType: 'COMPANY_BOOST',
+        title: `Strategic Growth Plan Sprint · ${company?.name || user?.name}`,
+        description: 'Comprehensive market penetration roadmap, ICP messaging architecture, and enterprise outbound growth playbook tailored for company scale.',
+        priority: 'MEDIUM',
+        price: 799
+      });
+      await loadData();
+      setPendingPaymentTicket(created);
+    } catch (err) {
+      alert(err.message || 'Failed to request Strategic Plan');
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  };
+
+  // Company Boost: Request Content
+  const handleRequestContent = async () => {
+    try {
+      setIsSubmittingRequest(true);
+      const created = await api.createRequest({
+        serviceType: 'COMPANY_BOOST',
+        title: `Branded Content & Media Sprint · ${company?.name || user?.name}`,
+        description: 'High-converting company-specific content production including branded posters, video assets, and multi-channel creative campaign deliverables.',
+        priority: 'MEDIUM',
+        price: 799
+      });
+      await loadData();
+      setPendingPaymentTicket(created);
+    } catch (err) {
+      alert(err.message || 'Failed to request Content');
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  };
+
+  // Company Boost: Request DevRel Plan
+  const handleRequestDevRelPlan = async () => {
+    try {
+      setIsSubmittingRequest(true);
+      const created = await api.createRequest({
+        serviceType: 'COMPANY_BOOST',
+        title: `Developer Relations (DevRel) Strategy Sprint · ${company?.name || user?.name}`,
+        description: 'Engineering-focused DevRel framework: technical documentation enhancement, developer community engagement funnels, and SDK evangelism strategy.',
+        priority: 'MEDIUM',
+        price: 799
+      });
+      await loadData();
+      setPendingPaymentTicket(created);
+    } catch (err) {
+      alert(err.message || 'Failed to request DevRel Plan');
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  };
+
+  // Company Boost: Request Custom Service
+  const handleRequestCustomService = async (e) => {
+    if (e) e.preventDefault();
+    const selected = [];
+    if (customServices.strategicPlan) selected.push('Strategic Plan');
+    if (customServices.content) selected.push('Content for Your Company');
+    if (customServices.devrel) selected.push('DevRel Plan');
+
+    if (selected.length === 0) {
+      alert('Please select at least one service area (Strategic Plan, Content for Your Company, or DevRel Plan).');
+      return;
+    }
+
+    if (!customRequirement.trim()) {
+      alert('Please describe what you would like CreativeGini to prepare for you.');
+      return;
+    }
+
+    try {
+      setIsSubmittingCustom(true);
+      const created = await api.createRequest({
+        serviceType: 'COMPANY_BOOST',
+        title: `Custom Boost Sprint: ${selected.join(' + ')} · ${company?.name || user?.name}`,
+        description: `Selected Services:\n${selected.map(s => `• ${s}`).join('\n')}\n\nClient Requirements:\n${customRequirement.trim()}`,
+        priority: 'HIGH',
+        price: 799
+      });
+      setCustomServices({ strategicPlan: false, content: false, devrel: false });
+      setCustomRequirement('');
+      await loadData();
+      setPendingPaymentTicket(created);
+    } catch (err) {
+      alert(err.message || 'Failed to submit custom request');
+    } finally {
+      setIsSubmittingCustom(false);
+    }
+  };
+
   // Process Simulated Payment
   const handleProcessPayment = async () => {
     if (!pendingPaymentTicket) return;
@@ -443,7 +594,76 @@ export default function UserDashboard({ user, onLogout }) {
   const activeRequests = requests.filter(r => !['COMPLETED'].includes(r.status));
   const completedRequests = requests.filter(r => r.status === 'COMPLETED');
   const pendingPayments = requests.filter(r => r.paymentStatus === 'PENDING');
-  const initialLeadsCount = company?.initialLeads?.length || 0;
+  
+  // Real database-driven Company Leads metrics
+  const leadsList = Array.isArray(company?.initialLeads) ? company.initialLeads : [];
+  const verifiedLeadsCount = leadsList.filter(
+    l => (l.status || '').toUpperCase() === 'VERIFIED' && Boolean(l.notes && l.notes.trim().length > 0)
+  ).length;
+  const pendingLeadsCount = leadsList.filter(
+    l => (l.status || '').toUpperCase() === 'PENDING'
+  ).length;
+  const researchedLeadsCount = leadsList.filter(
+    l => (l.status || '').toUpperCase() === 'RESEARCHED'
+  ).length;
+  const totalLeadsCount = leadsList.length;
+  const keyPeopleCount = Array.isArray(company?.initialKeyPeople) ? company.initialKeyPeople.length : 0;
+  const initialLeadsCount = totalLeadsCount;
+
+  // Company Lead Requests
+  const companyLeadRequests = requests
+    .filter(r => r && r.serviceType === 'COMPANY_LEAD')
+    .sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeB - timeA;
+    });
+  const activeLeadRequest = companyLeadRequests[0] || null;
+
+  // Filtered Company Leads
+  const filteredCompanyLeads = leadsList.filter(lead => {
+    const statusUpper = (lead.status || 'PENDING').toUpperCase();
+    const isVerified = statusUpper === 'VERIFIED' && Boolean(lead.notes && lead.notes.trim().length > 0);
+
+    if (leadStatusFilter === 'VERIFIED' && !isVerified) return false;
+    if (leadStatusFilter === 'PENDING' && statusUpper !== 'PENDING') return false;
+    if (leadStatusFilter === 'RESEARCHED' && statusUpper !== 'RESEARCHED') return false;
+
+    if (leadSearchQuery.trim()) {
+      const q = leadSearchQuery.toLowerCase();
+      const matchName = (lead.name || '').toLowerCase().includes(q);
+      const matchTitle = (lead.title || '').toLowerCase().includes(q);
+      const matchCompany = (lead.company || '').toLowerCase().includes(q);
+      const matchLocation = (lead.location || '').toLowerCase().includes(q);
+      const matchNotes = (lead.notes || '').toLowerCase().includes(q);
+      const matchEmail = (lead.email || '').toLowerCase().includes(q);
+      if (!matchName && !matchTitle && !matchCompany && !matchLocation && !matchNotes && !matchEmail) {
+        return false;
+      }
+    }
+    return true;
+  }).sort((a, b) => {
+    if (leadSortBy === 'NAME_ASC') {
+      return (a.name || '').localeCompare(b.name || '');
+    }
+    if (leadSortBy === 'COMPANY') {
+      return (a.company || '').localeCompare(b.company || '');
+    }
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return timeB - timeA;
+  });
+
+  const formatLeadDate = (dateVal) => {
+    if (!dateVal) return 'Not available';
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return 'Not available';
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return 'Not available';
+    }
+  };
 
   const filteredUserRequests = requests.filter(r => {
     const matchesSearch =
@@ -1485,110 +1705,426 @@ export default function UserDashboard({ user, onLogout }) {
           {activeNav === 'company-lead' && (
             <div>
               {/* Header Banner */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
-                  <h2 style={{ fontSize: '1.4rem', fontWeight: '800', margin: '0 0 0.35rem 0' }}>
-                    Company Lead Intelligence
-                  </h2>
-                  <p style={{ color: '#64748b', margin: 0, fontSize: '0.9rem' }}>
-                    Pre-researched leads and key decision makers curated specifically for <strong>{company?.name}</strong>.
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.35rem' }}>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: '800', margin: 0, color: '#F5F5F5' }}>
+                      Company Lead
+                    </h2>
+                    {company?.name && (
+                      <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(0, 217, 255, 0.12)', border: '1px solid rgba(0, 217, 255, 0.3)', color: '#00D9FF', fontWeight: '600' }}>
+                        {company.name}
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.9rem' }}>
+                    Research relevant companies and decision-makers for your business.
                   </p>
                 </div>
                 <button
                   className="portal-btn-primary"
                   onClick={() => handleOpenNewRequest('COMPANY_LEAD')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  <PlusCircle size={16} /> Request More Leads
+                  <PlusCircle size={16} /> Request Company Lead
                 </button>
               </div>
 
-              {/* Notice: No re-entry needed */}
-              <div style={{ background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(52, 211, 153, 0.3)', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <CheckCircle2 size={20} color="#34d399" />
-                <div style={{ fontSize: '0.875rem', color: '#a7f3d0' }}>
-                  <strong>Company Details Pre-Verified:</strong> Your company profile, domain, and market research are already on file in your workspace. When creating a new lead request, you do NOT need to re-enter your company background.
+              {/* Service Request / Sprint Status Card */}
+              {companyLeadRequests.length === 0 ? (
+                <div className="portal-card" style={{ marginBottom: '1.75rem', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%)', border: '1px dashed rgba(0, 217, 255, 0.35)', padding: '2rem 1.5rem', textAlign: 'center' }}>
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(0, 217, 255, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                    <Users size={28} color="#00D9FF" />
+                  </div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#F5F5F5', margin: '0 0 0.5rem 0' }}>
+                    Company Lead research hasn't been requested yet.
+                  </h3>
+                  <p style={{ color: '#94a3b8', fontSize: '0.9rem', maxWidth: '560px', margin: '0 auto 1.25rem', lineHeight: '1.5' }}>
+                    Initiate a dedicated research sprint to discover and verify target companies and decision-makers matched to your ICP.
+                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.05)', padding: '4px 10px', borderRadius: '6px' }}>✓ Verified Decision-Makers</span>
+                    <span style={{ fontSize: '0.78rem', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.05)', padding: '4px 10px', borderRadius: '6px' }}>✓ Direct Corporate Emails</span>
+                    <span style={{ fontSize: '0.78rem', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.05)', padding: '4px 10px', borderRadius: '6px' }}>✓ Target Account Profiles</span>
+                  </div>
+                  <button
+                    className="portal-btn-primary"
+                    onClick={() => handleOpenNewRequest('COMPANY_LEAD')}
+                    style={{ margin: '0 auto' }}
+                  >
+                    <PlusCircle size={15} /> Request Company Lead
+                  </button>
+                </div>
+              ) : activeLeadRequest && (
+                <div className="portal-card" style={{ marginBottom: '1.75rem', borderLeft: '4px solid #00D9FF' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span className="ticket-key" onClick={() => handleOpenTicket(activeLeadRequest)}>
+                          {activeLeadRequest.ticketId}
+                        </span>
+                        <span className={`status-pill ${activeLeadRequest.status}`}>
+                          {activeLeadRequest.status.replace(/_/g, ' ')}
+                        </span>
+                        <span className={`priority-pill ${activeLeadRequest.priority}`}>
+                          {activeLeadRequest.priority}
+                        </span>
+                      </div>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#F5F5F5', margin: 0 }}>
+                        {activeLeadRequest.title}
+                      </h3>
+                    </div>
+                    <button
+                      className="portal-btn-secondary"
+                      onClick={() => handleOpenTicket(activeLeadRequest)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', fontSize: '0.85rem' }}
+                    >
+                      <ExternalLink size={14} /> Open Ticket
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase' }}>Created Date</div>
+                      <div style={{ fontWeight: '600', color: '#e2e8f0', marginTop: '2px', fontSize: '0.9rem' }}>
+                        {formatLeadDate(activeLeadRequest.createdAt)}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase' }}>Last Updated</div>
+                      <div style={{ fontWeight: '600', color: '#e2e8f0', marginTop: '2px', fontSize: '0.9rem' }}>
+                        {formatLeadDate(activeLeadRequest.updatedAt || activeLeadRequest.createdAt)}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase' }}>Assigned Team</div>
+                      <div style={{ fontWeight: '600', color: '#e2e8f0', marginTop: '2px', fontSize: '0.9rem' }}>
+                        {activeLeadRequest.assignedTeam || 'Company Lead Team'}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase' }}>Payment Status</div>
+                      <div style={{ marginTop: '2px' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: activeLeadRequest.paymentStatus === 'PAID' ? '#10b981' : '#f59e0b' }}>
+                          {activeLeadRequest.paymentStatus || 'PENDING'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Dynamic Summary Cards (derived strictly from actual DB records) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
+                {/* 1. Total Leads */}
+                <div className="portal-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase' }}>Total Leads</span>
+                    <Users size={18} color="#00D9FF" />
+                  </div>
+                  <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#FFFFFF', marginBottom: '0.25rem' }}>
+                    {totalLeadsCount}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    All researched accounts
+                  </div>
+                </div>
+
+                {/* 2. Verified Leads */}
+                <div className="portal-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase' }}>Verified Leads</span>
+                    <ShieldCheck size={18} color={verifiedLeadsCount > 0 ? '#10b981' : '#f59e0b'} />
+                  </div>
+                  <div style={{ fontSize: '1.8rem', fontWeight: '800', color: verifiedLeadsCount > 0 ? '#10b981' : '#94a3b8', marginBottom: '0.25rem' }}>
+                    {verifiedLeadsCount}
+                  </div>
+                  <div style={{ fontSize: '0.78rem' }}>
+                    {verifiedLeadsCount === 0 ? (
+                      <span style={{ color: '#f59e0b', fontWeight: '600' }}>No verified leads yet</span>
+                    ) : (
+                      <span style={{ color: '#10b981', fontWeight: '600' }}>Verified with research proof</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Pending Verification */}
+                <div className="portal-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase' }}>Pending Verification</span>
+                    <Clock size={18} color="#f59e0b" />
+                  </div>
+                  <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#FFFFFF', marginBottom: '0.25rem' }}>
+                    {pendingLeadsCount}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    {pendingLeadsCount > 0 ? 'Verification in progress' : 'No pending records'}
+                  </div>
+                </div>
+
+                {/* 4. Key People */}
+                <div className="portal-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase' }}>Key People</span>
+                    <Briefcase size={18} color="#a855f7" />
+                  </div>
+                  <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#FFFFFF', marginBottom: '0.25rem' }}>
+                    {keyPeopleCount}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    Identified company contacts
+                  </div>
                 </div>
               </div>
 
-              {/* Research Summary Card */}
+              {/* Target Company Profile & Strategic Context Card (Company Boost consistency) */}
               <div className="portal-card" style={{ marginBottom: '1.75rem' }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px', color: '#FFFFFF' }}>
-                  <Search size={16} color="#2563EB" /> CreativeGini Initial Research Summary
+                <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '1rem', color: '#F5F5F5', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Building size={18} color="#00D9FF" /> Target Company Profile (On File)
                 </h4>
-                <p style={{ color: 'var(--portal-text-secondary)', fontSize: '0.92rem', lineHeight: '1.6', margin: 0 }}>
-                  {company?.researchSummary || 'CreativeGini pre-market analysis identified high-affinity European SaaS prospects.'}
-                </p>
-              </div>
-
-              {/* Initial Leads Table */}
-              <div className="portal-card" style={{ marginBottom: '1.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h4 style={{ fontSize: '1.05rem', fontWeight: '700', margin: 0 }}>
-                    Initial Researched Leads ({initialLeadsCount})
-                  </h4>
-                  <span style={{ fontSize: '0.78rem', color: '#16A34A', fontWeight: '700', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(52, 211, 153, 0.3)', padding: '3px 10px', borderRadius: '6px' }}>
-                    Status: Verified by CreativeGini
-                  </span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase' }}>Company</div>
+                    <div style={{ fontWeight: '600', marginTop: '2px', color: '#e2e8f0' }}>{company?.name || 'Not available'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase' }}>Industry</div>
+                    <div style={{ fontWeight: '600', marginTop: '2px', color: '#e2e8f0' }}>{company?.industry || 'Not available'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase' }}>Website</div>
+                    <div style={{ fontWeight: '600', marginTop: '2px' }}>
+                      {company?.website ? (
+                        <a href={company.website} target="_blank" rel="noreferrer" style={{ color: '#00D9FF', textDecoration: 'none' }}>
+                          {company.website}
+                        </a>
+                      ) : (
+                        <span style={{ color: '#64748b' }}>Not available</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase' }}>Lead Executive</div>
+                    <div style={{ fontWeight: '600', marginTop: '2px', color: '#e2e8f0' }}>{company?.contactPerson || 'Not available'}</div>
+                  </div>
                 </div>
 
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '1rem', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#cbd5e1', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Search size={14} color="#00D9FF" /> CreativeGini Initial Research Summary
+                  </div>
+                  <p style={{ color: '#94a3b8', fontSize: '0.88rem', lineHeight: '1.6', margin: 0 }}>
+                    {company?.researchSummary || 'Pre-researched market positioning and initial leads provided by CreativeGini.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Lead List Card with Search, Filter & Lead Details */}
+              <div className="portal-card" style={{ marginBottom: '1.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                  <div>
+                    <h4 style={{ fontSize: '1.1rem', fontWeight: '700', margin: '0 0 0.25rem 0', color: '#F5F5F5' }}>
+                      Researched Company Leads ({filteredCompanyLeads.length})
+                    </h4>
+                    <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>
+                      Verified decision-makers and target account contacts.
+                    </p>
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {[
+                      { key: 'ALL', label: `All (${totalLeadsCount})` },
+                      { key: 'VERIFIED', label: `Verified (${verifiedLeadsCount})` },
+                      { key: 'PENDING', label: `Pending (${pendingLeadsCount})` },
+                      { key: 'RESEARCHED', label: `Researched (${researchedLeadsCount})` },
+                    ].map(f => (
+                      <button
+                        key={f.key}
+                        onClick={() => setLeadStatusFilter(f.key)}
+                        style={{
+                          background: leadStatusFilter === f.key ? '#00D9FF' : 'rgba(255, 255, 255, 0.05)',
+                          color: leadStatusFilter === f.key ? '#000000' : '#cbd5e1',
+                          border: leadStatusFilter === f.key ? '1px solid #00D9FF' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '20px',
+                          padding: '4px 12px',
+                          fontSize: '0.78rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Search Bar & Sort Dropdown */}
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+                  <div style={{ position: 'relative', flex: '1', minWidth: '220px' }}>
+                    <Search size={15} color="#64748b" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="text"
+                      className="portal-input"
+                      placeholder="Search by name, title, target company, location, or notes..."
+                      value={leadSearchQuery}
+                      onChange={(e) => setLeadSearchQuery(e.target.value)}
+                      style={{ paddingLeft: '36px', height: '38px', fontSize: '0.85rem' }}
+                    />
+                    {leadSearchQuery && (
+                      <button
+                        onClick={() => setLeadSearchQuery('')}
+                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  <select
+                    className="portal-select"
+                    value={leadSortBy}
+                    onChange={(e) => setLeadSortBy(e.target.value)}
+                    style={{ width: '160px', height: '38px', fontSize: '0.85rem' }}
+                  >
+                    <option value="NEWEST">Newest First</option>
+                    <option value="NAME_ASC">Name (A-Z)</option>
+                    <option value="COMPANY">Company (A-Z)</option>
+                  </select>
+                </div>
+
+                {/* Table of Leads */}
                 <div className="request-table-wrapper">
                   <table className="request-table">
                     <thead>
                       <tr>
                         <th>Lead Name</th>
                         <th>Job Title</th>
-                        <th>Company</th>
+                        <th>Target Company</th>
                         <th>Location</th>
                         <th>Direct Contact</th>
                         <th>LinkedIn</th>
                         <th>Status</th>
+                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {company?.initialLeads && company.initialLeads.length > 0 ? (
-                        company.initialLeads.map((lead, idx) => (
-                          <tr key={idx}>
-                            <td style={{ fontWeight: '600', color: '#F5F5F5' }}>{lead.name}</td>
-                            <td style={{ color: 'var(--portal-text-muted)' }}>{lead.title}</td>
-                            <td style={{ fontWeight: '500', color: '#00D9FF' }}>{lead.company}</td>
-                            <td style={{ color: 'var(--portal-text-muted)' }}>{lead.location}</td>
-                            <td>
-                              <a href={`mailto:${lead.email}`} style={{ color: '#00D9FF', textDecoration: 'none' }}>
-                                {lead.email}
-                              </a>
-                            </td>
-                            <td>
-                              {lead.linkedin ? (
-                                <a href={lead.linkedin} target="_blank" rel="noreferrer" style={{ color: '#00D9FF', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
-                                  Profile <ExternalLink size={12} />
-                                </a>
-                              ) : (
-                                '—'
-                              )}
-                            </td>
-                            <td>
-                              <span className="status-pill COMPLETED">
-                                {lead.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
+                      {totalLeadsCount === 0 ? (
                         <tr>
-                          <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-                            No leads loaded yet.
+                          <td colSpan="8" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#94a3b8' }}>
+                            {companyLeadRequests.length > 0 ? (
+                              <div>
+                                <Clock size={32} color="#00D9FF" style={{ margin: '0 auto 0.5rem', display: 'block', opacity: 0.8 }} />
+                                <div style={{ fontWeight: '600', color: '#e2e8f0', marginBottom: '0.25rem' }}>No leads have been added yet.</div>
+                                <div style={{ fontSize: '0.85rem' }}>Our research team is actively prospecting targeted accounts for your sprint.</div>
+                              </div>
+                            ) : (
+                              <div>
+                                <Users size={32} color="#64748b" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
+                                <div style={{ fontWeight: '600', color: '#e2e8f0', marginBottom: '0.25rem' }}>Company Lead research hasn't been requested yet.</div>
+                                <button className="portal-btn-primary" style={{ marginTop: '0.75rem', fontSize: '0.8rem' }} onClick={() => handleOpenNewRequest('COMPANY_LEAD')}>
+                                  Request Company Lead
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
+                      ) : filteredCompanyLeads.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                            <div>No leads match your filter or search query.</div>
+                            <button
+                              className="portal-btn-secondary"
+                              style={{ marginTop: '0.5rem', fontSize: '0.78rem' }}
+                              onClick={() => { setLeadSearchQuery(''); setLeadStatusFilter('ALL'); }}
+                            >
+                              Reset Filters
+                            </button>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredCompanyLeads.map((lead, idx) => {
+                          const statusUpper = (lead.status || 'PENDING').toUpperCase();
+                          const isVerified = statusUpper === 'VERIFIED' && Boolean(lead.notes && lead.notes.trim().length > 0);
+                          const isPending = statusUpper === 'PENDING';
+                          const isResearched = statusUpper === 'RESEARCHED';
+
+                          return (
+                            <tr key={lead.id || idx}>
+                              <td style={{ fontWeight: '600', color: '#F5F5F5' }}>
+                                {lead.name}
+                              </td>
+                              <td style={{ color: '#94a3b8' }}>
+                                {lead.title || 'Not available'}
+                              </td>
+                              <td style={{ fontWeight: '500', color: '#00D9FF' }}>
+                                {lead.company || 'Not available'}
+                              </td>
+                              <td style={{ color: '#94a3b8' }}>
+                                {lead.location || 'Not available'}
+                              </td>
+                              <td>
+                                {lead.email ? (
+                                  <a href={`mailto:${lead.email}`} style={{ color: '#00D9FF', textDecoration: 'none' }}>
+                                    {lead.email}
+                                  </a>
+                                ) : (
+                                  <span style={{ color: '#64748b' }}>Not available</span>
+                                )}
+                              </td>
+                              <td>
+                                {lead.linkedin ? (
+                                  <a
+                                    href={lead.linkedin}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{ color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}
+                                  >
+                                    Profile <ExternalLink size={11} />
+                                  </a>
+                                ) : (
+                                  <span style={{ color: '#64748b' }}>—</span>
+                                )}
+                              </td>
+                              <td>
+                                {isVerified ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(52, 211, 153, 0.3)', color: '#34d399' }}>
+                                    <CheckCircle2 size={11} /> VERIFIED
+                                  </span>
+                                ) : isResearched ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: 'rgba(0, 217, 255, 0.15)', border: '1px solid rgba(0, 217, 255, 0.3)', color: '#00D9FF' }}>
+                                    <Search size={11} /> RESEARCHED
+                                  </span>
+                                ) : (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#fbbf24' }}>
+                                    <Clock size={11} /> PENDING
+                                  </span>
+                                )}
+                              </td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="portal-btn-secondary"
+                                  style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                                  onClick={() => setSelectedLeadDetail(lead)}
+                                >
+                                  <Eye size={12} /> Details
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* Initial Key People Table */}
-              <div className="portal-card">
-                <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '1rem' }}>
-                  Identified Key Stakeholders ({company?.initialKeyPeople?.length || 0})
+              {/* Identified Key Stakeholders Table */}
+              <div className="portal-card" style={{ marginBottom: '1.75rem' }}>
+                <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '1rem', color: '#F5F5F5', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Briefcase size={18} color="#a855f7" /> Identified Key Stakeholders ({keyPeopleCount})
                 </h4>
                 <div className="request-table-wrapper">
                   <table className="request-table">
@@ -1598,26 +2134,40 @@ export default function UserDashboard({ user, onLogout }) {
                         <th>Executive Role</th>
                         <th>Department</th>
                         <th>Contact Email</th>
+                        <th>Social Profile</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {company?.initialKeyPeople && company.initialKeyPeople.length > 0 ? (
+                      {keyPeopleCount > 0 ? (
                         company.initialKeyPeople.map((kp, idx) => (
-                          <tr key={idx}>
-                            <td style={{ fontWeight: '600' }}>{kp.name}</td>
-                            <td>{kp.role}</td>
-                            <td>{kp.department}</td>
+                          <tr key={kp.id || idx}>
+                            <td style={{ fontWeight: '600', color: '#F5F5F5' }}>{kp.name}</td>
+                            <td style={{ color: '#94a3b8' }}>{kp.role || 'Not available'}</td>
+                            <td style={{ color: '#94a3b8' }}>{kp.department || 'Not available'}</td>
                             <td>
-                              <a href={`mailto:${kp.contact}`} style={{ color: '#7b61ff', textDecoration: 'none' }}>
-                                {kp.contact}
-                              </a>
+                              {kp.contact ? (
+                                <a href={`mailto:${kp.contact}`} style={{ color: '#00D9FF', textDecoration: 'none' }}>
+                                  {kp.contact}
+                                </a>
+                              ) : (
+                                <span style={{ color: '#64748b' }}>Not available</span>
+                              )}
+                            </td>
+                            <td>
+                              {kp.socialProfile ? (
+                                <a href={kp.socialProfile} target="_blank" rel="noreferrer" style={{ color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
+                                  Profile <ExternalLink size={11} />
+                                </a>
+                              ) : (
+                                <span style={{ color: '#64748b' }}>Not available</span>
+                              )}
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="4" style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8' }}>
-                            No stakeholders specified.
+                          <td colSpan="5" style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8' }}>
+                            No stakeholders specified on file.
                           </td>
                         </tr>
                       )}
@@ -1626,10 +2176,10 @@ export default function UserDashboard({ user, onLogout }) {
                 </div>
               </div>
 
-              {/* Previous Company Lead Requests */}
-              <div className="portal-card" style={{ marginTop: '1.75rem' }}>
+              {/* Company Lead Sprints & Requests (Full History) */}
+              <div className="portal-card">
                 <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '1rem', color: '#F5F5F5' }}>
-                  Company Lead Sprints & Requests
+                  Company Lead Sprint History ({companyLeadRequests.length})
                 </h4>
                 <div className="request-table-wrapper">
                   <table className="request-table">
@@ -1644,21 +2194,21 @@ export default function UserDashboard({ user, onLogout }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {requests.filter(r => r.serviceType === 'COMPANY_LEAD').length === 0 ? (
+                      {companyLeadRequests.length === 0 ? (
                         <tr>
                           <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-                            No Company Lead requests created yet. Click "Request More Leads" to begin!
+                            No Company Lead requests created yet. Click "Request Company Lead" to begin!
                           </td>
                         </tr>
                       ) : (
-                        requests.filter(r => r.serviceType === 'COMPANY_LEAD').map((req) => (
+                        companyLeadRequests.map((req) => (
                           <tr key={req._id}>
                             <td>
                               <span className="ticket-key" onClick={() => handleOpenTicket(req)}>
                                 {req.ticketId}
                               </span>
                             </td>
-                            <td style={{ fontWeight: '600' }}>{req.title}</td>
+                            <td style={{ fontWeight: '600', color: '#e2e8f0' }}>{req.title}</td>
                             <td>
                               <span className={`priority-pill ${req.priority}`}>{req.priority}</span>
                             </td>
@@ -1667,7 +2217,7 @@ export default function UserDashboard({ user, onLogout }) {
                                 {req.status.replace(/_/g, ' ')}
                               </span>
                             </td>
-                            <td>{req.assignedTeam}</td>
+                            <td style={{ color: '#94a3b8' }}>{req.assignedTeam}</td>
                             <td>
                               <button
                                 type="button"
@@ -1685,27 +2235,751 @@ export default function UserDashboard({ user, onLogout }) {
                   </table>
                 </div>
               </div>
+
+              {/* LEAD DETAIL MODAL */}
+              {selectedLeadDetail && (
+                <div className="portal-modal-overlay" onClick={() => setSelectedLeadDetail(null)}>
+                  <div
+                    className="portal-modal-container"
+                    style={{ maxWidth: '640px', width: '92%', maxHeight: '90vh', overflowY: 'auto' }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Modal Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <h3 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: '#FFFFFF' }}>
+                            {selectedLeadDetail.name}
+                          </h3>
+                          {(() => {
+                            const stUpper = (selectedLeadDetail.status || 'PENDING').toUpperCase();
+                            const isV = stUpper === 'VERIFIED' && Boolean(selectedLeadDetail.notes && selectedLeadDetail.notes.trim().length > 0);
+                            if (isV) {
+                              return (
+                                <span style={{ fontSize: '0.72rem', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(52, 211, 153, 0.3)', color: '#34d399' }}>
+                                  VERIFIED
+                                </span>
+                              );
+                            }
+                            if (stUpper === 'RESEARCHED') {
+                              return (
+                                <span style={{ fontSize: '0.72rem', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', background: 'rgba(0, 217, 255, 0.15)', border: '1px solid rgba(0, 217, 255, 0.3)', color: '#00D9FF' }}>
+                                  RESEARCHED
+                                </span>
+                              );
+                            }
+                            return (
+                              <span style={{ fontSize: '0.72rem', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#fbbf24' }}>
+                                PENDING
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
+                          {selectedLeadDetail.title || 'Decision Maker'} • {selectedLeadDetail.company || 'Target Account'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedLeadDetail(null)}
+                        style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    {/* Modal Content: 5 Required Sections */}
+                    <div style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      {/* Section 1: COMPANY */}
+                      <div>
+                        <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#00D9FF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                          1. Target Company & Executive Profile
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                          <div>
+                            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Full Name</div>
+                            <div style={{ fontWeight: '600', color: '#F5F5F5', fontSize: '0.88rem' }}>{selectedLeadDetail.name}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Job Title</div>
+                            <div style={{ color: '#e2e8f0', fontSize: '0.88rem' }}>{selectedLeadDetail.title || 'Not available'}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Company</div>
+                            <div style={{ color: '#00D9FF', fontWeight: '600', fontSize: '0.88rem' }}>{selectedLeadDetail.company || 'Not available'}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Location</div>
+                            <div style={{ color: '#e2e8f0', fontSize: '0.88rem' }}>{selectedLeadDetail.location || 'Not available'}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Direct Email</div>
+                            <div style={{ fontSize: '0.88rem' }}>
+                              {selectedLeadDetail.email ? (
+                                <a href={`mailto:${selectedLeadDetail.email}`} style={{ color: '#00D9FF', textDecoration: 'none' }}>
+                                  {selectedLeadDetail.email}
+                                </a>
+                              ) : (
+                                <span style={{ color: '#64748b' }}>Not available</span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>LinkedIn</div>
+                            <div style={{ fontSize: '0.88rem' }}>
+                              {selectedLeadDetail.linkedin ? (
+                                <a href={selectedLeadDetail.linkedin} target="_blank" rel="noreferrer" style={{ color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
+                                  Profile <ExternalLink size={11} />
+                                </a>
+                              ) : (
+                                <span style={{ color: '#64748b' }}>Not available</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section 2: RELEVANCE */}
+                      <div>
+                        <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#00D9FF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                          2. Relevance & Research Rationale
+                        </div>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                          <p style={{ color: '#cbd5e1', fontSize: '0.88rem', lineHeight: '1.6', margin: 0 }}>
+                            {selectedLeadDetail.notes || 'Research notes in progress by CreativeGini specialist.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Section 3: VERIFICATION */}
+                      <div>
+                        <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#00D9FF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                          3. Verification Status & Audit
+                        </div>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Status:</span>
+                            <span style={{ fontWeight: '700', fontSize: '0.82rem', color: (selectedLeadDetail.status || '').toUpperCase() === 'VERIFIED' && selectedLeadDetail.notes ? '#34d399' : '#fbbf24' }}>
+                              {(selectedLeadDetail.status || 'PENDING').toUpperCase()}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: '1.5' }}>
+                            {(selectedLeadDetail.status || '').toUpperCase() === 'VERIFIED' && selectedLeadDetail.notes ? (
+                              <span style={{ color: '#a7f3d0' }}>
+                                ✓ Verified by CreativeGini specialist. Contact details and executive profile confirmed active via research sources.
+                              </span>
+                            ) : (
+                              <span>
+                                Verification is currently in progress. This lead has been identified through initial market research but has not yet met full verification criteria.
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section 4: KEY PEOPLE */}
+                      <div>
+                        <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#00D9FF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                          4. Related Account Stakeholders ({keyPeopleCount})
+                        </div>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                          {keyPeopleCount > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                              {company.initialKeyPeople.map((kp, kidx) => (
+                                <div key={kidx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: kidx < keyPeopleCount - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none' }}>
+                                  <div>
+                                    <span style={{ fontWeight: '600', color: '#F5F5F5', fontSize: '0.85rem' }}>{kp.name}</span>
+                                    <span style={{ color: '#64748b', fontSize: '0.78rem', marginLeft: '6px' }}>({kp.role || 'Stakeholder'})</span>
+                                  </div>
+                                  <div style={{ fontSize: '0.82rem' }}>
+                                    {kp.contact ? (
+                                      <a href={`mailto:${kp.contact}`} style={{ color: '#00D9FF', textDecoration: 'none' }}>{kp.contact}</a>
+                                    ) : (
+                                      <span style={{ color: '#64748b' }}>Not available</span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ color: '#64748b', fontSize: '0.85rem' }}>Not available</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Section 5: RELATED REQUEST / TICKET */}
+                      <div>
+                        <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#00D9FF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                          5. Related Service Request & Ticket
+                        </div>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                          {activeLeadRequest ? (
+                            <>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                  <span style={{ fontWeight: '700', color: '#00D9FF', fontSize: '0.88rem' }}>{activeLeadRequest.ticketId}</span>
+                                  <span className={`status-pill ${activeLeadRequest.status}`} style={{ fontSize: '0.72rem', padding: '1px 6px' }}>
+                                    {activeLeadRequest.status.replace(/_/g, ' ')}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>{activeLeadRequest.title}</div>
+                              </div>
+                              <button
+                                className="portal-btn-primary"
+                                style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                onClick={() => {
+                                  setSelectedLeadDetail(null);
+                                  handleOpenTicket(activeLeadRequest);
+                                }}
+                              >
+                                <ExternalLink size={13} /> Open Ticket
+                              </button>
+                            </>
+                          ) : (
+                            <div style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                              General Account Lead (No active sprint ticket linked)
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Modal Footer */}
+                    <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        className="portal-btn-secondary"
+                        onClick={() => setSelectedLeadDetail(null)}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* VIEW: COMPANY BOOST SERVICE */}
           {activeNav === 'company-boost' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.4rem', fontWeight: '800', margin: '0 0 0.35rem 0' }}>
-                    Company Boost Service
-                  </h2>
-                  <p style={{ color: '#64748b', margin: 0, fontSize: '0.9rem' }}>
-                    Accelerate your market traction and scale your outbound pipeline with specialized growth playbooks.
-                  </p>
+              {/* Header */}
+              <div style={{ marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '800', letterSpacing: '0.12em', color: '#FFB000', textTransform: 'uppercase', background: 'rgba(255, 176, 0, 0.12)', padding: '4px 10px', borderRadius: '4px', border: '1px solid rgba(255, 176, 0, 0.3)' }}>
+                    Company Boost
+                  </span>
                 </div>
-                <button
-                  className="portal-btn-primary"
-                  onClick={() => handleOpenNewRequest('COMPANY_BOOST')}
-                >
-                  <PlusCircle size={16} /> Request Growth Playbook
-                </button>
+                <h1 style={{ fontSize: '1.8rem', fontWeight: '900', color: '#F8FAFC', margin: '0 0 0.5rem 0', letterSpacing: '-0.02em' }}>
+                  Your Company Growth Workspace
+                </h1>
+                <p style={{ color: '#94A3B8', fontSize: '0.95rem', margin: 0, maxWidth: '750px', lineHeight: 1.6 }}>
+                  Access tailored strategic plans, company-specific branded content previews, and developer relations frameworks prepared for {company?.name || 'your company'}, or request high-impact execution sprints.
+                </p>
+              </div>
+
+              {/* THREE CORE SERVICE CARDS */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
+                
+                {/* CARD 1: Strategic Plan */}
+                <div className="portal-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid rgba(255, 176, 0, 0.25)', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #FFB000, #F59E0B)' }} />
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(255, 176, 0, 0.12)', border: '1px solid rgba(255, 176, 0, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFB000' }}>
+                          <Compass size={22} />
+                        </div>
+                        <div>
+                          <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
+                            Strategic Plan
+                          </h3>
+                          <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>Growth & Market Architecture</span>
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        background: onboardingStatus.strategicPlan === 'Uploaded' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 176, 0, 0.15)',
+                        color: onboardingStatus.strategicPlan === 'Uploaded' ? '#34D399' : '#FBBF24',
+                        border: onboardingStatus.strategicPlan === 'Uploaded' ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid rgba(251, 191, 36, 0.3)'
+                      }}>
+                        {onboardingStatus.strategicPlan === 'Uploaded' ? 'Sample Ready' : 'In Preparation'}
+                      </span>
+                    </div>
+
+                    <p style={{ color: '#CBD5E1', fontSize: '0.88rem', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+                      Comprehensive strategic roadmap tailored for {company?.name || 'your company'} covering market positioning, ICP pain-point mapping, outbound sequences, and growth playbooks.
+                    </p>
+
+                    {/* Onboarding Sample Plan View */}
+                    <div style={{ background: 'rgba(6, 17, 26, 0.85)', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '1rem', marginBottom: '1.25rem' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>
+                        Company Strategic Plan Sample
+                      </div>
+                      {onboardingAssets.strategicPlan ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                            <FileText size={20} style={{ color: '#FFB000', flexShrink: 0 }} />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#F8FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {onboardingAssets.strategicPlan.name}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
+                                {onboardingAssets.strategicPlan.size || 'PDF Document'}
+                              </div>
+                            </div>
+                          </div>
+                          <a
+                            href={onboardingAssets.strategicPlan.streamUrl || onboardingAssets.strategicPlan.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="portal-btn-secondary"
+                            style={{ padding: '6px 12px', fontSize: '0.78rem', flexShrink: 0, textDecoration: 'none' }}
+                          >
+                            <Eye size={14} /> View Plan
+                          </a>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#94A3B8', fontSize: '0.82rem' }}>
+                          <Clock size={16} style={{ color: '#FFB000' }} />
+                          <span>The Company Boost team is preparing the initial strategic plan sample for this company.</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* What is Included */}
+                    <div style={{ marginBottom: '1.25rem' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '8px' }}>
+                        What is Included:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem', color: '#CBD5E1' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span>Comprehensive market positioning audit</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span>Target ICP definition & pain-point matrix</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span>Tier-1 multi-channel outbound sequence architecture</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span>Executive presentation & implementation timeline</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Footer: Price & Action */}
+                  <div style={{ borderTop: '1px solid var(--portal-border)', paddingTop: '1rem', marginTop: 'auto' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Configured Fee</span>
+                      <span style={{ fontSize: '1.25rem', fontWeight: '800', color: '#FFB000', fontFamily: 'monospace' }}>$799.00 USD</span>
+                    </div>
+                    <button
+                      className="portal-btn-primary"
+                      style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #FFB000 0%, #f59e0b 100%)', color: '#030303', fontWeight: '800' }}
+                      onClick={handleRequestStrategicPlan}
+                      disabled={isSubmittingRequest}
+                    >
+                      <PlusCircle size={16} /> Request Strategic Plan
+                    </button>
+                  </div>
+                </div>
+
+                {/* CARD 2: Content for Your Company */}
+                <div className="portal-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid rgba(0, 217, 255, 0.25)', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #00D9FF, #0088ff)' }} />
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(0, 217, 255, 0.12)', border: '1px solid rgba(0, 217, 255, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00D9FF' }}>
+                          <Video size={22} />
+                        </div>
+                        <div>
+                          <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
+                            Content for Your Company
+                          </h3>
+                          <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>Branded Posters & Showcase Videos</span>
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        background: (onboardingStatus.poster === 'Uploaded' || onboardingStatus.video === 'Uploaded') ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 176, 0, 0.15)',
+                        color: (onboardingStatus.poster === 'Uploaded' || onboardingStatus.video === 'Uploaded') ? '#34D399' : '#FBBF24',
+                        border: (onboardingStatus.poster === 'Uploaded' || onboardingStatus.video === 'Uploaded') ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid rgba(251, 191, 36, 0.3)'
+                      }}>
+                        {(onboardingStatus.poster === 'Uploaded' && onboardingStatus.video === 'Uploaded') ? 'Samples Ready' : 'In Production'}
+                      </span>
+                    </div>
+
+                    <p style={{ color: '#CBD5E1', fontSize: '0.88rem', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+                      Engaging, high-converting visual assets and demo videos engineered to captivate prospects, demonstrate product value, and drive inbound engagement.
+                    </p>
+
+                    {/* Previews: 1 Poster + 1 Video */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '1.25rem' }}>
+                      {/* Poster Preview */}
+                      <div style={{ background: 'rgba(6, 17, 26, 0.85)', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '6px' }}>
+                          1 Poster
+                        </div>
+                        {onboardingAssets.poster ? (
+                          <div style={{ position: 'relative' }}>
+                            <img
+                              src={onboardingAssets.poster.streamUrl || onboardingAssets.poster.url}
+                              alt="Company Poster"
+                              style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
+                              onClick={() => setLightboxPoster(onboardingAssets.poster)}
+                              title="Click to expand poster"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setLightboxPoster(onboardingAssets.poster)}
+                              style={{ position: 'absolute', bottom: '6px', right: '6px', background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '4px', padding: '3px 6px', color: '#fff', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
+                            >
+                              <Eye size={12} /> View
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ height: '110px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748B', gap: '4px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+                            <Image size={24} style={{ color: '#00D9FF', opacity: 0.7 }} />
+                            <span style={{ fontSize: '0.72rem' }}>Poster in production</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Video Preview */}
+                      <div style={{ background: 'rgba(6, 17, 26, 0.85)', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '6px' }}>
+                          1 Video
+                        </div>
+                        {onboardingAssets.video ? (
+                          <div style={{ position: 'relative' }}>
+                            <video
+                              controls
+                              playsInline
+                              preload="metadata"
+                              style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '6px', background: '#000', border: '1px solid rgba(255,255,255,0.1)' }}
+                            >
+                              <source src={onboardingAssets.video.streamUrl || onboardingAssets.video.url} type={onboardingAssets.video.type || 'video/mp4'} />
+                              Your browser does not support inline video preview.
+                            </video>
+                          </div>
+                        ) : (
+                          <div style={{ height: '110px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748B', gap: '4px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+                            <Video size={24} style={{ color: '#00D9FF', opacity: 0.7 }} />
+                            <span style={{ fontSize: '0.72rem' }}>Video in production</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* What is Included */}
+                    <div style={{ marginBottom: '1.25rem' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '8px' }}>
+                        What is Included:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem', color: '#CBD5E1' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span>1 High-Resolution Branded Poster sprint deliverable</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span>1 High-Definition Product Showcase Video</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span>Multi-channel ad & social formats</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span>Full source files & commercial rights</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Footer: Price & Action */}
+                  <div style={{ borderTop: '1px solid var(--portal-border)', paddingTop: '1rem', marginTop: 'auto' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Configured Fee</span>
+                      <span style={{ fontSize: '1.25rem', fontWeight: '800', color: '#00D9FF', fontFamily: 'monospace' }}>$799.00 USD</span>
+                    </div>
+                    <button
+                      className="portal-btn-primary"
+                      style={{ width: '100%', justifyContent: 'center' }}
+                      onClick={handleRequestContent}
+                      disabled={isSubmittingRequest}
+                    >
+                      <PlusCircle size={16} /> Request Content
+                    </button>
+                  </div>
+                </div>
+
+                {/* CARD 3: DevRel Plan */}
+                <div className="portal-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid rgba(123, 97, 255, 0.25)', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #7b61ff, #a855f7)' }} />
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(123, 97, 255, 0.12)', border: '1px solid rgba(123, 97, 255, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7' }}>
+                          <Code2 size={22} />
+                        </div>
+                        <div>
+                          <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
+                            DevRel Plan
+                          </h3>
+                          <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>Technical & Developer Advocacy</span>
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        background: onboardingStatus.devrelPlan === 'Uploaded' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 176, 0, 0.15)',
+                        color: onboardingStatus.devrelPlan === 'Uploaded' ? '#34D399' : '#FBBF24',
+                        border: onboardingStatus.devrelPlan === 'Uploaded' ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid rgba(251, 191, 36, 0.3)'
+                      }}>
+                        {onboardingStatus.devrelPlan === 'Uploaded' ? 'Sample Ready' : 'In Preparation'}
+                      </span>
+                    </div>
+
+                    <p style={{ color: '#CBD5E1', fontSize: '0.88rem', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+                      Developer relations playbook engineered for technical products, API/SDK evangelism, developer community building, and technical content workflows.
+                    </p>
+
+                    {/* Onboarding Sample Plan View */}
+                    <div style={{ background: 'rgba(6, 17, 26, 0.85)', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '1rem', marginBottom: '1.25rem' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>
+                        Company DevRel Plan Sample
+                      </div>
+                      {onboardingAssets.devrelPlan ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                            <FileText size={20} style={{ color: '#a855f7', flexShrink: 0 }} />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#F8FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {onboardingAssets.devrelPlan.name}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
+                                {onboardingAssets.devrelPlan.size || 'PDF Document'}
+                              </div>
+                            </div>
+                          </div>
+                          <a
+                            href={onboardingAssets.devrelPlan.streamUrl || onboardingAssets.devrelPlan.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="portal-btn-secondary"
+                            style={{ padding: '6px 12px', fontSize: '0.78rem', flexShrink: 0, textDecoration: 'none' }}
+                          >
+                            <Eye size={14} /> View Plan
+                          </a>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#94A3B8', fontSize: '0.82rem' }}>
+                          <Clock size={16} style={{ color: '#a855f7' }} />
+                          <span>The Company Boost team is preparing the initial DevRel plan sample for this company.</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* What is Included */}
+                    <div style={{ marginBottom: '1.25rem' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '8px' }}>
+                        What is Included:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem', color: '#CBD5E1' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span>Developer ecosystem & API adoption roadmap</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span>Documentation audit & quickstart enhancement</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span>Open-source community engagement strategy</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                          <span>Technical advocacy & developer outreach playbook</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Footer: Price & Action */}
+                  <div style={{ borderTop: '1px solid var(--portal-border)', paddingTop: '1rem', marginTop: 'auto' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Configured Fee</span>
+                      <span style={{ fontSize: '1.25rem', fontWeight: '800', color: '#a855f7', fontFamily: 'monospace' }}>$799.00 USD</span>
+                    </div>
+                    <button
+                      className="portal-btn-primary"
+                      style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #7b61ff 0%, #6366f1 100%)' }}
+                      onClick={handleRequestDevRelPlan}
+                      disabled={isSubmittingRequest}
+                    >
+                      <PlusCircle size={16} /> Request DevRel Plan
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* 5. CUSTOM REQUEST SECTION */}
+              <div className="portal-card" style={{ marginBottom: '2.5rem', background: 'linear-gradient(135deg, rgba(8, 20, 32, 0.95) 0%, rgba(6, 17, 26, 0.98) 100%)', border: '1px solid rgba(0, 217, 255, 0.25)', position: 'relative' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <Sparkles size={18} style={{ color: '#00D9FF' }} />
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
+                        Custom Request
+                      </h3>
+                    </div>
+                    <p style={{ color: '#94A3B8', fontSize: '0.88rem', margin: 0 }}>
+                      Select a combination of services or define customized deliverables for your growth sprint.
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Sprint Service Fee</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#00D9FF', fontFamily: 'monospace' }}>
+                      $799.00 USD
+                    </div>
+                  </div>
+                </div>
+
+                <form onSubmit={handleRequestCustomService}>
+                  {/* Service Multi-Select Checkboxes */}
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#CBD5E1', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Select what you need:
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+                      
+                      <div
+                        onClick={() => setCustomServices(prev => ({ ...prev, strategicPlan: !prev.strategicPlan }))}
+                        style={{
+                          padding: '12px 14px',
+                          borderRadius: '8px',
+                          background: customServices.strategicPlan ? 'rgba(255, 176, 0, 0.12)' : 'rgba(6, 17, 26, 0.7)',
+                          border: customServices.strategicPlan ? '1px solid #FFB000' : '1px solid var(--portal-border)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {customServices.strategicPlan ? (
+                          <CheckSquare size={18} style={{ color: '#FFB000' }} />
+                        ) : (
+                          <Square size={18} style={{ color: '#64748B' }} />
+                        )}
+                        <div>
+                          <div style={{ fontSize: '0.9rem', fontWeight: '700', color: customServices.strategicPlan ? '#F8FAFC' : '#CBD5E1' }}>
+                            Strategic Plan
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Positioning & ICP Roadmap</div>
+                        </div>
+                      </div>
+
+                      <div
+                        onClick={() => setCustomServices(prev => ({ ...prev, content: !prev.content }))}
+                        style={{
+                          padding: '12px 14px',
+                          borderRadius: '8px',
+                          background: customServices.content ? 'rgba(0, 217, 255, 0.12)' : 'rgba(6, 17, 26, 0.7)',
+                          border: customServices.content ? '1px solid #00D9FF' : '1px solid var(--portal-border)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {customServices.content ? (
+                          <CheckSquare size={18} style={{ color: '#00D9FF' }} />
+                        ) : (
+                          <Square size={18} style={{ color: '#64748B' }} />
+                        )}
+                        <div>
+                          <div style={{ fontSize: '0.9rem', fontWeight: '700', color: customServices.content ? '#F8FAFC' : '#CBD5E1' }}>
+                            Content for Your Company
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Branded Posters & Demo Videos</div>
+                        </div>
+                      </div>
+
+                      <div
+                        onClick={() => setCustomServices(prev => ({ ...prev, devrel: !prev.devrel }))}
+                        style={{
+                          padding: '12px 14px',
+                          borderRadius: '8px',
+                          background: customServices.devrel ? 'rgba(123, 97, 255, 0.12)' : 'rgba(6, 17, 26, 0.7)',
+                          border: customServices.devrel ? '1px solid #7b61ff' : '1px solid var(--portal-border)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {customServices.devrel ? (
+                          <CheckSquare size={18} style={{ color: '#7b61ff' }} />
+                        ) : (
+                          <Square size={18} style={{ color: '#64748B' }} />
+                        )}
+                        <div>
+                          <div style={{ fontSize: '0.9rem', fontWeight: '700', color: customServices.devrel ? '#F8FAFC' : '#CBD5E1' }}>
+                            DevRel Plan
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Developer Relations Strategy</div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* Requirements Textarea */}
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#CBD5E1', marginBottom: '8px' }}>
+                      What would you like CreativeGini to prepare for you?
+                    </label>
+                    <textarea
+                      rows="4"
+                      className="portal-form-textarea"
+                      placeholder="Describe your specific requirements, key goals, target market, or customized deliverables..."
+                      value={customRequirement}
+                      onChange={(e) => setCustomRequirement(e.target.value)}
+                      required
+                      style={{ width: '100%', resize: 'vertical' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="submit"
+                      className="portal-btn-primary"
+                      disabled={isSubmittingCustom}
+                      style={{ padding: '10px 24px', fontSize: '0.9rem' }}
+                    >
+                      {isSubmittingCustom ? 'Creating Ticket...' : 'Request Custom Service'}
+                    </button>
+                  </div>
+                </form>
               </div>
 
               {/* Verified Company Profile Card */}
@@ -1737,11 +3011,16 @@ export default function UserDashboard({ user, onLogout }) {
                 </div>
               </div>
 
-              {/* Previous Boost Sprints */}
+              {/* Previous Boost Sprints History Table */}
               <div className="portal-card">
-                <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '1rem' }}>
-                  Company Boost Sprint History
-                </h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: '700', margin: 0 }}>
+                    Company Boost Sprint History
+                  </h4>
+                  <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
+                    {requests.filter(r => r.serviceType === 'COMPANY_BOOST').length} Total Sprints
+                  </span>
+                </div>
                 <div className="request-table-wrapper">
                   <table className="request-table">
                     <thead>
@@ -1758,7 +3037,7 @@ export default function UserDashboard({ user, onLogout }) {
                       {requests.filter(r => r.serviceType === 'COMPANY_BOOST').length === 0 ? (
                         <tr>
                           <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-                            No Company Boost requests created yet. Click "Create Boost Request" to begin!
+                            No Company Boost requests created yet. Select a service above to begin!
                           </td>
                         </tr>
                       ) : (
@@ -2395,6 +3674,35 @@ export default function UserDashboard({ user, onLogout }) {
               >
                 Close Receipt
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. POSTER LIGHTBOX MODAL */}
+      {lightboxPoster && (
+        <div className="portal-modal-overlay" onClick={() => setLightboxPoster(null)}>
+          <div className="portal-modal-card" style={{ maxWidth: '800px', padding: '1rem', background: 'rgba(6, 17, 26, 0.98)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--portal-border)' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1rem', color: '#F8FAFC', fontWeight: '700' }}>
+                  {lightboxPoster.name || 'Company Branded Poster'}
+                </h4>
+                <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{lightboxPoster.size || 'Image Deliverable'}</div>
+              </div>
+              <button
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
+                onClick={() => setLightboxPoster(null)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ textAlign: 'center', maxHeight: '75vh', overflow: 'auto' }}>
+              <img
+                src={lightboxPoster.streamUrl || lightboxPoster.url}
+                alt="Full Branded Poster"
+                style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: '8px', objectFit: 'contain' }}
+              />
             </div>
           </div>
         </div>

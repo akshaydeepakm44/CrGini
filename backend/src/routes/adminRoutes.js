@@ -13,7 +13,9 @@ import {
   getTeamMembers,
   updateUserPermissions,
   previewWelcomeEmailHandler,
-  sendWelcomeEmailHandler
+  sendWelcomeEmailHandler,
+  getEmailHistoryHandler,
+  clearEmailHistoryHandler
 } from '../controllers/userController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -35,5 +37,7 @@ router.post('/users/:id/send-welcome-email', sendWelcomeEmailHandler);
 router.patch('/users/:id/status', updateUserStatus);
 router.delete('/users/:id', deleteUserHandler);
 router.get('/activity-logs', getActivityLogs);
+router.get('/email-history', getEmailHistoryHandler);
+router.delete('/email-history', clearEmailHistoryHandler);
 
 export default router;

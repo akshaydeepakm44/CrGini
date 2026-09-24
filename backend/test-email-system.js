@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 import {
+  sendRequestCreatedEmail,
   sendTicketAssignedEmail,
   sendWorkStartedEmail,
   sendTicketProgressEmail,
@@ -95,9 +96,27 @@ async function runTests() {
   // Clear cache before event tests
   clearEmailDedupeCache();
 
-  // Test 2: Event 1 - New Ticket Assigned Email
+  // Test 2A: Event 1 - Request Created Email (to Client)
   try {
-    console.log('\nTEST 2: Event 1 - New Ticket Assigned Email');
+    console.log('\nTEST 2A: Event 1 - Request Created Confirmation Email (Client)');
+    const res = await sendRequestCreatedEmail({
+      client: mockClient,
+      ticket: { ...mockTicket, status: 'REQUEST_CREATED' }
+    });
+    if (res.success && (res.simulated || res.messageId)) {
+      console.log('  [PASS] sendRequestCreatedEmail succeeded:', res);
+      passed++;
+    } else {
+      throw new Error(`Failed with: ${JSON.stringify(res)}`);
+    }
+  } catch (err) {
+    console.error('  [FAIL] TEST 2A:', err.message);
+    failed++;
+  }
+
+  // Test 2B: Event 2 - New Ticket Assigned Email
+  try {
+    console.log('\nTEST 2B: Event 2 - New Ticket Assigned Email (Specialist)');
     const res = await sendTicketAssignedEmail({
       specialist: mockSpecialist,
       ticket: mockTicket,

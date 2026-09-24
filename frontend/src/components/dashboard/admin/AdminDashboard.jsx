@@ -268,16 +268,7 @@ export default function AdminDashboard({ user, onLogout }) {
         companyInfo: createWorkflow.companyInfo?.trim() || '',
         researchSummary: createWorkflow.companyInfo?.trim() || '',
         password: createWorkflow.password.trim(),
-        initialLeads: [
-          {
-            name: 'Senior Decision Maker (Sample)',
-            title: 'VP of Engineering / CTO',
-            company: createWorkflow.companyName.trim(),
-            email: `executive@${createWorkflow.email.split('@')[1] || 'client.com'}`,
-            location: 'Global',
-            status: 'Verified'
-          }
-        ],
+        initialLeads: [],
         initialKeyPeople: [
           {
             name: createWorkflow.contactPerson.trim(),

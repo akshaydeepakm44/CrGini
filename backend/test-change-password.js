@@ -247,7 +247,7 @@ async function runChangePasswordSuite() {
     console.log('\nTEST 9: Verify Admin account login is intact...');
     const res9 = await request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email: 'team@creativegini.com', password: process.env.EMAIL_PASSWORD || 'Admin@2026' })
+      body: JSON.stringify({ email: 'team@creativegini.com', password: 'Admin@2026' })
     });
 
     if (res9.status === 200 && res9.data.success && res9.data.user?.role === 'ADMIN') {

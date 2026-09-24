@@ -58,7 +58,7 @@ async function runWelcomeEmailWorkflowSuite() {
     console.log('[Setup]: Authenticating Admin user...');
     const adminLoginRes = await request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email: 'team@creativegini.com', password: process.env.EMAIL_PASSWORD || 'Admin@2026' })
+      body: JSON.stringify({ email: 'team@creativegini.com', password: 'Admin@2026' })
     });
 
     if (!adminLoginRes.ok || !adminLoginRes.data?.token) {

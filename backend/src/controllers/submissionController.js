@@ -166,7 +166,10 @@ export const createSubmission = async (req, res) => {
 
         await import('../repositories/submissionRepository.js').then(
           ({ addSubmissionFile }) =>
-            addSubmissionFile(submission._id, file)
+            addSubmissionFile(submission._id, {
+              ...file,
+              url: file.url || file.path || `/uploads/${encodeURIComponent(file.name || 'deliverable')}`
+            })
         );
       }
     }
@@ -217,14 +220,16 @@ export const createSubmission = async (req, res) => {
           client: clientUser,
           ticket: updatedRequest || request,
           submission,
-          specialist: req.user
+          specialist: req.user,
+          files: files || []
         }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
       } else {
         sendWorkSubmittedEmail({
           client: clientUser,
           ticket: updatedRequest || request,
           submission,
-          specialist: req.user
+          specialist: req.user,
+          files: files || []
         }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
       }
     }
@@ -453,11 +458,12 @@ export const approveSubmission = async (req, res) => {
     });
 
     // Safeguard 1: Trigger Work Approved email to specialist
-    if (request.assignedTo) {
+    const specialistRef = request.assignedTo || updatedRequest?.assignedTo;
+    if (specialistRef) {
       let specialistUser = null;
-      const assignedId = request.assignedTo?.id || request.assignedTo?._id || request.assignedTo;
-      if (request.assignedTo?.email) {
-        specialistUser = request.assignedTo;
+      const assignedId = specialistRef?.id || specialistRef?._id || specialistRef;
+      if (specialistRef?.email) {
+        specialistUser = specialistRef;
       } else if (assignedId) {
         specialistUser = await findUserById(assignedId).catch(() => null);
       }
@@ -572,7 +578,7 @@ export const requestChanges = async (req, res) => {
       });
     }
 
-    const wasAlreadyChangesRequested = submission.status === 'CHANGES_REQUESTED' || request.status === 'CHANGES_REQUESTED';
+    const wasAlreadyChangesRequested = submission.status === 'CHANGES_REQUESTED';
 
     const now = new Date();
 
@@ -622,11 +628,12 @@ export const requestChanges = async (req, res) => {
     });
 
     // Safeguard 1: Trigger Changes Requested email to specialist
-    if (!wasAlreadyChangesRequested && request.assignedTo) {
+    const specialistRef = request.assignedTo || updatedRequest?.assignedTo;
+    if (!wasAlreadyChangesRequested && specialistRef) {
       let specialistUser = null;
-      const assignedId = request.assignedTo?.id || request.assignedTo?._id || request.assignedTo;
-      if (request.assignedTo?.email) {
-        specialistUser = request.assignedTo;
+      const assignedId = specialistRef?.id || specialistRef?._id || specialistRef;
+      if (specialistRef?.email) {
+        specialistUser = specialistRef;
       } else if (assignedId) {
         specialistUser = await findUserById(assignedId).catch(() => null);
       }
@@ -636,7 +643,8 @@ export const requestChanges = async (req, res) => {
           specialist: specialistUser,
           ticket: updatedRequest || request,
           feedback: feedback.trim(),
-          client: req.user
+          client: req.user,
+          submission: updatedSubmission || submission
         }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
       }
     }

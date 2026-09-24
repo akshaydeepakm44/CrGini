@@ -41,6 +41,7 @@ const companySelect = `
       (
         SELECT jsonb_agg(
           jsonb_build_object(
+            'id', l.id,
             'name', l.name,
             'title', l.title,
             'company', l.lead_company,
@@ -48,7 +49,9 @@ const companySelect = `
             'linkedin', l.linkedin,
             'location', l.location,
             'status', l.status,
-            'notes', l.notes
+            'notes', l.notes,
+            'createdAt', l.created_at,
+            'updatedAt', l.updated_at
           )
           ORDER BY l.created_at
         )
@@ -62,11 +65,13 @@ const companySelect = `
       (
         SELECT jsonb_agg(
           jsonb_build_object(
+            'id', kp.id,
             'name', kp.name,
             'role', kp.role,
             'department', kp.department,
             'contact', kp.contact,
-            'socialProfile', kp.social_profile
+            'socialProfile', kp.social_profile,
+            'createdAt', kp.created_at
           )
           ORDER BY kp.created_at
         )
@@ -320,7 +325,7 @@ export const addCompanyLead = async (
       lead.email || null,
       lead.linkedin || null,
       lead.location || null,
-      lead.status || 'Verified',
+      lead.status || 'PENDING',
       lead.notes || null,
     ]
   );
@@ -471,6 +476,104 @@ export const deleteCompany = async (id) => {
   return result.rowCount > 0;
 };
 
+export const findLeadById = async (leadId) => {
+  const result = await query(
+    `
+    SELECT
+      l.id,
+      l.company_id,
+      l.name,
+      l.title,
+      l.lead_company AS company,
+      l.email,
+      l.linkedin,
+      l.location,
+      l.status,
+      l.notes,
+      l.created_at,
+      l.updated_at,
+      c.name AS target_company_name,
+      c.industry AS target_company_industry,
+      c.website AS target_company_website,
+      c.company_info AS target_company_info,
+      c.research_summary AS company_research_summary
+    FROM company_leads l
+    JOIN companies c ON c.id = l.company_id
+    WHERE l.id = $1
+    `,
+    [leadId]
+  );
+  return result.rows[0] || null;
+};
+
+export const updateCompanyLead = async (leadId, updates = {}) => {
+  const allowed = {
+    name: 'name',
+    title: 'title',
+    company: 'lead_company',
+    lead_company: 'lead_company',
+    email: 'email',
+    linkedin: 'linkedin',
+    location: 'location',
+    status: 'status',
+    notes: 'notes'
+  };
+
+  const setClauses = [];
+  const values = [];
+  let paramIdx = 1;
+
+  for (const [key, val] of Object.entries(updates)) {
+    if (allowed[key] !== undefined && val !== undefined) {
+      setClauses.push(`${allowed[key]} = $${paramIdx}`);
+      values.push(val);
+      paramIdx++;
+    }
+  }
+
+  if (setClauses.length === 0) return findLeadById(leadId);
+
+  setClauses.push(`updated_at = NOW()`);
+  values.push(leadId);
+
+  const sql = `
+    UPDATE company_leads
+    SET ${setClauses.join(', ')}
+    WHERE id = $${paramIdx}
+    RETURNING
+      id,
+      name,
+      title,
+      lead_company AS company,
+      email,
+      linkedin,
+      location,
+      status,
+      notes,
+      created_at,
+      updated_at
+  `;
+
+  const result = await query(sql, values);
+  return result.rows[0] || null;
+};
+
+export const deleteCompanyLead = async (leadId) => {
+  const result = await query(
+    `DELETE FROM company_leads WHERE id = $1 RETURNING id`,
+    [leadId]
+  );
+  return result.rowCount > 0;
+};
+
+export const deleteKeyPerson = async (personId) => {
+  const result = await query(
+    `DELETE FROM company_key_people WHERE id = $1 RETURNING id`,
+    [personId]
+  );
+  return result.rowCount > 0;
+};
+
 export default {
   findCompanyById,
   findCompanyByEmail,
@@ -486,4 +589,9 @@ export default {
   replaceCompanyLeads,
   replaceKeyPeople,
   deleteCompany,
+  findLeadById,
+  updateCompanyLead,
+  deleteCompanyLead,
+  deleteKeyPerson,
 };
+

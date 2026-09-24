@@ -52,9 +52,41 @@ export const clearEmailDedupeCache = () => {
 };
 
 /**
+ * Check whether password is a known placeholder string.
+ */
+export const isPlaceholderPassword = (pwd) => {
+  if (!pwd) return true;
+  const trimmed = String(pwd).trim();
+  return (
+    trimmed === '<GOOGLE_APP_PASSWORD>' ||
+    trimmed === 'your-app-password-here' ||
+    (trimmed.startsWith('<') && trimmed.endsWith('>'))
+  );
+};
+
+// In-memory event audit log for integration testing and monitoring
+const emailHistory = [];
+export const getEmailHistory = () => [...emailHistory];
+export const clearEmailHistory = () => {
+  emailHistory.length = 0;
+};
+export const recordEmailEvent = (entry) => {
+  emailHistory.push({ ...entry, timestamp: Date.now() });
+  if (emailHistory.length > 200) emailHistory.shift();
+};
+
+/**
  * Get nodemailer transporter or null if not configured.
  */
 let transporterInstance = null;
+
+export const setTransporter = (transporter) => {
+  transporterInstance = transporter;
+};
+
+export const resetTransporter = () => {
+  transporterInstance = null;
+};
 
 export const getTransporter = () => {
   if (transporterInstance !== null) {
@@ -68,6 +100,11 @@ export const getTransporter = () => {
   const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
 
   if (host && user && pass) {
+    if (isPlaceholderPassword(pass)) {
+      // In development / testing with placeholder credentials, run in simulation mode
+      return null;
+    }
+
     try {
       transporterInstance = nodemailer.createTransport({
         host,
@@ -105,6 +142,15 @@ export const verifySmtpConnection = async () => {
       success: false,
       configured: false,
       error: 'Missing SMTP credentials in backend/.env (EMAIL_HOST, EMAIL_USER, or EMAIL_PASSWORD).'
+    };
+  }
+
+  if (isPlaceholderPassword(pass)) {
+    return {
+      success: false,
+      configured: true,
+      placeholder: true,
+      error: 'SMTP is configured with placeholder credentials (<GOOGLE_APP_PASSWORD>). Live delivery requires a Google Workspace App Password.'
     };
   }
 
@@ -352,6 +398,15 @@ const buildHtmlTemplate = ({
 };
 
 /**
+ * Helper to retrieve formatted client and company display string.
+ */
+export const getClientDisplay = (ticket, client) => {
+  const name = client?.name || ticket?.user?.name || ticket?.userId?.name || 'Client';
+  const company = ticket?.company?.name || ticket?.companyId?.name || (typeof ticket?.companyId === 'string' ? '' : '') || '';
+  return company ? `${name} (${company})` : name;
+};
+
+/**
  * Generic dispatcher that handles transporter delivery, simulation fallback,
  * and error isolation. Never throws; always returns a result object.
  */
@@ -364,13 +419,23 @@ const sendEmail = async ({ to, subject, html, text, event, dedupeKey, attachment
   // Secondary layer: in-memory deduplication check
   if (dedupeKey && isDuplicateEmail(dedupeKey)) {
     console.log(`[EMAIL DEDUPE] Suppressed duplicate email for key: ${dedupeKey}`);
-    return { success: true, deduplicated: true };
+    return { success: true, deduplicated: true, to, subject, event };
   }
+
+  // Audit record for testing and telemetry
+  recordEmailEvent({
+    to,
+    subject,
+    event,
+    dedupeKey,
+    text,
+    attachmentsCount: (attachments || []).length
+  });
 
   const from = process.env.EMAIL_FROM || 'CreativeGini <team@creativegini.com>';
   const transporter = getTransporter();
 
-  // If SMTP is not configured, run in development/simulation mode
+  // If SMTP is not configured or running with placeholder credentials, run in simulation mode
   if (!transporter) {
     console.log(`[EMAIL SIMULATION] [${event}]`);
     console.log(`  To:          ${to}`);
@@ -423,7 +488,65 @@ const sendEmail = async ({ to, subject, html, text, event, dedupeKey, attachment
 };
 
 // ============================================================================
-// 1. NEW TICKET ASSIGNMENT EMAIL (Sent to specialist)
+// 1. REQUEST CREATED EMAIL (Sent to USER upon ticket creation)
+// ============================================================================
+export const sendRequestCreatedEmail = async ({ client, ticket }) => {
+  try {
+    const recipientEmail = client ? client.email : (ticket?.userId?.email || ticket?.user?.email);
+    if (!recipientEmail || !ticket?.ticketId) return { success: false, reason: 'invalid_payload' };
+
+    const serviceName = formatServiceType(ticket.serviceType);
+    const dedupeKey = `REQUEST_CREATED:${ticket.ticketId}:${recipientEmail}`;
+    const actionUrl = getTicketUrl(ticket.ticketId);
+
+    const clientName = client?.name || ticket?.userId?.name || 'Valued Client';
+    const subject = `Request Created: ${ticket.ticketId} - ${ticket.title}`;
+    const subtitle = `Your request ${ticket.ticketId} has been successfully created. Our team will review your requirements and begin sprint preparation.`;
+
+    const html = buildHtmlTemplate({
+      preheader: `Request ${ticket.ticketId} created: ${ticket.title}`,
+      headerBadge: 'Request Created',
+      statusColor: '#00E5FF',
+      ticketCode: ticket.ticketId,
+      serviceName,
+      title: 'Your Service Request Was Received',
+      subtitle,
+      details: [
+        { label: 'Ticket ID', value: ticket.ticketId },
+        { label: 'Request Title', value: ticket.title },
+        { label: 'Service', value: serviceName },
+        { label: 'Current Status', value: ticket.status || 'REQUEST_CREATED' },
+        { label: 'Priority', value: ticket.priority || 'MEDIUM' },
+        { label: 'Created At', value: ticket.createdAt ? new Date(ticket.createdAt).toLocaleString() : new Date().toLocaleString() }
+      ],
+      highlightBox: ticket.description ? {
+        title: 'Request Brief / Scope',
+        content: ticket.description,
+        color: '#00E5FF'
+      } : null,
+      actionText: 'Open Ticket',
+      actionUrl,
+      note: 'You can track progress, upload assets, and communicate with your team directly in the portal.'
+    });
+
+    const text = `Request Created: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nService: ${serviceName}\nStatus: ${ticket.status || 'REQUEST_CREATED'}\n\nView Ticket: ${actionUrl}`;
+
+    return await sendEmail({
+      to: recipientEmail,
+      subject,
+      html,
+      text,
+      event: 'REQUEST_CREATED',
+      dedupeKey
+    });
+  } catch (err) {
+    console.error('[EMAIL ERROR] sendRequestCreatedEmail:', err);
+    return { success: false, error: err.message };
+  }
+};
+
+// ============================================================================
+// 2. TICKET ASSIGNED / REASSIGNED EMAIL (Sent to assigned TEAM MEMBER)
 // ============================================================================
 export const sendTicketAssignedEmail = async ({ specialist, ticket, assignedBy }) => {
   try {
@@ -433,27 +556,27 @@ export const sendTicketAssignedEmail = async ({ specialist, ticket, assignedBy }
     const dedupeKey = `TICKET_ASSIGNED:${ticket.ticketId}:${specialist.email}`;
     const actionUrl = getTicketUrl(ticket.ticketId);
 
-    const clientName = ticket.userId?.name || 'Client';
-    const companyName = ticket.companyId?.name || '';
-    const clientDisplay = companyName ? `${clientName} (${companyName})` : clientName;
+    const clientDisplay = getClientDisplay(ticket);
 
     const subject = `New Ticket Assigned: ${ticket.ticketId} - ${ticket.title}`;
-    const subtitle = `You have been assigned to lead the work on ticket ${ticket.ticketId}. Please review the scope and start work.`;
+    const subtitle = `You have been assigned a new ticket: ${ticket.ticketId}. Please review the project scope and begin work.`;
 
     const html = buildHtmlTemplate({
-      preheader: `New ticket assigned: ${ticket.ticketId} - ${ticket.title}`,
+      preheader: `You have been assigned ticket ${ticket.ticketId}: ${ticket.title}`,
       headerBadge: 'Ticket Assigned',
       statusColor: '#00E5FF',
       ticketCode: ticket.ticketId,
       serviceName,
-      title: 'New Ticket Assigned to You',
+      title: 'You Have Been Assigned a New Ticket',
       subtitle,
       details: [
         { label: 'Ticket ID', value: ticket.ticketId },
+        { label: 'Client / Company', value: clientDisplay },
         { label: 'Service', value: serviceName },
-        { label: 'Client', value: clientDisplay },
+        { label: 'Request Title', value: ticket.title },
+        { label: 'Current Status', value: ticket.status || 'ASSIGNED' },
         { label: 'Priority', value: ticket.priority || 'MEDIUM' },
-        { label: 'Assigned By', value: assignedBy?.name || 'System / Admin' },
+        { label: 'Assigned By', value: assignedBy?.name || 'CreativeGini Team' },
         { label: 'Due Date', value: ticket.dueDate ? new Date(ticket.dueDate).toLocaleDateString() : 'Standard Sprint' }
       ],
       highlightBox: ticket.description ? {
@@ -465,7 +588,7 @@ export const sendTicketAssignedEmail = async ({ specialist, ticket, assignedBy }
       actionUrl
     });
 
-    const text = `New Ticket Assigned: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nService: ${serviceName}\nClient: ${clientDisplay}\nAssigned By: ${assignedBy?.name || 'CreativeGini'}\n\nView Ticket: ${actionUrl}`;
+    const text = `You Have Been Assigned a New Ticket: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nClient: ${clientDisplay}\nService: ${serviceName}\nStatus: ${ticket.status || 'ASSIGNED'}\nAssigned By: ${assignedBy?.name || 'CreativeGini'}\n\nView Ticket: ${actionUrl}`;
 
     return await sendEmail({
       to: specialist.email,
@@ -482,14 +605,15 @@ export const sendTicketAssignedEmail = async ({ specialist, ticket, assignedBy }
 };
 
 // ============================================================================
-// 2. WORK STARTED EMAIL (Sent to client)
+// 3. WORK STARTED EMAIL (Sent to USER when specialist begins work)
 // ============================================================================
 export const sendWorkStartedEmail = async ({ client, ticket, specialist }) => {
   try {
-    if (!client?.email || !ticket?.ticketId) return { success: false, reason: 'invalid_payload' };
+    const recipientEmail = client ? client.email : (ticket?.userId?.email || ticket?.user?.email);
+    if (!recipientEmail || !ticket?.ticketId) return { success: false, reason: 'invalid_payload' };
 
     const serviceName = formatServiceType(ticket.serviceType);
-    const dedupeKey = `WORK_STARTED:${ticket.ticketId}:${client.email}`;
+    const dedupeKey = `WORK_STARTED:${ticket.ticketId}:${recipientEmail}`;
     const actionUrl = getTicketUrl(ticket.ticketId);
 
     const specialistName = specialist?.name || ticket.assignedTo?.name || 'CreativeGini Specialist';
@@ -508,13 +632,14 @@ export const sendWorkStartedEmail = async ({ client, ticket, specialist }) => {
       subtitle,
       details: [
         { label: 'Ticket ID', value: ticket.ticketId },
+        { label: 'Request Title', value: ticket.title },
         { label: 'Service', value: serviceName },
+        { label: 'Current Status', value: 'IN PROGRESS' },
         { label: 'Assigned Specialist', value: `${specialistName} (${teamName})` },
-        { label: 'Status', value: 'IN PROGRESS' },
         { label: 'Started At', value: new Date().toLocaleString() }
       ],
       highlightBox: {
-        title: 'What Happens Next?',
+        title: 'Sprint Activated',
         content: 'Our team is actively executing your sprint requirements. You can track progress and communicate with your specialist directly through the portal.',
         color: '#00E5FF'
       },
@@ -525,7 +650,7 @@ export const sendWorkStartedEmail = async ({ client, ticket, specialist }) => {
     const text = `Work Started: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nService: ${serviceName}\nSpecialist: ${specialistName}\nStatus: IN PROGRESS\n\nTrack progress: ${actionUrl}`;
 
     return await sendEmail({
-      to: client.email,
+      to: recipientEmail,
       subject,
       html,
       text,
@@ -539,20 +664,21 @@ export const sendWorkStartedEmail = async ({ client, ticket, specialist }) => {
 };
 
 // ============================================================================
-// 3. TICKET PROGRESS / PORTAL UPDATE EMAIL (Sent to client)
+// 4. TICKET PROGRESS UPDATE EMAIL (Sent to USER on explicit progress update)
 // ============================================================================
 export const sendTicketProgressEmail = async ({ client, ticket, specialist, updateText, updateNote }) => {
   try {
-    if (!client?.email || !ticket?.ticketId) return { success: false, reason: 'invalid_payload' };
+    const recipientEmail = client ? client.email : (ticket?.userId?.email || ticket?.user?.email);
+    if (!recipientEmail || !ticket?.ticketId) return { success: false, reason: 'invalid_payload' };
 
     const serviceName = formatServiceType(ticket.serviceType);
     const content = (updateText || updateNote || '').trim();
-    // Unique key incorporating content hash or snippet to allow distinct progress updates
+    // Unique key incorporating content hash to allow distinct progress updates
     const contentHash = content.slice(0, 30).replace(/\s+/g, '_');
-    const dedupeKey = `TICKET_PROGRESS:${ticket.ticketId}:${client.email}:${contentHash}`;
+    const dedupeKey = `TICKET_PROGRESS:${ticket.ticketId}:${recipientEmail}:${contentHash}`;
     const actionUrl = getTicketUrl(ticket.ticketId, 'chat');
 
-    const specialistName = specialist?.name || 'CreativeGini Specialist';
+    const specialistName = specialist?.name || ticket.assignedTo?.name || 'CreativeGini Specialist';
 
     const subject = `Ticket Update: ${ticket.ticketId} - ${ticket.title}`;
     const subtitle = `A new progress update has been posted to your ticket by ${specialistName}.`;
@@ -567,6 +693,7 @@ export const sendTicketProgressEmail = async ({ client, ticket, specialist, upda
       subtitle,
       details: [
         { label: 'Ticket ID', value: ticket.ticketId },
+        { label: 'Request Title', value: ticket.title },
         { label: 'Service', value: serviceName },
         { label: 'Updated By', value: specialistName },
         { label: 'Updated At', value: new Date().toLocaleString() }
@@ -583,7 +710,7 @@ export const sendTicketProgressEmail = async ({ client, ticket, specialist, upda
     const text = `Ticket Update: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nUpdated By: ${specialistName}\nUpdate:\n${content}\n\nView ticket: ${actionUrl}`;
 
     return await sendEmail({
-      to: client.email,
+      to: recipientEmail,
       subject,
       html,
       text,
@@ -597,38 +724,50 @@ export const sendTicketProgressEmail = async ({ client, ticket, specialist, upda
 };
 
 // ============================================================================
-// 4. WORK SUBMITTED EMAIL (Sent to client for V1)
+// 5. WORK SUBMITTED EMAIL (Sent to USER for V1 deliverables)
 // ============================================================================
-export const sendWorkSubmittedEmail = async ({ client, ticket, submission, specialist }) => {
+export const sendWorkSubmittedEmail = async ({ client, ticket, submission, specialist, files = [] }) => {
   try {
-    if (!client?.email || !ticket?.ticketId) return { success: false, reason: 'invalid_payload' };
+    const recipientEmail = client ? client.email : (ticket?.userId?.email || ticket?.user?.email);
+    if (!recipientEmail || !ticket?.ticketId) return { success: false, reason: 'invalid_payload' };
 
     const serviceName = formatServiceType(ticket.serviceType);
-    const dedupeKey = `WORK_SUBMITTED:${ticket.ticketId}:${submission?.version || 1}:${client.email}`;
+    const version = submission?.version || 1;
+    const dedupeKey = `WORK_SUBMITTED:${ticket.ticketId}:${version}:${recipientEmail}`;
     const actionUrl = getTicketUrl(ticket.ticketId, 'review');
 
-    const specialistName = specialist?.name || 'CreativeGini Specialist';
+    const specialistName = specialist?.name || ticket.assignedTo?.name || 'CreativeGini Specialist';
 
     const subject = `Action Required: Work Submitted for ${ticket.ticketId}`;
     const subtitle = `Your completed deliverables for ticket ${ticket.ticketId} are now ready for your review and approval.`;
 
     const deliverableDetails = [
       { label: 'Ticket ID', value: ticket.ticketId },
+      { label: 'Request Title', value: ticket.title },
       { label: 'Service', value: serviceName },
       { label: 'Deliverable Title', value: submission?.title || ticket.title },
-      { label: 'Submission Version', value: `Version ${submission?.version || 1}` },
+      { label: 'Submission Version', value: `Version ${version}` },
       { label: 'Submitted By', value: specialistName }
     ];
 
+    const fileItems = Array.isArray(files) && files.length > 0 ? files : (Array.isArray(submission?.files) ? submission.files : []);
+    if (fileItems.length > 0) {
+      const fileNames = fileItems.map(f => typeof f === 'string' ? f : (f.name || f.filename || 'Deliverable File')).join(', ');
+      deliverableDetails.push({
+        label: `Attached Files (${fileItems.length})`,
+        value: fileNames
+      });
+    }
+
     if (submission?.externalLink) {
       deliverableDetails.push({
-        label: 'External Assets',
+        label: 'External Deliverables',
         value: `<a href="${submission.externalLink}" target="_blank" style="color: #00E5FF; text-decoration: underline;">Open Deliverables &rarr;</a>`
       });
     }
 
     const html = buildHtmlTemplate({
-      preheader: `Work ready for review on ${ticket.ticketId}`,
+      preheader: `Work ready for review on ${ticket.ticketId}: Version ${version}`,
       headerBadge: 'Ready for Review',
       statusColor: '#A855F7',
       ticketCode: ticket.ticketId,
@@ -637,19 +776,19 @@ export const sendWorkSubmittedEmail = async ({ client, ticket, submission, speci
       subtitle,
       details: deliverableDetails,
       highlightBox: submission?.description ? {
-        title: 'Deliverable Summary & Notes',
+        title: 'Deliverable Summary & Scope',
         content: submission.description,
         color: '#A855F7'
       } : null,
-      actionText: 'Open Ticket',
+      actionText: 'Review Work Deliverables',
       actionUrl,
       note: 'Please inspect the deliverables. You can either approve the work to complete the ticket or request revisions directly in the portal.'
     });
 
-    const text = `Work Submitted: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nVersion: V${submission?.version || 1}\nSubmitted By: ${specialistName}\n\nPlease review and approve: ${actionUrl}`;
+    const text = `Work Submitted: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nVersion: V${version}\nSubmitted By: ${specialistName}\n\nPlease review and approve: ${actionUrl}`;
 
     return await sendEmail({
-      to: client.email,
+      to: recipientEmail,
       subject,
       html,
       text,
@@ -663,20 +802,21 @@ export const sendWorkSubmittedEmail = async ({ client, ticket, submission, speci
 };
 
 // ============================================================================
-// 5. CHANGES REQUESTED EMAIL (Sent to specialist)
+// 6. CHANGES REQUESTED EMAIL (Sent to assigned TEAM MEMBER when user asks revisions)
 // ============================================================================
-export const sendChangesRequestedEmail = async ({ specialist, ticket, feedback, client }) => {
+export const sendChangesRequestedEmail = async ({ specialist, ticket, feedback, client, submission }) => {
   try {
     if (!specialist?.email || !ticket?.ticketId) return { success: false, reason: 'invalid_payload' };
 
     const serviceName = formatServiceType(ticket.serviceType);
-    const dedupeKey = `CHANGES_REQUESTED:${ticket.ticketId}:${specialist.email}`;
+    const version = submission?.version || ticket.currentSubmissionVersion || 1;
+    const dedupeKey = `CHANGES_REQUESTED:${ticket.ticketId}:${version}:${specialist.email}`;
     const actionUrl = getTicketUrl(ticket.ticketId, 'review');
 
-    const clientName = client?.name || ticket.userId?.name || 'Client';
+    const clientDisplay = getClientDisplay(ticket, client);
 
     const subject = `Changes Requested: ${ticket.ticketId} - ${ticket.title}`;
-    const subtitle = `${clientName} has reviewed the submission and requested revisions.`;
+    const subtitle = `${clientDisplay} has reviewed submission V${version} and requested revisions.`;
 
     const html = buildHtmlTemplate({
       preheader: `Changes requested on ${ticket.ticketId}: ${feedback?.slice(0, 80)}`,
@@ -688,9 +828,11 @@ export const sendChangesRequestedEmail = async ({ specialist, ticket, feedback, 
       subtitle,
       details: [
         { label: 'Ticket ID', value: ticket.ticketId },
+        { label: 'Request Title', value: ticket.title },
+        { label: 'Client / Company', value: clientDisplay },
         { label: 'Service', value: serviceName },
-        { label: 'Client', value: clientName },
-        { label: 'Status', value: 'CHANGES REQUESTED' },
+        { label: 'Submission Version', value: `Version ${version}` },
+        { label: 'Current Status', value: 'CHANGES REQUESTED' },
         { label: 'Requested At', value: new Date().toLocaleString() }
       ],
       highlightBox: {
@@ -703,7 +845,7 @@ export const sendChangesRequestedEmail = async ({ specialist, ticket, feedback, 
       note: 'Please make the requested adjustments and submit a new revision (V2+) through the portal once completed.'
     });
 
-    const text = `Changes Requested: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nClient: ${clientName}\nFeedback:\n${feedback}\n\nView details: ${actionUrl}`;
+    const text = `Changes Requested: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nClient: ${clientDisplay}\nVersion: V${version}\nFeedback:\n${feedback}\n\nView details: ${actionUrl}`;
 
     return await sendEmail({
       to: specialist.email,
@@ -720,29 +862,40 @@ export const sendChangesRequestedEmail = async ({ specialist, ticket, feedback, 
 };
 
 // ============================================================================
-// 6. WORK RESUBMITTED EMAIL (Sent to client for V > 1)
+// 7. WORK RESUBMITTED EMAIL (Sent to USER for V > 1 deliverables)
 // ============================================================================
-export const sendWorkResubmittedEmail = async ({ client, ticket, submission, specialist }) => {
+export const sendWorkResubmittedEmail = async ({ client, ticket, submission, specialist, files = [] }) => {
   try {
-    if (!client?.email || !ticket?.ticketId) return { success: false, reason: 'invalid_payload' };
+    const recipientEmail = client ? client.email : (ticket?.userId?.email || ticket?.user?.email);
+    if (!recipientEmail || !ticket?.ticketId) return { success: false, reason: 'invalid_payload' };
 
     const serviceName = formatServiceType(ticket.serviceType);
     const version = submission?.version || 2;
-    const dedupeKey = `WORK_RESUBMITTED:${ticket.ticketId}:${version}:${client.email}`;
+    const dedupeKey = `WORK_RESUBMITTED:${ticket.ticketId}:${version}:${recipientEmail}`;
     const actionUrl = getTicketUrl(ticket.ticketId, 'review');
 
-    const specialistName = specialist?.name || 'CreativeGini Specialist';
+    const specialistName = specialist?.name || ticket.assignedTo?.name || 'CreativeGini Specialist';
 
     const subject = `Revised Work Submitted: ${ticket.ticketId} (V${version})`;
     const subtitle = `The specialist has addressed your revision feedback and submitted a revised version (V${version}) for your review.`;
 
     const deliverableDetails = [
       { label: 'Ticket ID', value: ticket.ticketId },
+      { label: 'Request Title', value: ticket.title },
       { label: 'Service', value: serviceName },
       { label: 'Submission Version', value: `Version ${version}` },
       { label: 'Revised By', value: specialistName },
       { label: 'Resubmitted At', value: new Date().toLocaleString() }
     ];
+
+    const fileItems = Array.isArray(files) && files.length > 0 ? files : (Array.isArray(submission?.files) ? submission.files : []);
+    if (fileItems.length > 0) {
+      const fileNames = fileItems.map(f => typeof f === 'string' ? f : (f.name || f.filename || 'Revised Deliverable')).join(', ');
+      deliverableDetails.push({
+        label: `Attached Files (${fileItems.length})`,
+        value: fileNames
+      });
+    }
 
     if (submission?.externalLink) {
       deliverableDetails.push({
@@ -765,7 +918,7 @@ export const sendWorkResubmittedEmail = async ({ client, ticket, submission, spe
         content: submission.description,
         color: '#00E5FF'
       } : null,
-      actionText: 'Open Ticket',
+      actionText: 'Review Revised Work',
       actionUrl,
       note: 'Please review the updated deliverables. If everything meets your requirements, click "Approve Work" to finalize the ticket.'
     });
@@ -773,7 +926,7 @@ export const sendWorkResubmittedEmail = async ({ client, ticket, submission, spe
     const text = `Revised Work Submitted: ${ticket.ticketId} (V${version})\n\nTitle: ${ticket.title}\nRevised By: ${specialistName}\n\nReview revised work: ${actionUrl}`;
 
     return await sendEmail({
-      to: client.email,
+      to: recipientEmail,
       subject,
       html,
       text,
@@ -787,7 +940,7 @@ export const sendWorkResubmittedEmail = async ({ client, ticket, submission, spe
 };
 
 // ============================================================================
-// 7. WORK APPROVED EMAIL (Sent to specialist)
+// 8. WORK APPROVED EMAIL (Sent to assigned TEAM MEMBER when user approves)
 // ============================================================================
 export const sendWorkApprovedEmail = async ({ specialist, ticket, client }) => {
   try {
@@ -797,13 +950,14 @@ export const sendWorkApprovedEmail = async ({ specialist, ticket, client }) => {
     const dedupeKey = `WORK_APPROVED:${ticket.ticketId}:${specialist.email}`;
     const actionUrl = getTicketUrl(ticket.ticketId);
 
-    const clientName = client?.name || ticket.userId?.name || 'Client';
+    const clientDisplay = getClientDisplay(ticket, client);
+    const approverName = client?.name || ticket.userId?.name || 'Client';
 
     const subject = `Work Approved: ${ticket.ticketId} - ${ticket.title}`;
-    const subtitle = `Congratulations! ${clientName} has approved the deliverables for ticket ${ticket.ticketId}.`;
+    const subtitle = `Congratulations! ${clientDisplay} has approved the deliverables for ticket ${ticket.ticketId}.`;
 
     const html = buildHtmlTemplate({
-      preheader: `Work approved on ${ticket.ticketId} by ${clientName}`,
+      preheader: `Work approved on ${ticket.ticketId} by ${clientDisplay}`,
       headerBadge: 'Work Approved',
       statusColor: '#10B981',
       ticketCode: ticket.ticketId,
@@ -812,8 +966,10 @@ export const sendWorkApprovedEmail = async ({ specialist, ticket, client }) => {
       subtitle,
       details: [
         { label: 'Ticket ID', value: ticket.ticketId },
+        { label: 'Request Title', value: ticket.title },
+        { label: 'Client / Company', value: clientDisplay },
         { label: 'Service', value: serviceName },
-        { label: 'Approved By', value: clientName },
+        { label: 'Approved By', value: approverName },
         { label: 'Approved At', value: new Date().toLocaleString() },
         { label: 'Ticket Status', value: 'COMPLETED' }
       ],
@@ -826,7 +982,7 @@ export const sendWorkApprovedEmail = async ({ specialist, ticket, client }) => {
       actionUrl
     });
 
-    const text = `Work Approved: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nApproved By: ${clientName}\nStatus: COMPLETED\n\nView ticket: ${actionUrl}`;
+    const text = `Work Approved: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nApproved By: ${clientDisplay}\nStatus: COMPLETED\n\nView ticket: ${actionUrl}`;
 
     return await sendEmail({
       to: specialist.email,
@@ -843,14 +999,15 @@ export const sendWorkApprovedEmail = async ({ specialist, ticket, client }) => {
 };
 
 // ============================================================================
-// 8. TICKET COMPLETED EMAIL (Sent to client)
+// 9. TICKET COMPLETED EMAIL (Sent to USER when ticket is completed)
 // ============================================================================
 export const sendTicketCompletedEmail = async ({ client, ticket, completedBy, reason }) => {
   try {
-    if (!client?.email || !ticket?.ticketId) return { success: false, reason: 'invalid_payload' };
+    const recipientEmail = client ? client.email : (ticket?.userId?.email || ticket?.user?.email);
+    if (!recipientEmail || !ticket?.ticketId) return { success: false, reason: 'invalid_payload' };
 
     const serviceName = formatServiceType(ticket.serviceType);
-    const dedupeKey = `TICKET_COMPLETED:${ticket.ticketId}:${client.email}`;
+    const dedupeKey = `TICKET_COMPLETED:${ticket.ticketId}:${recipientEmail}`;
     const actionUrl = getTicketUrl(ticket.ticketId);
 
     const subject = `Ticket Completed: ${ticket.ticketId} - ${ticket.title}`;
@@ -858,6 +1015,7 @@ export const sendTicketCompletedEmail = async ({ client, ticket, completedBy, re
 
     const details = [
       { label: 'Ticket ID', value: ticket.ticketId },
+      { label: 'Request Title', value: ticket.title },
       { label: 'Service', value: serviceName },
       { label: 'Status', value: 'COMPLETED' },
       { label: 'Completed At', value: new Date().toLocaleString() }
@@ -892,7 +1050,7 @@ export const sendTicketCompletedEmail = async ({ client, ticket, completedBy, re
     const text = `Ticket Completed: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nService: ${serviceName}\nStatus: COMPLETED\n\nAccess portal: ${actionUrl}`;
 
     return await sendEmail({
-      to: client.email,
+      to: recipientEmail,
       subject,
       html,
       text,
@@ -1432,5 +1590,198 @@ export const sendPasswordResetEmail = async ({
     return { success: false, error: err.message };
   }
 };
+
+/**
+ * Dispatch internal notification email to internal team members (Company Boost, Company Lead, UI team)
+ * when Admin creates a new client.
+ *
+ * Requirements (Sections 6 & 16):
+ * - Send to internal team member(s) of:
+ *   1. Company Boost
+ *   2. Company Lead
+ *   3. UI team
+ * - "A new client has been created in CreativeGini and the team needs to prepare the initial company samples/workspace."
+ * - Include:
+ *   - Client/company name
+ *   - Contact person
+ *   - Company website
+ *   - Industry if available
+ *   - Client email
+ *   - Link to relevant internal dashboard / client profile
+ * - Do NOT send this email to the client!
+ * - Sender: CreativeGini <team@creativegini.com>
+ */
+export const buildInternalNewClientEmailTemplate = ({
+  companyName,
+  contactPerson,
+  companyWebsite,
+  industry,
+  clientEmail,
+  dashboardUrl
+}) => {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Client Onboarding Preparation Required</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #030812; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #E2E8F0;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #030812; min-height: 100vh; padding: 30px 15px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #081120; border: 1px solid #1E293B; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+          <!-- HEADER -->
+          <tr>
+            <td style="padding: 28px 32px; background: linear-gradient(135deg, #0B192C 0%, #030812 100%); border-bottom: 1px solid #1E293B;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.1em; color: #FFB000; text-transform: uppercase; background: rgba(255, 176, 0, 0.12); padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(255, 176, 0, 0.3);">
+                      INTERNAL TEAM NOTIFICATION
+                    </span>
+                    <h1 style="margin: 14px 0 6px 0; font-size: 20px; font-weight: 800; color: #F8FAFC;">
+                      New Client Onboarding Required
+                    </h1>
+                    <p style="margin: 0; font-size: 13px; color: #94A3B8;">
+                      A new client has been created in CreativeGini and the team needs to prepare the initial company samples/workspace.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- BODY DETAILS -->
+          <tr>
+            <td style="padding: 28px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(15, 23, 42, 0.6); border: 1px solid #1E293B; border-radius: 8px; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; width: 38%; font-size: 13px; color: #94A3B8;">Client / Company</td>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; font-weight: 700; color: #F8FAFC;">${companyName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #94A3B8;">Contact Person</td>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; font-weight: 600; color: #F8FAFC;">${contactPerson || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #94A3B8;">Client Email</td>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #00D9FF;">${clientEmail}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #94A3B8;">Company Website</td>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #00D9FF;">${companyWebsite || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 18px; font-size: 13px; color: #94A3B8;">Industry</td>
+                  <td style="padding: 14px 18px; font-size: 13px; color: #F8FAFC;">${industry || 'Technology / SaaS'}</td>
+                </tr>
+              </table>
+
+              <!-- REQUIRED DELIVERABLES NOTICE -->
+              <div style="background: rgba(0, 217, 255, 0.06); border: 1px solid rgba(0, 217, 255, 0.2); border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                <div style="font-size: 12px; font-weight: 700; color: #00D9FF; text-transform: uppercase; margin-bottom: 8px;">
+                  Company Boost Team Action Items
+                </div>
+                <div style="font-size: 13px; color: #CBD5E1; line-height: 1.6;">
+                  Please prepare the 4 initial onboarding materials for this workspace:<br>
+                  &bull; <strong>Sample Poster</strong> (Branded Visual)<br>
+                  &bull; <strong>Sample Video</strong> (Introductory Demo)<br>
+                  &bull; <strong>Strategic Plan</strong> (Company-specific growth strategy)<br>
+                  &bull; <strong>DevRel Plan</strong> (Technical Developer Relations plan)
+                </div>
+              </div>
+
+              <!-- ACTION BUTTON -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center">
+                    <a href="${dashboardUrl}" target="_blank" style="display: inline-block; padding: 12px 28px; background: #FFB000; color: #040810; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 6px; box-shadow: 0 4px 12px rgba(255, 176, 0, 0.25);">
+                      Open Company Boost Workspace &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="padding: 20px 32px; background: #040914; border-top: 1px solid #1E293B; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #64748B;">
+                CreativeGini &middot; Internal Operational Dispatch &middot; team@creativegini.com
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+};
+
+export const sendInternalNewClientNotification = async ({
+  recipients,
+  client,
+  company,
+  dashboardUrl
+}) => {
+  try {
+    if (!recipients || recipients.length === 0) {
+      console.warn('[EMAIL WARNING] sendInternalNewClientNotification: No recipients specified.');
+      return { success: false, reason: 'no_recipients' };
+    }
+
+    const companyName = company?.name || 'New Client Company';
+    const contactPerson = client?.name || company?.contactPerson || 'N/A';
+    const clientEmail = client?.email || company?.email || 'N/A';
+    const companyWebsite = company?.website || 'N/A';
+    const industry = company?.industry || 'Technology / SaaS';
+    const resolvedUrl = dashboardUrl || `${(process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '')}/company-boost`;
+
+    const subject = `[Internal] New Client Created: ${companyName} - Initial Workspace Preparation Required`;
+
+    const html = buildInternalNewClientEmailTemplate({
+      companyName,
+      contactPerson,
+      companyWebsite,
+      industry,
+      clientEmail,
+      dashboardUrl: resolvedUrl
+    });
+
+    const text = `[INTERNAL TEAM NOTIFICATION]\n\nA new client has been created in CreativeGini and the team needs to prepare the initial company samples/workspace.\n\nCompany Details:\n- Client/Company Name: ${companyName}\n- Contact Person: ${contactPerson}\n- Company Website: ${companyWebsite}\n- Industry: ${industry}\n- Client Email: ${clientEmail}\n\nRequired Action Items (Company Boost Team):\n1. Sample Poster\n2. Sample Video\n3. Strategic Plan\n4. DevRel Plan\n\nLink to Workspace: ${resolvedUrl}\n\n- CreativeGini Internal Ops`;
+
+    const results = [];
+    for (const recipient of recipients) {
+      const email = typeof recipient === 'string' ? recipient : recipient.email;
+      if (!email || !email.trim()) continue;
+      // CRITICAL: Safety check ensuring client email is never sent this notification
+      if (email.toLowerCase().trim() === clientEmail.toLowerCase().trim()) {
+        console.warn(`[EMAIL SAFETY] Skipped sending internal onboarding notification to client address: ${email}`);
+        continue;
+      }
+
+      const res = await sendEmail({
+        to: email.trim(),
+        subject,
+        html,
+        text,
+        event: 'INTERNAL_CLIENT_CREATED',
+        dedupeKey: `internal-new-client-${company?.id || company?._id}-${email.trim().toLowerCase()}`
+      });
+      results.push({ email, ...res });
+    }
+
+    return { success: true, count: results.length, results };
+  } catch (err) {
+    console.error('[EMAIL ERROR] sendInternalNewClientNotification:', err.message);
+    return { success: false, error: err.message };
+  }
+};
+
 
 

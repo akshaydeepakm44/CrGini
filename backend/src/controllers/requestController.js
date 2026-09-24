@@ -39,6 +39,7 @@ import {
 } from '../utils/ticketHelpers.js';
 
 import {
+  sendRequestCreatedEmail,
   sendTicketAssignedEmail,
   sendWorkStartedEmail,
   sendTicketProgressEmail,
@@ -147,6 +148,28 @@ export const createRequest = async (req, res) => {
       ticketId: request.id,
       ticketCode: ticketId
     });
+
+    // Safeguard: Trigger Request Created confirmation email to the user
+    sendRequestCreatedEmail({
+      client: req.user,
+      ticket: request
+    }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err.message));
+
+    // If an assigned specialist was assigned during creation, trigger assignment email
+    if (request.assignedTo) {
+      let specialistUser = request.assignedTo;
+      const assignedId = request.assignedTo?.id || request.assignedTo?._id || request.assignedTo;
+      if (!specialistUser?.email && assignedId) {
+        specialistUser = await findUserById(assignedId).catch(() => null);
+      }
+      if (specialistUser?.email) {
+        sendTicketAssignedEmail({
+          specialist: specialistUser,
+          ticket: request,
+          assignedBy: req.user
+        }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err.message));
+      }
+    }
 
     return res.status(201).json({
       success: true,
@@ -524,6 +547,14 @@ export const updateRequestStatus = async (req, res) => {
           ticket: updatedRequest || request,
           completedBy: req.user,
           reason: note || undefined
+        }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
+      }
+    } else if (status === 'IN_PROGRESS' && previousStatus !== 'IN_PROGRESS') {
+      if (clientUser?.email) {
+        sendWorkStartedEmail({
+          client: clientUser,
+          ticket: updatedRequest || request,
+          specialist: req.user
         }).catch(err => console.error('[EMAIL DISPATCH ERROR]:', err));
       }
     } else if (note && note.trim().length > 0 && previousStatus !== status) {

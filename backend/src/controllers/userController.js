@@ -20,9 +20,14 @@ import {
   createActivityLog,
   listActivityLogs,
 } from '../repositories/activityLogRepository.js';
+import { createNotification } from '../repositories/notificationRepository.js';
 import {
   buildWelcomeEmailTemplate,
   sendWelcomeEmail,
+  sendInternalNewClientNotification,
+  getEmailHistory,
+  clearEmailHistory,
+  clearEmailDedupeCache
 } from '../services/emailService.js';
 
 // Helper to generate a friendly secure temporary password
@@ -121,6 +126,79 @@ export const createClientUser = async (req, res) => {
       action: 'CLIENT_CREATED',
       details: `Admin ${req.user.name} created client user ${clientName} for company ${compName} (${userEmail}).`
     });
+
+    // 4. Notify internal team members (Company Boost, Company Lead, UI team)
+    try {
+      const internalUsersRes = await query(`
+        SELECT id, name, email, role, company_boost, company_lead, company_ui
+        FROM users
+        WHERE is_deleted = false AND (
+          role IN ('COMPANY_BOOST', 'COMPANY_LEAD', 'LANDING_PAGE')
+          OR company_boost = true
+          OR company_lead = true
+          OR company_ui = true
+        )
+      `);
+
+      const boostMembers = internalUsersRes.rows.filter(u => u.role === 'COMPANY_BOOST' || u.company_boost);
+      const leadMembers = internalUsersRes.rows.filter(u => u.role === 'COMPANY_LEAD' || u.company_lead);
+      const uiMembers = internalUsersRes.rows.filter(u => u.role === 'LANDING_PAGE' || u.company_ui);
+
+      const recipientEmails = new Set();
+      if (boostMembers.length > 0) {
+        boostMembers.forEach(u => recipientEmails.add(u.email));
+      } else {
+        recipientEmails.add('boost@creativegini.com');
+      }
+
+      if (leadMembers.length > 0) {
+        leadMembers.forEach(u => recipientEmails.add(u.email));
+      } else {
+        recipientEmails.add('lead@creativegini.com');
+      }
+
+      if (uiMembers.length > 0) {
+        uiMembers.forEach(u => recipientEmails.add(u.email));
+      } else {
+        recipientEmails.add('ui@creativegini.com');
+      }
+
+      // Ensure client's own email is strictly never in internal recipients
+      recipientEmails.delete(userEmail.toLowerCase().trim());
+
+      // Create in-app notifications for all matching internal users
+      const allInternalUsers = [...new Map(internalUsersRes.rows.map(u => [u.id, u])).values()];
+      for (const internalUser of allInternalUsers) {
+        try {
+          await createNotification({
+            userId: internalUser.id,
+            type: 'NEW_CLIENT',
+            title: `New Client Created: ${compName}`,
+            message: `A new client has been created in CreativeGini and the team needs to prepare the initial company samples/workspace.`
+          });
+        } catch (notifErr) {
+          console.warn('[INTERNAL NOTIF WARNING]:', notifErr.message);
+        }
+      }
+
+      // Dispatch internal notification emails
+      const portalBase = (process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '');
+      await sendInternalNewClientNotification({
+        recipients: Array.from(recipientEmails),
+        client: { name: clientName, email: userEmail },
+        company: {
+          id: company.id,
+          name: compName,
+          contactPerson: clientName,
+          website: website || null,
+          industry: industry || 'Technology / SaaS',
+          email: userEmail
+        },
+        dashboardUrl: `${portalBase}/company-boost`
+      });
+    } catch (notifErr) {
+      console.error('[INTERNAL ONBOARDING NOTIFICATION ERROR]:', notifErr);
+    }
 
     return res.status(201).json({
       success: true,
@@ -1004,4 +1082,26 @@ export const sendWelcomeEmailHandler = async (req, res) => {
       message: 'Unable to send the welcome email. Please review the email and try again.'
     });
   }
+};
+
+// @desc    Admin get email audit history (simulation & dispatch log)
+// @route   GET /api/admin/email-history
+// @access  Private (ADMIN only)
+export const getEmailHistoryHandler = async (req, res) => {
+  return res.json({
+    success: true,
+    history: getEmailHistory()
+  });
+};
+
+// @desc    Admin clear email audit history and dedupe cache
+// @route   DELETE /api/admin/email-history
+// @access  Private (ADMIN only)
+export const clearEmailHistoryHandler = async (req, res) => {
+  clearEmailHistory();
+  clearEmailDedupeCache();
+  return res.json({
+    success: true,
+    message: 'Email history and dedupe cache cleared successfully.'
+  });
 };

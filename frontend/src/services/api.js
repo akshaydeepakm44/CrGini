@@ -110,6 +110,28 @@ export const api = {
     return data.company;
   },
 
+  async getMyCompanyLeads() {
+    const res = await fetch(`${API_BASE}/company/my-company/leads`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch company leads');
+    }
+    return data;
+  },
+
+  async getMyCompanyLeadDetail(leadId) {
+    const res = await fetch(`${API_BASE}/company/my-company/leads/${leadId}`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch lead details');
+    }
+    return data;
+  },
+
   // Requests / Tickets
   async getRequests() {
     const res = await fetch(`${API_BASE}/requests`, {
@@ -545,5 +567,51 @@ export const api = {
     return `${API_BASE}/assets/${assetId}/download?token=${encodeURIComponent(token)}`;
   },
 
+  // Company Boost Onboarding Samples
+  async getMyOnboardingAssets() {
+    const res = await fetch(`${API_BASE}/company/my-company/onboarding-assets`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch onboarding assets');
+    }
+    return data;
+  },
+
+  async getCompanyOnboardingAssets(companyId) {
+    const res = await fetch(`${API_BASE}/company/${companyId}/onboarding-assets`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch company onboarding assets');
+    }
+    return data;
+  },
+
+  async saveCompanyOnboardingAssets(companyId, payload) {
+    const res = await fetch(`${API_BASE}/company/${companyId}/onboarding-assets`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to save onboarding assets');
+    }
+    return data;
+  },
+
+  async getOnboardingClients() {
+    const res = await fetch(`${API_BASE}/company/onboarding/clients`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch onboarding clients');
+    }
+    return data.clients || [];
+  },
 };
 

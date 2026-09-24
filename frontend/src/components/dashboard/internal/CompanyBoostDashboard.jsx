@@ -30,7 +30,16 @@ import {
   Search,
   ShieldCheck,
   Users,
-  Layers
+  Layers,
+  Compass,
+  Video,
+  Image,
+  Code2,
+  Eye,
+  Sparkles,
+  Plus,
+  Download,
+  Trash2
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import PortalCosmicBackground from '../common/PortalCosmicBackground';
@@ -71,6 +80,19 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
+  // Onboarding Samples Preparation State
+  const [onboardingClients, setOnboardingClients] = useState([]);
+  const [loadingOnboarding, setLoadingOnboarding] = useState(false);
+  const [selectedOnboardingClient, setSelectedOnboardingClient] = useState(null);
+  const [isPrepModalOpen, setIsPrepModalOpen] = useState(false);
+  const [prepPoster, setPrepPoster] = useState(null);
+  const [prepVideo, setPrepVideo] = useState(null);
+  const [prepStrategicPlan, setPrepStrategicPlan] = useState(null);
+  const [prepDevrelPlan, setPrepDevrelPlan] = useState(null);
+  const [isSavingOnboarding, setIsSavingOnboarding] = useState(false);
+  const [onboardingSearchQuery, setOnboardingSearchQuery] = useState('');
+  const [onboardingStatusFilter, setOnboardingStatusFilter] = useState('ALL');
+
   // Sidebar Collapse, Mobile Drawer, Profile Dropdown
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
@@ -95,9 +117,10 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
   const loadTickets = async () => {
     try {
       setLoading(true);
-      const [data, notifs] = await Promise.all([
+      const [data, notifs, onbClients] = await Promise.all([
         api.getRequests().catch(() => []),
-        api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 }))
+        api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 })),
+        api.getOnboardingClients().catch(() => [])
       ]);
       // Enforce strictly COMPANY_BOOST requests only
       const list = Array.isArray(data) ? data : (data?.requests || []);
@@ -106,11 +129,78 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
         setNotifications(notifs.notifications || []);
         setUnreadNotifCount(notifs.unreadCount || 0);
       }
+      setOnboardingClients(onbClients || []);
     } catch (err) {
       console.error('Error loading Company Boost requests:', err);
       setRequests([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenOnboardingPrep = async (client) => {
+    setSelectedOnboardingClient(client);
+    setLoadingOnboarding(true);
+    setIsPrepModalOpen(true);
+    try {
+      const res = await api.getCompanyOnboardingAssets(client.id);
+      if (res?.assets) {
+        setPrepPoster(res.assets.poster || null);
+        setPrepVideo(res.assets.video || null);
+        setPrepStrategicPlan(res.assets.strategicPlan || null);
+        setPrepDevrelPlan(res.assets.devrelPlan || null);
+      } else {
+        setPrepPoster(null);
+        setPrepVideo(null);
+        setPrepStrategicPlan(null);
+        setPrepDevrelPlan(null);
+      }
+    } catch (err) {
+      console.error('Failed to load company onboarding assets:', err);
+    } finally {
+      setLoadingOnboarding(false);
+    }
+  };
+
+  const handleFileUpload = (type, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const fileData = {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        dataUrl: event.target.result
+      };
+      if (type === 'poster') setPrepPoster(fileData);
+      else if (type === 'video') setPrepVideo(fileData);
+      else if (type === 'strategicPlan') setPrepStrategicPlan(fileData);
+      else if (type === 'devrelPlan') setPrepDevrelPlan(fileData);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveOnboardingAssets = async () => {
+    if (!selectedOnboardingClient) return;
+    try {
+      setIsSavingOnboarding(true);
+      await api.saveCompanyOnboardingAssets(selectedOnboardingClient.id, {
+        poster: prepPoster,
+        video: prepVideo,
+        strategicPlan: prepStrategicPlan,
+        devrelPlan: prepDevrelPlan
+      });
+      alert('Onboarding sample assets saved successfully!');
+      setIsPrepModalOpen(false);
+      // Reload onboarding clients
+      const clients = await api.getOnboardingClients().catch(() => []);
+      setOnboardingClients(clients || []);
+    } catch (err) {
+      alert('Failed to save onboarding assets: ' + err.message);
+    } finally {
+      setIsSavingOnboarding(false);
     }
   };
 
@@ -207,6 +297,8 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
           setIsMobileDrawerOpen(false);
         } else if (isSubmissionModalOpen) {
           setIsSubmissionModalOpen(false);
+        } else if (isPrepModalOpen) {
+          setIsPrepModalOpen(false);
         } else if (selectedTicket) {
           setSelectedTicket(null);
         } else if (isNotificationsOpen) {
@@ -216,7 +308,7 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isMobileDrawerOpen, isSubmissionModalOpen, selectedTicket, isNotificationsOpen]);
+  }, [isMobileDrawerOpen, isSubmissionModalOpen, isPrepModalOpen, selectedTicket, isNotificationsOpen]);
 
   const handleMarkNotifRead = async (id) => {
     try {
@@ -303,6 +395,26 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
       (r.assignedTeam && r.assignedTeam.toLowerCase().includes(q))
     );
     return matchesStatus && matchesPriority && matchesSearch;
+  });
+
+  // Onboarding metrics and filtering
+  const pendingOnboardingCount = onboardingClients.filter(c => !c.onboardingStatus?.allPrepared).length;
+  const preparedOnboardingCount = onboardingClients.filter(c => c.onboardingStatus?.allPrepared).length;
+
+  const filteredOnboardingClients = onboardingClients.filter(c => {
+    const q = onboardingSearchQuery.toLowerCase().trim();
+    const matchesSearch = !q || (
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.contactPerson && c.contactPerson.toLowerCase().includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
+      (c.industry && c.industry.toLowerCase().includes(q))
+    );
+    const matchesStatus = onboardingStatusFilter === 'ALL'
+      ? true
+      : onboardingStatusFilter === 'PENDING'
+      ? !c.onboardingStatus?.allPrepared
+      : c.onboardingStatus?.allPrepared;
+    return matchesSearch && matchesStatus;
   });
 
   return (
@@ -393,6 +505,20 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
           <div className="portal-nav-section-title" style={{ marginTop: '12px' }}>Workspace</div>
 
           <button
+            className={`portal-nav-btn ${activeTab === 'onboarding' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('onboarding'); setSelectedTicket(null); setIsMobileDrawerOpen(false); }}
+            title="Client Onboarding Samples"
+          >
+            <Sparkles size={18} />
+            <span>Onboarding Samples</span>
+            {pendingOnboardingCount > 0 && (
+              <span className="portal-nav-badge" style={{ background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)', color: '#030303' }}>
+                {pendingOnboardingCount}
+              </span>
+            )}
+          </button>
+
+          <button
             className={`portal-nav-btn ${activeTab === 'conversations' ? 'active' : ''}`}
             onClick={() => { setActiveTab('conversations'); setSelectedTicket(null); setIsMobileDrawerOpen(false); }}
             title="Ticket Conversations"
@@ -469,6 +595,7 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                 ) : (
                   <>
                     {activeTab === 'dashboard' && 'Company Boost Dashboard'}
+                    {activeTab === 'onboarding' && 'Client Onboarding Samples & Initial Assets'}
                     {activeTab === 'conversations' && 'Company Boost Client Conversations'}
                     {activeTab === 'tickets' && 'Company Boost Requests & Tickets'}
                     {activeTab === 'settings' && 'Company Boost Settings'}
@@ -481,6 +608,7 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                 ) : (
                   <>
                     {activeTab === 'dashboard' && 'Overview of assigned work, sprint progress and delivery status.'}
+                    {activeTab === 'onboarding' && 'Prepare and manage the 4 initial onboarding materials (Poster, Video, Strategic Plan, DevRel Plan) for clients.'}
                     {activeTab === 'conversations' && 'Persistent direct communication channels with your Company Boost clients.'}
                     {activeTab === 'tickets' && 'Manage and track all Company Boost requests and tickets.'}
                     {activeTab === 'settings' && 'Team specialist account configuration and operational settings.'}
@@ -624,6 +752,60 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
 {/* DASHBOARD: OVERVIEW / WORK MANAGEMENT PAGE */}
           {activeTab === 'dashboard' && (
             <>
+              {/* Onboarding Callout Banner if any clients need preparation */}
+              {pendingOnboardingCount > 0 && (
+                <div style={{
+                  background: 'rgba(0, 217, 255, 0.08)',
+                  border: '1px solid rgba(0, 217, 255, 0.3)',
+                  borderRadius: '10px',
+                  padding: '14px 18px',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '14px',
+                  flexWrap: 'wrap'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '8px',
+                      background: 'rgba(0, 217, 255, 0.15)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#00D9FF'
+                    }}>
+                      <Sparkles size={20} />
+                    </div>
+                    <div>
+                      <div style={{ color: '#F5F5F5', fontWeight: '700', fontSize: '0.95rem' }}>
+                        {pendingOnboardingCount} {pendingOnboardingCount === 1 ? 'Client Awaits' : 'Clients Await'} Initial Onboarding Samples
+                      </div>
+                      <div style={{ color: '#94A3B8', fontSize: '0.82rem', marginTop: '2px' }}>
+                        Prepare initial deliverables (Branded Poster, Video, Strategic Plan, DevRel Plan) before the client requests full sprints.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="portal-btn-primary"
+                    onClick={() => setActiveTab('onboarding')}
+                    style={{
+                      padding: '8px 16px',
+                      fontSize: '0.82rem',
+                      background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
+                      color: '#030303',
+                      fontWeight: '700',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Prepare Client Samples →
+                  </button>
+                </div>
+              )}
+
               {/* 5 KPI / Summary Cards */}
               <div className="portal-metrics-grid cols-5">
                 <div className="portal-metric-card">
@@ -891,6 +1073,218 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                 </div>
               </div>
             </>
+          )}
+
+          {/* ONBOARDING: CLIENT ONBOARDING SAMPLES PREPARATION */}
+          {activeTab === 'onboarding' && (
+            <div className="portal-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '700', margin: '0 0 4px 0', color: '#F5F5F5' }}>
+                    Client Onboarding Samples Management
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: '#94A3B8', margin: 0 }}>
+                    When a new client is created, the Company Boost team prepares 4 initial samples: Poster, Showcase Video, Strategic Plan, and DevRel Plan.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <span style={{ background: 'rgba(0, 217, 255, 0.15)', color: '#00D9FF', padding: '4px 12px', borderRadius: '12px', fontWeight: '700', fontSize: '0.82rem' }}>
+                    {onboardingClients.length} Total Clients
+                  </span>
+                  <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', padding: '4px 12px', borderRadius: '12px', fontWeight: '700', fontSize: '0.82rem' }}>
+                    {pendingOnboardingCount} Pending Prep
+                  </span>
+                  <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34D399', padding: '4px 12px', borderRadius: '12px', fontWeight: '700', fontSize: '0.82rem' }}>
+                    {preparedOnboardingCount} Fully Prepared
+                  </span>
+                </div>
+              </div>
+
+              {/* Search & Filter Toolbar */}
+              <div style={{
+                background: 'rgba(4, 12, 18, 0.85)',
+                border: '1px solid var(--portal-border)',
+                borderRadius: '10px',
+                padding: '14px 16px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 280px', maxWidth: '420px', position: 'relative' }}>
+                  <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px' }} />
+                  <input
+                    type="text"
+                    className="portal-form-input"
+                    style={{ paddingLeft: '36px', height: '38px', fontSize: '0.85rem' }}
+                    placeholder="Search clients by name, contact, email..."
+                    value={onboardingSearchQuery}
+                    onChange={(e) => setOnboardingSearchQuery(e.target.value)}
+                  />
+                  {onboardingSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setOnboardingSearchQuery('')}
+                      style={{ position: 'absolute', right: '10px', background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {[
+                    { id: 'ALL', label: `All (${onboardingClients.length})` },
+                    { id: 'PENDING', label: `Pending Samples (${pendingOnboardingCount})` },
+                    { id: 'PREPARED', label: `Fully Prepared (${preparedOnboardingCount})` }
+                  ].map(pill => (
+                    <button
+                      key={pill.id}
+                      type="button"
+                      onClick={() => setOnboardingStatusFilter(pill.id)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        background: onboardingStatusFilter === pill.id ? 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)' : 'rgba(255, 255, 255, 0.05)',
+                        color: onboardingStatusFilter === pill.id ? '#030303' : '#CBD5E1',
+                        border: onboardingStatusFilter === pill.id ? '1px solid #00D9FF' : '1px solid rgba(255, 255, 255, 0.1)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {pill.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Clients Table */}
+              <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                <table className="request-table">
+                  <thead>
+                    <tr>
+                      <th>Client / Company</th>
+                      <th style={{ width: '180px' }}>Contact Person</th>
+                      <th style={{ width: '130px', textAlign: 'center' }}>Strategic Plan</th>
+                      <th style={{ width: '120px', textAlign: 'center' }}>Poster</th>
+                      <th style={{ width: '120px', textAlign: 'center' }}>Video</th>
+                      <th style={{ width: '130px', textAlign: 'center' }}>DevRel Plan</th>
+                      <th style={{ width: '120px', textAlign: 'center' }}>Overall Status</th>
+                      <th style={{ width: '150px', textAlign: 'right' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOnboardingClients.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '3.5rem', color: '#94A3B8' }}>
+                          No client companies match your search or filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredOnboardingClients.map(client => {
+                        const st = client.onboardingStatus || {};
+                        const allDone = st.allPrepared;
+                        return (
+                          <tr key={client.id}>
+                            <td>
+                              <div style={{ fontWeight: '700', color: '#F5F5F5' }}>{client.name}</div>
+                              <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '2px' }}>
+                                {client.industry || 'Tech'} · Added {new Date(client.createdAt).toLocaleDateString()}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ color: '#CBD5E1', fontSize: '0.85rem' }}>{client.contactPerson}</div>
+                              <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>{client.email}</div>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                background: st.strategicPlan === 'Uploaded' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: st.strategicPlan === 'Uploaded' ? '#34D399' : '#F59E0B'
+                              }}>
+                                {st.strategicPlan === 'Uploaded' ? 'Uploaded' : 'Pending'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                background: st.poster === 'Uploaded' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: st.poster === 'Uploaded' ? '#34D399' : '#F59E0B'
+                              }}>
+                                {st.poster === 'Uploaded' ? 'Uploaded' : 'Pending'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                background: st.video === 'Uploaded' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: st.video === 'Uploaded' ? '#34D399' : '#F59E0B'
+                              }}>
+                                {st.video === 'Uploaded' ? 'Uploaded' : 'Pending'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                background: st.devrelPlan === 'Uploaded' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: st.devrelPlan === 'Uploaded' ? '#34D399' : '#F59E0B'
+                              }}>
+                                {st.devrelPlan === 'Uploaded' ? 'Uploaded' : 'Pending'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{
+                                padding: '3px 10px',
+                                borderRadius: '20px',
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                background: allDone ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: allDone ? '#34D399' : '#F59E0B',
+                                border: allDone ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)'
+                              }}>
+                                {allDone ? 'Complete' : 'Action Needed'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <button
+                                type="button"
+                                className="portal-btn-primary"
+                                style={{
+                                  padding: '5px 12px',
+                                  fontSize: '0.8rem',
+                                  background: allDone ? 'linear-gradient(135deg, #FFB000 0%, #f59e0b 100%)' : 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
+                                  color: '#030303',
+                                  fontWeight: '700'
+                                }}
+                                onClick={() => handleOpenOnboardingPrep(client)}
+                              >
+                                {allDone ? 'Update Samples' : 'Prepare Samples'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
 
           {/* TICKETS: DEDICATED TICKET MANAGEMENT PAGE */}
@@ -1199,6 +1593,455 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
           onClose={() => setIsSubmissionModalOpen(false)}
           loading={isSubmittingWork}
         />
+      )}
+
+      {/* ONBOARDING PREPARATION MODAL */}
+      {isPrepModalOpen && selectedOnboardingClient && (
+        <div className="portal-modal-overlay" onClick={() => setIsPrepModalOpen(false)}>
+          <div
+            className="portal-modal-card"
+            style={{ maxWidth: '840px', width: '95%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="portal-modal-header">
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <Sparkles size={18} color="#00D9FF" />
+                  <span style={{ fontSize: '0.85rem', color: '#00D9FF', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Company Boost Workspace Onboarding
+                  </span>
+                </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', margin: 0, color: '#FFFFFF' }}>
+                  Prepare Onboarding Samples: {selectedOnboardingClient.name}
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: '4px 0 0 0' }}>
+                  Upload sample assets to be showcased in the client's Company Boost dashboard. Files are stored securely in the company assets system.
+                </p>
+              </div>
+              <button
+                type="button"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8fa0b5' }}
+                onClick={() => setIsPrepModalOpen(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="portal-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', padding: '20px' }}>
+              {loadingOnboarding ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#94A3B8' }}>
+                  Loading existing onboarding assets...
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
+                  {/* 1. Strategic Plan Sample */}
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--portal-border)',
+                    borderRadius: '10px',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Compass size={18} color="#FFB000" />
+                        <span style={{ fontWeight: '700', color: '#F5F5F5', fontSize: '0.95rem' }}>Strategic Plan Sample</span>
+                      </div>
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        background: prepStrategicPlan ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                        color: prepStrategicPlan ? '#34D399' : '#F59E0B'
+                      }}>
+                        {prepStrategicPlan ? 'Uploaded' : 'Pending'}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: '0 0 14px 0' }}>
+                      Sample multi-quarter growth strategy, positioning audit, or expansion roadmap (PDF / Word / Text).
+                    </p>
+
+                    {prepStrategicPlan ? (
+                      <div style={{
+                        background: 'rgba(4, 12, 18, 0.75)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        marginTop: 'auto',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '10px'
+                      }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#F5F5F5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {prepStrategicPlan.name || 'strategic_plan.pdf'}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{prepStrategicPlan.size || 'Ready'}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          {(prepStrategicPlan.url || prepStrategicPlan.streamUrl) && (
+                            <a
+                              href={prepStrategicPlan.url || prepStrategicPlan.streamUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="portal-btn-secondary"
+                              style={{ padding: '4px 8px', fontSize: '0.75rem', color: '#00D9FF' }}
+                              title="View Document"
+                            >
+                              <ExternalLink size={13} />
+                            </a>
+                          )}
+                          <label
+                            className="portal-btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer' }}
+                            title="Replace File"
+                          >
+                            <Upload size={13} />
+                            <input
+                              type="file"
+                              accept=".pdf,.doc,.docx,.txt"
+                              style={{ display: 'none' }}
+                              onChange={(e) => handleFileUpload('strategicPlan', e)}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <label style={{
+                        marginTop: 'auto',
+                        padding: '20px',
+                        borderRadius: '8px',
+                        border: '1px dashed rgba(255, 255, 255, 0.15)',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        color: '#94A3B8',
+                        fontSize: '0.82rem',
+                        display: 'block'
+                      }}>
+                        <Upload size={22} style={{ margin: '0 auto 6px', color: '#FFB000', opacity: 0.8 }} />
+                        <div>Click to <strong>Upload Strategic Plan</strong></div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>PDF, DOCX or TXT</div>
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx,.txt"
+                          style={{ display: 'none' }}
+                          onChange={(e) => handleFileUpload('strategicPlan', e)}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* 2. Branded Poster / Image */}
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--portal-border)',
+                    borderRadius: '10px',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Image size={18} color="#00D9FF" />
+                        <span style={{ fontWeight: '700', color: '#F5F5F5', fontSize: '0.95rem' }}>Branded Showcase Poster</span>
+                      </div>
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        background: prepPoster ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                        color: prepPoster ? '#34D399' : '#F59E0B'
+                      }}>
+                        {prepPoster ? 'Uploaded' : 'Pending'}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: '0 0 14px 0' }}>
+                      High-impact branded graphic or product announcement poster (PNG, JPG, WEBP).
+                    </p>
+
+                    {prepPoster ? (
+                      <div style={{
+                        background: 'rgba(4, 12, 18, 0.75)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        padding: '10px',
+                        marginTop: 'auto'
+                      }}>
+                        <div style={{ height: '120px', borderRadius: '6px', overflow: 'hidden', marginBottom: '8px', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <img
+                            src={prepPoster.dataUrl || prepPoster.url || prepPoster.streamUrl}
+                            alt="Poster Preview"
+                            style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: '600', color: '#F5F5F5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+                            {prepPoster.name || 'poster.png'}
+                          </div>
+                          <label
+                            className="portal-btn-secondary"
+                            style={{ padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <Upload size={12} /> Replace
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              onChange={(e) => handleFileUpload('poster', e)}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <label style={{
+                        marginTop: 'auto',
+                        padding: '20px',
+                        borderRadius: '8px',
+                        border: '1px dashed rgba(255, 255, 255, 0.15)',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        color: '#94A3B8',
+                        fontSize: '0.82rem',
+                        display: 'block'
+                      }}>
+                        <Upload size={22} style={{ margin: '0 auto 6px', color: '#00D9FF', opacity: 0.8 }} />
+                        <div>Click to <strong>Upload Poster Image</strong></div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>PNG, JPG or WEBP</div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={(e) => handleFileUpload('poster', e)}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* 3. Company Video Preview */}
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--portal-border)',
+                    borderRadius: '10px',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Video size={18} color="#c084fc" />
+                        <span style={{ fontWeight: '700', color: '#F5F5F5', fontSize: '0.95rem' }}>Company Showcase Video</span>
+                      </div>
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        background: prepVideo ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                        color: prepVideo ? '#34D399' : '#F59E0B'
+                      }}>
+                        {prepVideo ? 'Uploaded' : 'Pending'}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: '0 0 14px 0' }}>
+                      Demo teaser or pitch clip that plays directly in the client dashboard (MP4 / WebM).
+                    </p>
+
+                    {prepVideo ? (
+                      <div style={{
+                        background: 'rgba(4, 12, 18, 0.75)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        padding: '10px',
+                        marginTop: 'auto'
+                      }}>
+                        <div style={{ height: '120px', borderRadius: '6px', overflow: 'hidden', marginBottom: '8px', background: '#000' }}>
+                          <video
+                            src={prepVideo.dataUrl || prepVideo.url || prepVideo.streamUrl}
+                            controls
+                            playsInline
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: '600', color: '#F5F5F5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+                            {prepVideo.name || 'showcase_video.mp4'}
+                          </div>
+                          <label
+                            className="portal-btn-secondary"
+                            style={{ padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <Upload size={12} /> Replace
+                            <input
+                              type="file"
+                              accept="video/mp4,video/webm,video/quicktime"
+                              style={{ display: 'none' }}
+                              onChange={(e) => handleFileUpload('video', e)}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <label style={{
+                        marginTop: 'auto',
+                        padding: '20px',
+                        borderRadius: '8px',
+                        border: '1px dashed rgba(255, 255, 255, 0.15)',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        color: '#94A3B8',
+                        fontSize: '0.82rem',
+                        display: 'block'
+                      }}>
+                        <Upload size={22} style={{ margin: '0 auto 6px', color: '#c084fc', opacity: 0.8 }} />
+                        <div>Click to <strong>Upload Video Clip</strong></div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>MP4, WebM or MOV</div>
+                        <input
+                          type="file"
+                          accept="video/mp4,video/webm,video/quicktime"
+                          style={{ display: 'none' }}
+                          onChange={(e) => handleFileUpload('video', e)}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* 4. DevRel Plan Sample */}
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--portal-border)',
+                    borderRadius: '10px',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Code2 size={18} color="#34D399" />
+                        <span style={{ fontWeight: '700', color: '#F5F5F5', fontSize: '0.95rem' }}>DevRel Plan Sample</span>
+                      </div>
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.72rem',
+                        fontWeight: '700',
+                        background: prepDevrelPlan ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                        color: prepDevrelPlan ? '#34D399' : '#F59E0B'
+                      }}>
+                        {prepDevrelPlan ? 'Uploaded' : 'Pending'}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: '0 0 14px 0' }}>
+                      Developer advocacy blueprint, documentation overhaul, or technical ecosystem strategy.
+                    </p>
+
+                    {prepDevrelPlan ? (
+                      <div style={{
+                        background: 'rgba(4, 12, 18, 0.75)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        marginTop: 'auto',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '10px'
+                      }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#F5F5F5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {prepDevrelPlan.name || 'devrel_plan.pdf'}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{prepDevrelPlan.size || 'Ready'}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          {(prepDevrelPlan.url || prepDevrelPlan.streamUrl) && (
+                            <a
+                              href={prepDevrelPlan.url || prepDevrelPlan.streamUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="portal-btn-secondary"
+                              style={{ padding: '4px 8px', fontSize: '0.75rem', color: '#00D9FF' }}
+                              title="View Document"
+                            >
+                              <ExternalLink size={13} />
+                            </a>
+                          )}
+                          <label
+                            className="portal-btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer' }}
+                            title="Replace File"
+                          >
+                            <Upload size={13} />
+                            <input
+                              type="file"
+                              accept=".pdf,.doc,.docx,.txt"
+                              style={{ display: 'none' }}
+                              onChange={(e) => handleFileUpload('devrelPlan', e)}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <label style={{
+                        marginTop: 'auto',
+                        padding: '20px',
+                        borderRadius: '8px',
+                        border: '1px dashed rgba(255, 255, 255, 0.15)',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        color: '#94A3B8',
+                        fontSize: '0.82rem',
+                        display: 'block'
+                      }}>
+                        <Upload size={22} style={{ margin: '0 auto 6px', color: '#34D399', opacity: 0.8 }} />
+                        <div>Click to <strong>Upload DevRel Plan</strong></div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>PDF, DOCX or TXT</div>
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx,.txt"
+                          style={{ display: 'none' }}
+                          onChange={(e) => handleFileUpload('devrelPlan', e)}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="portal-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="portal-btn-secondary"
+                onClick={() => setIsPrepModalOpen(false)}
+                disabled={isSavingOnboarding}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="portal-btn-primary"
+                onClick={handleSaveOnboardingAssets}
+                disabled={isSavingOnboarding}
+                style={{
+                  background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
+                  color: '#030303',
+                  fontWeight: '700',
+                  padding: '8px 20px'
+                }}
+              >
+                {isSavingOnboarding ? 'Saving Assets...' : 'Save Onboarding Samples'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
