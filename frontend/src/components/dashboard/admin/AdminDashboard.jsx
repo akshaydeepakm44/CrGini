@@ -58,6 +58,7 @@ import ActionMenu from '../common/ActionMenu';
 import NotificationPanel from '../common/NotificationPanel';
 import ActivityTimeline from '../common/ActivityTimeline';
 import AssetsView from '../user/AssetsView';
+import ChangePasswordSection from '../../common/ChangePasswordSection';
 
 export default function AdminDashboard({ user, onLogout }) {
   const navigate = useNavigate();
@@ -124,12 +125,10 @@ export default function AdminDashboard({ user, onLogout }) {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [ticketMessages, setTicketMessages] = useState([]);
 
-  // 3-Step Create Client User + Welcome Email Workflow State
+  // Create Client User Workflow State
   const [createWorkflow, setCreateWorkflow] = useState({
     isOpen: false,
-    step: 1, // 1: User Details, 2: Welcome Email & Attachments, 3: Success Confirmation
-    createdUserId: null,
-    companyId: null,
+    step: 1, // 1: User Details, 2: Account Created Success
     contactPerson: '',
     email: '',
     companyName: '',
@@ -138,24 +137,9 @@ export default function AdminDashboard({ user, onLogout }) {
     website: '',
     industry: 'Enterprise SaaS / AI',
     companyInfo: '',
-    emailSubject: 'Welcome to CreativeGini - Your Account & Workspace Access',
-    emailBody: 'We are pleased to welcome you to CreativeGini. Your dedicated client workspace has been provisioned and is ready for use. Below are your account credentials and access instructions to review your performance dashboards, prospect intelligence, and active deliverables.',
-    activeEmailTab: 'edit', // 'edit' | 'preview'
-    previewHtml: '',
-    isLoadingPreview: false,
-    attachments: [],
-    attachmentError: null,
-    poster: null,
-    video: null,
-    initialAssetError: null,
-    isSubmittingStep1: false,
-    isSendingEmail: false,
-    sendError: null,
+    isSubmitting: false,
     successData: null
   });
-  const fileInputRef = useRef(null);
-  const posterInputRef = useRef(null);
-  const videoInputRef = useRef(null);
 
   const [toastNotice, setToastNotice] = useState(null);
   const [copiedKey, setCopiedKey] = useState(false);
@@ -245,15 +229,11 @@ export default function AdminDashboard({ user, onLogout }) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const BLOCKED_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.vbs', '.msi', '.js', '.scr', '.pif', '.com', '.jar', '.vbe', '.wsf', '.jse'];
-
-  // Open the 3-step create client workflow
+  // Open the create client user workflow
   const handleOpenCreateWorkflow = () => {
     setCreateWorkflow({
       isOpen: true,
       step: 1,
-      createdUserId: null,
-      companyId: null,
       contactPerson: '',
       email: '',
       companyName: '',
@@ -262,137 +242,23 @@ export default function AdminDashboard({ user, onLogout }) {
       website: '',
       industry: 'Enterprise SaaS / AI',
       companyInfo: '',
-      emailSubject: 'Welcome to CreativeGini - Your Account & Workspace Access',
-      emailBody: 'We are pleased to welcome you to CreativeGini. Your dedicated client workspace has been provisioned and is ready for use. Below are your account credentials and access instructions to review your performance dashboards, prospect intelligence, and active deliverables.',
-      activeEmailTab: 'edit',
-      previewHtml: '',
-      isLoadingPreview: false,
-      attachments: [],
-      attachmentError: null,
-      poster: null,
-      video: null,
-      initialAssetError: null,
-      isSubmittingStep1: false,
-      isSendingEmail: false,
-      sendError: null,
+      isSubmitting: false,
       successData: null
     });
   };
 
-  // Initial Onboarding Assets selection handlers
-  const handlePosterSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-
-    const validMimes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
-    const validExts = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
-    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
-
-    if (!validMimes.includes(file.type.toLowerCase()) && !validExts.includes(ext)) {
-      setCreateWorkflow(prev => ({ ...prev, initialAssetError: `Poster must be an image (${validExts.join(', ')}). Received "${file.name}".` }));
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setCreateWorkflow(prev => ({ ...prev, initialAssetError: `Poster exceeds the 10 MB limit (${formatFileSize(file.size)}).` }));
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setCreateWorkflow(prev => ({
-        ...prev,
-        poster: {
-          name: file.name,
-          size: file.size,
-          mimeType: file.type || 'image/png',
-          dataUrl: reader.result,
-          previewUrl: reader.result
-        },
-        initialAssetError: null
-      }));
-    };
-    reader.onerror = () => {
-      setCreateWorkflow(prev => ({ ...prev, initialAssetError: 'Failed to read poster image file.' }));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleVideoSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-
-    const validExts = ['.mp4', '.mov', '.webm', '.mkv'];
-    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
-    const isVideoMime = file.type.toLowerCase().startsWith('video/');
-
-    if (!isVideoMime && !validExts.includes(ext)) {
-      setCreateWorkflow(prev => ({ ...prev, initialAssetError: `Video must be a valid video format (${validExts.join(', ')}). Received "${file.name}".` }));
-      return;
-    }
-
-    if (file.size > 100 * 1024 * 1024) {
-      setCreateWorkflow(prev => ({ ...prev, initialAssetError: `Video exceeds the 100 MB limit (${formatFileSize(file.size)}).` }));
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setCreateWorkflow(prev => ({
-        ...prev,
-        video: {
-          name: file.name,
-          size: file.size,
-          mimeType: file.type || 'video/mp4',
-          dataUrl: reader.result,
-          previewUrl: reader.result
-        },
-        initialAssetError: null
-      }));
-    };
-    reader.onerror = () => {
-      setCreateWorkflow(prev => ({ ...prev, initialAssetError: 'Failed to read video file.' }));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemovePoster = () => {
-    setCreateWorkflow(prev => ({ ...prev, poster: null }));
-  };
-
-  const handleRemoveVideo = () => {
-    setCreateWorkflow(prev => ({ ...prev, video: null }));
-  };
-
-  // STEP 1: Continue to Email
-  // If createdUserId does not exist, provision client. If createdUserId exists, update existing user and replace onboarding files.
-  const handleStep1Continue = async (e) => {
+  // Submit client user creation form
+  const handleCreateAccount = async (e) => {
     e.preventDefault();
     if (!createWorkflow.companyName?.trim() || !createWorkflow.contactPerson?.trim() || !createWorkflow.email?.trim() || !createWorkflow.password?.trim()) {
       alert('Please provide Company Name, Client Name, Email, and Temporary Password.');
       return;
     }
 
-    if (!createWorkflow.poster) {
-      alert('Please upload an initial marketing Poster (image) before continuing.');
-      return;
-    }
-
-    if (!createWorkflow.video) {
-      alert('Please upload an initial marketing Video before continuing.');
-      return;
-    }
-
     try {
-      setCreateWorkflow(prev => ({ ...prev, isSubmittingStep1: true, sendError: null, initialAssetError: null }));
-
-      let userId = createWorkflow.createdUserId;
-      let compId = createWorkflow.companyId;
+      setCreateWorkflow(prev => ({ ...prev, isSubmitting: true }));
 
       const payload = {
-        existingUserId: userId || undefined,
         companyName: createWorkflow.companyName.trim(),
         contactPerson: createWorkflow.contactPerson.trim(),
         email: createWorkflow.email.trim(),
@@ -402,18 +268,6 @@ export default function AdminDashboard({ user, onLogout }) {
         companyInfo: createWorkflow.companyInfo?.trim() || '',
         researchSummary: createWorkflow.companyInfo?.trim() || '',
         password: createWorkflow.password.trim(),
-        poster: createWorkflow.poster ? {
-          name: createWorkflow.poster.name,
-          size: createWorkflow.poster.size,
-          mimeType: createWorkflow.poster.mimeType,
-          dataUrl: createWorkflow.poster.dataUrl
-        } : null,
-        video: createWorkflow.video ? {
-          name: createWorkflow.video.name,
-          size: createWorkflow.video.size,
-          mimeType: createWorkflow.video.mimeType,
-          dataUrl: createWorkflow.video.dataUrl
-        } : null,
         initialLeads: [
           {
             name: 'Senior Decision Maker (Sample)',
@@ -435,277 +289,29 @@ export default function AdminDashboard({ user, onLogout }) {
       };
 
       const res = await api.adminCreateClient(payload);
-      userId = res.user?.id || res.user?._id || userId;
-      compId = res.company?.id || res.user?.companyId || compId;
-
-      // Automatically attach initial assets to welcome email
-      const initialAttachments = [
-        {
-          id: 'initial-poster',
-          isInitialAsset: true,
-          assetType: 'Poster',
-          name: createWorkflow.poster.name,
-          filename: createWorkflow.poster.name,
-          size: createWorkflow.poster.size,
-          sizeFormatted: formatFileSize(createWorkflow.poster.size),
-          mimeType: createWorkflow.poster.mimeType,
-          dataUrl: createWorkflow.poster.dataUrl,
-        },
-        {
-          id: 'initial-video',
-          isInitialAsset: true,
-          assetType: 'Video',
-          name: createWorkflow.video.name,
-          filename: createWorkflow.video.name,
-          size: createWorkflow.video.size,
-          sizeFormatted: formatFileSize(createWorkflow.video.size),
-          mimeType: createWorkflow.video.mimeType,
-          dataUrl: createWorkflow.video.dataUrl,
-        }
-      ];
-      const nonInitialAttachments = (createWorkflow.attachments || []).filter(a => !a.isInitialAsset);
-      const combinedAttachments = [...initialAttachments, ...nonInitialAttachments];
 
       setCreateWorkflow(prev => ({
         ...prev,
-        createdUserId: userId,
-        companyId: compId,
+        isSubmitting: false,
         step: 2,
-        attachments: combinedAttachments,
-        isSubmittingStep1: false,
-        isLoadingPreview: true
-      }));
-
-      // Preload preview in background
-      try {
-        const prevRes = await api.adminPreviewWelcomeEmail(userId, {
-          name: createWorkflow.contactPerson.trim(),
-          email: createWorkflow.email.trim(),
-          companyName: createWorkflow.companyName.trim(),
-          temporaryPassword: createWorkflow.password.trim(),
-          subject: createWorkflow.emailSubject,
-          customBody: createWorkflow.emailBody,
-          attachments: combinedAttachments
-        });
-        if (prevRes?.html) {
-          setCreateWorkflow(curr => (curr.isOpen && curr.createdUserId === userId ? { ...curr, previewHtml: prevRes.html, isLoadingPreview: false } : curr));
-        } else {
-          setCreateWorkflow(curr => ({ ...curr, isLoadingPreview: false }));
-        }
-      } catch (prevErr) {
-        console.warn('Background preview load notice:', prevErr.message);
-        setCreateWorkflow(curr => ({ ...curr, isLoadingPreview: false }));
-      }
-
-      await loadAdminData();
-    } catch (err) {
-      alert('Failed to save client user details: ' + (err.message || 'Unknown error'));
-      setCreateWorkflow(prev => ({ ...prev, isSubmittingStep1: false }));
-    }
-  };
-
-  // STEP 2: Previous button back to Step 1
-  const handleBackToStep1 = () => {
-    setCreateWorkflow(prev => ({
-      ...prev,
-      step: 1,
-      sendError: null
-    }));
-  };
-
-  // Switch between Edit Message and Live Preview
-  const handleSwitchEmailTab = async (tab) => {
-    if (tab === 'preview') {
-      setCreateWorkflow(prev => ({ ...prev, activeEmailTab: 'preview', isLoadingPreview: true, sendError: null }));
-      try {
-        const res = await api.adminPreviewWelcomeEmail(createWorkflow.createdUserId || 'draft', {
-          name: createWorkflow.contactPerson.trim(),
-          email: createWorkflow.email.trim(),
-          companyName: createWorkflow.companyName.trim(),
-          temporaryPassword: createWorkflow.password.trim(),
-          subject: createWorkflow.emailSubject,
-          customBody: createWorkflow.emailBody,
-          attachments: createWorkflow.attachments
-        });
-        setCreateWorkflow(prev => ({
-          ...prev,
-          previewHtml: res.html || '',
-          isLoadingPreview: false
-        }));
-      } catch (err) {
-        console.error('Failed to load email preview:', err);
-        setCreateWorkflow(prev => ({
-          ...prev,
-          isLoadingPreview: false,
-          sendError: 'Failed to generate live preview. Please check connection and try again.'
-        }));
-      }
-    } else {
-      setCreateWorkflow(prev => ({ ...prev, activeEmailTab: 'edit', sendError: null }));
-    }
-  };
-
-  // Gmail-like attachment selector with validation
-  const handleFileSelect = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-
-    e.target.value = ''; // Reset input to allow selecting same file if re-added
-
-    let currentAttachments = [...createWorkflow.attachments];
-    let currentTotalSize = currentAttachments.reduce((sum, a) => sum + (a.size || 0), 0);
-    let errorMessage = null;
-
-    for (const file of files) {
-      const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
-
-      if (file.size === 0) {
-        errorMessage = `File "${file.name}" is empty (0 bytes) and cannot be attached.`;
-        break;
-      }
-
-      if (BLOCKED_EXTENSIONS.includes(ext)) {
-        errorMessage = `File "${file.name}" has an unsafe extension (${ext}) and was blocked for security.`;
-        break;
-      }
-
-      if (file.size > 10 * 1024 * 1024) {
-        errorMessage = `File "${file.name}" exceeds the maximum 10 MB limit per file (${formatFileSize(file.size)}).`;
-        break;
-      }
-
-      if (currentTotalSize + file.size > 15 * 1024 * 1024) {
-        errorMessage = `Total attachments cannot exceed 15 MB. Adding "${file.name}" would exceed this limit.`;
-        break;
-      }
-
-      try {
-        const base64Data = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result;
-            const commaIdx = result.indexOf(',');
-            resolve(commaIdx !== -1 ? result.substring(commaIdx + 1) : result);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-
-        const newAtt = {
-          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          filename: file.name,
-          contentType: file.type || 'application/octet-stream',
-          size: file.size,
-          sizeFormatted: formatFileSize(file.size),
-          base64: base64Data
-        };
-
-        currentAttachments.push(newAtt);
-        currentTotalSize += file.size;
-      } catch (readErr) {
-        errorMessage = `Failed to process "${file.name}". Please try another file.`;
-        break;
-      }
-    }
-
-    setCreateWorkflow(prev => {
-      const updated = {
-        ...prev,
-        attachments: currentAttachments,
-        attachmentError: errorMessage
-      };
-
-      if (updated.activeEmailTab === 'preview' && updated.createdUserId) {
-        api.adminPreviewWelcomeEmail(updated.createdUserId, {
-          name: updated.contactPerson.trim(),
-          email: updated.email.trim(),
-          companyName: updated.companyName.trim(),
-          temporaryPassword: updated.password.trim(),
-          subject: updated.emailSubject,
-          customBody: updated.emailBody,
-          attachments: currentAttachments
-        }).then(res => {
-          if (res?.html) {
-            setCreateWorkflow(c => ({ ...c, previewHtml: res.html }));
-          }
-        }).catch(console.warn);
-      }
-
-      return updated;
-    });
-  };
-
-  // Remove attachment
-  const handleRemoveAttachment = (attId) => {
-    setCreateWorkflow(prev => {
-      const filtered = prev.attachments.filter(a => a.id !== attId);
-      const updated = {
-        ...prev,
-        attachments: filtered,
-        attachmentError: null
-      };
-
-      if (updated.activeEmailTab === 'preview' && updated.createdUserId) {
-        api.adminPreviewWelcomeEmail(updated.createdUserId, {
-          name: updated.contactPerson.trim(),
-          email: updated.email.trim(),
-          companyName: updated.companyName.trim(),
-          temporaryPassword: updated.password.trim(),
-          subject: updated.emailSubject,
-          customBody: updated.emailBody,
-          attachments: filtered
-        }).then(res => {
-          if (res?.html) {
-            setCreateWorkflow(c => ({ ...c, previewHtml: res.html }));
-          }
-        }).catch(console.warn);
-      }
-
-      return updated;
-    });
-  };
-
-  // STEP 2: Send Welcome Email
-  const handleSendWelcomeEmail = async () => {
-    if (!createWorkflow.createdUserId) return;
-
-    try {
-      setCreateWorkflow(prev => ({ ...prev, isSendingEmail: true, sendError: null }));
-
-      await api.adminSendWelcomeEmail(createWorkflow.createdUserId, {
-        subject: createWorkflow.emailSubject,
-        customBody: createWorkflow.emailBody,
-        temporaryPassword: createWorkflow.password,
-        attachments: createWorkflow.attachments
-      });
-
-      setCreateWorkflow(prev => ({
-        ...prev,
-        isSendingEmail: false,
-        step: 3,
-        sendError: null,
         successData: {
-          clientName: createWorkflow.contactPerson,
-          email: createWorkflow.email,
-          company: createWorkflow.companyName,
-          attachmentCount: createWorkflow.attachments.length
+          clientName: createWorkflow.contactPerson.trim(),
+          email: createWorkflow.email.trim(),
+          companyName: createWorkflow.companyName.trim(),
+          status: res.user?.status || 'ACTIVE'
         }
       }));
 
-      showNotice(`Welcome email sent successfully to ${createWorkflow.email}.`);
+      showNotice(`Client account created successfully for ${createWorkflow.email}.`);
       await loadAdminData();
     } catch (err) {
-      console.error('Failed to send welcome email:', err);
-      // User is NOT deleted!
-      setCreateWorkflow(prev => ({
-        ...prev,
-        isSendingEmail: false,
-        sendError: 'Unable to send the welcome email. Please review the email and try again.'
-      }));
+      console.error('Failed to create client user:', err);
+      alert('Failed to create client user: ' + (err.message || 'Unknown error'));
+      setCreateWorkflow(prev => ({ ...prev, isSubmitting: false }));
     }
   };
 
-  // Finish Workflow (Step 3 Done)
+  // Finish Workflow (Success Done)
   const handleFinishWorkflow = async () => {
     setCreateWorkflow(prev => ({ ...prev, isOpen: false }));
     await loadAdminData();
@@ -1245,7 +851,7 @@ export default function AdminDashboard({ user, onLogout }) {
             {!isSidebarCollapsed && (
               <div className="portal-user-meta">
                 <div className="portal-user-name">{user?.name || 'Administrator'}</div>
-                <div className="portal-user-role">admin@creativegini.com</div>
+                <div className="portal-user-role">{user?.email || 'team@creativegini.com'}</div>
               </div>
             )}
           </div>
@@ -1346,7 +952,7 @@ export default function AdminDashboard({ user, onLogout }) {
                 <div className="portal-topbar-dropdown" style={{ width: '220px' }}>
                   <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--portal-border)', marginBottom: '6px' }}>
                     <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#F5F5F5' }}>{user?.name || 'Master Admin'}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>admin@creativegini.com</div>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{user?.email || 'team@creativegini.com'}</div>
                   </div>
                   <button
                     className="portal-dropdown-item"
@@ -2428,7 +2034,7 @@ export default function AdminDashboard({ user, onLogout }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {teamMembers.map((member) => {
                   const isEditing = editingPermissionsUserId === member._id;
-                  const isMemberAdmin = member.role === 'ADMIN' || member.email === 'admin@creativegini.com' || String(member._id || member.id) === String(user?.id || user?._id);
+                  const isMemberAdmin = member.role === 'ADMIN' || member.email === 'team@creativegini.com' || member.email === 'admin@creativegini.com' || String(member._id || member.id) === String(user?.id || user?._id);
                   const da = member.dashboardAccess || {};
 
                   return (
@@ -3062,7 +2668,7 @@ export default function AdminDashboard({ user, onLogout }) {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--portal-border)' }}>
                     <span style={{ color: '#94a3b8' }}>Email:</span>
-                    <span style={{ color: '#00D9FF' }}>{user?.email || 'admin@creativegini.com'}</span>
+                    <span style={{ color: '#00D9FF' }}>{user?.email || 'team@creativegini.com'}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--portal-border)' }}>
                     <span style={{ color: '#94a3b8' }}>Privileges:</span>
@@ -3074,6 +2680,7 @@ export default function AdminDashboard({ user, onLogout }) {
                   </div>
                 </div>
               </div>
+              <ChangePasswordSection />
             </div>
           )}
             </>
@@ -3154,13 +2761,13 @@ export default function AdminDashboard({ user, onLogout }) {
         )}
       </div>
 
-      {/* UNIFIED ADMIN CLIENT ONBOARDING & WELCOME EMAIL WORKFLOW MODAL */}
+      {/* ADMIN CREATE CLIENT USER MODAL */}
       {createWorkflow.isOpen && (
         <div className="portal-modal-overlay" onClick={() => setCreateWorkflow(prev => ({ ...prev, isOpen: false }))}>
           <div
             className="portal-modal-card"
             style={{
-              maxWidth: createWorkflow.step === 2 ? '840px' : createWorkflow.step === 3 ? '580px' : '720px',
+              maxWidth: createWorkflow.step === 2 ? '540px' : '680px',
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
@@ -3172,18 +2779,14 @@ export default function AdminDashboard({ user, onLogout }) {
             <div className="portal-modal-header" style={{ borderBottom: '1px solid var(--portal-border)', paddingBottom: '0.85rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(0, 229, 255, 0.12)', color: '#00D9FF', border: '1px solid rgba(0, 229, 255, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {createWorkflow.step === 1 ? <UserPlus size={20} /> : createWorkflow.step === 2 ? <Mail size={20} /> : <CheckCircle2 size={20} />}
+                  {createWorkflow.step === 1 ? <UserPlus size={20} /> : <CheckCircle2 size={20} />}
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: '#F5F5F5' }}>
-                    {createWorkflow.step === 1 && 'Create Client User'}
-                    {createWorkflow.step === 2 && 'Welcome Email Review & Composer'}
-                    {createWorkflow.step === 3 && 'Account Provisioning Complete'}
+                    {createWorkflow.step === 1 ? 'Create User' : 'Account Created'}
                   </h3>
                   <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
-                    {createWorkflow.step === 1 && 'Fill account credentials and company profile • Step 1 of 2'}
-                    {createWorkflow.step === 2 && 'Review branded email, edit message, attach files, and send • Step 2 of 2'}
-                    {createWorkflow.step === 3 && 'Account provisioned and welcome email dispatched successfully'}
+                    {createWorkflow.step === 1 ? 'Enter client credentials and company details' : 'Account created successfully'}
                   </span>
                 </div>
               </div>
@@ -3197,31 +2800,9 @@ export default function AdminDashboard({ user, onLogout }) {
               </button>
             </div>
 
-            {/* Step Indicator */}
-            <div style={{ padding: '0.85rem 1.25rem 0' }}>
-              <div className="workflow-step-bar">
-                <div className={`workflow-step-badge ${createWorkflow.step === 1 ? 'active' : createWorkflow.step > 1 ? 'completed' : ''}`}>
-                  <span className="workflow-step-num">{createWorkflow.step > 1 ? '✓' : '1'}</span>
-                  <span>User Details</span>
-                </div>
-                <span className="workflow-step-sep">&rarr;</span>
-                <div className={`workflow-step-badge ${createWorkflow.step === 2 ? 'active' : createWorkflow.step > 2 ? 'completed' : ''}`}>
-                  <span className="workflow-step-num">{createWorkflow.step > 2 ? '✓' : '2'}</span>
-                  <span>Welcome Email & Attachments</span>
-                </div>
-                <span className="workflow-step-sep">&rarr;</span>
-                <div className={`workflow-step-badge ${createWorkflow.step === 3 ? 'active completed' : ''}`}>
-                  <span className="workflow-step-num">{createWorkflow.step === 3 ? '✓' : '3'}</span>
-                  <span>Confirmation</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ============================================================ */}
-            {/* STEP 1: USER DETAILS */}
-            {/* ============================================================ */}
+            {/* STEP 1: USER DETAILS FORM */}
             {createWorkflow.step === 1 && (
-              <form onSubmit={handleStep1Continue} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <form onSubmit={handleCreateAccount} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
                 <div className="portal-modal-body" style={{ overflowY: 'auto', flex: 1 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div className="portal-form-group">
@@ -3274,7 +2855,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div className="portal-form-group">
-                      <label className="portal-form-label">Phone (Optional)</label>
+                      <label className="portal-form-label">Phone</label>
                       <input
                         className="portal-form-input"
                         value={createWorkflow.phone}
@@ -3284,7 +2865,7 @@ export default function AdminDashboard({ user, onLogout }) {
                     </div>
 
                     <div className="portal-form-group">
-                      <label className="portal-form-label">Website (Optional)</label>
+                      <label className="portal-form-label">Website</label>
                       <input
                         className="portal-form-input"
                         value={createWorkflow.website}
@@ -3304,162 +2885,15 @@ export default function AdminDashboard({ user, onLogout }) {
                     />
                   </div>
 
-                  <div className="portal-form-group">
-                    <label className="portal-form-label">Company Description / Research Summary</label>
+                  <div className="portal-form-group" style={{ marginBottom: 0 }}>
+                    <label className="portal-form-label">Description / Summary</label>
                     <textarea
                       className="portal-form-textarea"
-                      rows="2"
+                      rows="3"
                       value={createWorkflow.companyInfo}
                       onChange={e => setCreateWorkflow({ ...createWorkflow, companyInfo: e.target.value })}
                       placeholder="Initial details and market positioning..."
                     />
-                  </div>
-
-                  {/* INITIAL ASSETS SECTION (POSTER & VIDEO) */}
-                  <div className="onboarding-assets-section">
-                    <div className="onboarding-assets-header">
-                      <div className="onboarding-assets-title-group">
-                        <FolderArchive size={16} color="#00D9FF" />
-                        <span className="onboarding-assets-title">Initial Deliverables / Marketing Assets</span>
-                        <span className="onboarding-assets-badge">Required</span>
-                      </div>
-                      <p className="onboarding-assets-subtitle">
-                        Upload 1 Poster and 1 Video. These are permanently saved into the client's Media Library and automatically attached to the Welcome Email.
-                      </p>
-                    </div>
-
-                    {createWorkflow.initialAssetError && (
-                      <div className="email-attachment-error" style={{ marginBottom: '10px' }}>
-                        <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                        <span>{createWorkflow.initialAssetError}</span>
-                      </div>
-                    )}
-
-                    <div className="onboarding-assets-grid">
-                      {/* POSTER (IMAGE) DROPZONE */}
-                      <div className="onboarding-asset-card">
-                        <div className="onboarding-asset-card-header">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <ImageIcon size={15} color="#38BDF8" />
-                            <strong>Marketing Poster (Image)</strong>
-                          </div>
-                          <span className="asset-card-format-tag">PNG, JPG, WEBP &bull; Max 10MB</span>
-                        </div>
-
-                        <input
-                          type="file"
-                          ref={posterInputRef}
-                          accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
-                          onChange={handlePosterSelect}
-                          style={{ display: 'none' }}
-                        />
-
-                        {createWorkflow.poster ? (
-                          <div className="onboarding-asset-preview-box">
-                            <div className="onboarding-asset-thumb-wrap">
-                              <img
-                                src={createWorkflow.poster.previewUrl || createWorkflow.poster.dataUrl}
-                                alt="Poster Preview"
-                                className="onboarding-asset-thumb"
-                              />
-                            </div>
-                            <div className="onboarding-asset-info">
-                              <span className="onboarding-asset-name" title={createWorkflow.poster.name}>
-                                {createWorkflow.poster.name}
-                              </span>
-                              <span className="onboarding-asset-size">
-                                {formatFileSize(createWorkflow.poster.size)}
-                              </span>
-                              <div className="onboarding-asset-actions">
-                                <button
-                                  type="button"
-                                  className="onboarding-asset-action-btn"
-                                  onClick={() => posterInputRef.current?.click()}
-                                >
-                                  Replace
-                                </button>
-                                <button
-                                  type="button"
-                                  className="onboarding-asset-action-btn delete"
-                                  onClick={handleRemovePoster}
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div
-                            className="onboarding-asset-dropzone"
-                            onClick={() => posterInputRef.current?.click()}
-                          >
-                            <Upload size={22} color="#00D9FF" />
-                            <span>Click to upload Poster</span>
-                            <span className="dropzone-hint">PNG, JPG, JPEG, WEBP up to 10MB</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* VIDEO DROPZONE */}
-                      <div className="onboarding-asset-card">
-                        <div className="onboarding-asset-card-header">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Film size={15} color="#A78BFA" />
-                            <strong>Welcome / Demo Video</strong>
-                          </div>
-                          <span className="asset-card-format-tag">MP4, MOV, WEBM &bull; Max 100MB</span>
-                        </div>
-
-                        <input
-                          type="file"
-                          ref={videoInputRef}
-                          accept="video/mp4,video/quicktime,video/webm,video/x-matroska,.mp4,.mov,.webm,.mkv"
-                          onChange={handleVideoSelect}
-                          style={{ display: 'none' }}
-                        />
-
-                        {createWorkflow.video ? (
-                          <div className="onboarding-asset-preview-box">
-                            <div className="onboarding-asset-thumb-wrap video-placeholder">
-                              <Film size={26} color="#A78BFA" />
-                            </div>
-                            <div className="onboarding-asset-info">
-                              <span className="onboarding-asset-name" title={createWorkflow.video.name}>
-                                {createWorkflow.video.name}
-                              </span>
-                              <span className="onboarding-asset-size">
-                                {formatFileSize(createWorkflow.video.size)}
-                              </span>
-                              <div className="onboarding-asset-actions">
-                                <button
-                                  type="button"
-                                  className="onboarding-asset-action-btn"
-                                  onClick={() => videoInputRef.current?.click()}
-                                >
-                                  Replace
-                                </button>
-                                <button
-                                  type="button"
-                                  className="onboarding-asset-action-btn delete"
-                                  onClick={handleRemoveVideo}
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div
-                            className="onboarding-asset-dropzone"
-                            onClick={() => videoInputRef.current?.click()}
-                          >
-                            <Upload size={22} color="#A78BFA" />
-                            <span>Click to upload Video</span>
-                            <span className="dropzone-hint">MP4, MOV, WEBM up to 100MB</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -3468,338 +2902,91 @@ export default function AdminDashboard({ user, onLogout }) {
                     type="button"
                     className="portal-btn-secondary"
                     onClick={() => setCreateWorkflow(prev => ({ ...prev, isOpen: false }))}
+                    disabled={createWorkflow.isSubmitting}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     className="portal-btn-primary"
-                    disabled={createWorkflow.isSubmittingStep1}
+                    disabled={createWorkflow.isSubmitting}
                   >
-                    {createWorkflow.isSubmittingStep1 ? 'Saving & Preparing Email...' : 'Continue to Email →'}
+                    {createWorkflow.isSubmitting ? (
+                      <>
+                        <RefreshCw size={14} className="portal-spin" />
+                        Creating Account...
+                      </>
+                    ) : (
+                      'Create Account'
+                    )}
                   </button>
                 </div>
               </form>
             )}
 
-            {/* ============================================================ */}
-            {/* STEP 2: WELCOME EMAIL REVIEW & COMPOSER */}
-            {/* ============================================================ */}
+            {/* STEP 2: ACCOUNT CREATED SUCCESS */}
             {createWorkflow.step === 2 && (
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-                <div className="portal-modal-body" style={{ overflowY: 'auto', flex: 1 }}>
-                  {/* Account Summary Strip */}
-                  <div className="workflow-summary-strip">
-                    <div className="workflow-summary-item">
-                      <span>Client Name</span>
-                      <strong>{createWorkflow.contactPerson}</strong>
-                    </div>
-                    <div className="workflow-summary-item">
-                      <span>Company</span>
-                      <strong>{createWorkflow.companyName}</strong>
-                    </div>
-                    <div className="workflow-summary-item">
-                      <span>Recipient Email</span>
-                      <strong style={{ color: '#00D9FF' }}>{createWorkflow.email}</strong>
-                    </div>
-                    <div className="workflow-summary-item">
-                      <span>Temporary Password</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                        <code style={{ fontSize: '0.88rem', fontWeight: '800', color: '#FFB000' }}>
-                          {createWorkflow.password}
-                        </code>
-                        <button
-                          type="button"
-                          className="portal-btn-secondary"
-                          style={{ padding: '2px 6px', fontSize: '0.72rem', height: '22px' }}
-                          onClick={() => handleCopyPassword(createWorkflow.password)}
-                          title="Copy temporary password"
-                        >
-                          {copiedKey ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Send Error Notice with Retry */}
-                  {createWorkflow.sendError && (
-                    <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#FCA5A5', fontSize: '0.84rem' }}>
-                        <AlertTriangle size={18} color="#EF4444" style={{ flexShrink: 0 }} />
-                        <span>{createWorkflow.sendError}</span>
-                      </div>
-                      <button
-                        type="button"
-                        className="portal-btn-primary"
-                        style={{ fontSize: '0.78rem', padding: '6px 12px', flexShrink: 0 }}
-                        onClick={handleSendWelcomeEmail}
-                        disabled={createWorkflow.isSendingEmail}
-                      >
-                        <RefreshCw size={13} className={createWorkflow.isSendingEmail ? 'portal-spin' : ''} />
-                        Retry Send
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Email Subject Field */}
-                  <div className="portal-form-group" style={{ marginBottom: '1rem' }}>
-                    <label className="portal-form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Email Subject</span>
-                      <span style={{ fontSize: '0.74rem', color: '#94A3B8' }}>Editable</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="portal-form-input"
-                      value={createWorkflow.emailSubject}
-                      onChange={(e) => setCreateWorkflow(prev => ({ ...prev, emailSubject: e.target.value }))}
-                      placeholder="Enter email subject"
-                    />
-                  </div>
-
-                  {/* Tabs: Edit Message & Live Preview */}
-                  <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--portal-border)', paddingBottom: '8px', marginBottom: '1rem' }}>
-                    <button
-                      type="button"
-                      style={{
-                        background: createWorkflow.activeEmailTab === 'edit' ? 'rgba(0, 217, 255, 0.15)' : 'transparent',
-                        color: createWorkflow.activeEmailTab === 'edit' ? '#00D9FF' : '#94A3B8',
-                        border: createWorkflow.activeEmailTab === 'edit' ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
-                        borderRadius: '6px',
-                        padding: '6px 14px',
-                        fontSize: '0.82rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                      onClick={() => handleSwitchEmailTab('edit')}
-                    >
-                      <Edit3 size={14} />
-                      Edit Message
-                    </button>
-
-                    <button
-                      type="button"
-                      style={{
-                        background: createWorkflow.activeEmailTab === 'preview' ? 'rgba(0, 217, 255, 0.15)' : 'transparent',
-                        color: createWorkflow.activeEmailTab === 'preview' ? '#00D9FF' : '#94A3B8',
-                        border: createWorkflow.activeEmailTab === 'preview' ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
-                        borderRadius: '6px',
-                        padding: '6px 14px',
-                        fontSize: '0.82rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                      onClick={() => handleSwitchEmailTab('preview')}
-                    >
-                      <Eye size={14} />
-                      Live Email Preview
-                    </button>
-                  </div>
-
-                  {/* TAB 1: EDIT MESSAGE BODY */}
-                  {createWorkflow.activeEmailTab === 'edit' && (
-                    <div>
-                      <div className="portal-form-group">
-                        <label className="portal-form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Welcome Message Body</span>
-                          <span style={{ fontSize: '0.74rem', color: '#94A3B8' }}>Customizable text</span>
-                        </label>
-                        <textarea
-                          rows={6}
-                          className="portal-form-textarea"
-                          value={createWorkflow.emailBody}
-                          onChange={(e) => setCreateWorkflow(prev => ({ ...prev, emailBody: e.target.value }))}
-                          placeholder="Write your custom welcome message..."
-                          style={{ resize: 'vertical' }}
-                        />
-                      </div>
-                      <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--portal-border)', borderRadius: '6px', padding: '0.65rem 0.85rem', fontSize: '0.78rem', color: '#94A3B8', lineHeight: 1.5 }}>
-                        <strong style={{ color: '#CBD5E1' }}>Template Structure:</strong> Official CreativeGini branding, company details, credentials box, direct sign-in instructions, and attached files are automatically styled in the final HTML email.
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 2: LIVE EMAIL PREVIEW */}
-                  {createWorkflow.activeEmailTab === 'preview' && (
-                    <div>
-                      {createWorkflow.isLoadingPreview ? (
-                        <div style={{ height: '360px', maxHeight: '44vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', background: '#060B13', borderRadius: '8px', border: '1px solid var(--portal-border)', color: '#94A3B8', fontSize: '0.85rem' }}>
-                          <RefreshCw size={24} className="portal-spin" color="#00D9FF" />
-                          Rendering branded email template...
-                        </div>
-                      ) : (
-                        <iframe
-                          title="Live Welcome Email Preview"
-                          srcDoc={createWorkflow.previewHtml}
-                          style={{
-                            width: '100%',
-                            height: '360px',
-                            maxHeight: '44vh',
-                            border: '1px solid var(--portal-border)',
-                            borderRadius: '8px',
-                            background: '#060B13',
-                            boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.5)'
-                          }}
-                        />
-                      )}
-                    </div>
-                  )}
-
-                  {/* ATTACHMENT SECTION (GMAIL-LIKE) */}
-                  <div className="email-attachments-zone">
-                    <div className="email-attachments-header">
-                      <div className="email-attachments-title">
-                        <Paperclip size={14} color="#00D9FF" />
-                        <span>Attached Files ({createWorkflow.attachments.length})</span>
-                      </div>
-                      <div>
-                        <input
-                          type="file"
-                          multiple
-                          ref={fileInputRef}
-                          onChange={handleFileSelect}
-                          style={{ display: 'none' }}
-                        />
-                        <button
-                          type="button"
-                          className="email-attachments-add-btn"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          <Paperclip size={13} />
-                          {createWorkflow.attachments.length > 0 ? '+ Add another file' : 'Attach files'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {createWorkflow.attachmentError && (
-                      <div className="email-attachment-error">
-                        <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                        <span>{createWorkflow.attachmentError}</span>
-                      </div>
-                    )}
-
-                    {createWorkflow.attachments.length > 0 ? (
-                      <div className="email-attachments-list">
-                        {createWorkflow.attachments.map((att) => (
-                          <div key={att.id} className="email-attachment-chip">
-                            <span>📎</span>
-                            <span className="email-attachment-name" title={att.filename}>{att.filename}</span>
-                            <span className="email-attachment-size">{att.sizeFormatted}</span>
-                            {att.isInitialAsset && (
-                              <span className="email-attachment-asset-badge">Saved to Assets</span>
-                            )}
-                            <button
-                              type="button"
-                              className="email-attachment-remove"
-                              onClick={() => handleRemoveAttachment(att.id)}
-                              title="Remove file"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: '0.76rem', color: '#64748B', marginTop: '4px' }}>
-                        No files attached. Attach company profiles, contracts, or onboarding assets (Max 10 MB/file, 15 MB total).
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Step 2 Footer */}
-                <div className="portal-modal-footer" style={{ justifyContent: 'space-between', borderTop: '1px solid var(--portal-border)', paddingTop: '0.85rem' }}>
-                  <button
-                    type="button"
-                    className="portal-btn-secondary"
-                    onClick={handleBackToStep1}
-                  >
-                    ← Back to User Details
-                  </button>
-
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    {createWorkflow.activeEmailTab === 'edit' ? (
-                      <button
-                        type="button"
-                        className="portal-btn-secondary"
-                        onClick={() => handleSwitchEmailTab('preview')}
-                      >
-                        <Eye size={14} />
-                        Preview Email
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="portal-btn-secondary"
-                        onClick={() => handleSwitchEmailTab('edit')}
-                      >
-                        <Edit3 size={14} />
-                        Edit Message
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      className="portal-btn-primary"
-                      onClick={handleSendWelcomeEmail}
-                      disabled={createWorkflow.isSendingEmail}
-                    >
-                      {createWorkflow.isSendingEmail ? (
-                        <>
-                          <RefreshCw size={14} className="portal-spin" />
-                          Sending Email...
-                        </>
-                      ) : (
-                        <>
-                          <Send size={14} />
-                          Send Email
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ============================================================ */}
-            {/* STEP 3: SUCCESS CONFIRMATION */}
-            {/* ============================================================ */}
-            {createWorkflow.step === 3 && (
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                <div className="portal-modal-body" style={{ flex: 1, padding: '1.5rem 1.5rem 1rem' }}>
-                  <div className="workflow-success-card">
-                    <div className="workflow-success-icon">
-                      <CheckCircle2 size={32} />
-                    </div>
-                    <h4 className="workflow-success-title">
-                      User Account Created & Welcome Email Sent
-                    </h4>
-                    <p className="workflow-success-subtitle">
-                      The client account and company workspace have been successfully provisioned and the welcome email has been delivered.
-                    </p>
+                <div className="portal-modal-body" style={{ flex: 1, padding: '2rem 1.75rem 1.5rem', textAlign: 'center' }}>
+                  <div style={{
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '50%',
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    color: '#10B981',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 1.25rem'
+                  }}>
+                    <CheckCircle2 size={32} />
+                  </div>
+                  <h4 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#F8FAFC', margin: '0 0 0.5rem 0' }}>
+                    Account Created Successfully
+                  </h4>
+                  <p style={{ fontSize: '0.88rem', color: '#94A3B8', margin: '0 0 1.5rem 0' }}>
+                    The client account and company workspace have been successfully provisioned.
+                  </p>
 
-                    <div className="workflow-success-details">
-                      <div>
-                        <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>Client Name</span>
-                        <strong style={{ color: '#F8FAFC', fontSize: '0.9rem' }}>{createWorkflow.successData?.clientName}</strong>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>Recipient Email</span>
-                        <strong style={{ color: '#00D9FF', fontSize: '0.9rem' }}>{createWorkflow.successData?.email}</strong>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>Company Workspace</span>
-                        <strong style={{ color: '#F8FAFC', fontSize: '0.9rem' }}>{createWorkflow.successData?.company}</strong>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>Attachments Included</span>
-                        <strong style={{ color: '#34D399', fontSize: '0.9rem' }}>{createWorkflow.successData?.attachmentCount || 0} file(s)</strong>
-                      </div>
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--portal-border)',
+                    borderRadius: '10px',
+                    padding: '1.25rem',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '1rem',
+                    textAlign: 'left',
+                    maxWidth: '460px',
+                    margin: '0 auto'
+                  }}>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '2px' }}>Client Name</span>
+                      <strong style={{ color: '#F8FAFC', fontSize: '0.92rem' }}>{createWorkflow.successData?.clientName}</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '2px' }}>Email</span>
+                      <strong style={{ color: '#00D9FF', fontSize: '0.92rem' }}>{createWorkflow.successData?.email}</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '2px' }}>Company Name</span>
+                      <strong style={{ color: '#F8FAFC', fontSize: '0.92rem' }}>{createWorkflow.successData?.companyName}</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '2px' }}>Account Status</span>
+                      <span style={{
+                        display: 'inline-block',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background: 'rgba(16, 185, 129, 0.15)',
+                        color: '#34d399',
+                        border: '1px solid rgba(52, 211, 153, 0.35)'
+                      }}>
+                        {createWorkflow.successData?.status || 'ACTIVE'}
+                      </span>
                     </div>
                   </div>
                 </div>

@@ -37,6 +37,7 @@ import PortalCosmicBackground from '../common/PortalCosmicBackground';
 import WorkSubmissionModal from '../common/WorkSubmissionModal';
 import NotificationPanel from '../common/NotificationPanel';
 import ActivityTimeline from '../common/ActivityTimeline';
+import ChangePasswordSection from '../../common/ChangePasswordSection';
 
 export default function CompanyLeadDashboard({ user, onLogout }) {
   const navigate = useNavigate();
@@ -1479,6 +1480,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                   <input className="portal-form-input" value={`${requests.length} Active Tickets`} readOnly />
                 </div>
               </div>
+              <ChangePasswordSection />
             </div>
           )}
 

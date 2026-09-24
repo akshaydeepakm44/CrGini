@@ -239,14 +239,10 @@ export default function App() {
         <Route
           path="/reset-password"
           element={
-            user ? (
-              <Navigate to={getRoleHome(user)} replace />
-            ) : (
-              <ResetPasswordPage
-                onBackHome={() => navigate('/')}
-                showToast={showToast}
-              />
-            )
+            <ResetPasswordPage
+              onBackHome={() => navigate('/')}
+              showToast={showToast}
+            />
           }
         />
 

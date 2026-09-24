@@ -367,7 +367,7 @@ const sendEmail = async ({ to, subject, html, text, event, dedupeKey, attachment
     return { success: true, deduplicated: true };
   }
 
-  const from = process.env.EMAIL_FROM || 'CreativeGini <akhil.k@datai2i.com>';
+  const from = process.env.EMAIL_FROM || 'CreativeGini <team@creativegini.com>';
   const transporter = getTransporter();
 
   // If SMTP is not configured, run in development/simulation mode

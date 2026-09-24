@@ -90,7 +90,7 @@ async function runAssetsLibraryTestSuite() {
     console.log('[Step 1]: Authenticating Admin user...');
     const adminLoginRes = await request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email: 'admin@creativegini.com', password: 'Admin@123' })
+      body: JSON.stringify({ email: 'team@creativegini.com', password: process.env.EMAIL_PASSWORD || 'Admin@2026' })
     });
     assert(adminLoginRes.status === 200 && adminLoginRes.data?.token, 'Admin logged in successfully');
     adminToken = adminLoginRes.data.token;

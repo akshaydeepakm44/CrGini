@@ -10,6 +10,7 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 import { query, connectPostgres } from './src/config/postgres.js';
 import { createUser, findUserByEmail } from './src/repositories/userRepository.js';
+import { clearForgotPasswordRateLimits } from './src/controllers/authController.js';
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -227,6 +228,8 @@ async function runChangePasswordSuite() {
 
     // TEST 8: Verify Forgot Password flow still works concurrently
     console.log('\nTEST 8: Verify Forgot Password flow still works...');
+    clearForgotPasswordRateLimits();
+    await request('/auth/reset-rate-limits', { method: 'POST' }).catch(() => {});
     const res8 = await request('/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email: testUserEmail })
@@ -244,7 +247,7 @@ async function runChangePasswordSuite() {
     console.log('\nTEST 9: Verify Admin account login is intact...');
     const res9 = await request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email: 'admin@creativegini.com', password: 'Admin@123' })
+      body: JSON.stringify({ email: 'team@creativegini.com', password: process.env.EMAIL_PASSWORD || 'Admin@2026' })
     });
 
     if (res9.status === 200 && res9.data.success && res9.data.user?.role === 'ADMIN') {

@@ -41,6 +41,7 @@ import PortalCosmicBackground from '../common/PortalCosmicBackground';
 import WorkSubmissionModal from '../common/WorkSubmissionModal';
 import NotificationPanel from '../common/NotificationPanel';
 import ActivityTimeline from '../common/ActivityTimeline';
+import ChangePasswordSection from '../../common/ChangePasswordSection';
 
 export default function LandingPageDashboard({ user, onLogout }) {
   const navigate = useNavigate();
@@ -1085,6 +1086,7 @@ export default function LandingPageDashboard({ user, onLogout }) {
                   <input className="portal-form-input" style={{ background: 'rgba(6, 17, 26, 0.75)', color: '#F5F5F5' }} value={`${requests.length} Active Sprints`} readOnly />
                 </div>
               </div>
+              <ChangePasswordSection />
             </div>
           )}
 

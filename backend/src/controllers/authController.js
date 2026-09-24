@@ -299,11 +299,32 @@ export const forgotPassword = async (req, res) => {
         expiresAt,
       });
 
-      // 6. Build reset URL using configured portal base URL
-      const portalBase = (
+      // 6. Build reset URL using configured portal base URL or request origin
+      let portalBase = (
         process.env.PORTAL_BASE_URL || 'http://localhost:5174'
       ).replace(/\/$/, '');
-      const resetUrl = `${portalBase}/reset-password?token=${rawToken}`;
+
+      const originHeader = req.headers.origin || req.headers.referer;
+      if (originHeader) {
+        try {
+          const parsed = new URL(originHeader);
+          const originBase = `${parsed.protocol}//${parsed.host}`;
+          const allowedOrigins = (process.env.CLIENT_URL || '')
+            .split(',')
+            .map((u) => u.trim().replace(/\/$/, ''))
+            .filter(Boolean);
+          if (
+            allowedOrigins.includes(originBase) ||
+            parsed.hostname === 'localhost' ||
+            parsed.hostname === '127.0.0.1'
+          ) {
+            portalBase = originBase;
+          }
+        } catch (_) {}
+      }
+
+      const resetUrl = `${portalBase}/reset-password?token=${encodeURIComponent(rawToken)}`;
+      console.log(`[Auth Recovery Link]: ${resetUrl}`);
 
       // 7. Dispatch branded recovery email (async non-blocking)
       try {

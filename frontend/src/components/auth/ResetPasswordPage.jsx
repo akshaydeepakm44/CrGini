@@ -89,6 +89,9 @@ export default function ResetPasswordPage({ onBackHome, showToast }) {
 
     try {
       await api.resetPassword(token, newPassword);
+      try {
+        localStorage.removeItem('cg_auth_token');
+      } catch (_) {}
       setIsSubmitting(false);
       setIsSuccess(true);
       if (showToast) {

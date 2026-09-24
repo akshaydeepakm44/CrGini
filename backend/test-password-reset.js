@@ -57,6 +57,7 @@ async function runPasswordResetSuite() {
     // TEST 1: Registered user requests password reset
     console.log('TEST 1: Registered user requests password reset...');
     clearForgotPasswordRateLimits();
+    await request('/auth/reset-rate-limits', { method: 'POST' }).catch(() => {});
     const res1 = await request('/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email: testUserEmail })
@@ -332,7 +333,7 @@ async function runPasswordResetSuite() {
 
     // Verify Admin account is still 100% intact and unaffected
     console.log('\n[Verification]: Verifying Admin account credentials untouched...');
-    const adminUser = await findUserByEmail('admin@creativegini.com', { includePassword: true });
+    const adminUser = await findUserByEmail('team@creativegini.com', { includePassword: true });
     if (adminUser && adminUser.role === 'ADMIN' && adminUser.status === 'ACTIVE') {
       console.log('  ✓ Admin account is intact with ADMIN role and ACTIVE status');
       passed++;

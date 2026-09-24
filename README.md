@@ -111,7 +111,7 @@ creativegini-main/
 
 | Role | Default Email | Default Password | Default Route | Description |
 |---|---|---|---|---|
-| **ADMIN** | `admin@creativegini.com` | `admin123` | `/admin` | Full executive access: manage clients, invite/manage team members, assign granular permissions, oversee all service tickets, force-complete overrides, and revenue tracking. Protected against account deletion. |
+| **ADMIN** | `team@creativegini.com` | `[Configured in .env]` | `/admin` | Full executive access: manage clients, invite/manage team members, assign granular permissions, oversee all service tickets, force-complete overrides, and revenue tracking. Protected against account deletion. |
 | **USER** (Client) | `akhil.k@datai2i.com` / `client@acmecorp.com` | `client123` | `/dashboard` | Client portal: view pre-researched leads, create service requests, pay invoices, inspect deliverables, request revisions, and approve completed work. |
 | **COMPANY_LEAD** | `lead@creativegini.com` | `specialist123` | `/company-lead` | Specialist queue: B2B decision-maker research, verified lead lists, data enrichment, and deliverable submission. |
 | **COMPANY_BOOST** | `boost@creativegini.com` | `specialist123` | `/company-boost` | Specialist queue: autonomous outbound sales funnels, email automation workflows, campaign execution, and deliverable submission. |
@@ -144,7 +144,7 @@ creativegini-main/
   - `Company Lead` (`companyLead`)
   - `Company UI` (`companyUI`)
 - **Security Guarantees**:
-  - Super Admin (`admin@creativegini.com`) is permanently protected from deletion.
+  - Super Admin (`team@creativegini.com`) is permanently protected from deletion.
   - Newly created team members can never be granted `ADMIN` privileges.
   - Backend endpoints strictly verify service-level authorization (`hasServiceTypeAccess`) on all mutating actions.
 

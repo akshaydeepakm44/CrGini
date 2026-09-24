@@ -1,6 +1,6 @@
 import pool, { query, getPool } from '../src/config/postgres.js';
 
-const PROTECTED_ADMIN_EMAIL = 'admin@creativegini.com';
+const PROTECTED_ADMIN_EMAIL = 'team@creativegini.com';
 
 const TABLES_TO_AUDIT = [
   'activity_logs',
@@ -226,7 +226,7 @@ async function runReset() {
     const authRes = await fetch('http://localhost:5000/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@creativegini.com', password: 'Admin@123' })
+      body: JSON.stringify({ email: 'team@creativegini.com', password: process.env.EMAIL_PASSWORD || 'Admin@2026' })
     });
     const authData = await authRes.json();
     if (authRes.ok && authData.success && authData.user?.role === 'ADMIN') {
