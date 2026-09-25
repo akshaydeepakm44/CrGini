@@ -75,6 +75,17 @@ export default function LandingPageDashboard({ user, onLogout }) {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
+  // Onboarding Samples Preparation State
+  const [onboardingClients, setOnboardingClients] = useState([]);
+  const [loadingOnboarding, setLoadingOnboarding] = useState(false);
+  const [selectedOnboardingClient, setSelectedOnboardingClient] = useState(null);
+  const [isPrepModalOpen, setIsPrepModalOpen] = useState(false);
+  const [prepUiAnalysis, setPrepUiAnalysis] = useState(null);
+  const [prepLandingPageEnhancement, setPrepLandingPageEnhancement] = useState(null);
+  const [isSavingOnboarding, setIsSavingOnboarding] = useState(false);
+  const [onboardingSearchQuery, setOnboardingSearchQuery] = useState('');
+  const [onboardingStatusFilter, setOnboardingStatusFilter] = useState('ALL');
+
   // Sidebar Collapse, Mobile Drawer, Profile Dropdown
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
@@ -99,9 +110,10 @@ export default function LandingPageDashboard({ user, onLogout }) {
   const loadTickets = async () => {
     try {
       setLoading(true);
-      const [data, notifs] = await Promise.all([
+      const [data, notifs, onbClients] = await Promise.all([
         api.getRequests().catch(() => []),
-        api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 }))
+        api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 })),
+        api.getOnboardingClients().catch(() => [])
       ]);
       // Enforce strictly LANDING_PAGE requests only
       const list = Array.isArray(data) ? data : (data?.requests || []);
@@ -110,11 +122,69 @@ export default function LandingPageDashboard({ user, onLogout }) {
         setNotifications(notifs.notifications || []);
         setUnreadNotifCount(notifs.unreadCount || 0);
       }
+      setOnboardingClients(onbClients || []);
     } catch (err) {
       console.error('Error loading Landing Page requests:', err);
       setRequests([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenOnboardingPrep = async (client) => {
+    setSelectedOnboardingClient(client);
+    setLoadingOnboarding(true);
+    setIsPrepModalOpen(true);
+    try {
+      const res = await api.getCompanyUiOnboardingAssets(client.id);
+      if (res?.assets) {
+        setPrepUiAnalysis(res.assets.uiAnalysis || null);
+        setPrepLandingPageEnhancement(res.assets.landingPageEnhancement || null);
+      } else {
+        setPrepUiAnalysis(null);
+        setPrepLandingPageEnhancement(null);
+      }
+    } catch (err) {
+      console.error('Failed to load company UI onboarding assets:', err);
+    } finally {
+      setLoadingOnboarding(false);
+    }
+  };
+
+  const handleFileUpload = (type, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const fileData = {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        dataUrl: event.target.result
+      };
+      if (type === 'uiAnalysis') setPrepUiAnalysis(fileData);
+      else if (type === 'landingPageEnhancement') setPrepLandingPageEnhancement(fileData);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveOnboarding = async () => {
+    if (!selectedOnboardingClient) return;
+    try {
+      setIsSavingOnboarding(true);
+      await api.saveCompanyUiOnboardingAssets(selectedOnboardingClient.id, {
+        uiAnalysis: prepUiAnalysis,
+        landingPageEnhancement: prepLandingPageEnhancement
+      });
+      alert('Landing page onboarding sample assets saved successfully.');
+      setIsPrepModalOpen(false);
+      const onbClients = await api.getOnboardingClients();
+      setOnboardingClients(onbClients || []);
+    } catch (err) {
+      alert('Failed to save UI onboarding assets: ' + err.message);
+    } finally {
+      setIsSavingOnboarding(false);
     }
   };
 
@@ -209,6 +279,8 @@ export default function LandingPageDashboard({ user, onLogout }) {
       if (e.key === 'Escape') {
         if (isMobileDrawerOpen) {
           setIsMobileDrawerOpen(false);
+        } else if (isPrepModalOpen) {
+          setIsPrepModalOpen(false);
         } else if (isSubmissionModalOpen) {
           setIsSubmissionModalOpen(false);
         } else if (selectedTicket) {
@@ -220,7 +292,19 @@ export default function LandingPageDashboard({ user, onLogout }) {
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isMobileDrawerOpen, isSubmissionModalOpen, selectedTicket, isNotificationsOpen]);
+  }, [isMobileDrawerOpen, isPrepModalOpen, isSubmissionModalOpen, selectedTicket, isNotificationsOpen]);
+
+  const pendingOnboardingCount = onboardingClients.filter(c => !(c.uiOnboardingStatus?.allPrepared)).length;
+  const preparedOnboardingCount = onboardingClients.filter(c => Boolean(c.uiOnboardingStatus?.allPrepared)).length;
+  const filteredOnboardingClients = onboardingClients.filter(c => {
+    if (onboardingStatusFilter === 'PENDING') return !(c.uiOnboardingStatus?.allPrepared);
+    if (onboardingStatusFilter === 'PREPARED') return Boolean(c.uiOnboardingStatus?.allPrepared);
+    return true;
+  }).filter(c => {
+    if (!onboardingSearchQuery) return true;
+    const q = onboardingSearchQuery.toLowerCase();
+    return (c.name || '').toLowerCase().includes(q) || (c.contactPerson || '').toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q);
+  });
 
   const handleMarkNotifRead = async (id) => {
     try {
@@ -385,6 +469,20 @@ export default function LandingPageDashboard({ user, onLogout }) {
           )}
 
           <div className="portal-nav-section-title" style={{ marginTop: '12px' }}>Workspace</div>
+
+          <button
+            className={`portal-nav-btn ${activeTab === 'onboarding' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('onboarding'); setSelectedTicket(null); setIsMobileDrawerOpen(false); }}
+            title="Client Onboarding Samples"
+          >
+            <Sparkles size={18} />
+            <span>Client Onboarding</span>
+            {pendingOnboardingCount > 0 && (
+              <span className="portal-nav-badge" style={{ background: '#FFB000', color: '#030303', fontWeight: '800' }}>
+                {pendingOnboardingCount}
+              </span>
+            )}
+          </button>
 
           <button
             className={`portal-nav-btn ${activeTab === 'conversations' ? 'active' : ''}`}
@@ -1175,6 +1273,198 @@ export default function LandingPageDashboard({ user, onLogout }) {
               )}
             </div>
           )}
+
+          {/* ONBOARDING: CLIENT ONBOARDING SAMPLE WORK VIEW */}
+          {activeTab === 'onboarding' && (
+            <div className="portal-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '700', margin: '0 0 4px 0', color: '#F5F5F5' }}>
+                    Client Onboarding Sample Work
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: '#94A3B8', margin: 0 }}>
+                    When a new client is onboarded, prepare the initial UI/UX Analysis and Sample Landing Page Enhancement.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <span style={{ background: 'rgba(0, 217, 255, 0.15)', color: '#00D9FF', padding: '4px 12px', borderRadius: '12px', fontWeight: '700', fontSize: '0.82rem' }}>
+                    {onboardingClients.length} Total Clients
+                  </span>
+                  <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', padding: '4px 12px', borderRadius: '12px', fontWeight: '700', fontSize: '0.82rem' }}>
+                    {pendingOnboardingCount} Pending Prep
+                  </span>
+                  <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34D399', padding: '4px 12px', borderRadius: '12px', fontWeight: '700', fontSize: '0.82rem' }}>
+                    {preparedOnboardingCount} Fully Prepared
+                  </span>
+                </div>
+              </div>
+
+              {/* Search & Filter Toolbar */}
+              <div style={{
+                background: 'rgba(4, 12, 18, 0.85)',
+                border: '1px solid var(--portal-border)',
+                borderRadius: '10px',
+                padding: '14px 16px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 280px', maxWidth: '420px', position: 'relative' }}>
+                  <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px' }} />
+                  <input
+                    type="text"
+                    className="portal-form-input"
+                    style={{ paddingLeft: '36px', height: '38px', fontSize: '0.85rem' }}
+                    placeholder="Search clients by name, contact, email..."
+                    value={onboardingSearchQuery}
+                    onChange={(e) => setOnboardingSearchQuery(e.target.value)}
+                  />
+                  {onboardingSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setOnboardingSearchQuery('')}
+                      style={{ position: 'absolute', right: '10px', background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {[
+                    { id: 'ALL', label: `All (${onboardingClients.length})` },
+                    { id: 'PENDING', label: `Pending Samples (${pendingOnboardingCount})` },
+                    { id: 'PREPARED', label: `Fully Prepared (${preparedOnboardingCount})` }
+                  ].map(pill => (
+                    <button
+                      key={pill.id}
+                      type="button"
+                      onClick={() => setOnboardingStatusFilter(pill.id)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        background: onboardingStatusFilter === pill.id ? 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)' : 'rgba(255, 255, 255, 0.05)',
+                        color: onboardingStatusFilter === pill.id ? '#030303' : '#CBD5E1',
+                        border: onboardingStatusFilter === pill.id ? '1px solid #00D9FF' : '1px solid rgba(255, 255, 255, 0.1)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {pill.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Clients Table */}
+              <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                <table className="request-table">
+                  <thead>
+                    <tr>
+                      <th>Client / Company</th>
+                      <th style={{ width: '220px' }}>Contact Person</th>
+                      <th style={{ width: '180px', textAlign: 'center' }}>Initial UI/UX Analysis</th>
+                      <th style={{ width: '200px', textAlign: 'center' }}>Landing Page Enhancement</th>
+                      <th style={{ width: '140px', textAlign: 'center' }}>Overall Status</th>
+                      <th style={{ width: '180px', textAlign: 'right' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingOnboarding ? (
+                      <tr>
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '3.5rem', color: '#94A3B8' }}>
+                          Loading onboarding clients...
+                        </td>
+                      </tr>
+                    ) : filteredOnboardingClients.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '3.5rem', color: '#94A3B8' }}>
+                          No client companies match your search or filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredOnboardingClients.map(client => {
+                        const st = client.uiOnboardingStatus || {};
+                        const allDone = st.allPrepared;
+                        return (
+                          <tr key={client.id}>
+                            <td>
+                              <div style={{ fontWeight: '700', color: '#F5F5F5' }}>{client.name}</div>
+                              <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '2px' }}>
+                                {client.industry || 'General'} · Added {new Date(client.createdAt).toLocaleDateString()}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ color: '#CBD5E1', fontSize: '0.85rem' }}>{client.contactPerson}</div>
+                              <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>{client.email}</div>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{
+                                padding: '3px 10px',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                background: st.uiAnalysis === 'Uploaded' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: st.uiAnalysis === 'Uploaded' ? '#34D399' : '#F59E0B'
+                              }}>
+                                {st.uiAnalysis === 'Uploaded' ? '✓ Uploaded' : 'Pending'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{
+                                padding: '3px 10px',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                background: st.landingPageEnhancement === 'Uploaded' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: st.landingPageEnhancement === 'Uploaded' ? '#34D399' : '#F59E0B'
+                              }}>
+                                {st.landingPageEnhancement === 'Uploaded' ? '✓ Uploaded' : 'Pending'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{
+                                padding: '3px 10px',
+                                borderRadius: '20px',
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                background: allDone ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: allDone ? '#34D399' : '#F59E0B',
+                                border: allDone ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)'
+                              }}>
+                                {allDone ? 'Complete' : 'Action Needed'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <button
+                                type="button"
+                                className="portal-btn-primary"
+                                style={{
+                                  padding: '5px 12px',
+                                  fontSize: '0.8rem',
+                                  background: allDone ? 'linear-gradient(135deg, #FFB000 0%, #f59e0b 100%)' : 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
+                                  color: '#030303',
+                                  fontWeight: '700'
+                                }}
+                                onClick={() => handleOpenOnboardingPrep(client)}
+                              >
+                                {allDone ? 'Update Sample Work' : 'Submit Sample Work'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
             </>
           )}
         </div>
@@ -1190,6 +1480,281 @@ export default function LandingPageDashboard({ user, onLogout }) {
           onClose={() => setIsSubmissionModalOpen(false)}
           loading={isSubmittingWork}
         />
+      )}
+
+      {/* COMPANY UI ONBOARDING PREP MODAL */}
+      {isPrepModalOpen && selectedOnboardingClient && (
+        <div className="portal-modal-backdrop" onClick={() => !isSavingOnboarding && setIsPrepModalOpen(false)}>
+          <div
+            className="portal-modal-card"
+            style={{ maxWidth: '800px', width: '92%' }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="portal-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <Sparkles size={18} style={{ color: '#00D9FF' }} />
+                  <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#00D9FF', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Company UI Onboarding Sample Work
+                  </span>
+                </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#F5F5F5', margin: 0 }}>
+                  {selectedOnboardingClient.name}
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: '4px 0 0 0' }}>
+                  Upload the initial UI/UX analysis and sample landing page enhancement. These files automatically become visible to the client and appear in their Assets workspace.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="portal-modal-close-btn"
+                onClick={() => setIsPrepModalOpen(false)}
+                disabled={isSavingOnboarding}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="portal-modal-body" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+                {/* 1. INITIAL UI/UX ANALYSIS */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: prepUiAnalysis ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '10px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FileText size={18} style={{ color: '#00D9FF' }} />
+                      <span style={{ fontWeight: '700', color: '#F5F5F5', fontSize: '0.92rem' }}>
+                        1. Initial UI/UX Analysis
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: '700',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      background: prepUiAnalysis ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                      color: prepUiAnalysis ? '#34D399' : '#F59E0B'
+                    }}>
+                      {prepUiAnalysis ? '✓ Prepared' : 'Pending'}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: 0 }}>
+                    Comprehensive initial UI/UX audit, design findings, and recommendations for the client.
+                  </p>
+
+                  {prepUiAnalysis ? (
+                    <div style={{
+                      background: 'rgba(0, 0, 0, 0.35)',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      marginTop: 'auto',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px'
+                    }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#F5F5F5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {prepUiAnalysis.name || 'ui_ux_analysis.pdf'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{prepUiAnalysis.size || 'Ready'}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {(prepUiAnalysis.url || prepUiAnalysis.streamUrl) && (
+                          <a
+                            href={prepUiAnalysis.url || prepUiAnalysis.streamUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="portal-btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '0.75rem', color: '#00D9FF' }}
+                            title="View Document"
+                          >
+                            <ExternalLink size={13} />
+                          </a>
+                        )}
+                        <label
+                          className="portal-btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer' }}
+                          title="Replace File"
+                        >
+                          <Upload size={13} />
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx"
+                            style={{ display: 'none' }}
+                            onChange={(e) => handleFileUpload('uiAnalysis', e)}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <label style={{
+                      marginTop: 'auto',
+                      padding: '20px',
+                      borderRadius: '8px',
+                      border: '1px dashed rgba(255, 255, 255, 0.15)',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      color: '#94A3B8',
+                      fontSize: '0.82rem',
+                      display: 'block'
+                    }}>
+                      <Upload size={22} style={{ margin: '0 auto 6px', color: '#00D9FF', opacity: 0.8 }} />
+                      <div>Click to <strong>Upload UI/UX Analysis</strong></div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>PDF or Word Document</div>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleFileUpload('uiAnalysis', e)}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* 2. SAMPLE LANDING PAGE ENHANCEMENT */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: prepLandingPageEnhancement ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '10px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <LayoutTemplate size={18} style={{ color: '#34D399' }} />
+                      <span style={{ fontWeight: '700', color: '#F5F5F5', fontSize: '0.92rem' }}>
+                        2. Sample Landing Page Enhancement
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: '700',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      background: prepLandingPageEnhancement ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                      color: prepLandingPageEnhancement ? '#34D399' : '#F59E0B'
+                    }}>
+                      {prepLandingPageEnhancement ? '✓ Prepared' : 'Pending'}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: 0 }}>
+                    High-fidelity landing page enhancement mockup, redesign wireframe, or prototype asset.
+                  </p>
+
+                  {prepLandingPageEnhancement ? (
+                    <div style={{
+                      background: 'rgba(0, 0, 0, 0.35)',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      marginTop: 'auto',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px'
+                    }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#F5F5F5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {prepLandingPageEnhancement.name || 'landing_page_enhancement'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{prepLandingPageEnhancement.size || 'Ready'}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {(prepLandingPageEnhancement.url || prepLandingPageEnhancement.streamUrl) && (
+                          <a
+                            href={prepLandingPageEnhancement.url || prepLandingPageEnhancement.streamUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="portal-btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '0.75rem', color: '#34D399' }}
+                            title="View Asset"
+                          >
+                            <ExternalLink size={13} />
+                          </a>
+                        )}
+                        <label
+                          className="portal-btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer' }}
+                          title="Replace File"
+                        >
+                          <Upload size={13} />
+                          <input
+                            type="file"
+                            accept=".png,.jpg,.jpeg,.webp,.pdf,.zip"
+                            style={{ display: 'none' }}
+                            onChange={(e) => handleFileUpload('landingPageEnhancement', e)}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <label style={{
+                      marginTop: 'auto',
+                      padding: '20px',
+                      borderRadius: '8px',
+                      border: '1px dashed rgba(255, 255, 255, 0.15)',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      color: '#94A3B8',
+                      fontSize: '0.82rem',
+                      display: 'block'
+                    }}>
+                      <Upload size={22} style={{ margin: '0 auto 6px', color: '#34D399', opacity: 0.8 }} />
+                      <div>Click to <strong>Upload Landing Page Enhancement</strong></div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>Image (PNG/JPG), PDF or ZIP</div>
+                      <input
+                        type="file"
+                        accept=".png,.jpg,.jpeg,.webp,.pdf,.zip"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleFileUpload('landingPageEnhancement', e)}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="portal-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="portal-btn-secondary"
+                onClick={() => setIsPrepModalOpen(false)}
+                disabled={isSavingOnboarding}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="portal-btn-primary"
+                onClick={handleSaveOnboarding}
+                disabled={isSavingOnboarding}
+                style={{
+                  background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
+                  color: '#030303',
+                  fontWeight: '700',
+                  padding: '8px 20px'
+                }}
+              >
+                {isSavingOnboarding ? 'Saving Assets...' : 'Save Sample Work'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

@@ -1679,17 +1679,47 @@ export const buildInternalNewClientEmailTemplate = ({
                 </tr>
               </table>
 
-              <!-- REQUIRED DELIVERABLES NOTICE -->
-              <div style="background: rgba(0, 217, 255, 0.06); border: 1px solid rgba(0, 217, 255, 0.2); border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-                <div style="font-size: 12px; font-weight: 700; color: #00D9FF; text-transform: uppercase; margin-bottom: 8px;">
-                  Company Boost Team Action Items
+              <!-- REQUIRED DELIVERABLES NOTICE FOR ALL 3 TEAMS -->
+              <div style="margin-bottom: 24px;">
+                <!-- 1. Company Boost Team -->
+                <div style="background: rgba(255, 176, 0, 0.06); border: 1px solid rgba(255, 176, 0, 0.25); border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+                  <div style="font-size: 12px; font-weight: 700; color: #FFB000; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    ⚡ Company Boost Team Action Items
+                  </div>
+                  <div style="font-size: 13px; color: #CBD5E1; line-height: 1.6;">
+                    Please prepare the 4 initial onboarding materials for this workspace:<br>
+                    &bull; <strong>1 Sample Poster</strong> (Branded Visual Marketing Asset)<br>
+                    &bull; <strong>1 Sample Video</strong> (Introductory Product Showcase Demo)<br>
+                    &bull; <strong>Strategic Plan</strong> (Company-specific growth & positioning strategy)<br>
+                    &bull; <strong>DevRel Plan</strong> (Technical Developer Relations & outreach plan)
+                  </div>
                 </div>
-                <div style="font-size: 13px; color: #CBD5E1; line-height: 1.6;">
-                  Please prepare the 4 initial onboarding materials for this workspace:<br>
-                  &bull; <strong>Sample Poster</strong> (Branded Visual)<br>
-                  &bull; <strong>Sample Video</strong> (Introductory Demo)<br>
-                  &bull; <strong>Strategic Plan</strong> (Company-specific growth strategy)<br>
-                  &bull; <strong>DevRel Plan</strong> (Technical Developer Relations plan)
+
+                <!-- 2. Company Lead Team -->
+                <div style="background: rgba(0, 217, 255, 0.06); border: 1px solid rgba(0, 217, 255, 0.25); border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+                  <div style="font-size: 12px; font-weight: 700; color: #00D9FF; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    🎯 Company Lead Team Action Items
+                  </div>
+                  <div style="font-size: 13px; color: #CBD5E1; line-height: 1.6;">
+                    Please research and upload the initial sample data from your Company Lead dashboard:<br>
+                    &bull; <strong>Company Study / Research</strong> (Market analysis & target positioning)<br>
+                    &bull; <strong>At least 5 Sample Leads</strong> (Verified/researched accounts matching ICP)<br>
+                    &bull; <strong>Key Stakeholders</strong> (Important decision-makers & contacts)<br>
+                    &bull; <strong>Stakeholder Titles/Roles</strong> (Executive & technical titles)<br>
+                    &bull; <strong>LinkedIn Profiles</strong> (Direct URLs for verified profiles)
+                  </div>
+                </div>
+
+                <!-- 3. Company UI Team -->
+                <div style="background: rgba(168, 85, 247, 0.06); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; padding: 16px;">
+                  <div style="font-size: 12px; font-weight: 700; color: #C084FC; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    🎨 Company UI Team Action Items
+                  </div>
+                  <div style="font-size: 13px; color: #CBD5E1; line-height: 1.6;">
+                    Please prepare the initial UI/UX assessment and enhancement sample work:<br>
+                    &bull; <strong>Initial UI/UX Analysis</strong> (Heuristic review & responsive audit)<br>
+                    &bull; <strong>Sample Landing Page Enhancement Work</strong> (Visual redesign & conversion recommendations)
+                  </div>
                 </div>
               </div>
 
@@ -1698,7 +1728,7 @@ export const buildInternalNewClientEmailTemplate = ({
                 <tr>
                   <td align="center">
                     <a href="${dashboardUrl}" target="_blank" style="display: inline-block; padding: 12px 28px; background: #FFB000; color: #040810; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 6px; box-shadow: 0 4px 12px rgba(255, 176, 0, 0.25);">
-                      Open Company Boost Workspace &rarr;
+                      Open Team Dashboard &rarr;
                     </a>
                   </td>
                 </tr>
@@ -1753,7 +1783,39 @@ export const sendInternalNewClientNotification = async ({
       dashboardUrl: resolvedUrl
     });
 
-    const text = `[INTERNAL TEAM NOTIFICATION]\n\nA new client has been created in CreativeGini and the team needs to prepare the initial company samples/workspace.\n\nCompany Details:\n- Client/Company Name: ${companyName}\n- Contact Person: ${contactPerson}\n- Company Website: ${companyWebsite}\n- Industry: ${industry}\n- Client Email: ${clientEmail}\n\nRequired Action Items (Company Boost Team):\n1. Sample Poster\n2. Sample Video\n3. Strategic Plan\n4. DevRel Plan\n\nLink to Workspace: ${resolvedUrl}\n\n- CreativeGini Internal Ops`;
+    const text = `[INTERNAL TEAM NOTIFICATION]
+
+A new client has been created in CreativeGini and the internal teams need to prepare the required sample work.
+
+Company Details:
+- Client / Company Name: ${companyName}
+- Contact Person: ${contactPerson}
+- Company Website: ${companyWebsite}
+- Industry: ${industry}
+- Client Email: ${clientEmail}
+
+---
+COMPANY BOOST TEAM ACTION ITEMS:
+1. 1 Sample Poster (Branded Visual)
+2. 1 Sample Video (Introductory Demo)
+3. Strategic Plan (Company-specific growth strategy)
+4. DevRel Plan (Technical Developer Relations plan)
+
+COMPANY LEAD TEAM ACTION ITEMS:
+1. Company Study / Research
+2. At least 5 Sample Leads
+3. Key Stakeholders
+4. Stakeholder Titles/Roles
+5. LinkedIn Profiles
+
+COMPANY UI TEAM ACTION ITEMS:
+1. Initial UI/UX analysis
+2. Sample landing page enhancement work
+---
+
+Link to Workspace: ${resolvedUrl}
+
+- CreativeGini Internal Ops <team@creativegini.com>`;
 
     const results = [];
     for (const recipient of recipients) {

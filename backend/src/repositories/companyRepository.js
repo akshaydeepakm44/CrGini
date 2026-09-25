@@ -3,6 +3,18 @@ import { query } from '../config/postgres.js';
 const mapCompany = (row) => {
   if (!row) return null;
 
+  const leads = (row.initial_leads || []).map(l => {
+    const pdfMatch = (l.notes || '').match(/\[Lead PDF:\s*([^\]]+)\]/);
+    const source_reference = pdfMatch ? pdfMatch[1] : null;
+    const cleanNotes = (l.notes || '').replace(/\[Lead PDF:\s*[^\]]+\]/g, '').trim();
+    return {
+      ...l,
+      notes: cleanNotes,
+      source_reference,
+      sourceReference: source_reference
+    };
+  });
+
   return {
     _id: row.id,
     id: row.id,
@@ -14,8 +26,10 @@ const mapCompany = (row) => {
     industry: row.industry,
     companyInfo: row.company_info,
     researchSummary: row.research_summary,
-    initialLeads: row.initial_leads || [],
+    initialLeads: leads,
+    leads: leads,
     initialKeyPeople: row.initial_key_people || [],
+    keyPeople: row.initial_key_people || [],
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -400,7 +414,17 @@ export const getCompanyLeads = async (companyId) => {
     [companyId]
   );
 
-  return result.rows;
+  return result.rows.map(r => {
+    const pdfMatch = (r.notes || '').match(/\[Lead PDF:\s*([^\]]+)\]/);
+    const source_reference = pdfMatch ? pdfMatch[1] : null;
+    const cleanNotes = (r.notes || '').replace(/\[Lead PDF:\s*[^\]]+\]/g, '').trim();
+    return {
+      ...r,
+      notes: cleanNotes,
+      source_reference,
+      sourceReference: source_reference
+    };
+  });
 };
 
 export const getKeyPeople = async (companyId) => {

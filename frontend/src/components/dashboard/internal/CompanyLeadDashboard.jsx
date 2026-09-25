@@ -30,7 +30,14 @@ import {
   FileText,
   UserCheck,
   TrendingUp,
-  Layers
+  Layers,
+  Sparkles,
+  Plus,
+  Trash2,
+  Edit2,
+  Save,
+  BookOpen,
+  Check
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import PortalCosmicBackground from '../common/PortalCosmicBackground';
@@ -73,6 +80,50 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [assignedToMeOnly, setAssignedToMeOnly] = useState(false);
 
+  // Onboarding Leads Workspace State
+  const [onboardingClients, setOnboardingClients] = useState([]);
+  const [loadingOnboarding, setLoadingOnboarding] = useState(false);
+  const [selectedOnboardingClient, setSelectedOnboardingClient] = useState(null);
+  const [isPrepModalOpen, setIsPrepModalOpen] = useState(false);
+  const [onboardingSearchQuery, setOnboardingSearchQuery] = useState('');
+  const [onboardingStatusFilter, setOnboardingStatusFilter] = useState('ALL');
+
+  // Client leads and research editing state inside modal
+  const [activePrepTab, setActivePrepTab] = useState('research'); // 'research' | 'leads' | 'keyPeople'
+  const [clientResearch, setClientResearch] = useState('');
+  const [isSavingResearch, setIsSavingResearch] = useState(false);
+  const [clientLeads, setClientLeads] = useState([]);
+  const [clientKeyPeople, setClientKeyPeople] = useState([]);
+  const [loadingClientDetails, setLoadingClientDetails] = useState(false);
+  const [uploadingLeadPdfId, setUploadingLeadPdfId] = useState(null);
+
+  // New Lead form state
+  const [newLeadForm, setNewLeadForm] = useState({
+    name: '',
+    title: '',
+    company: '',
+    email: '',
+    linkedin: '',
+    location: '',
+    status: 'PENDING',
+    notes: ''
+  });
+  const [isAddingLead, setIsAddingLead] = useState(false);
+
+  // Editing Lead state
+  const [editingLead, setEditingLead] = useState(null);
+  const [isUpdatingLead, setIsUpdatingLead] = useState(false);
+
+  // New Key Person form state
+  const [newKeyPersonForm, setNewKeyPersonForm] = useState({
+    name: '',
+    role: '',
+    department: '',
+    contact: '',
+    socialProfile: ''
+  });
+  const [isAddingKeyPerson, setIsAddingKeyPerson] = useState(false);
+
   // Sidebar Collapse, Mobile Drawer, Profile Dropdown
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
@@ -97,13 +148,15 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
   const loadTickets = async () => {
     try {
       setLoading(true);
-      const [data, notifs] = await Promise.all([
+      const [data, notifs, onbClients] = await Promise.all([
         api.getRequests().catch(() => []),
-        api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 }))
+        api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 })),
+        api.getOnboardingClients().catch(() => [])
       ]);
       // Enforce only COMPANY_LEAD requests
       const list = Array.isArray(data) ? data : (data?.requests || []);
       setRequests(list.filter(r => r && r.serviceType === 'COMPANY_LEAD'));
+      setOnboardingClients(onbClients || []);
       if (notifs) {
         setNotifications(notifs.notifications || []);
         setUnreadNotifCount(notifs.unreadCount || 0);
@@ -125,6 +178,8 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       if (e.key === 'Escape') {
         if (isMobileDrawerOpen) {
           setIsMobileDrawerOpen(false);
+        } else if (isPrepModalOpen) {
+          setIsPrepModalOpen(false);
         } else if (isSubmissionModalOpen) {
           setIsSubmissionModalOpen(false);
         } else if (selectedTicket) {
@@ -136,7 +191,235 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMobileDrawerOpen, isSubmissionModalOpen, selectedTicket, isNotificationsOpen]);
+  }, [isMobileDrawerOpen, isPrepModalOpen, isSubmissionModalOpen, selectedTicket, isNotificationsOpen]);
+
+  // Open Client Onboarding Prep modal
+  const handleOpenClientPrep = async (client) => {
+    setSelectedOnboardingClient(client);
+    setIsPrepModalOpen(true);
+    setActivePrepTab('research');
+    setClientResearch(client.researchSummary || '');
+    setEditingLead(null);
+    setNewLeadForm({
+      name: '',
+      title: '',
+      company: client.name || '',
+      email: '',
+      linkedin: '',
+      location: '',
+      status: 'PENDING',
+      notes: ''
+    });
+    setNewKeyPersonForm({
+      name: '',
+      role: '',
+      department: '',
+      contact: '',
+      socialProfile: ''
+    });
+
+    try {
+      setLoadingClientDetails(true);
+      const res = await api.getCompanyLeads(client.id);
+      if (res && res.company) {
+        setClientResearch(res.company.researchSummary || '');
+      }
+      setClientLeads(res.leads || []);
+      setClientKeyPeople(res.keyPeople || []);
+    } catch (err) {
+      console.error('Failed to load client leads data:', err);
+    } finally {
+      setLoadingClientDetails(false);
+    }
+  };
+
+  // Refresh client data after updates
+  const refreshClientData = async (companyId) => {
+    try {
+      const [leadsRes, clientsRes] = await Promise.all([
+        api.getCompanyLeads(companyId),
+        api.getOnboardingClients()
+      ]);
+      if (leadsRes && leadsRes.company) {
+        setClientResearch(leadsRes.company.researchSummary || '');
+      }
+      setClientLeads(leadsRes.leads || []);
+      setClientKeyPeople(leadsRes.keyPeople || []);
+      setOnboardingClients(clientsRes || []);
+
+      // Also update selected client in modal
+      const updatedClient = (clientsRes || []).find(c => c.id === companyId);
+      if (updatedClient) {
+        setSelectedOnboardingClient(updatedClient);
+      }
+    } catch (err) {
+      console.error('Failed to refresh client data:', err);
+    }
+  };
+
+  // Save Company Study / Research
+  const handleSaveResearch = async () => {
+    if (!selectedOnboardingClient) return;
+    try {
+      setIsSavingResearch(true);
+      await api.updateCompanyResearch(selectedOnboardingClient.id, clientResearch);
+      await refreshClientData(selectedOnboardingClient.id);
+      alert('Company study & research saved successfully!');
+    } catch (err) {
+      alert('Failed to save research: ' + err.message);
+    } finally {
+      setIsSavingResearch(false);
+    }
+  };
+
+  // Add a sample lead
+  const handleAddLead = async (e) => {
+    e.preventDefault();
+    if (!selectedOnboardingClient) return;
+    if (!newLeadForm.name.trim()) {
+      alert('Lead name is required.');
+      return;
+    }
+
+    if (newLeadForm.status === 'VERIFIED' && (!newLeadForm.notes || !newLeadForm.notes.trim())) {
+      alert('Cannot mark a lead as VERIFIED without research/verification notes.');
+      return;
+    }
+
+    try {
+      setIsAddingLead(true);
+      await api.addCompanyLead(selectedOnboardingClient.id, newLeadForm);
+      await refreshClientData(selectedOnboardingClient.id);
+      setNewLeadForm({
+        name: '',
+        title: '',
+        company: selectedOnboardingClient.name || '',
+        email: '',
+        linkedin: '',
+        location: '',
+        status: 'PENDING',
+        notes: ''
+      });
+    } catch (err) {
+      alert('Failed to add lead: ' + err.message);
+    } finally {
+      setIsAddingLead(false);
+    }
+  };
+
+  // Update lead
+  const handleUpdateLead = async (e) => {
+    e.preventDefault();
+    if (!editingLead) return;
+    if (!editingLead.name.trim()) {
+      alert('Lead name is required.');
+      return;
+    }
+
+    if (editingLead.status === 'VERIFIED' && (!editingLead.notes || !editingLead.notes.trim())) {
+      alert('Cannot mark a lead as VERIFIED without research/verification notes.');
+      return;
+    }
+
+    try {
+      setIsUpdatingLead(true);
+      await api.updateCompanyLead(editingLead.id, editingLead);
+      await refreshClientData(selectedOnboardingClient.id);
+      setEditingLead(null);
+    } catch (err) {
+      alert('Failed to update lead: ' + err.message);
+    } finally {
+      setIsUpdatingLead(false);
+    }
+  };
+
+  // Delete lead
+  const handleDeleteLead = async (leadId) => {
+    if (!confirm('Are you sure you want to delete this lead?')) return;
+    try {
+      await api.deleteCompanyLead(leadId);
+      await refreshClientData(selectedOnboardingClient.id);
+    } catch (err) {
+      alert('Failed to delete lead: ' + err.message);
+    }
+  };
+
+  // Upload PDF Documentation for a Lead
+  const handleUploadLeadPdf = async (lead, e) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedOnboardingClient) return;
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Please select a PDF document.');
+      return;
+    }
+    try {
+      setUploadingLeadPdfId(lead.id);
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const leadIndex = clientLeads.findIndex(l => l.id === lead.id);
+          await api.saveCompanyLeadOnboardingAssets(selectedOnboardingClient.id, {
+            leadId: lead.id,
+            leadIndex: leadIndex >= 0 ? leadIndex + 1 : 1,
+            leadName: lead.name,
+            file: {
+              name: file.name,
+              size: file.size,
+              type: file.type || 'application/pdf',
+              dataUrl: event.target.result
+            }
+          });
+          await refreshClientData(selectedOnboardingClient.id);
+        } catch (err) {
+          alert('Failed to upload lead PDF: ' + err.message);
+        } finally {
+          setUploadingLeadPdfId(null);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      alert('Failed to read file: ' + err.message);
+      setUploadingLeadPdfId(null);
+    }
+  };
+
+  // Add Key Person
+  const handleAddKeyPerson = async (e) => {
+    e.preventDefault();
+    if (!selectedOnboardingClient) return;
+    if (!newKeyPersonForm.name.trim()) {
+      alert('Stakeholder name is required.');
+      return;
+    }
+
+    try {
+      setIsAddingKeyPerson(true);
+      await api.addKeyPerson(selectedOnboardingClient.id, newKeyPersonForm);
+      await refreshClientData(selectedOnboardingClient.id);
+      setNewKeyPersonForm({
+        name: '',
+        role: '',
+        department: '',
+        contact: '',
+        socialProfile: ''
+      });
+    } catch (err) {
+      alert('Failed to add stakeholder: ' + err.message);
+    } finally {
+      setIsAddingKeyPerson(false);
+    }
+  };
+
+  // Delete Key Person
+  const handleDeleteKeyPerson = async (personId) => {
+    if (!confirm('Are you sure you want to delete this stakeholder?')) return;
+    try {
+      await api.deleteKeyPerson(personId);
+      await refreshClientData(selectedOnboardingClient.id);
+    } catch (err) {
+      alert('Failed to delete stakeholder: ' + err.message);
+    }
+  };
 
   const handleOpenTicket = async (ticket, initialTab) => {
     setSelectedTicket(ticket);
@@ -306,6 +589,26 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     return matchesStatus && matchesPriority && matchesSearch;
   });
 
+  // Onboarding metrics and filtering for Company Lead
+  const pendingLeadOnboardingCount = onboardingClients.filter(c => !c.leadOnboardingStatus?.allPrepared).length;
+  const preparedLeadOnboardingCount = onboardingClients.filter(c => c.leadOnboardingStatus?.allPrepared).length;
+
+  const filteredOnboardingClients = onboardingClients.filter(c => {
+    const q = onboardingSearchQuery.toLowerCase().trim();
+    const matchesSearch = !q || (
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.contactPerson && c.contactPerson.toLowerCase().includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
+      (c.industry && c.industry.toLowerCase().includes(q))
+    );
+    const matchesStatus = onboardingStatusFilter === 'ALL'
+      ? true
+      : onboardingStatusFilter === 'PENDING'
+      ? !c.leadOnboardingStatus?.allPrepared
+      : c.leadOnboardingStatus?.allPrepared;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="portal-root">
       <PortalCosmicBackground />
@@ -391,6 +694,20 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
           )}
 
           <div className="portal-nav-section-title" style={{ marginTop: '12px' }}>Workspace</div>
+
+          <button
+            className={`portal-nav-btn ${activeTab === 'onboarding' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('onboarding'); setSelectedTicket(null); setIsMobileDrawerOpen(false); }}
+            title="Client Onboarding & Sample Leads"
+          >
+            <Sparkles size={18} />
+            <span>Onboarding Leads</span>
+            {pendingLeadOnboardingCount > 0 && (
+              <span className="portal-nav-badge" style={{ background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)', color: '#030303' }}>
+                {pendingLeadOnboardingCount}
+              </span>
+            )}
+          </button>
 
           <button
             className={`portal-nav-btn ${activeTab === 'conversations' ? 'active' : ''}`}
@@ -1278,6 +1595,232 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
             </>
           )}
 
+          {/* ONBOARDING: CLIENT ONBOARDING & SAMPLE LEADS WORKSPACE */}
+          {activeTab === 'onboarding' && (
+            <div className="portal-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '700', margin: '0 0 4px 0', color: '#F5F5F5' }}>
+                    Client Onboarding & Sample Leads Workspace
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: '#94A3B8', margin: 0 }}>
+                    When a new client account is created, the Company Lead team prepares initial sample work: Company Study / Research, at least 5 Sample Leads, and Key Stakeholders with LinkedIn profiles.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ background: 'rgba(0, 217, 255, 0.15)', color: '#00D9FF', padding: '4px 12px', borderRadius: '12px', fontWeight: '700', fontSize: '0.82rem' }}>
+                    {onboardingClients.length} Total Clients
+                  </span>
+                  <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', padding: '4px 12px', borderRadius: '12px', fontWeight: '700', fontSize: '0.82rem' }}>
+                    {pendingLeadOnboardingCount} Pending Onboarding
+                  </span>
+                  <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34D399', padding: '4px 12px', borderRadius: '12px', fontWeight: '700', fontSize: '0.82rem' }}>
+                    {preparedLeadOnboardingCount} Fully Prepared
+                  </span>
+                </div>
+              </div>
+
+              {/* Search & Filter Toolbar */}
+              <div style={{
+                background: 'rgba(4, 12, 18, 0.85)',
+                border: '1px solid var(--portal-border)',
+                borderRadius: '10px',
+                padding: '14px 16px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 280px', maxWidth: '420px', position: 'relative' }}>
+                  <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px' }} />
+                  <input
+                    type="text"
+                    className="portal-form-input"
+                    style={{ paddingLeft: '36px', height: '38px', fontSize: '0.85rem' }}
+                    placeholder="Search clients by company, contact person, email, industry..."
+                    value={onboardingSearchQuery}
+                    onChange={(e) => setOnboardingSearchQuery(e.target.value)}
+                  />
+                  {onboardingSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setOnboardingSearchQuery('')}
+                      style={{ position: 'absolute', right: '10px', background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {[
+                    { id: 'ALL', label: `All Clients (${onboardingClients.length})` },
+                    { id: 'PENDING', label: `Pending Samples (${pendingLeadOnboardingCount})` },
+                    { id: 'PREPARED', label: `Fully Prepared (${preparedLeadOnboardingCount})` }
+                  ].map(pill => (
+                    <button
+                      key={pill.id}
+                      type="button"
+                      onClick={() => setOnboardingStatusFilter(pill.id)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        border: onboardingStatusFilter === pill.id ? '1px solid #00D9FF' : '1px solid var(--portal-border)',
+                        background: onboardingStatusFilter === pill.id ? 'rgba(0, 217, 255, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                        color: onboardingStatusFilter === pill.id ? '#00D9FF' : '#94A3B8',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {pill.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Onboarding Clients Table */}
+              {loading ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
+                  <Clock size={24} className="spin" style={{ marginBottom: '8px' }} />
+                  <div>Loading onboarding client database...</div>
+                </div>
+              ) : filteredOnboardingClients.length === 0 ? (
+                <div style={{ padding: '50px 20px', textAlign: 'center', color: '#94A3B8' }}>
+                  <Users size={36} color="#64748B" style={{ margin: '0 auto 12px', display: 'block' }} />
+                  <div style={{ fontWeight: '600', color: '#F5F5F5', marginBottom: '4px' }}>No clients match filter criteria</div>
+                  <div style={{ fontSize: '0.85rem' }}>Try clearing the search query or status filter.</div>
+                </div>
+              ) : (
+                <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                  <table className="request-table">
+                    <thead>
+                      <tr>
+                        <th>Company Name</th>
+                        <th>Client Contact</th>
+                        <th>Industry & Web</th>
+                        <th>Company Study</th>
+                        <th>Sample Leads</th>
+                        <th>Key Stakeholders</th>
+                        <th>Onboarding State</th>
+                        <th style={{ textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredOnboardingClients.map((client) => {
+                        const ls = client.leadOnboardingStatus || {};
+                        const leadsUploaded = ls.leadCount || 0;
+                        const hasResearch = ls.hasResearch;
+                        const isAllPrepared = ls.allPrepared;
+
+                        return (
+                          <tr key={client.id}>
+                            <td>
+                              <div style={{ fontWeight: '700', color: '#F5F5F5', fontSize: '0.92rem' }}>
+                                {client.name}
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '2px' }}>
+                                Added {new Date(client.createdAt).toLocaleDateString()}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ color: '#CBD5E1', fontWeight: '500' }}>{client.contactPerson}</div>
+                              <div style={{ fontSize: '0.78rem', color: '#00D9FF' }}>{client.email}</div>
+                            </td>
+                            <td>
+                              <div style={{ color: '#94A3B8' }}>{client.industry}</div>
+                              {client.website ? (
+                                <a href={client.website} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: '#00D9FF', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  {client.website.replace(/^https?:\/\//, '')} <ExternalLink size={10} />
+                                </a>
+                              ) : (
+                                <span style={{ fontSize: '0.75rem', color: '#64748B' }}>No website</span>
+                              )}
+                            </td>
+                            <td>
+                              {hasResearch ? (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: '700', color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '3px 8px', borderRadius: '4px' }}>
+                                  <Check size={12} /> Added
+                                </span>
+                              ) : (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '3px 8px', borderRadius: '4px' }}>
+                                  <Clock size={12} /> Not Added
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{
+                                    fontSize: '0.8rem',
+                                    fontWeight: '700',
+                                    color: leadsUploaded >= 5 ? '#10b981' : '#f59e0b',
+                                    background: leadsUploaded >= 5 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                                    border: leadsUploaded >= 5 ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+                                    padding: '3px 8px',
+                                    borderRadius: '4px'
+                                  }}>
+                                    {leadsUploaded} / 5 Leads
+                                  </span>
+                                  {ls.verifiedLeadCount > 0 && (
+                                    <span style={{ fontSize: '0.72rem', color: '#34d399' }}>
+                                      ({ls.verifiedLeadCount} Verified)
+                                    </span>
+                                  )}
+                                </div>
+                                <span style={{ fontSize: '0.74rem', color: (ls.leadsWithPdfCount || 0) >= 5 ? '#34d399' : '#00D9FF' }}>
+                                  {ls.leadsWithPdfCount || 0} / 5 with PDF Document
+                                </span>
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>
+                                <strong>{ls.keyPeopleCount || 0}</strong> Stakeholders
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#94A3B8' }}>
+                                {ls.linkedInCount || 0} LinkedIn Profiles
+                              </div>
+                            </td>
+                            <td>
+                              {isAllPrepared ? (
+                                <span className="status-pill COMPLETED">
+                                  Prepared
+                                </span>
+                              ) : (
+                                <span className="status-pill PENDING">
+                                  In Progress
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <button
+                                type="button"
+                                className="portal-btn-primary"
+                                style={{
+                                  padding: '6px 14px',
+                                  fontSize: '0.82rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}
+                                onClick={() => handleOpenClientPrep(client)}
+                              >
+                                <Sparkles size={14} /> Prepare Sample Work
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* TICKETS: DEDICATED TICKET MANAGEMENT PAGE */}
           {activeTab === 'tickets' && (
             <div className="portal-card">
@@ -1583,6 +2126,746 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
           onSubmit={handleSubmitWork}
           isSubmitting={isSubmittingWork}
         />
+      )}
+
+      {/* CLIENT ONBOARDING & SAMPLE LEADS PREPARATION MODAL */}
+      {isPrepModalOpen && selectedOnboardingClient && (
+        <div className="portal-modal-overlay" onClick={() => setIsPrepModalOpen(false)}>
+          <div
+            className="portal-modal-card wide"
+            style={{ maxWidth: '1000px', width: '95%', display: 'flex', flexDirection: 'column' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="portal-modal-header" style={{ borderBottom: '1px solid var(--portal-border)', paddingBottom: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '800', letterSpacing: '0.06em', color: '#00D9FF', textTransform: 'uppercase', background: 'rgba(0, 217, 255, 0.12)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(0, 217, 255, 0.3)' }}>
+                    Sample Work Workspace
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>·</span>
+                  <span style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>{selectedOnboardingClient.industry}</span>
+                </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0, color: '#F5F5F5' }}>
+                  {selectedOnboardingClient.name}
+                </h3>
+                <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '2px' }}>
+                  Client Contact: <strong style={{ color: '#CBD5E1' }}>{selectedOnboardingClient.contactPerson}</strong> ({selectedOnboardingClient.email})
+                </div>
+              </div>
+              <button
+                type="button"
+                className="portal-btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                onClick={() => setIsPrepModalOpen(false)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Sub-tabs Navigation */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--portal-border)', background: 'rgba(0,0,0,0.2)', padding: '0 20px', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setActivePrepTab('research')}
+                style={{
+                  padding: '12px 16px',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: activePrepTab === 'research' ? '2px solid #00D9FF' : '2px solid transparent',
+                  color: activePrepTab === 'research' ? '#00D9FF' : '#94A3B8',
+                  fontWeight: activePrepTab === 'research' ? '700' : '500',
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <BookOpen size={15} />
+                <span>1. Company Study & Research</span>
+                {clientResearch?.trim() && (
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActivePrepTab('leads')}
+                style={{
+                  padding: '12px 16px',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: activePrepTab === 'leads' ? '2px solid #00D9FF' : '2px solid transparent',
+                  color: activePrepTab === 'leads' ? '#00D9FF' : '#94A3B8',
+                  fontWeight: activePrepTab === 'leads' ? '700' : '500',
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Users size={15} />
+                <span>2. Sample Leads ({clientLeads.length}/5)</span>
+                {clientLeads.length >= 5 ? (
+                  <span style={{ fontSize: '0.72rem', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '1px 6px', borderRadius: '8px' }}>Done</span>
+                ) : (
+                  <span style={{ fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', padding: '1px 6px', borderRadius: '8px' }}>{clientLeads.length}/5</span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActivePrepTab('keyPeople')}
+                style={{
+                  padding: '12px 16px',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: activePrepTab === 'keyPeople' ? '2px solid #00D9FF' : '2px solid transparent',
+                  color: activePrepTab === 'keyPeople' ? '#00D9FF' : '#94A3B8',
+                  fontWeight: activePrepTab === 'keyPeople' ? '700' : '500',
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <UserCheck size={15} />
+                <span>3. Key Stakeholders ({clientKeyPeople.length})</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="portal-modal-body" style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+              {loadingClientDetails ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#94A3B8' }}>
+                  <Clock size={24} className="spin" style={{ marginBottom: '8px' }} />
+                  <div>Loading client intelligence workspace...</div>
+                </div>
+              ) : (
+                <>
+                  {/* TAB 1: COMPANY STUDY / RESEARCH */}
+                  {activePrepTab === 'research' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ background: 'rgba(0, 217, 255, 0.05)', border: '1px solid rgba(0, 217, 255, 0.2)', borderRadius: '8px', padding: '14px 16px' }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#00D9FF', marginBottom: '4px' }}>
+                          Company Study & Pre-market Research
+                        </div>
+                        <p style={{ fontSize: '0.82rem', color: '#CBD5E1', margin: 0, lineHeight: '1.5' }}>
+                          Provide initial intelligence on {selectedOnboardingClient.name}'s industry positioning, target accounts, ICP persona attributes, and key strategic angles. The client will see this study in their dashboard once submitted.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#CBD5E1', marginBottom: '8px' }}>
+                          Company Research Document / Study Summary
+                        </label>
+                        <textarea
+                          className="portal-form-input"
+                          rows={10}
+                          style={{ width: '100%', resize: 'vertical', lineHeight: '1.6', fontSize: '0.88rem' }}
+                          placeholder="Enter market study, ideal customer profile (ICP), target verticals, value propositions, and competitor landscape notes..."
+                          value={clientResearch}
+                          onChange={(e) => setClientResearch(e.target.value)}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                        <button
+                          type="button"
+                          className="portal-btn-primary"
+                          disabled={isSavingResearch}
+                          onClick={handleSaveResearch}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                        >
+                          <Save size={15} />
+                          <span>{isSavingResearch ? 'Saving Research...' : 'Save Company Study & Research'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: SAMPLE LEADS (AT LEAST 5) */}
+                  {activePrepTab === 'leads' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      {/* Counter banner */}
+                      <div style={{
+                        background: clientLeads.length >= 5 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                        border: clientLeads.length >= 5 ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+                        borderRadius: '8px',
+                        padding: '12px 16px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '8px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {clientLeads.length >= 5 ? (
+                            <CheckCircle2 size={18} color="#10B981" />
+                          ) : (
+                            <AlertCircle size={18} color="#F59E0B" />
+                          )}
+                          <div>
+                            <strong style={{ color: clientLeads.length >= 5 ? '#34d399' : '#fbbf24', fontSize: '0.86rem' }}>
+                              {clientLeads.length >= 5 ? 'Sample Lead Requirement Met' : 'Sample Leads Required: Minimum 5'}
+                            </strong>
+                            <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
+                              {clientLeads.length} sample leads currently uploaded for this client.
+                            </div>
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '0.82rem', fontWeight: '700', color: clientLeads.length >= 5 ? '#34d399' : '#fbbf24' }}>
+                          {clientLeads.length} / 5 Leads
+                        </span>
+                      </div>
+
+                      {/* Add Lead Form */}
+                      <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '16px' }}>
+                        <h5 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Plus size={15} color="#00D9FF" /> Add Sample Lead
+                        </h5>
+                        <form onSubmit={handleAddLead}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Lead Full Name *</label>
+                              <input
+                                type="text"
+                                className="portal-form-input"
+                                placeholder="e.g. Alex Morgan"
+                                value={newLeadForm.name}
+                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, name: e.target.value }))}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Job Title</label>
+                              <input
+                                type="text"
+                                className="portal-form-input"
+                                placeholder="e.g. VP of Engineering / CTO"
+                                value={newLeadForm.title}
+                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, title: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Target Company</label>
+                              <input
+                                type="text"
+                                className="portal-form-input"
+                                placeholder="e.g. Datacore Global"
+                                value={newLeadForm.company}
+                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, company: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Location</label>
+                              <input
+                                type="text"
+                                className="portal-form-input"
+                                placeholder="e.g. San Francisco, CA"
+                                value={newLeadForm.location}
+                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, location: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Corporate Email</label>
+                              <input
+                                type="email"
+                                className="portal-form-input"
+                                placeholder="alex@datacore.io"
+                                value={newLeadForm.email}
+                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, email: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>LinkedIn Profile URL</label>
+                              <input
+                                type="url"
+                                className="portal-form-input"
+                                placeholder="https://linkedin.com/in/alex-morgan"
+                                value={newLeadForm.linkedin}
+                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, linkedin: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Verification Status</label>
+                              <select
+                                className="portal-form-input"
+                                value={newLeadForm.status}
+                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, status: e.target.value }))}
+                              >
+                                <option value="PENDING">PENDING</option>
+                                <option value="RESEARCHED">RESEARCHED</option>
+                                <option value="VERIFIED">VERIFIED (Requires Research Notes)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Research / Verification Notes</label>
+                              <input
+                                type="text"
+                                className="portal-form-input"
+                                placeholder="e.g. Verified corporate email via SMTP; active role on LinkedIn"
+                                value={newLeadForm.notes}
+                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, notes: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                              type="submit"
+                              className="portal-btn-primary"
+                              disabled={isAddingLead}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                            >
+                              <Plus size={14} />
+                              <span>{isAddingLead ? 'Adding Lead...' : 'Add Sample Lead'}</span>
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+
+                      {/* Editing Lead Modal / Inline Box */}
+                      {editingLead && (
+                        <div style={{ background: 'rgba(0, 217, 255, 0.06)', border: '1px solid rgba(0, 217, 255, 0.3)', borderRadius: '8px', padding: '16px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h5 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#00D9FF', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Edit2 size={14} /> Edit Lead: {editingLead.name}
+                            </h5>
+                            <button
+                              type="button"
+                              onClick={() => setEditingLead(null)}
+                              style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
+                            >
+                              <X size={15} />
+                            </button>
+                          </div>
+                          <form onSubmit={handleUpdateLead}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Name *</label>
+                                <input
+                                  type="text"
+                                  className="portal-form-input"
+                                  value={editingLead.name || ''}
+                                  onChange={(e) => setEditingLead(prev => ({ ...prev, name: e.target.value }))}
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Title</label>
+                                <input
+                                  type="text"
+                                  className="portal-form-input"
+                                  value={editingLead.title || ''}
+                                  onChange={(e) => setEditingLead(prev => ({ ...prev, title: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Company</label>
+                                <input
+                                  type="text"
+                                  className="portal-form-input"
+                                  value={editingLead.company || ''}
+                                  onChange={(e) => setEditingLead(prev => ({ ...prev, company: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Location</label>
+                                <input
+                                  type="text"
+                                  className="portal-form-input"
+                                  value={editingLead.location || ''}
+                                  onChange={(e) => setEditingLead(prev => ({ ...prev, location: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Email</label>
+                                <input
+                                  type="email"
+                                  className="portal-form-input"
+                                  value={editingLead.email || ''}
+                                  onChange={(e) => setEditingLead(prev => ({ ...prev, email: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>LinkedIn URL</label>
+                                <input
+                                  type="url"
+                                  className="portal-form-input"
+                                  value={editingLead.linkedin || ''}
+                                  onChange={(e) => setEditingLead(prev => ({ ...prev, linkedin: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Status</label>
+                                <select
+                                  className="portal-form-input"
+                                  value={editingLead.status || 'PENDING'}
+                                  onChange={(e) => setEditingLead(prev => ({ ...prev, status: e.target.value }))}
+                                >
+                                  <option value="PENDING">PENDING</option>
+                                  <option value="RESEARCHED">RESEARCHED</option>
+                                  <option value="VERIFIED">VERIFIED (Requires Research Notes)</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Notes</label>
+                                <input
+                                  type="text"
+                                  className="portal-form-input"
+                                  value={editingLead.notes || ''}
+                                  onChange={(e) => setEditingLead(prev => ({ ...prev, notes: e.target.value }))}
+                                />
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                              <button
+                                type="button"
+                                className="portal-btn-secondary"
+                                onClick={() => setEditingLead(null)}
+                                style={{ padding: '5px 12px', fontSize: '0.8rem' }}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                className="portal-btn-primary"
+                                disabled={isUpdatingLead}
+                                style={{ padding: '5px 14px', fontSize: '0.8rem' }}
+                              >
+                                {isUpdatingLead ? 'Saving...' : 'Update Lead'}
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      )}
+
+                      {/* Current Leads Table */}
+                      <div>
+                        <h5 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5', margin: '0 0 10px 0' }}>
+                          Uploaded Leads ({clientLeads.length})
+                        </h5>
+                        {clientLeads.length === 0 ? (
+                          <div style={{ padding: '30px', textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', color: '#94A3B8', fontSize: '0.85rem' }}>
+                            No sample leads added yet. Use the form above to add at least 5 leads for this client.
+                          </div>
+                        ) : (
+                          <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                            <table className="request-table">
+                              <thead>
+                                <tr>
+                                  <th>Name</th>
+                                  <th>Title</th>
+                                  <th>Company</th>
+                                  <th>Location</th>
+                                  <th>Email</th>
+                                  <th>LinkedIn</th>
+                                  <th>Lead PDF / Dossier</th>
+                                  <th>Status</th>
+                                  <th>Verification Notes</th>
+                                  <th style={{ textAlign: 'right' }}>Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {clientLeads.map((lead) => (
+                                  <tr key={lead.id}>
+                                    <td style={{ fontWeight: '600', color: '#F5F5F5' }}>{lead.name}</td>
+                                    <td style={{ color: '#CBD5E1' }}>{lead.title || '—'}</td>
+                                    <td style={{ color: '#00D9FF' }}>{lead.company || '—'}</td>
+                                    <td style={{ color: '#94A3B8' }}>{lead.location || '—'}</td>
+                                    <td>
+                                      {lead.email ? (
+                                        <a href={`mailto:${lead.email}`} style={{ color: '#00D9FF', textDecoration: 'none', fontSize: '0.8rem' }}>
+                                          {lead.email}
+                                        </a>
+                                      ) : (
+                                        <span style={{ color: '#64748B' }}>—</span>
+                                      )}
+                                    </td>
+                                    <td>
+                                      {lead.linkedin ? (
+                                        <a href={lead.linkedin} target="_blank" rel="noreferrer" style={{ color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', fontSize: '0.78rem' }}>
+                                          Profile <ExternalLink size={10} />
+                                        </a>
+                                      ) : (
+                                        <span style={{ color: '#64748B' }}>—</span>
+                                      )}
+                                    </td>
+                                    <td>
+                                      {uploadingLeadPdfId === lead.id ? (
+                                        <span style={{ fontSize: '0.75rem', color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                          <Clock size={12} className="spin" /> Uploading PDF...
+                                        </span>
+                                      ) : (lead.source_reference || lead.sourceReference) ? (
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                          <a
+                                            href={lead.source_reference || lead.sourceReference}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="portal-btn-secondary"
+                                            style={{ padding: '3px 8px', fontSize: '0.75rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                            title="View Lead PDF"
+                                          >
+                                            <FileText size={12} />
+                                            <span>View PDF</span>
+                                          </a>
+                                          <label
+                                            className="portal-btn-secondary"
+                                            style={{ padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                            title="Replace Lead PDF"
+                                          >
+                                            <Upload size={11} />
+                                            <input
+                                              type="file"
+                                              accept=".pdf"
+                                              style={{ display: 'none' }}
+                                              onChange={(e) => handleUploadLeadPdf(lead, e)}
+                                            />
+                                          </label>
+                                        </div>
+                                      ) : (
+                                        <label
+                                          className="portal-btn-primary"
+                                          style={{
+                                            padding: '3px 10px',
+                                            fontSize: '0.75rem',
+                                            cursor: 'pointer',
+                                            background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
+                                            color: '#030303',
+                                            fontWeight: '700',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                          }}
+                                          title="Upload Lead PDF Documentation"
+                                        >
+                                          <Upload size={12} />
+                                          <span>Upload PDF</span>
+                                          <input
+                                            type="file"
+                                            accept=".pdf"
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => handleUploadLeadPdf(lead, e)}
+                                          />
+                                        </label>
+                                      )}
+                                    </td>
+                                    <td>
+                                      <span className={`status-pill ${(lead.status || 'PENDING').toUpperCase()}`}>
+                                        {lead.status || 'PENDING'}
+                                      </span>
+                                    </td>
+                                    <td style={{ fontSize: '0.78rem', color: '#94A3B8', maxWidth: '200px' }} className="cell-truncate" title={lead.notes || ''}>
+                                      {lead.notes || '—'}
+                                    </td>
+                                    <td style={{ textAlign: 'right' }}>
+                                      <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                        <button
+                                          type="button"
+                                          className="portal-btn-secondary"
+                                          style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                          onClick={() => setEditingLead(lead)}
+                                          title="Edit or Verify Lead"
+                                        >
+                                          <Edit2 size={12} />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="portal-btn-secondary"
+                                          style={{ padding: '4px 8px', fontSize: '0.75rem', color: '#ef4444' }}
+                                          onClick={() => handleDeleteLead(lead.id)}
+                                          title="Delete Lead"
+                                        >
+                                          <Trash2 size={12} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 3: KEY PEOPLE & STAKEHOLDERS */}
+                  {activePrepTab === 'keyPeople' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      <div style={{ background: 'rgba(168, 85, 247, 0.05)', border: '1px solid rgba(168, 85, 247, 0.2)', borderRadius: '8px', padding: '14px 16px' }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#C084FC', marginBottom: '4px' }}>
+                          Key Decision-Makers & Stakeholders
+                        </div>
+                        <p style={{ fontSize: '0.82rem', color: '#CBD5E1', margin: 0, lineHeight: '1.5' }}>
+                          Add primary contacts and stakeholders identified for {selectedOnboardingClient.name} with their respective roles and verified LinkedIn profiles.
+                        </p>
+                      </div>
+
+                      {/* Add Stakeholder Form */}
+                      <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '16px' }}>
+                        <h5 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Plus size={15} color="#C084FC" /> Add Key Stakeholder
+                        </h5>
+                        <form onSubmit={handleAddKeyPerson}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Full Name *</label>
+                              <input
+                                type="text"
+                                className="portal-form-input"
+                                placeholder="e.g. Samantha Wright"
+                                value={newKeyPersonForm.name}
+                                onChange={(e) => setNewKeyPersonForm(prev => ({ ...prev, name: e.target.value }))}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Executive Role / Title *</label>
+                              <input
+                                type="text"
+                                className="portal-form-input"
+                                placeholder="e.g. Chief Operating Officer"
+                                value={newKeyPersonForm.role}
+                                onChange={(e) => setNewKeyPersonForm(prev => ({ ...prev, role: e.target.value }))}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Department</label>
+                              <input
+                                type="text"
+                                className="portal-form-input"
+                                placeholder="e.g. Executive Leadership / Operations"
+                                value={newKeyPersonForm.department}
+                                onChange={(e) => setNewKeyPersonForm(prev => ({ ...prev, department: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Contact Email</label>
+                              <input
+                                type="email"
+                                className="portal-form-input"
+                                placeholder="samantha@company.com"
+                                value={newKeyPersonForm.contact}
+                                onChange={(e) => setNewKeyPersonForm(prev => ({ ...prev, contact: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>LinkedIn / Social Profile</label>
+                              <input
+                                type="url"
+                                className="portal-form-input"
+                                placeholder="https://linkedin.com/in/samantha-wright"
+                                value={newKeyPersonForm.socialProfile}
+                                onChange={(e) => setNewKeyPersonForm(prev => ({ ...prev, socialProfile: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                              type="submit"
+                              className="portal-btn-primary"
+                              disabled={isAddingKeyPerson}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                            >
+                              <Plus size={14} />
+                              <span>{isAddingKeyPerson ? 'Adding...' : 'Add Key Stakeholder'}</span>
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+
+                      {/* Current Stakeholders Table */}
+                      <div>
+                        <h5 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5', margin: '0 0 10px 0' }}>
+                          Identified Stakeholders ({clientKeyPeople.length})
+                        </h5>
+                        {clientKeyPeople.length === 0 ? (
+                          <div style={{ padding: '30px', textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', color: '#94A3B8', fontSize: '0.85rem' }}>
+                            No stakeholders added yet. Use the form above to add key company leaders.
+                          </div>
+                        ) : (
+                          <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
+                            <table className="request-table">
+                              <thead>
+                                <tr>
+                                  <th>Name</th>
+                                  <th>Role / Title</th>
+                                  <th>Department</th>
+                                  <th>Contact Email</th>
+                                  <th>LinkedIn / Social Profile</th>
+                                  <th style={{ textAlign: 'right' }}>Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {clientKeyPeople.map((kp) => (
+                                  <tr key={kp.id}>
+                                    <td style={{ fontWeight: '600', color: '#F5F5F5' }}>{kp.name}</td>
+                                    <td style={{ color: '#00D9FF' }}>{kp.role || '—'}</td>
+                                    <td style={{ color: '#CBD5E1' }}>{kp.department || '—'}</td>
+                                    <td>
+                                      {kp.contact ? (
+                                        <a href={`mailto:${kp.contact}`} style={{ color: '#00D9FF', textDecoration: 'none', fontSize: '0.8rem' }}>
+                                          {kp.contact}
+                                        </a>
+                                      ) : (
+                                        <span style={{ color: '#64748B' }}>—</span>
+                                      )}
+                                    </td>
+                                    <td>
+                                      {kp.socialProfile ? (
+                                        <a href={kp.socialProfile} target="_blank" rel="noreferrer" style={{ color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', fontSize: '0.78rem' }}>
+                                          Profile <ExternalLink size={10} />
+                                        </a>
+                                      ) : (
+                                        <span style={{ color: '#64748B' }}>—</span>
+                                      )}
+                                    </td>
+                                    <td style={{ textAlign: 'right' }}>
+                                      <button
+                                        type="button"
+                                        className="portal-btn-secondary"
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem', color: '#ef4444' }}
+                                        onClick={() => handleDeleteKeyPerson(kp.id)}
+                                        title="Delete Stakeholder"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="portal-modal-footer" style={{ borderTop: '1px solid var(--portal-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '14px', fontSize: '0.78rem', color: '#94A3B8' }}>
+                <span>Research: <strong style={{ color: clientResearch?.trim() ? '#34d399' : '#fbbf24' }}>{clientResearch?.trim() ? '✓ Saved' : 'Pending'}</strong></span>
+                <span>Sample Leads: <strong style={{ color: clientLeads.length >= 5 ? '#34d399' : '#fbbf24' }}>{clientLeads.length}/5</strong></span>
+                <span>Stakeholders: <strong style={{ color: clientKeyPeople.length > 0 ? '#34d399' : '#fbbf24' }}>{clientKeyPeople.length}</strong></span>
+              </div>
+              <button
+                type="button"
+                className="portal-btn-primary"
+                onClick={() => setIsPrepModalOpen(false)}
+              >
+                Done / Close Workspace
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

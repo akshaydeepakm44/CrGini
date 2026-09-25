@@ -76,12 +76,82 @@ export const generateTicketId = async () => {
   return `CG-${maxNum + 1}`;
 };
 
+// Authoritative backend pricing calculation engine
+export const calculateServicePrice = ({ serviceType, subService, requirements = {}, selectedServices = [] }) => {
+  let basePrice = 799;
+  let breakdown = [];
+  let serviceLabel = 'Company Boost Sprint';
+
+  if (serviceType === 'COMPANY_LEAD') {
+    basePrice = 499;
+    serviceLabel = 'Company Lead Target Research';
+    const countLabel = requirements.leadsCount ? `${requirements.leadsCount} Target Leads` : '50 Verified Leads';
+    breakdown.push({ item: `Prospecting & Profile Discovery (${countLabel})`, amount: 349 });
+    breakdown.push({ item: 'Direct Contact & Decision-Maker Verification', amount: 150 });
+  } else if (serviceType === 'LANDING_PAGE') {
+    basePrice = 599;
+    serviceLabel = 'Landing Page Enhancement Sprint';
+    breakdown.push({ item: 'UI/UX Enhancement Sprint', amount: 599 });
+  } else if (serviceType === 'COMPANY_BOOST') {
+    if (subService === 'STRATEGIC_PLAN') {
+      basePrice = 799;
+      serviceLabel = 'Company Boost: Strategic Plan Sprint';
+      breakdown.push({ item: 'Market & Positioning Architecture', amount: 499 });
+      breakdown.push({ item: 'Outbound Playbook & Growth Sequencing', amount: 300 });
+    } else if (subService === 'CONTENT') {
+      basePrice = 799;
+      serviceLabel = 'Company Boost: Content Production Sprint';
+      breakdown.push({ item: 'Branded Poster & Visual Creative Assets', amount: 399 });
+      breakdown.push({ item: 'High-Definition Product Showcase Video', amount: 400 });
+    } else if (subService === 'DEVREL_PLAN' || subService === 'DEVREL') {
+      basePrice = 799;
+      serviceLabel = 'Company Boost: DevRel Strategy Sprint';
+      breakdown.push({ item: 'Developer Ecosystem & Documentation Audit', amount: 499 });
+      breakdown.push({ item: 'Technical Community & Outreach Roadmap', amount: 300 });
+    } else if (subService === 'CUSTOM') {
+      basePrice = 799;
+      serviceLabel = 'Company Boost: Custom Scope Sprint';
+      const count = Array.isArray(selectedServices) && selectedServices.length > 0 ? selectedServices.length : 1;
+      breakdown.push({ item: `Custom Multidisciplinary Scope (${count} Service Areas)`, amount: 799 });
+    } else {
+      basePrice = 799;
+      serviceLabel = 'Company Boost Growth Sprint';
+      breakdown.push({ item: 'Standard Growth Operations Sprint', amount: 799 });
+    }
+  }
+
+  return {
+    price: basePrice,
+    currency: 'USD',
+    pricingStatus: 'CONFIGURED',
+    serviceLabel,
+    breakdown
+  };
+};
+
+// @desc    Calculate authoritative configured price for service requirements
+// @route   POST /api/requests/calculate-price
+// @access  Private (USER, ADMIN)
+export const calculateRequestPrice = async (req, res) => {
+  try {
+    const { serviceType = 'COMPANY_BOOST', subService, requirements = {}, selectedServices = [] } = req.body;
+    const pricing = calculateServicePrice({ serviceType, subService, requirements, selectedServices });
+    return res.json({
+      success: true,
+      ...pricing
+    });
+  } catch (error) {
+    console.error('Calculate price error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to calculate price.' });
+  }
+};
+
 // @desc    Create a new service request / ticket
 // @route   POST /api/requests
 // @access  Private (USER)
 export const createRequest = async (req, res) => {
   try {
-    const { serviceType, title, description, priority, price, notes } = req.body;
+    const { serviceType, subService, title, description, priority, notes, requirements, selectedServices } = req.body;
 
     if (!serviceType || !title || !description) {
       return res.status(400).json({
@@ -108,9 +178,27 @@ export const createRequest = async (req, res) => {
       LANDING_PAGE: 'Landing Page Enhancement Team'
     };
 
-    const defaultPrice = serviceType === 'COMPANY_LEAD' ? 499
-      : serviceType === 'COMPANY_BOOST' ? 799
-      : 599;
+    // Authoritative backend price calculation:
+    // The backend is the sole source of truth for the price.
+    // Client-provided price inputs are never trusted to prevent devtools manipulation.
+    const pricing = calculateServicePrice({ serviceType, subService, requirements, selectedServices });
+    const finalPrice = pricing.price;
+
+    let finalNotes = notes || null;
+    if (requirements && typeof requirements === 'object' && Object.keys(requirements).length > 0) {
+      finalNotes = JSON.stringify({
+        subService,
+        requirements,
+        selectedServices: selectedServices || [],
+        pricing: {
+          price: finalPrice,
+          currency: pricing.currency,
+          status: pricing.pricingStatus,
+          breakdown: pricing.breakdown
+        },
+        submittedAt: new Date().toISOString()
+      });
+    }
 
     const ticketId = await generateTicketId();
 
@@ -122,9 +210,9 @@ export const createRequest = async (req, res) => {
       title,
       description,
       priority: priority || 'MEDIUM',
-      price: price || defaultPrice,
+      price: finalPrice,
       assignedTeam: teamMap[serviceType] || 'CreativeGini Core Team',
-      notes: notes || null,
+      notes: finalNotes,
       status: 'REQUEST_CREATED',
       paymentStatus: 'PENDING'
     });

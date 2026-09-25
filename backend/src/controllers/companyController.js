@@ -8,6 +8,7 @@ import {
   deleteCompanyLead,
   addKeyPerson,
   deleteKeyPerson,
+  updateCompany,
 } from '../repositories/companyRepository.js';
 import { query } from '../config/postgres.js';
 
@@ -419,13 +420,83 @@ export const deleteKeyPersonHandler = async (req, res) => {
   }
 };
 
+// @desc    Update company research / study (Admin / Specialist)
+// @route   PATCH /api/company/:companyId/research
+// @access  Private (ADMIN, COMPANY_LEAD)
+export const updateCompanyResearchHandler = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { researchSummary } = req.body;
+
+    const company = await findCompanyById(companyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found.' });
+    }
+
+    const updated = await updateCompany(companyId, {
+      researchSummary: typeof researchSummary === 'string' ? researchSummary.trim() : null
+    });
+
+    return res.json({
+      success: true,
+      message: 'Company research study saved successfully.',
+      company: updated
+    });
+  } catch (error) {
+    console.error('[Update Company Research Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update company research.' });
+  }
+};
+
+// @desc    Get company leads & key people by companyId (Admin / Specialist)
+// @route   GET /api/company/:companyId/leads
+// @access  Private (ADMIN, COMPANY_LEAD)
+export const getCompanyLeadsByCompanyId = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const [company, rawLeads, keyPeople] = await Promise.all([
+      findCompanyById(companyId),
+      getCompanyLeads(companyId),
+      getKeyPeople(companyId),
+    ]);
+
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found.' });
+    }
+
+    const leads = rawLeads.map((l) => ({
+      ...l,
+      isVerified: isLeadVerified(l),
+    }));
+
+    return res.json({
+      success: true,
+      company: {
+        id: company.id,
+        name: company.name,
+        contactPerson: company.contactPerson,
+        email: company.email,
+        website: company.website,
+        industry: company.industry,
+        companyInfo: company.companyInfo,
+        researchSummary: company.researchSummary,
+      },
+      leads,
+      keyPeople,
+    });
+  } catch (error) {
+    console.error('[Get Company Leads By ID Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch company leads.' });
+  }
+};
+
 // @desc    Get onboarding samples for a company (Poster, Video, Strategic Plan, DevRel Plan)
 // @route   GET /api/company/:companyId/onboarding-assets
 // @access  Private (ADMIN, COMPANY_BOOST, or Client of that company)
 export const getCompanyOnboardingAssets = async (req, res) => {
   try {
-    const targetCompanyId = req.params.companyId === 'my-company' 
-      ? req.user.companyId 
+    const targetCompanyId = (!req.params.companyId || req.params.companyId === 'my-company')
+      ? (req.user.companyId || (req.user.company && (req.user.company.id || req.user.company._id)))
       : req.params.companyId;
 
     if (!targetCompanyId) {
@@ -649,39 +720,53 @@ export const saveCompanyOnboardingAssets = async (req, res) => {
   }
 };
 
-// @desc    Get all companies with their onboarding assets status for the Company Boost team
+// @desc    Get all companies with their onboarding assets status for internal teams (Company Boost & Company Lead)
 // @route   GET /api/company/onboarding/clients
-// @access  Private (ADMIN, COMPANY_BOOST)
+// @desc    Get all companies with their onboarding assets status for internal teams (Company Boost, Company Lead, Landing Page)
+// @route   GET /api/company/onboarding/clients
+// @access  Private (ADMIN, COMPANY_BOOST, COMPANY_LEAD, LANDING_PAGE)
 export const getOnboardingClients = async (req, res) => {
   try {
     const companiesRes = await query(`
       SELECT 
         c.id, c.name, c.contact_person AS "contactPerson", c.email, 
         c.phone, c.website, c.industry, c.company_info AS "companyInfo", 
+        c.research_summary AS "researchSummary",
         c.created_at AS "createdAt",
         u.id AS "clientUserId", u.name AS "clientUserName", u.email AS "clientUserEmail",
-        r.id AS "onboardingRequestId", r.ticket_id AS "onboardingTicketId"
+        rb.id AS "boostRequestId", rb.ticket_id AS "boostTicketId",
+        rl.id AS "leadRequestId", rl.ticket_id AS "leadTicketId",
+        ru.id AS "uiRequestId", ru.ticket_id AS "uiTicketId",
+        (SELECT COUNT(*)::int FROM company_leads WHERE company_id = c.id) AS "leadCount",
+        (SELECT COUNT(*)::int FROM company_leads WHERE company_id = c.id AND UPPER(status) = 'VERIFIED' AND notes IS NOT NULL AND TRIM(notes) != '') AS "verifiedLeadCount",
+        (SELECT COUNT(*)::int FROM submission_files sf JOIN submissions s ON sf.submission_id = s.id WHERE s.request_id = rl.id) AS "leadsWithPdfCount",
+        (SELECT COUNT(*)::int FROM company_key_people WHERE company_id = c.id) AS "keyPeopleCount",
+        (SELECT COUNT(*)::int FROM company_key_people WHERE company_id = c.id AND social_profile IS NOT NULL AND TRIM(social_profile) != '') AS "linkedInCount"
       FROM companies c
       LEFT JOIN users u ON u.company_id = c.id AND u.role = 'USER' AND u.is_deleted = false
-      LEFT JOIN requests r ON r.company_id = c.id AND r.service_type = 'COMPANY_BOOST' 
-        AND (r.title ILIKE '%Onboarding%' OR r.title ILIKE '%Welcome / Initial%')
+      LEFT JOIN requests rb ON rb.company_id = c.id AND rb.service_type = 'COMPANY_BOOST' 
+        AND (rb.title ILIKE '%Onboarding%' OR rb.title ILIKE '%Welcome%')
+      LEFT JOIN requests rl ON rl.company_id = c.id AND rl.service_type = 'COMPANY_LEAD' 
+        AND (rl.title ILIKE '%Onboarding%' OR rl.title ILIKE '%Sample Leads%')
+      LEFT JOIN requests ru ON ru.company_id = c.id AND ru.service_type = 'LANDING_PAGE' 
+        AND (ru.title ILIKE '%Onboarding%' OR ru.title ILIKE '%Welcome%')
       ORDER BY c.created_at DESC
     `);
 
-    // For each company, fetch files in onboarding submission
+    // For each company, fetch files in onboarding submissions
     const clientsWithStatus = await Promise.all(companiesRes.rows.map(async (row) => {
       let posterUploaded = false;
       let videoUploaded = false;
       let strategicPlanUploaded = false;
       let devrelPlanUploaded = false;
 
-      if (row.onboardingRequestId) {
+      if (row.boostRequestId) {
         const filesRes = await query(`
           SELECT sf.name, sf.type
           FROM submission_files sf
           JOIN submissions s ON s.id = sf.submission_id
           WHERE s.request_id = $1
-        `, [row.onboardingRequestId]);
+        `, [row.boostRequestId]);
 
         for (const f of filesRes.rows) {
           const n = (f.name || '').toLowerCase();
@@ -693,6 +778,34 @@ export const getOnboardingClients = async (req, res) => {
         }
       }
 
+      let uiAnalysisUploaded = false;
+      let landingPageEnhancementUploaded = false;
+
+      if (row.uiRequestId) {
+        const uiFilesRes = await query(`
+          SELECT sf.name, sf.type
+          FROM submission_files sf
+          JOIN submissions s ON s.id = sf.submission_id
+          WHERE s.request_id = $1
+        `, [row.uiRequestId]);
+
+        for (const f of uiFilesRes.rows) {
+          const n = (f.name || '').toLowerCase();
+          if (n.startsWith('[ui/ux analysis]') || n.includes('analysis')) uiAnalysisUploaded = true;
+          if (n.startsWith('[landing page enhancement]') || n.includes('enhancement') || n.includes('landing')) landingPageEnhancementUploaded = true;
+        }
+      }
+
+      const hasResearch = Boolean(row.researchSummary && row.researchSummary.trim().length > 0);
+      const leadCount = row.leadCount || 0;
+      const verifiedLeadCount = row.verifiedLeadCount || 0;
+      const leadsWithPdfCount = row.leadsWithPdfCount || 0;
+      const keyPeopleCount = row.keyPeopleCount || 0;
+      const linkedInCount = row.linkedInCount || 0;
+      const sampleLeadsCompleted = leadCount >= 5;
+      const keyPeopleCompleted = keyPeopleCount > 0;
+      const leadOnboardingAllPrepared = hasResearch && sampleLeadsCompleted && keyPeopleCompleted;
+
       return {
         id: row.id,
         name: row.name,
@@ -702,14 +815,34 @@ export const getOnboardingClients = async (req, res) => {
         website: row.website,
         industry: row.industry || 'Technology / SaaS',
         companyInfo: row.companyInfo,
+        researchSummary: row.researchSummary || '',
         createdAt: row.createdAt,
-        onboardingTicketId: row.onboardingTicketId || null,
+        onboardingTicketId: row.boostTicketId || null,
+        leadTicketId: row.leadTicketId || null,
+        uiTicketId: row.uiTicketId || null,
         onboardingStatus: {
           poster: posterUploaded ? 'Uploaded' : 'Pending',
           video: videoUploaded ? 'Uploaded' : 'Pending',
           strategicPlan: strategicPlanUploaded ? 'Uploaded' : 'Pending',
           devrelPlan: devrelPlanUploaded ? 'Uploaded' : 'Pending',
           allPrepared: posterUploaded && videoUploaded && strategicPlanUploaded && devrelPlanUploaded
+        },
+        leadOnboardingStatus: {
+          hasResearch,
+          researchCompleted: hasResearch,
+          leadCount,
+          verifiedLeadCount,
+          leadsWithPdfCount,
+          keyPeopleCount,
+          linkedInCount,
+          sampleLeadsCompleted,
+          keyPeopleCompleted,
+          allPrepared: leadOnboardingAllPrepared
+        },
+        uiOnboardingStatus: {
+          uiAnalysis: uiAnalysisUploaded ? 'Uploaded' : 'Pending',
+          landingPageEnhancement: landingPageEnhancementUploaded ? 'Uploaded' : 'Pending',
+          allPrepared: uiAnalysisUploaded && landingPageEnhancementUploaded
         }
       };
     }));
@@ -722,6 +855,523 @@ export const getOnboardingClients = async (req, res) => {
   } catch (error) {
     console.error('[Get Onboarding Clients Error]:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch onboarding clients.' });
+  }
+};
+
+// @desc    Get UI onboarding samples for a company (UI/UX Analysis, Landing Page Enhancement)
+// @route   GET /api/company/:companyId/ui-onboarding-assets
+// @access  Private (ADMIN, LANDING_PAGE, or Client of that company)
+export const getCompanyUiOnboardingAssets = async (req, res) => {
+  try {
+    const targetCompanyId = (!req.params.companyId || req.params.companyId === 'my-company')
+      ? (req.user.companyId || (req.user.company && (req.user.company.id || req.user.company._id)))
+      : req.params.companyId;
+
+    if (!targetCompanyId) {
+      return res.status(400).json({ success: false, message: 'Company ID required.' });
+    }
+
+    if (req.user.role === 'USER') {
+      const userCompanyId = req.user.companyId || (req.user.company && (req.user.company.id || req.user.company._id));
+      if (String(userCompanyId) !== String(targetCompanyId)) {
+        return res.status(403).json({ success: false, message: 'Forbidden: You cannot access assets of another company.' });
+      }
+    } else if (!['ADMIN', 'LANDING_PAGE'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Forbidden: Insufficient privileges.' });
+    }
+
+    const company = await findCompanyById(targetCompanyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found.' });
+    }
+
+    const reqRes = await query(`
+      SELECT r.id, r.ticket_id, r.status, r.created_at
+      FROM requests r
+      WHERE r.company_id = $1 AND r.service_type = 'LANDING_PAGE'
+        AND (r.title ILIKE '%Onboarding%' OR r.title ILIKE '%Welcome%')
+      ORDER BY r.created_at ASC
+      LIMIT 1
+    `, [targetCompanyId]);
+
+    let uiAnalysis = null;
+    let landingPageEnhancement = null;
+    let ticketId = null;
+
+    if (reqRes.rows.length > 0) {
+      const reqRow = reqRes.rows[0];
+      ticketId = reqRow.ticket_id;
+
+      const subRes = await query(`
+        SELECT id FROM submissions WHERE request_id = $1 ORDER BY version ASC LIMIT 1
+      `, [reqRow.id]);
+
+      if (subRes.rows.length > 0) {
+        const subId = subRes.rows[0].id;
+        const filesRes = await query(`
+          SELECT id, name, url, size, type, created_at
+          FROM submission_files
+          WHERE submission_id = $1
+          ORDER BY created_at ASC
+        `, [subId]);
+
+        for (const file of filesRes.rows) {
+          const rawName = file.name || '';
+          const nameLower = rawName.toLowerCase();
+          const fileObj = {
+            id: file.id,
+            name: rawName.replace(/^\[(UI\/UX Analysis|Landing Page Enhancement)\]\s*/i, ''),
+            rawName,
+            size: file.size,
+            type: file.type,
+            url: file.url,
+            streamUrl: `/api/assets/${file.id}/stream`,
+            createdAt: file.created_at
+          };
+
+          if (rawName.startsWith('[UI/UX Analysis]') || nameLower.includes('analysis') || nameLower.includes('ui_ux')) {
+            uiAnalysis = fileObj;
+          } else if (rawName.startsWith('[Landing Page Enhancement]') || nameLower.includes('enhancement') || nameLower.includes('landing')) {
+            landingPageEnhancement = fileObj;
+          }
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      company: {
+        id: company.id,
+        name: company.name,
+        contactPerson: company.contactPerson,
+        website: company.website,
+        industry: company.industry
+      },
+      ticketId,
+      assets: {
+        uiAnalysis,
+        landingPageEnhancement
+      },
+      status: {
+        uiAnalysis: uiAnalysis ? 'Uploaded' : 'Pending',
+        landingPageEnhancement: landingPageEnhancement ? 'Uploaded' : 'Pending',
+        allPrepared: Boolean(uiAnalysis && landingPageEnhancement)
+      }
+    });
+  } catch (error) {
+    console.error('[Get UI Onboarding Assets Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch UI onboarding assets.' });
+  }
+};
+
+// @desc    Upload / save UI onboarding samples for a company in the existing Assets system
+// @route   POST /api/company/:companyId/ui-onboarding-assets
+// @access  Private (ADMIN, LANDING_PAGE)
+export const saveCompanyUiOnboardingAssets = async (req, res) => {
+  try {
+    const targetCompanyId = req.params.companyId;
+    if (!targetCompanyId) {
+      return res.status(400).json({ success: false, message: 'Company ID required.' });
+    }
+
+    const company = await findCompanyById(targetCompanyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found.' });
+    }
+
+    const clientUserRes = await query(`
+      SELECT id, name, email FROM users WHERE company_id = $1 AND role = 'USER' ORDER BY created_at ASC LIMIT 1
+    `, [targetCompanyId]);
+    const clientUserId = clientUserRes.rows[0]?.id || req.user.id;
+
+    let request;
+    const reqCheck = await query(`
+      SELECT * FROM requests 
+      WHERE company_id = $1 AND service_type = 'LANDING_PAGE'
+        AND (title ILIKE '%Onboarding%' OR title ILIKE '%Welcome%')
+      ORDER BY created_at ASC LIMIT 1
+    `, [targetCompanyId]);
+
+    if (reqCheck.rows.length > 0) {
+      request = reqCheck.rows[0];
+    } else {
+      const countRes = await query('SELECT COUNT(*)::int as count FROM requests');
+      const ticketId = `CG-UI-ONB-${1000 + (countRes.rows[0]?.count || 0) + 1}`;
+      const insertReq = await query(`
+        INSERT INTO requests (
+          ticket_id, user_id, company_id, service_type, title, description,
+          priority, status, price, payment_status, assigned_team, completed_at
+        ) VALUES (
+          $1, $2, $3, 'LANDING_PAGE', 'Company UI / Landing Page Onboarding Samples',
+          'Initial UI/UX assessment and sample landing page enhancement work prepared for client workspace.',
+          'MEDIUM', 'COMPLETED', 999, 'PAID', 'Landing Page Team', NOW()
+        ) RETURNING *
+      `, [ticketId, clientUserId, targetCompanyId]);
+      request = insertReq.rows[0];
+    }
+
+    let submission;
+    const subCheck = await query(`
+      SELECT * FROM submissions WHERE request_id = $1 ORDER BY version ASC LIMIT 1
+    `, [request.id]);
+
+    if (subCheck.rows.length > 0) {
+      submission = subCheck.rows[0];
+    } else {
+      const insertSub = await query(`
+        INSERT INTO submissions (
+          request_id, ticket_code, version, title, description, status,
+          submitted_by, submitted_by_name, submitted_at
+        ) VALUES (
+          $1, $2, 1, 'Landing Page Onboarding Deliverables',
+          'Approved onboarding sample work including UI/UX Analysis and Landing Page Enhancement.',
+          'APPROVED', $3, $4, NOW()
+        ) RETURNING *
+      `, [request.id, request.ticket_id, req.user.id, req.user.name]);
+      submission = insertSub.rows[0];
+    }
+
+    const { uiAnalysis, landingPageEnhancement } = req.body;
+
+    const upsertFile = async (tag, fileData, defaultMime) => {
+      if (!fileData) return;
+      await query(`
+        DELETE FROM submission_files
+        WHERE submission_id = $1 AND name ILIKE $2
+      `, [submission.id, `[${tag}]%`]);
+
+      const fileName = `[${tag}] ${fileData.name || tag}`;
+      const mime = fileData.mimeType || fileData.type || defaultMime || 'application/pdf';
+      const size = fileData.size ? (typeof fileData.size === 'number' ? `${(fileData.size / 1024).toFixed(1)} KB` : String(fileData.size)) : 'Unknown';
+      const url = fileData.dataUrl || fileData.url || '';
+
+      await query(`
+        INSERT INTO submission_files (submission_id, name, url, size, type, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+      `, [submission.id, fileName, url, size, mime]);
+    };
+
+    if (uiAnalysis) await upsertFile('UI/UX Analysis', uiAnalysis, 'application/pdf');
+    if (landingPageEnhancement) await upsertFile('Landing Page Enhancement', landingPageEnhancement, 'application/pdf');
+
+    return res.json({
+      success: true,
+      message: 'Landing page onboarding sample assets saved successfully.',
+      ticketId: request.ticket_id
+    });
+  } catch (error) {
+    console.error('[Save UI Onboarding Assets Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to save UI onboarding assets.' });
+  }
+};
+
+// @desc    Get Lead onboarding samples (first 5 leads with associated PDFs)
+// @route   GET /api/company/:companyId/lead-onboarding-assets
+// @access  Private (ADMIN, COMPANY_LEAD, or Client of that company)
+export const getCompanyLeadOnboardingAssets = async (req, res) => {
+  try {
+    const targetCompanyId = (!req.params.companyId || req.params.companyId === 'my-company')
+      ? (req.user.companyId || (req.user.company && (req.user.company.id || req.user.company._id)))
+      : req.params.companyId;
+
+    if (!targetCompanyId) {
+      return res.status(400).json({ success: false, message: 'Company ID required.' });
+    }
+
+    if (req.user.role === 'USER') {
+      const userCompanyId = req.user.companyId || (req.user.company && (req.user.company.id || req.user.company._id));
+      if (String(userCompanyId) !== String(targetCompanyId)) {
+        return res.status(403).json({ success: false, message: 'Forbidden: You cannot access assets of another company.' });
+      }
+    } else if (!['ADMIN', 'COMPANY_LEAD'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Forbidden: Insufficient privileges.' });
+    }
+
+    const company = await findCompanyById(targetCompanyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found.' });
+    }
+
+    // Get up to 5 initial sample leads
+    const leadsRes = await query(`
+      SELECT id, name, title, lead_company AS company, email, linkedin, location, status, notes, source_reference, created_at
+      FROM company_leads
+      WHERE company_id = $1
+      ORDER BY created_at ASC
+      LIMIT 5
+    `, [targetCompanyId]);
+
+    // Check for onboarding request
+    const reqRes = await query(`
+      SELECT r.id, r.ticket_id
+      FROM requests r
+      WHERE r.company_id = $1 AND r.service_type = 'COMPANY_LEAD'
+        AND (r.title ILIKE '%Onboarding%' OR r.title ILIKE '%Sample Leads%')
+      ORDER BY r.created_at ASC LIMIT 1
+    `, [targetCompanyId]);
+
+    const filesByTag = new Map();
+    let ticketId = null;
+
+    if (reqRes.rows.length > 0) {
+      ticketId = reqRes.rows[0].ticket_id;
+      const subRes = await query(`
+        SELECT id FROM submissions WHERE request_id = $1 ORDER BY version ASC LIMIT 1
+      `, [reqRes.rows[0].id]);
+
+      if (subRes.rows.length > 0) {
+        const filesRes = await query(`
+          SELECT id, name, url, size, type, created_at
+          FROM submission_files
+          WHERE submission_id = $1
+          ORDER BY created_at ASC
+        `, [subRes.rows[0].id]);
+
+        for (const file of filesRes.rows) {
+          const match = file.name.match(/^\[Lead\s*0?([1-5])\]/i);
+          if (match) {
+            const idx = parseInt(match[1], 10);
+            filesByTag.set(idx, {
+              id: file.id,
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              url: file.url,
+              streamUrl: `/api/assets/${file.id}/stream`,
+              createdAt: file.created_at
+            });
+          }
+        }
+      }
+    }
+
+    const mappedLeads = leadsRes.rows.map((lead, i) => {
+      const slotIndex = i + 1;
+      const pdf = filesByTag.get(slotIndex) || (lead.source_reference ? {
+        id: null,
+        name: `${lead.name} Profile.pdf`,
+        streamUrl: lead.source_reference
+      } : null);
+
+      return {
+        ...lead,
+        slotIndex,
+        pdf
+      };
+    });
+
+    return res.json({
+      success: true,
+      company: {
+        id: company.id,
+        name: company.name,
+        contactPerson: company.contactPerson,
+        website: company.website,
+        industry: company.industry,
+        researchSummary: company.researchSummary || ''
+      },
+      ticketId,
+      leads: mappedLeads,
+      count: mappedLeads.length,
+      allPrepared: mappedLeads.length >= 5 && mappedLeads.every(l => l.pdf)
+    });
+  } catch (error) {
+    console.error('[Get Lead Onboarding Assets Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch lead onboarding assets.' });
+  }
+};
+
+// @desc    Save a sample lead and/or upload its PDF document in the existing Assets system
+// @route   POST /api/company/:companyId/lead-onboarding-assets
+// @access  Private (ADMIN, COMPANY_LEAD)
+export const saveCompanyLeadOnboardingAssets = async (req, res) => {
+  try {
+    const targetCompanyId = req.params.companyId;
+    if (!targetCompanyId) {
+      return res.status(400).json({ success: false, message: 'Company ID required.' });
+    }
+
+    const company = await findCompanyById(targetCompanyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found.' });
+    }
+
+    const { leadIndex, leadId, leadData, file } = req.body;
+    let cleanIndex = null;
+    if (leadId) {
+      const idxRes = await query(`
+        SELECT id FROM company_leads WHERE company_id = $1 ORDER BY created_at ASC LIMIT 5
+      `, [targetCompanyId]);
+      const foundIdx = idxRes.rows.findIndex(r => String(r.id) === String(leadId));
+      if (foundIdx !== -1) {
+        cleanIndex = foundIdx + 1;
+      }
+    }
+    if (!cleanIndex) {
+      const parsed = parseInt(leadIndex, 10);
+      cleanIndex = !isNaN(parsed) && parsed >= 1 && parsed <= 5 ? parsed : 1;
+    }
+    const tag = `Lead 0${cleanIndex}`;
+
+    const clientUserRes = await query(`
+      SELECT id, name, email FROM users WHERE company_id = $1 AND role = 'USER' ORDER BY created_at ASC LIMIT 1
+    `, [targetCompanyId]);
+    const clientUserId = clientUserRes.rows[0]?.id || req.user.id;
+
+    let request;
+    const reqCheck = await query(`
+      SELECT * FROM requests 
+      WHERE company_id = $1 AND service_type = 'COMPANY_LEAD'
+        AND (title ILIKE '%Onboarding%' OR title ILIKE '%Sample Leads%')
+      ORDER BY created_at ASC LIMIT 1
+    `, [targetCompanyId]);
+
+    if (reqCheck.rows.length > 0) {
+      request = reqCheck.rows[0];
+    } else {
+      const countRes = await query('SELECT COUNT(*)::int as count FROM requests');
+      const ticketId = `CG-LEAD-ONB-${1000 + (countRes.rows[0]?.count || 0) + 1}`;
+      const insertReq = await query(`
+        INSERT INTO requests (
+          ticket_id, user_id, company_id, service_type, title, description,
+          priority, status, price, payment_status, assigned_team, completed_at
+        ) VALUES (
+          $1, $2, $3, 'COMPANY_LEAD', 'Company Lead Onboarding Samples',
+          'Initial 5 sample leads and documentation prepared for client workspace.',
+          'MEDIUM', 'COMPLETED', 499, 'PAID', 'Company Lead Team', NOW()
+        ) RETURNING *
+      `, [ticketId, clientUserId, targetCompanyId]);
+      request = insertReq.rows[0];
+    }
+
+    let submission;
+    const subCheck = await query(`
+      SELECT * FROM submissions WHERE request_id = $1 ORDER BY version ASC LIMIT 1
+    `, [request.id]);
+
+    if (subCheck.rows.length > 0) {
+      submission = subCheck.rows[0];
+    } else {
+      const insertSub = await query(`
+        INSERT INTO submissions (
+          request_id, ticket_code, version, title, description, status,
+          submitted_by, submitted_by_name, submitted_at
+        ) VALUES (
+          $1, $2, 1, 'Company Lead Onboarding Deliverables',
+          'Approved onboarding sample leads and PDF profile documentation.',
+          'APPROVED', $3, $4, NOW()
+        ) RETURNING *
+      `, [request.id, request.ticket_id, req.user.id, req.user.name]);
+      submission = insertSub.rows[0];
+    }
+
+    let fileRecord = null;
+    let streamUrl = null;
+
+    if (file && (file.dataUrl || file.url)) {
+      await query(`
+        DELETE FROM submission_files
+        WHERE submission_id = $1 AND name ILIKE $2
+      `, [submission.id, `[${tag}]%`]);
+
+      const leadName = leadData?.name ? leadData.name.trim() : `Sample Lead ${cleanIndex}`;
+      const fileName = `[${tag}] ${leadName} - Executive Lead Profile.pdf`;
+      const mime = file.type || file.mimeType || 'application/pdf';
+      const size = file.size ? (typeof file.size === 'number' ? `${(file.size / 1024).toFixed(1)} KB` : String(file.size)) : 'Unknown';
+      const url = file.dataUrl || file.url || '';
+
+      const insFile = await query(`
+        INSERT INTO submission_files (submission_id, name, url, size, type, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        RETURNING *
+      `, [submission.id, fileName, url, size, mime]);
+      fileRecord = insFile.rows[0];
+      streamUrl = `/api/assets/${fileRecord.id}/stream`;
+    }
+
+    // Now update or insert the lead in company_leads
+    let savedLead = null;
+    if (leadId) {
+      const updateFields = [];
+      const updateValues = [];
+      let valIdx = 1;
+
+      if (leadData?.name) { updateFields.push(`name = $${valIdx++}`); updateValues.push(leadData.name.trim()); }
+      if (leadData?.title !== undefined) { updateFields.push(`title = $${valIdx++}`); updateValues.push(leadData.title); }
+      if (leadData?.company !== undefined) { updateFields.push(`lead_company = $${valIdx++}`); updateValues.push(leadData.company); }
+      if (leadData?.email !== undefined) { updateFields.push(`email = $${valIdx++}`); updateValues.push(leadData.email); }
+      if (leadData?.linkedin !== undefined) { updateFields.push(`linkedin = $${valIdx++}`); updateValues.push(leadData.linkedin); }
+      if (leadData?.location !== undefined) { updateFields.push(`location = $${valIdx++}`); updateValues.push(leadData.location); }
+      
+      let finalNotes = leadData?.notes;
+      if (streamUrl) {
+        if (finalNotes === undefined) {
+          const cur = await query(`SELECT notes FROM company_leads WHERE id = $1`, [leadId]);
+          finalNotes = cur.rows[0]?.notes || '';
+        }
+        const stripped = (finalNotes || '').replace(/\[Lead PDF:\s*[^\]]+\]/g, '').trim();
+        finalNotes = stripped ? `${stripped}\n[Lead PDF: ${streamUrl}]` : `[Lead PDF: ${streamUrl}]`;
+        updateFields.push(`status = $${valIdx++}`);
+        updateValues.push('VERIFIED');
+      } else if (leadData?.status) {
+        updateFields.push(`status = $${valIdx++}`);
+        updateValues.push(leadData.status);
+      }
+      
+      if (finalNotes !== undefined) {
+        updateFields.push(`notes = $${valIdx++}`);
+        updateValues.push(finalNotes);
+      }
+      updateFields.push(`updated_at = NOW()`);
+
+      updateValues.push(leadId);
+      const resLead = await query(`
+        UPDATE company_leads
+        SET ${updateFields.join(', ')}
+        WHERE id = $${valIdx}
+        RETURNING *
+      `, updateValues);
+      savedLead = resLead.rows[0];
+    } else if (leadData && leadData.name) {
+      const baseNotes = (leadData.notes || 'Onboarding Sample Lead with verified documentation.').replace(/\[Lead PDF:\s*[^\]]+\]/g, '').trim();
+      const finalNotes = streamUrl ? `${baseNotes}\n[Lead PDF: ${streamUrl}]` : baseNotes;
+
+      const insLead = await query(`
+        INSERT INTO company_leads (
+          company_id, name, title, lead_company, email, linkedin, location,
+          status, notes, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7,
+          'VERIFIED', $8, NOW(), NOW()
+        ) RETURNING *
+      `, [
+        targetCompanyId,
+        leadData.name.trim(),
+        leadData.title || null,
+        leadData.company || null,
+        leadData.email || null,
+        leadData.linkedin || null,
+        leadData.location || null,
+        finalNotes
+      ]);
+      savedLead = insLead.rows[0];
+    }
+
+    return res.json({
+      success: true,
+      message: `Lead ${cleanIndex} onboarding work saved successfully.`,
+      ticketId: request.ticket_id,
+      lead: savedLead,
+      fileUrl: streamUrl,
+      file: fileRecord ? {
+        id: fileRecord.id,
+        name: fileRecord.name,
+        streamUrl
+      } : null
+    });
+  } catch (error) {
+    console.error('[Save Lead Onboarding Assets Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to save lead onboarding work.' });
   }
 };
 

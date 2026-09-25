@@ -101,7 +101,7 @@ export const createClientUser = async (req, res) => {
       website: website || null,
       industry: industry || 'Technology / SaaS',
       companyInfo: companyInfo || description || null,
-      researchSummary: researchSummary || 'Pre-researched market positioning and initial leads provided by CreativeGini.',
+      researchSummary: researchSummary?.trim() || null,
       initialLeads: initialLeads || [],
       initialKeyPeople: initialKeyPeople || [],
       createdBy: req.user.id || req.user._id
@@ -172,7 +172,7 @@ export const createClientUser = async (req, res) => {
         try {
           await createNotification({
             userId: internalUser.id,
-            type: 'NEW_CLIENT',
+            type: 'ASSIGNMENT',
             title: `New Client Created: ${compName}`,
             message: `A new client has been created in CreativeGini and the team needs to prepare the initial company samples/workspace.`
           });

@@ -266,17 +266,10 @@ export default function AdminDashboard({ user, onLogout }) {
         website: createWorkflow.website?.trim() || '',
         industry: createWorkflow.industry?.trim() || 'Enterprise SaaS / AI',
         companyInfo: createWorkflow.companyInfo?.trim() || '',
-        researchSummary: createWorkflow.companyInfo?.trim() || '',
+        researchSummary: '',
         password: createWorkflow.password.trim(),
         initialLeads: [],
-        initialKeyPeople: [
-          {
-            name: createWorkflow.contactPerson.trim(),
-            role: 'Executive Sponsor',
-            department: 'Management',
-            contact: createWorkflow.email.trim()
-          }
-        ]
+        initialKeyPeople: []
       };
 
       const res = await api.adminCreateClient(payload);

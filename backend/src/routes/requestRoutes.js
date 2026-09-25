@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   createRequest,
+  calculateRequestPrice,
   getRequests,
   getRequestById,
   updateRequestStatus,
@@ -27,6 +28,9 @@ router.route('/')
   .post(protect, createRequest)
   .get(protect, getRequests);
 
+router.route('/calculate-price')
+  .post(protect, calculateRequestPrice);
+
 router.route('/:id')
   .get(protect, getRequestById);
 
@@ -37,7 +41,8 @@ router.route('/:id/assign')
   .post(protect, authorize('ADMIN', 'COMPANY_LEAD', 'COMPANY_BOOST', 'LANDING_PAGE'), assignTicket);
 
 router.route('/:id/start-work')
-  .post(protect, authorize('ADMIN', 'COMPANY_LEAD', 'COMPANY_BOOST', 'LANDING_PAGE'), startWork);
+  .post(protect, authorize('ADMIN', 'COMPANY_LEAD', 'COMPANY_BOOST', 'LANDING_PAGE'), startWork)
+  .patch(protect, authorize('ADMIN', 'COMPANY_LEAD', 'COMPANY_BOOST', 'LANDING_PAGE'), startWork);
 
 router.route('/:id/admin-override')
   .post(protect, authorize('ADMIN'), adminOverride);

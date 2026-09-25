@@ -155,6 +155,19 @@ export const api = {
     return data.request;
   },
 
+  async calculatePrice(payload) {
+    const res = await fetch(`${API_BASE}/requests/calculate-price`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to calculate request price');
+    }
+    return data;
+  },
+
   async createRequest(payload) {
     const res = await fetch(`${API_BASE}/requests`, {
       method: 'POST',
@@ -612,6 +625,177 @@ export const api = {
       throw new Error(data.message || 'Failed to fetch onboarding clients');
     }
     return data.clients || [];
+  },
+
+  // Company UI Onboarding Samples
+  async getMyUiOnboardingAssets() {
+    const res = await fetch(`${API_BASE}/company/my-company/ui-onboarding-assets`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch UI onboarding assets');
+    }
+    return data;
+  },
+
+  async getCompanyUiOnboardingAssets(companyId) {
+    const res = await fetch(`${API_BASE}/company/${companyId}/ui-onboarding-assets`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch company UI onboarding assets');
+    }
+    return data;
+  },
+
+  async saveCompanyUiOnboardingAssets(companyId, payload) {
+    const res = await fetch(`${API_BASE}/company/${companyId}/ui-onboarding-assets`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to save UI onboarding assets');
+    }
+    return data;
+  },
+
+  // Company Lead Onboarding Samples (First 5 Sample Leads & PDFs)
+  async getMyLeadOnboardingAssets() {
+    const res = await fetch(`${API_BASE}/company/my-company/lead-onboarding-assets`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch lead onboarding assets');
+    }
+    return data;
+  },
+
+  async getCompanyLeadOnboardingAssets(companyId) {
+    const res = await fetch(`${API_BASE}/company/${companyId}/lead-onboarding-assets`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch company lead onboarding assets');
+    }
+    return data;
+  },
+
+  async saveCompanyLeadOnboardingAssets(companyId, payload) {
+    const res = await fetch(`${API_BASE}/company/${companyId}/lead-onboarding-assets`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to save lead onboarding work');
+    }
+    return data;
+  },
+
+  // Company Lead Specialist & Management APIs
+  async getCompanyById(companyId) {
+    const res = await fetch(`${API_BASE}/company/${companyId}`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch company profile');
+    }
+    return data.company;
+  },
+
+  async getCompanyLeads(companyId) {
+    const res = await fetch(`${API_BASE}/company/${companyId}/leads`, {
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to fetch company leads');
+    }
+    return data;
+  },
+
+  async updateCompanyResearch(companyId, researchSummary) {
+    const res = await fetch(`${API_BASE}/company/${companyId}/research`, {
+      method: 'PATCH',
+      headers: getHeaders(true),
+      body: JSON.stringify({ researchSummary })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to update company research study');
+    }
+    return data;
+  },
+
+  async addCompanyLead(companyId, payload) {
+    const res = await fetch(`${API_BASE}/company/${companyId}/leads`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to add lead');
+    }
+    return data;
+  },
+
+  async updateCompanyLead(leadId, payload) {
+    const res = await fetch(`${API_BASE}/company/leads/${leadId}`, {
+      method: 'PATCH',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to update lead');
+    }
+    return data;
+  },
+
+  async deleteCompanyLead(leadId) {
+    const res = await fetch(`${API_BASE}/company/leads/${leadId}`, {
+      method: 'DELETE',
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to delete lead');
+    }
+    return data;
+  },
+
+  async addKeyPerson(companyId, payload) {
+    const res = await fetch(`${API_BASE}/company/${companyId}/key-people`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to add stakeholder');
+    }
+    return data;
+  },
+
+  async deleteKeyPerson(personId) {
+    const res = await fetch(`${API_BASE}/company/key-people/${personId}`, {
+      method: 'DELETE',
+      headers: getHeaders(true)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to delete stakeholder');
+    }
+    return data;
   },
 };
 

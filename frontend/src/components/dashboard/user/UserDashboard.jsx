@@ -142,24 +142,115 @@ export default function UserDashboard({ user, onLogout }) {
     strategicPlan: 'Pending',
     devrelPlan: 'Pending'
   });
+
+  // Company UI Workspace & Onboarding Assets State
+  const [uiOnboardingAssets, setUiOnboardingAssets] = useState({
+    uiAnalysis: null,
+    landingPageEnhancement: null
+  });
+  const [uiOnboardingStatus, setUiOnboardingStatus] = useState({
+    uiAnalysis: 'Pending',
+    landingPageEnhancement: 'Pending'
+  });
+
   const [customServices, setCustomServices] = useState({
     strategicPlan: false,
     content: false,
     devrel: false
   });
-  const [customRequirement, setCustomRequirement] = useState('');
-  const [isSubmittingCustom, setIsSubmittingCustom] = useState(false);
   const [lightboxPoster, setLightboxPoster] = useState(null);
+
+  // Requirement Modal State (Multi-step flow for Company Boost)
+  const [isRequirementModalOpen, setIsRequirementModalOpen] = useState(false);
+  const [requirementSubService, setRequirementSubService] = useState('STRATEGIC_PLAN'); // 'STRATEGIC_PLAN' | 'CONTENT' | 'DEVREL' | 'CUSTOM'
+  const [requirementStep, setRequirementStep] = useState(1); // 1: Input, 2: Review, 3: Pricing
+  const [calculatingPrice, setCalculatingPrice] = useState(false);
+  const [configuredPriceData, setConfiguredPriceData] = useState(null);
+  const [requirementErrors, setRequirementErrors] = useState({});
+
+  // 1. Strategic Plan fields
+  const [strategicPlanForm, setStrategicPlanForm] = useState({
+    mainGoal: '',
+    targetMarket: '',
+    focusArea: '',
+    currentStage: '',
+    painPoints: '',
+    competitors: '',
+    expectedOutcome: '',
+    additionalRequirements: '',
+    referenceLinks: ''
+  });
+
+  // 2. Content for Your Company fields
+  const [contentForm, setContentForm] = useState({
+    contentTypes: {
+      poster: true,
+      productVideo: true,
+      socialContent: false,
+      productShowcase: false,
+      other: false
+    },
+    deliverablesCount: '1 Poster + 1 Showcase Video',
+    mainPurpose: '',
+    targetAudience: '',
+    productHighlight: '',
+    preferredPlatforms: '',
+    keyMessage: '',
+    brandRequirements: '',
+    referenceExamples: '',
+    existingBrandAssets: '',
+    additionalRequirements: ''
+  });
+
+  // 3. DevRel Plan fields
+  const [devrelForm, setDevrelForm] = useState({
+    mainDevrelGoal: '',
+    productApiSdk: '',
+    targetDeveloperAudience: '',
+    developerPlatforms: '',
+    developerAdoptionChallenges: '',
+    documentationRequirements: '',
+    communityRequirements: '',
+    openSourceRequirements: '',
+    developerContentRequirements: '',
+    expectedOutcome: '',
+    referenceLinks: '',
+    additionalRequirements: ''
+  });
+
+  // 4. Custom Request fields
+  const [customForm, setCustomForm] = useState({
+    selectedServices: {
+      strategicPlan: true,
+      content: false,
+      devrel: false
+    },
+    requirements: '',
+    expectedOutcome: '',
+    additionalRequirements: '',
+    referenceLinks: ''
+  });
+
+  // Lead Requirement Modal State ("Request More Leads" flow - simplified 2-step)
+  const [isLeadReqModalOpen, setIsLeadReqModalOpen] = useState(false);
+  const [leadReqStep, setLeadReqStep] = useState(1); // 1: Number of Leads, 2: Pricing & Payment
+  const [calculatingLeadPrice, setCalculatingLeadPrice] = useState(false);
+  const [leadPriceData, setLeadPriceData] = useState(null);
+  const [leadReqErrors, setLeadReqErrors] = useState({});
+  const [leadReqForm, setLeadReqForm] = useState({
+    leadsCount: '50'
+  });
 
   // Load Company, Requests, and Notifications
   const loadData = async () => {
     try {
       setLoading(true);
-      const [companyData, requestsData, notifsData, onbData] = await Promise.all([
+      const [companyData, requestsData, notifsData, onbData, uiOnbData] = await Promise.all([
         api.getMyCompany().catch(() => user?.company || null),
         api.getRequests().catch(() => []),
         api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 })),
-        api.getMyOnboardingAssets().catch(() => null)
+        api.getMyOnboardingAssets().catch(() => null),
+        api.getMyUiOnboardingAssets().catch(() => null)
       ]);
       if (companyData) setCompany(companyData);
       setRequests(requestsData);
@@ -170,6 +261,10 @@ export default function UserDashboard({ user, onLogout }) {
       if (onbData?.assets) {
         setOnboardingAssets(onbData.assets);
         setOnboardingStatus(onbData.status || {});
+      }
+      if (uiOnbData?.assets) {
+        setUiOnboardingAssets(uiOnbData.assets);
+        setUiOnboardingStatus(uiOnbData.status || {});
       }
     } catch (err) {
       console.error('Error loading user dashboard data:', err);
@@ -184,6 +279,8 @@ export default function UserDashboard({ user, onLogout }) {
     setSelectedTicket(null);
     setSelectedLeadDetail(null);
     setIsRequestModalOpen(false);
+    setIsRequirementModalOpen(false);
+    setIsLeadReqModalOpen(false);
     setIsMobileDrawerOpen(false);
     if (window.history.state?.modal) {
       window.history.replaceState({ nav: navKey }, '');
@@ -209,6 +306,8 @@ export default function UserDashboard({ user, onLogout }) {
     setSelectedTicket(null);
     setSelectedLeadDetail(null);
     setIsRequestModalOpen(false);
+    setIsRequirementModalOpen(false);
+    setIsLeadReqModalOpen(false);
   }, [activeNav]);
 
   // Listen for browser back/forward buttons (popstate)
@@ -216,6 +315,12 @@ export default function UserDashboard({ user, onLogout }) {
     const handlePopState = () => {
       if (isRequestModalOpen) {
         setIsRequestModalOpen(false);
+      }
+      if (isRequirementModalOpen) {
+        setIsRequirementModalOpen(false);
+      }
+      if (isLeadReqModalOpen) {
+        setIsLeadReqModalOpen(false);
       }
       if (selectedTicket) {
         setSelectedTicket(null);
@@ -226,7 +331,7 @@ export default function UserDashboard({ user, onLogout }) {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [isRequestModalOpen, selectedTicket, selectedLeadDetail]);
+  }, [isRequestModalOpen, isRequirementModalOpen, isLeadReqModalOpen, selectedTicket, selectedLeadDetail]);
 
   useEffect(() => {
     loadData();
@@ -235,7 +340,11 @@ export default function UserDashboard({ user, onLogout }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (isMobileDrawerOpen) {
+        if (isLeadReqModalOpen) {
+          setIsLeadReqModalOpen(false);
+        } else if (isRequirementModalOpen) {
+          setIsRequirementModalOpen(false);
+        } else if (isMobileDrawerOpen) {
           setIsMobileDrawerOpen(false);
         } else if (viewingInvoice) {
           setViewingInvoice(null);
@@ -259,7 +368,7 @@ export default function UserDashboard({ user, onLogout }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    isMobileDrawerOpen, viewingInvoice, selectedLeadDetail, isRequestModalOpen, pendingPaymentTicket, selectedTicket,
+    isLeadReqModalOpen, isRequirementModalOpen, isMobileDrawerOpen, viewingInvoice, selectedLeadDetail, isRequestModalOpen, pendingPaymentTicket, selectedTicket,
     isHelpModalOpen, isNotificationsOpen, isProfileMenuOpen
   ]);
 
@@ -476,101 +585,251 @@ export default function UserDashboard({ user, onLogout }) {
     }
   };
 
-  // Company Boost: Request Strategic Plan
-  const handleRequestStrategicPlan = async () => {
-    try {
-      setIsSubmittingRequest(true);
-      const created = await api.createRequest({
-        serviceType: 'COMPANY_BOOST',
-        title: `Strategic Growth Plan Sprint · ${company?.name || user?.name}`,
-        description: 'Comprehensive market penetration roadmap, ICP messaging architecture, and enterprise outbound growth playbook tailored for company scale.',
-        priority: 'MEDIUM',
-        price: 799
-      });
-      await loadData();
-      setPendingPaymentTicket(created);
-    } catch (err) {
-      alert(err.message || 'Failed to request Strategic Plan');
-    } finally {
-      setIsSubmittingRequest(false);
-    }
-  };
-
-  // Company Boost: Request Content
-  const handleRequestContent = async () => {
-    try {
-      setIsSubmittingRequest(true);
-      const created = await api.createRequest({
-        serviceType: 'COMPANY_BOOST',
-        title: `Branded Content & Media Sprint · ${company?.name || user?.name}`,
-        description: 'High-converting company-specific content production including branded posters, video assets, and multi-channel creative campaign deliverables.',
-        priority: 'MEDIUM',
-        price: 799
-      });
-      await loadData();
-      setPendingPaymentTicket(created);
-    } catch (err) {
-      alert(err.message || 'Failed to request Content');
-    } finally {
-      setIsSubmittingRequest(false);
-    }
-  };
-
-  // Company Boost: Request DevRel Plan
-  const handleRequestDevRelPlan = async () => {
-    try {
-      setIsSubmittingRequest(true);
-      const created = await api.createRequest({
-        serviceType: 'COMPANY_BOOST',
-        title: `Developer Relations (DevRel) Strategy Sprint · ${company?.name || user?.name}`,
-        description: 'Engineering-focused DevRel framework: technical documentation enhancement, developer community engagement funnels, and SDK evangelism strategy.',
-        priority: 'MEDIUM',
-        price: 799
-      });
-      await loadData();
-      setPendingPaymentTicket(created);
-    } catch (err) {
-      alert(err.message || 'Failed to request DevRel Plan');
-    } finally {
-      setIsSubmittingRequest(false);
-    }
-  };
-
-  // Company Boost: Request Custom Service
-  const handleRequestCustomService = async (e) => {
+  // Custom Request Handler: opens requirement modal
+  const handleRequestCustomService = (e) => {
     if (e) e.preventDefault();
-    const selected = [];
-    if (customServices.strategicPlan) selected.push('Strategic Plan');
-    if (customServices.content) selected.push('Content for Your Company');
-    if (customServices.devrel) selected.push('DevRel Plan');
+    handleOpenRequirementModal('CUSTOM');
+  };
 
-    if (selected.length === 0) {
-      alert('Please select at least one service area (Strategic Plan, Content for Your Company, or DevRel Plan).');
-      return;
+  // Company Boost Requirement Modal Handler
+  const handleOpenRequirementModal = (subService) => {
+    setRequirementSubService(subService);
+    setRequirementStep(1);
+    setRequirementErrors({});
+    setConfiguredPriceData(null);
+    if (subService === 'CUSTOM') {
+      setCustomForm(prev => ({
+        ...prev,
+        selectedServices: {
+          strategicPlan: customServices.strategicPlan || (!customServices.content && !customServices.devrel),
+          content: customServices.content,
+          devrel: customServices.devrel
+        }
+      }));
+    }
+    setIsRequirementModalOpen(true);
+  };
+
+  // Step 1 Validation
+  const validateStep1 = () => {
+    const errors = {};
+    if (requirementSubService === 'STRATEGIC_PLAN') {
+      if (!strategicPlanForm.mainGoal.trim()) errors.mainGoal = 'Main goal is required';
+      if (!strategicPlanForm.targetMarket.trim()) errors.targetMarket = 'Target market / audience is required';
+      if (!strategicPlanForm.focusArea.trim()) errors.focusArea = 'Please specify focus areas';
+      if (!strategicPlanForm.painPoints.trim()) errors.painPoints = 'Key challenges or pain points are required';
+      if (!strategicPlanForm.expectedOutcome.trim()) errors.expectedOutcome = 'Expected outcome is required';
+    } else if (requirementSubService === 'CONTENT') {
+      const hasType = Object.values(contentForm.contentTypes).some(Boolean);
+      if (!hasType) errors.contentTypes = 'Select at least one content type';
+      if (!contentForm.deliverablesCount.trim()) errors.deliverablesCount = 'Deliverables count / scope is required';
+      if (!contentForm.mainPurpose.trim()) errors.mainPurpose = 'Main purpose of the content is required';
+      if (!contentForm.targetAudience.trim()) errors.targetAudience = 'Target audience is required';
+      if (!contentForm.productHighlight.trim()) errors.productHighlight = 'Product or service to highlight is required';
+    } else if (requirementSubService === 'DEVREL') {
+      if (!devrelForm.mainDevrelGoal.trim()) errors.mainDevrelGoal = 'Main DevRel goal is required';
+      if (!devrelForm.productApiSdk.trim()) errors.productApiSdk = 'Product, API, or SDK name is required';
+      if (!devrelForm.targetDeveloperAudience.trim()) errors.targetDeveloperAudience = 'Target developer audience is required';
+      if (!devrelForm.expectedOutcome.trim()) errors.expectedOutcome = 'Expected outcome is required';
+    } else if (requirementSubService === 'CUSTOM') {
+      const hasService = Object.values(customForm.selectedServices).some(Boolean);
+      if (!hasService) errors.selectedServices = 'Select at least one service area';
+      if (!customForm.requirements.trim()) errors.requirements = 'Requirements description is required';
     }
 
-    if (!customRequirement.trim()) {
-      alert('Please describe what you would like CreativeGini to prepare for you.');
-      return;
-    }
+    setRequirementErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
+  const handleProceedToReview = (e) => {
+    if (e) e.preventDefault();
+    if (validateStep1()) {
+      setRequirementStep(2);
+    }
+  };
+
+  const handleProceedToPricing = async () => {
     try {
-      setIsSubmittingCustom(true);
+      setCalculatingPrice(true);
+      const selected = [];
+      if (requirementSubService === 'CUSTOM') {
+        if (customForm.selectedServices.strategicPlan) selected.push('Strategic Plan');
+        if (customForm.selectedServices.content) selected.push('Content for Your Company');
+        if (customForm.selectedServices.devrel) selected.push('DevRel Plan');
+      }
+
+      let reqData = {};
+      if (requirementSubService === 'STRATEGIC_PLAN') reqData = strategicPlanForm;
+      else if (requirementSubService === 'CONTENT') reqData = contentForm;
+      else if (requirementSubService === 'DEVREL') reqData = devrelForm;
+      else if (requirementSubService === 'CUSTOM') reqData = customForm;
+
+      const res = await api.calculatePrice({
+        serviceType: 'COMPANY_BOOST',
+        subService: requirementSubService,
+        requirements: reqData,
+        selectedServices: selected
+      });
+      setConfiguredPriceData(res);
+      setRequirementStep(3);
+    } catch (err) {
+      alert('Failed to configure pricing: ' + err.message);
+    } finally {
+      setCalculatingPrice(false);
+    }
+  };
+
+  const handleConfirmAndProceedToPayment = async () => {
+    try {
+      setIsSubmittingRequest(true);
+
+      let title = '';
+      let formattedDescription = '';
+      let reqData = {};
+      let selectedList = [];
+
+      if (requirementSubService === 'STRATEGIC_PLAN') {
+        title = `Strategic Growth Plan Sprint · ${company?.name || user?.name}`;
+        formattedDescription = `[STRATEGIC PLAN REQUIREMENT SPECIFICATION]
+• Main Goal: ${strategicPlanForm.mainGoal}
+• Target Market / Audience: ${strategicPlanForm.targetMarket}
+• Primary Focus Areas: ${strategicPlanForm.focusArea}
+• Key Challenges & Pain Points: ${strategicPlanForm.painPoints}
+• Expected Outcome: ${strategicPlanForm.expectedOutcome}
+${strategicPlanForm.currentStage ? `• Current Business Stage: ${strategicPlanForm.currentStage}\n` : ''}${strategicPlanForm.competitors ? `• Competitors / Reference Companies: ${strategicPlanForm.competitors}\n` : ''}${strategicPlanForm.additionalRequirements ? `• Additional Requirements: ${strategicPlanForm.additionalRequirements}\n` : ''}${strategicPlanForm.referenceLinks ? `• Reference Links: ${strategicPlanForm.referenceLinks}\n` : ''}`.trim();
+        reqData = strategicPlanForm;
+      } else if (requirementSubService === 'CONTENT') {
+        title = `Branded Content & Media Sprint · ${company?.name || user?.name}`;
+        const selectedTypes = Object.entries(contentForm.contentTypes)
+          .filter(([_, v]) => v)
+          .map(([k]) => k === 'productVideo' ? 'Product Video' : k === 'socialContent' ? 'Social Media Content' : k === 'productShowcase' ? 'Product Showcase' : k === 'poster' ? 'Poster' : 'Other')
+          .join(', ');
+        formattedDescription = `[CONTENT PRODUCTION REQUIREMENT SPECIFICATION]
+• Content Types: ${selectedTypes}
+• Deliverables Scope: ${contentForm.deliverablesCount}
+• Main Purpose: ${contentForm.mainPurpose}
+• Target Audience: ${contentForm.targetAudience}
+• Product / Service to Highlight: ${contentForm.productHighlight}
+${contentForm.preferredPlatforms ? `• Preferred Platforms: ${contentForm.preferredPlatforms}\n` : ''}${contentForm.keyMessage ? `• Key Message: ${contentForm.keyMessage}\n` : ''}${contentForm.brandRequirements ? `• Brand / Style Guidelines: ${contentForm.brandRequirements}\n` : ''}${contentForm.referenceExamples ? `• Reference Examples / Links: ${contentForm.referenceExamples}\n` : ''}${contentForm.existingBrandAssets ? `• Existing Brand Assets: ${contentForm.existingBrandAssets}\n` : ''}${contentForm.additionalRequirements ? `• Additional Requirements: ${contentForm.additionalRequirements}\n` : ''}`.trim();
+        reqData = contentForm;
+      } else if (requirementSubService === 'DEVREL') {
+        title = `Developer Relations (DevRel) Strategy Sprint · ${company?.name || user?.name}`;
+        formattedDescription = `[DEVREL STRATEGY REQUIREMENT SPECIFICATION]
+• Main DevRel Goal: ${devrelForm.mainDevrelGoal}
+• Product / API / SDK: ${devrelForm.productApiSdk}
+• Target Developer Audience: ${devrelForm.targetDeveloperAudience}
+• Expected Outcome: ${devrelForm.expectedOutcome}
+${devrelForm.developerPlatforms ? `• Target Platforms / Communities: ${devrelForm.developerPlatforms}\n` : ''}${devrelForm.developerAdoptionChallenges ? `• Adoption Challenges: ${devrelForm.developerAdoptionChallenges}\n` : ''}${devrelForm.documentationRequirements ? `• Documentation Scope: ${devrelForm.documentationRequirements}\n` : ''}${devrelForm.communityRequirements ? `• Community Building Scope: ${devrelForm.communityRequirements}\n` : ''}${devrelForm.openSourceRequirements ? `• Open Source Scope: ${devrelForm.openSourceRequirements}\n` : ''}${devrelForm.developerContentRequirements ? `• Developer Content Scope: ${devrelForm.developerContentRequirements}\n` : ''}${devrelForm.referenceLinks ? `• Reference Links: ${devrelForm.referenceLinks}\n` : ''}${devrelForm.additionalRequirements ? `• Additional Requirements: ${devrelForm.additionalRequirements}\n` : ''}`.trim();
+        reqData = devrelForm;
+      } else if (requirementSubService === 'CUSTOM') {
+        if (customForm.selectedServices.strategicPlan) selectedList.push('Strategic Plan');
+        if (customForm.selectedServices.content) selectedList.push('Content for Your Company');
+        if (customForm.selectedServices.devrel) selectedList.push('DevRel Plan');
+        title = `Custom Boost Sprint: ${selectedList.join(' + ')} · ${company?.name || user?.name}`;
+        formattedDescription = `[CUSTOM COMPANY BOOST SPRINT SPECIFICATION]
+• Selected Services: ${selectedList.join(', ')}
+• Client Requirements & Scope: ${customForm.requirements}
+${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutcome}\n` : ''}${customForm.additionalRequirements ? `• Additional Requirements: ${customForm.additionalRequirements}\n` : ''}${customForm.referenceLinks ? `• Reference Links: ${customForm.referenceLinks}\n` : ''}`.trim();
+        reqData = customForm;
+      }
+
+      // Create request in backend (which calculates and protects the final price)
       const created = await api.createRequest({
         serviceType: 'COMPANY_BOOST',
-        title: `Custom Boost Sprint: ${selected.join(' + ')} · ${company?.name || user?.name}`,
-        description: `Selected Services:\n${selected.map(s => `• ${s}`).join('\n')}\n\nClient Requirements:\n${customRequirement.trim()}`,
-        priority: 'HIGH',
-        price: 799
+        subService: requirementSubService,
+        title,
+        description: formattedDescription,
+        priority: requirementSubService === 'CUSTOM' ? 'HIGH' : 'MEDIUM',
+        requirements: reqData,
+        selectedServices: selectedList
       });
-      setCustomServices({ strategicPlan: false, content: false, devrel: false });
-      setCustomRequirement('');
+
+      // Close requirement modal
+      setIsRequirementModalOpen(false);
       await loadData();
+
+      // Launch existing payment confirmation modal
       setPendingPaymentTicket(created);
     } catch (err) {
-      alert(err.message || 'Failed to submit custom request');
+      alert('Failed to submit service request: ' + err.message);
     } finally {
-      setIsSubmittingCustom(false);
+      setIsSubmittingRequest(false);
+    }
+  };
+
+  // Company Lead Requirement Modal Handlers ("Request More Leads" flow)
+  // Company Lead Requirement Modal Handlers ("Request More Leads" flow - simplified 2-step)
+  const handleOpenLeadRequirementModal = () => {
+    setLeadReqStep(1);
+    setLeadReqErrors({});
+    setLeadPriceData(null);
+    setLeadReqForm({ leadsCount: '50' });
+    setIsLeadReqModalOpen(true);
+  };
+
+  const validateLeadCount = () => {
+    const errors = {};
+    const val = leadReqForm.leadsCount;
+    if (val === undefined || val === null || String(val).trim() === '') {
+      errors.leadsCount = 'Number of leads is required';
+    } else {
+      const num = Number(val);
+      if (isNaN(num) || !Number.isInteger(num)) {
+        errors.leadsCount = 'Please enter a valid whole integer';
+      } else if (num <= 0) {
+        errors.leadsCount = 'Number of leads must be greater than 0';
+      } else if (num > 5000) {
+        errors.leadsCount = 'Maximum limit is 5,000 leads per request';
+      }
+    }
+    setLeadReqErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleProceedLeadToPricing = async (e) => {
+    if (e) e.preventDefault();
+    if (!validateLeadCount()) return;
+
+    try {
+      setCalculatingLeadPrice(true);
+      const count = Number(leadReqForm.leadsCount) || 50;
+      const res = await api.calculatePrice({
+        serviceType: 'COMPANY_LEAD',
+        requirements: { leadsCount: count }
+      });
+      setLeadPriceData(res);
+      setLeadReqStep(2);
+    } catch (err) {
+      alert('Failed to configure pricing: ' + err.message);
+    } finally {
+      setCalculatingLeadPrice(false);
+    }
+  };
+
+  const handleConfirmLeadRequestAndPay = async () => {
+    try {
+      setIsSubmittingRequest(true);
+      const leads = Number(leadReqForm.leadsCount) || 50;
+      const title = `Target Leads Research Sprint (${leads} Leads) · ${company?.name || user?.name}`;
+      const formattedDescription = `Requested Leads: ${leads}`;
+
+      const created = await api.createRequest({
+        serviceType: 'COMPANY_LEAD',
+        title,
+        description: formattedDescription,
+        priority: 'HIGH',
+        requirements: { leadsCount: leads }
+      });
+
+      setIsLeadReqModalOpen(false);
+      await loadData();
+
+      // Launch existing payment confirmation modal
+      setPendingPaymentTicket(created);
+    } catch (err) {
+      alert('Failed to submit lead research request: ' + err.message);
+    } finally {
+      setIsSubmittingRequest(false);
     }
   };
 
@@ -609,6 +868,7 @@ export default function UserDashboard({ user, onLogout }) {
   const totalLeadsCount = leadsList.length;
   const keyPeopleCount = Array.isArray(company?.initialKeyPeople) ? company.initialKeyPeople.length : 0;
   const initialLeadsCount = totalLeadsCount;
+  const hasOnboardingLeadData = totalLeadsCount > 0 || Boolean(company?.researchSummary && company.researchSummary.trim().length > 0) || keyPeopleCount > 0;
 
   // Company Lead Requests
   const companyLeadRequests = requests
@@ -1722,38 +1982,27 @@ export default function UserDashboard({ user, onLogout }) {
                   </p>
                 </div>
                 <button
+                  id="header-btn-request-more-leads"
                   className="portal-btn-primary"
-                  onClick={() => handleOpenNewRequest('COMPANY_LEAD')}
+                  onClick={handleOpenLeadRequirementModal}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  <PlusCircle size={16} /> Request Company Lead
+                  <PlusCircle size={16} /> Request More Leads
                 </button>
               </div>
 
-              {/* Service Request / Sprint Status Card */}
-              {companyLeadRequests.length === 0 ? (
-                <div className="portal-card" style={{ marginBottom: '1.75rem', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%)', border: '1px dashed rgba(0, 217, 255, 0.35)', padding: '2rem 1.5rem', textAlign: 'center' }}>
-                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(0, 217, 255, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-                    <Users size={28} color="#00D9FF" />
+              {/* Onboarding Preparation State Banner (for brand-new client without sample work yet) */}
+              {!hasOnboardingLeadData ? (
+                <div className="portal-card" style={{ marginBottom: '1.75rem', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.7) 100%)', border: '1px dashed rgba(0, 217, 255, 0.4)', padding: '2.5rem 1.75rem', borderRadius: '12px', textAlign: 'center' }}>
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(0, 217, 255, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+                    <Clock size={28} color="#00D9FF" />
                   </div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#F5F5F5', margin: '0 0 0.5rem 0' }}>
-                    Company Lead research hasn't been requested yet.
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#F5F5F5', margin: '0 0 0.6rem 0' }}>
+                    Your Company Lead workspace is being prepared.
                   </h3>
-                  <p style={{ color: '#94a3b8', fontSize: '0.9rem', maxWidth: '560px', margin: '0 auto 1.25rem', lineHeight: '1.5' }}>
-                    Initiate a dedicated research sprint to discover and verify target companies and decision-makers matched to your ICP.
+                  <p style={{ color: '#94a3b8', fontSize: '0.92rem', maxWidth: '640px', margin: '0 auto', lineHeight: '1.6' }}>
+                    Once our Company Lead team completes your initial research, your sample leads, company study, and key people will appear here.
                   </p>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
-                    <span style={{ fontSize: '0.78rem', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.05)', padding: '4px 10px', borderRadius: '6px' }}>✓ Verified Decision-Makers</span>
-                    <span style={{ fontSize: '0.78rem', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.05)', padding: '4px 10px', borderRadius: '6px' }}>✓ Direct Corporate Emails</span>
-                    <span style={{ fontSize: '0.78rem', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.05)', padding: '4px 10px', borderRadius: '6px' }}>✓ Target Account Profiles</span>
-                  </div>
-                  <button
-                    className="portal-btn-primary"
-                    onClick={() => handleOpenNewRequest('COMPANY_LEAD')}
-                    style={{ margin: '0 auto' }}
-                  >
-                    <PlusCircle size={15} /> Request Company Lead
-                  </button>
                 </div>
               ) : activeLeadRequest && (
                 <div className="portal-card" style={{ marginBottom: '1.75rem', borderLeft: '4px solid #00D9FF' }}>
@@ -1909,14 +2158,22 @@ export default function UserDashboard({ user, onLogout }) {
                   </div>
                 </div>
 
-                <div style={{ background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '1rem', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#cbd5e1', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Search size={14} color="#00D9FF" /> CreativeGini Initial Research Summary
+                {company?.researchSummary && company.researchSummary.trim() ? (
+                  <div style={{ background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '1rem', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#cbd5e1', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Search size={14} color="#00D9FF" /> Company Study / Initial Research Summary
+                    </div>
+                    <p style={{ color: '#94a3b8', fontSize: '0.88rem', lineHeight: '1.6', margin: 0, whiteSpace: 'pre-wrap' }}>
+                      {company.researchSummary}
+                    </p>
                   </div>
-                  <p style={{ color: '#94a3b8', fontSize: '0.88rem', lineHeight: '1.6', margin: 0 }}>
-                    {company?.researchSummary || 'Pre-researched market positioning and initial leads provided by CreativeGini.'}
-                  </p>
-                </div>
+                ) : (
+                  <div style={{ background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', padding: '0.85rem 1rem', border: '1px dashed rgba(255, 255, 255, 0.08)' }}>
+                    <div style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Clock size={14} color="#64748b" /> Initial Company Study is currently being conducted by our lead specialists.
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Lead List Card with Search, Filter & Lead Details */}
@@ -2005,6 +2262,7 @@ export default function UserDashboard({ user, onLogout }) {
                         <th>Location</th>
                         <th>Direct Contact</th>
                         <th>LinkedIn</th>
+                        <th>Lead PDF / Dossier</th>
                         <th>Status</th>
                         <th>Action</th>
                       </tr>
@@ -2012,27 +2270,15 @@ export default function UserDashboard({ user, onLogout }) {
                     <tbody>
                       {totalLeadsCount === 0 ? (
                         <tr>
-                          <td colSpan="8" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#94a3b8' }}>
-                            {companyLeadRequests.length > 0 ? (
-                              <div>
-                                <Clock size={32} color="#00D9FF" style={{ margin: '0 auto 0.5rem', display: 'block', opacity: 0.8 }} />
-                                <div style={{ fontWeight: '600', color: '#e2e8f0', marginBottom: '0.25rem' }}>No leads have been added yet.</div>
-                                <div style={{ fontSize: '0.85rem' }}>Our research team is actively prospecting targeted accounts for your sprint.</div>
-                              </div>
-                            ) : (
-                              <div>
-                                <Users size={32} color="#64748b" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
-                                <div style={{ fontWeight: '600', color: '#e2e8f0', marginBottom: '0.25rem' }}>Company Lead research hasn't been requested yet.</div>
-                                <button className="portal-btn-primary" style={{ marginTop: '0.75rem', fontSize: '0.8rem' }} onClick={() => handleOpenNewRequest('COMPANY_LEAD')}>
-                                  Request Company Lead
-                                </button>
-                              </div>
-                            )}
+                          <td colSpan="9" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#94a3b8' }}>
+                            <Users size={32} color="#64748b" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
+                            <div style={{ fontWeight: '600', color: '#e2e8f0', marginBottom: '0.25rem' }}>No leads available yet.</div>
+                            <div style={{ fontSize: '0.85rem' }}>Your initial sample leads (minimum 5) will appear here once prepared by our Company Lead team.</div>
                           </td>
                         </tr>
                       ) : filteredCompanyLeads.length === 0 ? (
                         <tr>
-                          <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                          <td colSpan="9" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
                             <div>No leads match your filter or search query.</div>
                             <button
                               className="portal-btn-secondary"
@@ -2052,8 +2298,23 @@ export default function UserDashboard({ user, onLogout }) {
 
                           return (
                             <tr key={lead.id || idx}>
-                              <td style={{ fontWeight: '600', color: '#F5F5F5' }}>
-                                {lead.name}
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontWeight: '600', color: '#F5F5F5' }}>{lead.name}</span>
+                                  {idx < 5 && (
+                                    <span style={{
+                                      fontSize: '0.68rem',
+                                      padding: '1px 6px',
+                                      borderRadius: '4px',
+                                      background: 'rgba(168, 85, 247, 0.15)',
+                                      border: '1px solid rgba(168, 85, 247, 0.3)',
+                                      color: '#c084fc',
+                                      fontWeight: '700'
+                                    }}>
+                                      Sample Lead {idx + 1}
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td style={{ color: '#94a3b8' }}>
                                 {lead.title || 'Not available'}
@@ -2085,6 +2346,33 @@ export default function UserDashboard({ user, onLogout }) {
                                   </a>
                                 ) : (
                                   <span style={{ color: '#64748b' }}>—</span>
+                                )}
+                              </td>
+                              <td>
+                                {(lead.source_reference || lead.sourceReference) ? (
+                                  <a
+                                    href={lead.source_reference || lead.sourceReference}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="portal-btn-primary"
+                                    style={{
+                                      padding: '4px 10px',
+                                      fontSize: '0.78rem',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      textDecoration: 'none',
+                                      background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
+                                      color: '#030303',
+                                      fontWeight: '700'
+                                    }}
+                                  >
+                                    <FileText size={12} /> View Lead PDF
+                                  </a>
+                                ) : (
+                                  <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <Clock size={11} /> In Preparation
+                                  </span>
                                 )}
                               </td>
                               <td>
@@ -2176,6 +2464,53 @@ export default function UserDashboard({ user, onLogout }) {
                 </div>
               </div>
 
+              {/* Dedicated "Request More Leads" Card & CTA (Above Sprint History) */}
+              <div
+                className="portal-card"
+                style={{
+                  marginBottom: '1.75rem',
+                  background: 'linear-gradient(135deg, rgba(10, 18, 32, 0.95) 0%, rgba(17, 28, 48, 0.85) 100%)',
+                  border: '1px solid rgba(0, 217, 255, 0.25)',
+                  padding: '1.75rem 2rem',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '1.5rem',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)'
+                }}
+              >
+                <div style={{ maxWidth: '640px' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: '#00D9FF', letterSpacing: '0.5px', marginBottom: '0.35rem' }}>
+                    <Sparkles size={13} /> Dedicated Outbound Prospecting
+                  </div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#FFFFFF', margin: '0 0 0.4rem 0' }}>
+                    Need Custom or High-Volume Lead Prospecting?
+                  </h3>
+                  <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: 0, lineHeight: '1.5' }}>
+                    Commission a dedicated lead research sprint tailored to your ICP. Our specialized team sources, enriches, and validates verified decision-maker contacts and company intelligence.
+                  </p>
+                </div>
+                <button
+                  id="btn-request-more-leads"
+                  type="button"
+                  className="portal-btn-primary"
+                  onClick={handleOpenLeadRequirementModal}
+                  style={{
+                    padding: '10px 22px',
+                    fontSize: '0.92rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 15px rgba(0, 217, 255, 0.3)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <PlusCircle size={16} /> Request More Leads
+                </button>
+              </div>
+
               {/* Company Lead Sprints & Requests (Full History) */}
               <div className="portal-card">
                 <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '1rem', color: '#F5F5F5' }}>
@@ -2240,8 +2575,8 @@ export default function UserDashboard({ user, onLogout }) {
               {selectedLeadDetail && (
                 <div className="portal-modal-overlay" onClick={() => setSelectedLeadDetail(null)}>
                   <div
-                    className="portal-modal-container"
-                    style={{ maxWidth: '640px', width: '92%', maxHeight: '90vh', overflowY: 'auto' }}
+                    className="portal-modal-card"
+                    style={{ maxWidth: '640px', width: '92%' }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     {/* Modal Header */}
@@ -2406,10 +2741,56 @@ export default function UserDashboard({ user, onLogout }) {
                         </div>
                       </div>
 
-                      {/* Section 5: RELATED REQUEST / TICKET */}
+                      {/* Section 5: LEAD RESEARCH DOSSIER / PDF */}
                       <div>
                         <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#00D9FF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                          5. Related Service Request & Ticket
+                          5. Lead Research Dossier & PDF Documentation
+                        </div>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                          {(selectedLeadDetail.source_reference || selectedLeadDetail.sourceReference) ? (
+                            <>
+                              <div>
+                                <div style={{ fontSize: '0.88rem', fontWeight: '600', color: '#F5F5F5', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <FileText size={16} color="#00D9FF" />
+                                  <span>{selectedLeadDetail.name} — Research Intelligence Dossier</span>
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
+                                  Official lead profile document prepared by Company Lead specialists.
+                                </div>
+                              </div>
+                              <a
+                                href={selectedLeadDetail.source_reference || selectedLeadDetail.sourceReference}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="portal-btn-primary"
+                                style={{
+                                  padding: '6px 14px',
+                                  fontSize: '0.82rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  textDecoration: 'none',
+                                  background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
+                                  color: '#030303',
+                                  fontWeight: '700'
+                                }}
+                              >
+                                <FileText size={14} /> View Lead PDF
+                              </a>
+                            </>
+                          ) : (
+                            <div style={{ color: '#94a3b8', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Clock size={16} color="#f59e0b" />
+                              <span>Lead documentation PDF is currently in preparation by the Company Lead specialist.</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Section 6: RELATED REQUEST / TICKET */}
+                      <div>
+                        <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#00D9FF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                          6. Related Service Request & Ticket
                         </div>
                         <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                           {activeLeadRequest ? (
@@ -2577,14 +2958,13 @@ export default function UserDashboard({ user, onLogout }) {
                   {/* Card Footer: Price & Action */}
                   <div style={{ borderTop: '1px solid var(--portal-border)', paddingTop: '1rem', marginTop: 'auto' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Configured Fee</span>
-                      <span style={{ fontSize: '1.25rem', fontWeight: '800', color: '#FFB000', fontFamily: 'monospace' }}>$799.00 USD</span>
+                      <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Pricing Model</span>
+                      <span style={{ fontSize: '0.95rem', fontWeight: '700', color: '#FFB000' }}>Pricing based on scope</span>
                     </div>
                     <button
                       className="portal-btn-primary"
                       style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #FFB000 0%, #f59e0b 100%)', color: '#030303', fontWeight: '800' }}
-                      onClick={handleRequestStrategicPlan}
-                      disabled={isSubmittingRequest}
+                      onClick={() => handleOpenRequirementModal('STRATEGIC_PLAN')}
                     >
                       <PlusCircle size={16} /> Request Strategic Plan
                     </button>
@@ -2711,14 +3091,13 @@ export default function UserDashboard({ user, onLogout }) {
                   {/* Card Footer: Price & Action */}
                   <div style={{ borderTop: '1px solid var(--portal-border)', paddingTop: '1rem', marginTop: 'auto' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Configured Fee</span>
-                      <span style={{ fontSize: '1.25rem', fontWeight: '800', color: '#00D9FF', fontFamily: 'monospace' }}>$799.00 USD</span>
+                      <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Pricing Model</span>
+                      <span style={{ fontSize: '0.95rem', fontWeight: '700', color: '#00D9FF' }}>Pricing based on scope</span>
                     </div>
                     <button
                       className="portal-btn-primary"
                       style={{ width: '100%', justifyContent: 'center' }}
-                      onClick={handleRequestContent}
-                      disabled={isSubmittingRequest}
+                      onClick={() => handleOpenRequirementModal('CONTENT')}
                     >
                       <PlusCircle size={16} /> Request Content
                     </button>
@@ -2823,14 +3202,13 @@ export default function UserDashboard({ user, onLogout }) {
                   {/* Card Footer: Price & Action */}
                   <div style={{ borderTop: '1px solid var(--portal-border)', paddingTop: '1rem', marginTop: 'auto' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Configured Fee</span>
-                      <span style={{ fontSize: '1.25rem', fontWeight: '800', color: '#a855f7', fontFamily: 'monospace' }}>$799.00 USD</span>
+                      <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Pricing Model</span>
+                      <span style={{ fontSize: '0.95rem', fontWeight: '700', color: '#a855f7' }}>Pricing based on scope</span>
                     </div>
                     <button
                       className="portal-btn-primary"
                       style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #7b61ff 0%, #6366f1 100%)' }}
-                      onClick={handleRequestDevRelPlan}
-                      disabled={isSubmittingRequest}
+                      onClick={() => handleOpenRequirementModal('DEVREL')}
                     >
                       <PlusCircle size={16} /> Request DevRel Plan
                     </button>
@@ -2854,9 +3232,9 @@ export default function UserDashboard({ user, onLogout }) {
                     </p>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Sprint Service Fee</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#00D9FF', fontFamily: 'monospace' }}>
-                      $799.00 USD
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Pricing Model</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#00D9FF' }}>
+                      Pricing based on scope
                     </div>
                   </div>
                 </div>
@@ -2962,8 +3340,8 @@ export default function UserDashboard({ user, onLogout }) {
                       rows="4"
                       className="portal-form-textarea"
                       placeholder="Describe your specific requirements, key goals, target market, or customized deliverables..."
-                      value={customRequirement}
-                      onChange={(e) => setCustomRequirement(e.target.value)}
+                      value={customForm.requirements}
+                      onChange={(e) => setCustomForm(prev => ({ ...prev, requirements: e.target.value }))}
                       required
                       style={{ width: '100%', resize: 'vertical' }}
                     />
@@ -2971,12 +3349,12 @@ export default function UserDashboard({ user, onLogout }) {
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button
-                      type="submit"
+                      type="button"
                       className="portal-btn-primary"
-                      disabled={isSubmittingCustom}
+                      onClick={() => handleOpenRequirementModal('CUSTOM')}
                       style={{ padding: '10px 24px', fontSize: '0.9rem' }}
                     >
-                      {isSubmittingCustom ? 'Creating Ticket...' : 'Request Custom Service'}
+                      Configure Custom Request →
                     </button>
                   </div>
                 </form>
@@ -3111,6 +3489,187 @@ export default function UserDashboard({ user, onLogout }) {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Onboarding Sample Work Section */}
+              <div className="portal-card" style={{ marginBottom: '1.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#F5F5F5', margin: '0 0 4px 0' }}>
+                      Onboarding Sample Work
+                    </h3>
+                    <p style={{ fontSize: '0.84rem', color: '#94A3B8', margin: 0 }}>
+                      Initial sample deliverables prepared for your company by the CreativeGini UI/UX team.
+                    </p>
+                  </div>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    padding: '3px 10px',
+                    borderRadius: '20px',
+                    background: (uiOnboardingAssets.uiAnalysis && uiOnboardingAssets.landingPageEnhancement) ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                    color: (uiOnboardingAssets.uiAnalysis && uiOnboardingAssets.landingPageEnhancement) ? '#34D399' : '#F59E0B',
+                    border: (uiOnboardingAssets.uiAnalysis && uiOnboardingAssets.landingPageEnhancement) ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)'
+                  }}>
+                    {(uiOnboardingAssets.uiAnalysis && uiOnboardingAssets.landingPageEnhancement) ? 'Samples Complete' : 'In Preparation'}
+                  </span>
+                </div>
+
+                {(!uiOnboardingAssets.uiAnalysis && !uiOnboardingAssets.landingPageEnhancement) ? (
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px dashed rgba(0, 217, 255, 0.3)',
+                    borderRadius: '8px',
+                    padding: '2rem 1.5rem',
+                    textAlign: 'center'
+                  }}>
+                    <Clock size={28} color="#00D9FF" style={{ margin: '0 auto 10px', display: 'block' }} />
+                    <div style={{ fontSize: '0.98rem', fontWeight: '700', color: '#F5F5F5', marginBottom: '4px' }}>
+                      Your onboarding sample work is being prepared by our team.
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#94A3B8', maxWidth: '520px', margin: '0 auto' }}>
+                      Our UI/UX architects are currently reviewing your target digital touchpoints to prepare an initial UI/UX analysis and landing page enhancement concept.
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                    {/* Item 1: UI/UX Analysis */}
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: uiOnboardingAssets.uiAnalysis ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between'
+                    }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5' }}>
+                            1. Initial UI/UX Analysis
+                          </span>
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: '700',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            background: uiOnboardingAssets.uiAnalysis ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                            color: uiOnboardingAssets.uiAnalysis ? '#34D399' : '#F59E0B'
+                          }}>
+                            {uiOnboardingAssets.uiAnalysis ? 'Ready' : 'In Preparation'}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: '0 0 12px 0' }}>
+                          Complete UX critique, conversion friction points, and visual hierarchy review.
+                        </p>
+                      </div>
+
+                      {uiOnboardingAssets.uiAnalysis ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'rgba(0, 0, 0, 0.3)', padding: '10px 12px', borderRadius: '6px' }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: '600', color: '#F5F5F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {uiOnboardingAssets.uiAnalysis.name || 'ui_ux_analysis.pdf'}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{uiOnboardingAssets.uiAnalysis.size || 'PDF'}</div>
+                          </div>
+                          <a
+                            href={uiOnboardingAssets.uiAnalysis.streamUrl || uiOnboardingAssets.uiAnalysis.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="portal-btn-primary"
+                            style={{
+                              padding: '5px 12px',
+                              fontSize: '0.78rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              textDecoration: 'none',
+                              background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
+                              color: '#030303',
+                              fontWeight: '700',
+                              flexShrink: 0
+                            }}
+                          >
+                            <FileText size={13} /> View Analysis
+                          </a>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94A3B8', fontSize: '0.8rem' }}>
+                          <Clock size={14} color="#f59e0b" />
+                          <span>Specialist is finalizing your UI/UX analysis.</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Item 2: Landing Page Enhancement */}
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: uiOnboardingAssets.landingPageEnhancement ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between'
+                    }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5' }}>
+                            2. Landing Page Enhancement
+                          </span>
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: '700',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            background: uiOnboardingAssets.landingPageEnhancement ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                            color: uiOnboardingAssets.landingPageEnhancement ? '#34D399' : '#F59E0B'
+                          }}>
+                            {uiOnboardingAssets.landingPageEnhancement ? 'Ready' : 'In Preparation'}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: '0 0 12px 0' }}>
+                          Sample concept prototype, high-fidelity mockups, and layout recommendations.
+                        </p>
+                      </div>
+
+                      {uiOnboardingAssets.landingPageEnhancement ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'rgba(0, 0, 0, 0.3)', padding: '10px 12px', borderRadius: '6px' }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: '600', color: '#F5F5F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {uiOnboardingAssets.landingPageEnhancement.name || 'landing_page_sample'}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>{uiOnboardingAssets.landingPageEnhancement.size || 'Design Asset'}</div>
+                          </div>
+                          <a
+                            href={uiOnboardingAssets.landingPageEnhancement.streamUrl || uiOnboardingAssets.landingPageEnhancement.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="portal-btn-primary"
+                            style={{
+                              padding: '5px 12px',
+                              fontSize: '0.78rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              textDecoration: 'none',
+                              background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
+                              color: '#030303',
+                              fontWeight: '700',
+                              flexShrink: 0
+                            }}
+                          >
+                            <ExternalLink size={13} /> View Sample
+                          </a>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'center', alignItems: 'center', gap: '6px', color: '#94A3B8', fontSize: '0.8rem' }}>
+                          <Clock size={14} color="#f59e0b" />
+                          <span>Specialist is finalizing your landing page concept.</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Landing Page Requests */}
@@ -3518,6 +4077,1355 @@ export default function UserDashboard({ user, onLogout }) {
         </div>
       </div>
 
+      {/* 3.5. COMPANY BOOST REQUIREMENT MODAL (MULTI-STEP FLOW) */}
+      {isRequirementModalOpen && (
+        <div className="portal-modal-overlay" onClick={() => setIsRequirementModalOpen(false)}>
+          <div
+            className="portal-modal-card"
+            style={{
+              maxWidth: '820px',
+              width: '94vw',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: 0,
+              overflow: 'hidden',
+              background: '#07101E',
+              border: '1px solid rgba(0, 217, 255, 0.3)',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 30px rgba(0, 217, 255, 0.15)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '1.25rem 1.5rem',
+                borderBottom: '1px solid var(--portal-border)',
+                background: 'rgba(6, 17, 26, 0.95)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '1rem',
+                flexShrink: 0
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      background: 'rgba(0, 217, 255, 0.12)',
+                      color: '#00D9FF',
+                      border: '1px solid rgba(0, 217, 255, 0.25)',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '0.72rem',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    {requirementSubService === 'STRATEGIC_PLAN'
+                      ? 'Strategic Plan Sprint'
+                      : requirementSubService === 'CONTENT'
+                      ? 'Content Production Sprint'
+                      : requirementSubService === 'DEVREL'
+                      ? 'DevRel Strategy Sprint'
+                      : 'Custom Boost Sprint'}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Company Boost Service</span>
+                </div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: '#F8FAFC' }}>
+                  {requirementStep === 1 && 'Tell us what you need'}
+                  {requirementStep === 2 && 'Review Your Requirements'}
+                  {requirementStep === 3 && 'Your Request Price'}
+                </h3>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {/* Stepper Indicator */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {[
+                    { num: 1, label: 'Scope' },
+                    { num: 2, label: 'Review' },
+                    { num: 3, label: 'Price' }
+                  ].map((s, idx) => (
+                    <React.Fragment key={s.num}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          fontSize: '0.72rem',
+                          fontWeight: '700',
+                          background: requirementStep === s.num
+                            ? 'rgba(0, 217, 255, 0.2)'
+                            : requirementStep > s.num
+                            ? 'rgba(16, 185, 129, 0.15)'
+                            : 'rgba(255,255,255,0.05)',
+                          color: requirementStep === s.num
+                            ? '#00D9FF'
+                            : requirementStep > s.num
+                            ? '#10B981'
+                            : '#64748B',
+                          border: requirementStep === s.num ? '1px solid #00D9FF' : '1px solid transparent'
+                        }}
+                      >
+                        <span>{s.num}</span>
+                        <span>{s.label}</span>
+                      </div>
+                      {idx < 2 && <span style={{ color: '#475569', fontSize: '0.7rem' }}>→</span>}
+                    </React.Fragment>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#94A3B8',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={() => setIsRequirementModalOpen(false)}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div
+              style={{
+                padding: '1.5rem',
+                overflowY: 'auto',
+                flexGrow: 1,
+                background: 'rgba(6, 17, 26, 0.4)'
+              }}
+            >
+              {/* STEP 1: FORM FIELDS */}
+              {requirementStep === 1 && (
+                <div>
+                  <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginTop: 0, marginBottom: '1.25rem' }}>
+                    Provide your requirements below. Required fields are marked with an asterisk (<span style={{ color: '#EF4444' }}>*</span>).
+                  </p>
+
+                  {/* 1. STRATEGIC PLAN FORM */}
+                  {requirementSubService === 'STRATEGIC_PLAN' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div>
+                        <label className="portal-form-label">
+                          Main Goal <span style={{ color: '#EF4444' }}>*</span>
+                        </label>
+                        <input
+                          className="portal-form-input"
+                          placeholder="e.g. Enterprise account expansion, market repositioning, GTM outbound strategy"
+                          value={strategicPlanForm.mainGoal}
+                          onChange={(e) => setStrategicPlanForm({ ...strategicPlanForm, mainGoal: e.target.value })}
+                          style={{ borderColor: requirementErrors.mainGoal ? '#EF4444' : undefined }}
+                        />
+                        {requirementErrors.mainGoal && (
+                          <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                            {requirementErrors.mainGoal}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">
+                            Target Market / Audience <span style={{ color: '#EF4444' }}>*</span>
+                          </label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. North American B2B SaaS, Seed to Series B"
+                            value={strategicPlanForm.targetMarket}
+                            onChange={(e) => setStrategicPlanForm({ ...strategicPlanForm, targetMarket: e.target.value })}
+                            style={{ borderColor: requirementErrors.targetMarket ? '#EF4444' : undefined }}
+                          />
+                          {requirementErrors.targetMarket && (
+                            <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                              {requirementErrors.targetMarket}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">
+                            What Should CreativeGini Focus On? <span style={{ color: '#EF4444' }}>*</span>
+                          </label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. Ideal customer profile definition, positioning copy, competitive moats"
+                            value={strategicPlanForm.focusArea}
+                            onChange={(e) => setStrategicPlanForm({ ...strategicPlanForm, focusArea: e.target.value })}
+                            style={{ borderColor: requirementErrors.focusArea ? '#EF4444' : undefined }}
+                          />
+                          {requirementErrors.focusArea && (
+                            <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                              {requirementErrors.focusArea}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="portal-form-label">
+                          Current Challenges / Pain Points <span style={{ color: '#EF4444' }}>*</span>
+                        </label>
+                        <textarea
+                          className="portal-form-input"
+                          rows={3}
+                          placeholder="Describe your current bottlenecks, conversion issues, or competitive headwinds..."
+                          value={strategicPlanForm.painPoints}
+                          onChange={(e) => setStrategicPlanForm({ ...strategicPlanForm, painPoints: e.target.value })}
+                          style={{ borderColor: requirementErrors.painPoints ? '#EF4444' : undefined, resize: 'vertical' }}
+                        />
+                        {requirementErrors.painPoints && (
+                          <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                            {requirementErrors.painPoints}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="portal-form-label">
+                          Expected Outcome <span style={{ color: '#EF4444' }}>*</span>
+                        </label>
+                        <textarea
+                          className="portal-form-input"
+                          rows={2}
+                          placeholder="e.g. Actionable 60-day outbound roadmap, clear pitch deck narrative, sales collateral templates"
+                          value={strategicPlanForm.expectedOutcome}
+                          onChange={(e) => setStrategicPlanForm({ ...strategicPlanForm, expectedOutcome: e.target.value })}
+                          style={{ borderColor: requirementErrors.expectedOutcome ? '#EF4444' : undefined, resize: 'vertical' }}
+                        />
+                        {requirementErrors.expectedOutcome && (
+                          <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                            {requirementErrors.expectedOutcome}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">Competitors / Reference Companies</label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. Acme Corp, Linear, Retool"
+                            value={strategicPlanForm.competitors}
+                            onChange={(e) => setStrategicPlanForm({ ...strategicPlanForm, competitors: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">Reference Links</label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. https://yourcompany.com/pitch or Notion link"
+                            value={strategicPlanForm.referenceLinks}
+                            onChange={(e) => setStrategicPlanForm({ ...strategicPlanForm, referenceLinks: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="portal-form-label">Additional Requirements</label>
+                        <textarea
+                          className="portal-form-input"
+                          rows={2}
+                          placeholder="Any specific constraints, timelines, or tone preferences..."
+                          value={strategicPlanForm.additionalRequirements}
+                          onChange={(e) => setStrategicPlanForm({ ...strategicPlanForm, additionalRequirements: e.target.value })}
+                          style={{ resize: 'vertical' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. CONTENT FORM */}
+                  {requirementSubService === 'CONTENT' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div>
+                        <label className="portal-form-label">
+                          Content Type <span style={{ color: '#EF4444' }}>*</span>
+                        </label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '6px' }}>
+                          {[
+                            { key: 'poster', label: 'Poster / Visual Asset' },
+                            { key: 'productVideo', label: 'Product Video' },
+                            { key: 'socialContent', label: 'Social Media Content' },
+                            { key: 'productShowcase', label: 'Product Showcase' },
+                            { key: 'other', label: 'Other' }
+                          ].map((t) => (
+                            <label
+                              key={t.key}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                background: contentForm.contentTypes[t.key] ? 'rgba(0, 217, 255, 0.15)' : 'rgba(255,255,255,0.04)',
+                                border: contentForm.contentTypes[t.key] ? '1px solid #00D9FF' : '1px solid var(--portal-border)',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                color: contentForm.contentTypes[t.key] ? '#00D9FF' : '#CBD5E1',
+                                userSelect: 'none'
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={!!contentForm.contentTypes[t.key]}
+                                onChange={(e) =>
+                                  setContentForm({
+                                    ...contentForm,
+                                    contentTypes: { ...contentForm.contentTypes, [t.key]: e.target.checked }
+                                  })
+                                }
+                                style={{ display: 'none' }}
+                              />
+                              {contentForm.contentTypes[t.key] ? <CheckSquare size={16} color="#00D9FF" /> : <Square size={16} color="#64748B" />}
+                              <span>{t.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {requirementErrors.contentTypes && (
+                          <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '6px' }}>
+                            {requirementErrors.contentTypes}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">
+                            Number / Type of Deliverables <span style={{ color: '#EF4444' }}>*</span>
+                          </label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. 1 High-res Poster + 1 60s Showcase Video"
+                            value={contentForm.deliverablesCount}
+                            onChange={(e) => setContentForm({ ...contentForm, deliverablesCount: e.target.value })}
+                            style={{ borderColor: requirementErrors.deliverablesCount ? '#EF4444' : undefined }}
+                          />
+                          {requirementErrors.deliverablesCount && (
+                            <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                              {requirementErrors.deliverablesCount}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">
+                            Product / Service to Highlight <span style={{ color: '#EF4444' }}>*</span>
+                          </label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. AI Workflow Engine, Enterprise Data Layer"
+                            value={contentForm.productHighlight}
+                            onChange={(e) => setContentForm({ ...contentForm, productHighlight: e.target.value })}
+                            style={{ borderColor: requirementErrors.productHighlight ? '#EF4444' : undefined }}
+                          />
+                          {requirementErrors.productHighlight && (
+                            <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                              {requirementErrors.productHighlight}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">
+                            Main Purpose <span style={{ color: '#EF4444' }}>*</span>
+                          </label>
+                          <textarea
+                            className="portal-form-input"
+                            rows={2}
+                            placeholder="e.g. Product launch announcement, LinkedIn paid campaign, lead generation"
+                            value={contentForm.mainPurpose}
+                            onChange={(e) => setContentForm({ ...contentForm, mainPurpose: e.target.value })}
+                            style={{ borderColor: requirementErrors.mainPurpose ? '#EF4444' : undefined, resize: 'vertical' }}
+                          />
+                          {requirementErrors.mainPurpose && (
+                            <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                              {requirementErrors.mainPurpose}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">
+                            Target Audience <span style={{ color: '#EF4444' }}>*</span>
+                          </label>
+                          <textarea
+                            className="portal-form-input"
+                            rows={2}
+                            placeholder="e.g. Enterprise CTOs, VP Product, Web3 Developers"
+                            value={contentForm.targetAudience}
+                            onChange={(e) => setContentForm({ ...contentForm, targetAudience: e.target.value })}
+                            style={{ borderColor: requirementErrors.targetAudience ? '#EF4444' : undefined, resize: 'vertical' }}
+                          />
+                          {requirementErrors.targetAudience && (
+                            <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                              {requirementErrors.targetAudience}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">Preferred Platforms</label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. LinkedIn, Twitter / X, YouTube, Website Hero"
+                            value={contentForm.preferredPlatforms}
+                            onChange={(e) => setContentForm({ ...contentForm, preferredPlatforms: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">Key Message</label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. The fastest way to build enterprise apps in 2026"
+                            value={contentForm.keyMessage}
+                            onChange={(e) => setContentForm({ ...contentForm, keyMessage: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">Brand / Style Requirements</label>
+                          <textarea
+                            className="portal-form-input"
+                            rows={2}
+                            placeholder="e.g. Dark mode aesthetics, futuristic cyberpunk accents, clean minimalist typography"
+                            value={contentForm.brandRequirements}
+                            onChange={(e) => setContentForm({ ...contentForm, brandRequirements: e.target.value })}
+                            style={{ resize: 'vertical' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">Reference Examples</label>
+                          <textarea
+                            className="portal-form-input"
+                            rows={2}
+                            placeholder="e.g. Links to visual styles, videos, or competitor creative you like"
+                            value={contentForm.referenceExamples}
+                            onChange={(e) => setContentForm({ ...contentForm, referenceExamples: e.target.value })}
+                            style={{ resize: 'vertical' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">Existing Brand Assets</label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. Vector logo in Google Drive, brand kit available upon kickoff"
+                            value={contentForm.existingBrandAssets}
+                            onChange={(e) => setContentForm({ ...contentForm, existingBrandAssets: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">Additional Requirements</label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. 16:9 widescreen format, subtitle/caption file required"
+                            value={contentForm.additionalRequirements}
+                            onChange={(e) => setContentForm({ ...contentForm, additionalRequirements: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. DEVREL PLAN FORM */}
+                  {requirementSubService === 'DEVREL' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">
+                            Main DevRel Goal <span style={{ color: '#EF4444' }}>*</span>
+                          </label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. Increase SDK installs, launch developer hackathon, build dev docs"
+                            value={devrelForm.mainDevrelGoal}
+                            onChange={(e) => setDevrelForm({ ...devrelForm, mainDevrelGoal: e.target.value })}
+                            style={{ borderColor: requirementErrors.mainDevrelGoal ? '#EF4444' : undefined }}
+                          />
+                          {requirementErrors.mainDevrelGoal && (
+                            <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                              {requirementErrors.mainDevrelGoal}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">
+                            Product / API / SDK <span style={{ color: '#EF4444' }}>*</span>
+                          </label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. CreativeGini TypeScript SDK, GraphQL Data API"
+                            value={devrelForm.productApiSdk}
+                            onChange={(e) => setDevrelForm({ ...devrelForm, productApiSdk: e.target.value })}
+                            style={{ borderColor: requirementErrors.productApiSdk ? '#EF4444' : undefined }}
+                          />
+                          {requirementErrors.productApiSdk && (
+                            <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                              {requirementErrors.productApiSdk}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">
+                            Target Developer Audience <span style={{ color: '#EF4444' }}>*</span>
+                          </label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. Senior Frontend Engineers, DevOps/SREs, Python Data Scientists"
+                            value={devrelForm.targetDeveloperAudience}
+                            onChange={(e) => setDevrelForm({ ...devrelForm, targetDeveloperAudience: e.target.value })}
+                            style={{ borderColor: requirementErrors.targetDeveloperAudience ? '#EF4444' : undefined }}
+                          />
+                          {requirementErrors.targetDeveloperAudience && (
+                            <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                              {requirementErrors.targetDeveloperAudience}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">Developer Platforms / Communities</label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. GitHub, Discord, Hacker News, Reddit r/webdev, StackOverflow"
+                            value={devrelForm.developerPlatforms}
+                            onChange={(e) => setDevrelForm({ ...devrelForm, developerPlatforms: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="portal-form-label">Current Developer Adoption / Challenges</label>
+                        <textarea
+                          className="portal-form-input"
+                          rows={2}
+                          placeholder="e.g. High initial drop-off during onboarding, missing code samples, complex auth setup..."
+                          value={devrelForm.developerAdoptionChallenges}
+                          onChange={(e) => setDevrelForm({ ...devrelForm, developerAdoptionChallenges: e.target.value })}
+                          style={{ resize: 'vertical' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">Documentation Requirements</label>
+                          <textarea
+                            className="portal-form-input"
+                            rows={2}
+                            placeholder="e.g. Quickstart guide, interactive API playground, SDK reference..."
+                            value={devrelForm.documentationRequirements}
+                            onChange={(e) => setDevrelForm({ ...devrelForm, documentationRequirements: e.target.value })}
+                            style={{ resize: 'vertical' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">Community Requirements</label>
+                          <textarea
+                            className="portal-form-input"
+                            rows={2}
+                            placeholder="e.g. Discord server structure, developer advocate office hours, community badges..."
+                            value={devrelForm.communityRequirements}
+                            onChange={(e) => setDevrelForm({ ...devrelForm, communityRequirements: e.target.value })}
+                            style={{ resize: 'vertical' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">Open-Source Requirements</label>
+                          <textarea
+                            className="portal-form-input"
+                            rows={2}
+                            placeholder="e.g. GitHub starter template, good first issues, contribution guidelines..."
+                            value={devrelForm.openSourceRequirements}
+                            onChange={(e) => setDevrelForm({ ...devrelForm, openSourceRequirements: e.target.value })}
+                            style={{ resize: 'vertical' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">Developer Content Requirements</label>
+                          <textarea
+                            className="portal-form-input"
+                            rows={2}
+                            placeholder="e.g. Technical tutorials, architecture deep dives, benchmark blog posts..."
+                            value={devrelForm.developerContentRequirements}
+                            onChange={(e) => setDevrelForm({ ...devrelForm, developerContentRequirements: e.target.value })}
+                            style={{ resize: 'vertical' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="portal-form-label">
+                          Expected Outcome <span style={{ color: '#EF4444' }}>*</span>
+                        </label>
+                        <textarea
+                          className="portal-form-input"
+                          rows={2}
+                          placeholder="e.g. Complete DevRel operational blueprint, 30-day developer acquisition sprint plan"
+                          value={devrelForm.expectedOutcome}
+                          onChange={(e) => setDevrelForm({ ...devrelForm, expectedOutcome: e.target.value })}
+                          style={{ borderColor: requirementErrors.expectedOutcome ? '#EF4444' : undefined, resize: 'vertical' }}
+                        />
+                        {requirementErrors.expectedOutcome && (
+                          <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                            {requirementErrors.expectedOutcome}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">Reference Links</label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. https://github.com/your-repo or API docs link"
+                            value={devrelForm.referenceLinks}
+                            onChange={(e) => setDevrelForm({ ...devrelForm, referenceLinks: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">Additional Requirements</label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. Integration with Stripe dev portal style"
+                            value={devrelForm.additionalRequirements}
+                            onChange={(e) => setDevrelForm({ ...devrelForm, additionalRequirements: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4. CUSTOM REQUEST FORM */}
+                  {requirementSubService === 'CUSTOM' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div>
+                        <label className="portal-form-label">
+                          Select Services Needed <span style={{ color: '#EF4444' }}>*</span>
+                        </label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '6px' }}>
+                          {[
+                            { key: 'strategicPlan', label: 'Strategic Plan' },
+                            { key: 'content', label: 'Content for Your Company' },
+                            { key: 'devrel', label: 'DevRel Plan' }
+                          ].map((srv) => (
+                            <label
+                              key={srv.key}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 14px',
+                                borderRadius: '8px',
+                                background: customForm.selectedServices[srv.key] ? 'rgba(0, 217, 255, 0.15)' : 'rgba(255,255,255,0.04)',
+                                border: customForm.selectedServices[srv.key] ? '1px solid #00D9FF' : '1px solid var(--portal-border)',
+                                cursor: 'pointer',
+                                fontSize: '0.88rem',
+                                color: customForm.selectedServices[srv.key] ? '#00D9FF' : '#CBD5E1',
+                                userSelect: 'none'
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={!!customForm.selectedServices[srv.key]}
+                                onChange={(e) =>
+                                  setCustomForm({
+                                    ...customForm,
+                                    selectedServices: { ...customForm.selectedServices, [srv.key]: e.target.checked }
+                                  })
+                                }
+                                style={{ display: 'none' }}
+                              />
+                              {customForm.selectedServices[srv.key] ? <CheckSquare size={16} color="#00D9FF" /> : <Square size={16} color="#64748B" />}
+                              <span>{srv.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {requirementErrors.selectedServices && (
+                          <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '6px' }}>
+                            {requirementErrors.selectedServices}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="portal-form-label">
+                          Requirements / Description <span style={{ color: '#EF4444' }}>*</span>
+                        </label>
+                        <textarea
+                          className="portal-form-input"
+                          rows={4}
+                          placeholder="Describe the multidisciplinary scope, goals, target deliverables, or custom assistance needed..."
+                          value={customForm.requirements}
+                          onChange={(e) => setCustomForm({ ...customForm, requirements: e.target.value })}
+                          style={{ borderColor: requirementErrors.requirements ? '#EF4444' : undefined, resize: 'vertical' }}
+                        />
+                        {requirementErrors.requirements && (
+                          <div style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                            {requirementErrors.requirements}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="portal-form-label">Expected Outcome</label>
+                        <textarea
+                          className="portal-form-input"
+                          rows={2}
+                          placeholder="e.g. End-to-end positioning narrative and matching hero visual asset"
+                          value={customForm.expectedOutcome}
+                          onChange={(e) => setCustomForm({ ...customForm, expectedOutcome: e.target.value })}
+                          style={{ resize: 'vertical' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                        <div>
+                          <label className="portal-form-label">Additional Requirements</label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="Any specific tools, frameworks, or deadlines"
+                            value={customForm.additionalRequirements}
+                            onChange={(e) => setCustomForm({ ...customForm, additionalRequirements: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="portal-form-label">Reference Links</label>
+                          <input
+                            className="portal-form-input"
+                            placeholder="e.g. https://yourcompany.com or design docs"
+                            value={customForm.referenceLinks}
+                            onChange={(e) => setCustomForm({ ...customForm, referenceLinks: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* STEP 2: REVIEW REQUIREMENTS */}
+              {requirementStep === 2 && (
+                <div>
+                  <div style={{ background: 'rgba(0, 217, 255, 0.08)', border: '1px solid rgba(0, 217, 255, 0.25)', borderRadius: '10px', padding: '1rem', marginBottom: '1.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#00D9FF', fontWeight: '700', fontSize: '0.9rem' }}>
+                      <CheckCircle2 size={18} /> Review Your Requirements Brief
+                    </div>
+                    <p style={{ margin: '4px 0 0 0', color: '#CBD5E1', fontSize: '0.82rem' }}>
+                      Review everything you entered below before proceeding to backend price calculation. No ticket has been created yet.
+                    </p>
+                  </div>
+
+                  <div style={{ background: 'rgba(6, 17, 26, 0.95)', border: '1px solid var(--portal-border)', borderRadius: '10px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--portal-border)', paddingBottom: '0.75rem', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Service Area</span>
+                      <span style={{ fontWeight: '700', color: '#00D9FF' }}>
+                        {requirementSubService === 'STRATEGIC_PLAN' && 'Strategic Plan Sprint'}
+                        {requirementSubService === 'CONTENT' && 'Content for Your Company Sprint'}
+                        {requirementSubService === 'DEVREL' && 'DevRel Plan Sprint'}
+                        {requirementSubService === 'CUSTOM' && 'Custom Boost Sprint'}
+                      </span>
+                    </div>
+
+                    {requirementSubService === 'STRATEGIC_PLAN' && (
+                      <>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Main Goal</div>
+                          <div style={{ color: '#F8FAFC', fontWeight: '600', marginTop: '2px' }}>{strategicPlanForm.mainGoal}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target Market / Audience</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px' }}>{strategicPlanForm.targetMarket}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Focus Area</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px' }}>{strategicPlanForm.focusArea}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Current Challenges / Pain Points</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{strategicPlanForm.painPoints}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Expected Outcome</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{strategicPlanForm.expectedOutcome}</div>
+                        </div>
+                        {strategicPlanForm.competitors && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Competitors / References</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px' }}>{strategicPlanForm.competitors}</div>
+                          </div>
+                        )}
+                        {strategicPlanForm.additionalRequirements && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Additional Requirements</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{strategicPlanForm.additionalRequirements}</div>
+                          </div>
+                        )}
+                        {strategicPlanForm.referenceLinks && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Reference Links</div>
+                            <div style={{ color: '#00D9FF', marginTop: '2px', wordBreak: 'break-all' }}>{strategicPlanForm.referenceLinks}</div>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {requirementSubService === 'CONTENT' && (
+                      <>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Content Types Selected</div>
+                          <div style={{ color: '#00D9FF', fontWeight: '600', marginTop: '2px' }}>
+                            {Object.entries(contentForm.contentTypes)
+                              .filter(([_, v]) => v)
+                              .map(([k]) => k === 'productVideo' ? 'Product Video' : k === 'socialContent' ? 'Social Media Content' : k === 'productShowcase' ? 'Product Showcase' : k === 'poster' ? 'Poster' : 'Other')
+                              .join(', ') || 'None selected'}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Deliverables Scope</div>
+                          <div style={{ color: '#F8FAFC', fontWeight: '600', marginTop: '2px' }}>{contentForm.deliverablesCount}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Product / Service to Highlight</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px' }}>{contentForm.productHighlight}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Main Purpose</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{contentForm.mainPurpose}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target Audience</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px' }}>{contentForm.targetAudience}</div>
+                        </div>
+                        {contentForm.preferredPlatforms && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Preferred Platforms</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px' }}>{contentForm.preferredPlatforms}</div>
+                          </div>
+                        )}
+                        {contentForm.keyMessage && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Key Message</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px' }}>{contentForm.keyMessage}</div>
+                          </div>
+                        )}
+                        {contentForm.brandRequirements && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Brand / Style Requirements</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px' }}>{contentForm.brandRequirements}</div>
+                          </div>
+                        )}
+                        {contentForm.referenceExamples && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Reference Examples</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px' }}>{contentForm.referenceExamples}</div>
+                          </div>
+                        )}
+                        {contentForm.existingBrandAssets && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Existing Brand Assets</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px' }}>{contentForm.existingBrandAssets}</div>
+                          </div>
+                        )}
+                        {contentForm.additionalRequirements && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Additional Requirements</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{contentForm.additionalRequirements}</div>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {requirementSubService === 'DEVREL' && (
+                      <>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Main DevRel Goal</div>
+                          <div style={{ color: '#F8FAFC', fontWeight: '600', marginTop: '2px' }}>{devrelForm.mainDevrelGoal}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Product / API / SDK</div>
+                          <div style={{ color: '#F8FAFC', fontWeight: '600', marginTop: '2px' }}>{devrelForm.productApiSdk}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target Developer Audience</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px' }}>{devrelForm.targetDeveloperAudience}</div>
+                        </div>
+                        {devrelForm.developerPlatforms && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Platforms & Communities</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px' }}>{devrelForm.developerPlatforms}</div>
+                          </div>
+                        )}
+                        {devrelForm.developerAdoptionChallenges && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Adoption Challenges</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{devrelForm.developerAdoptionChallenges}</div>
+                          </div>
+                        )}
+                        {devrelForm.documentationRequirements && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Documentation Scope</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px' }}>{devrelForm.documentationRequirements}</div>
+                          </div>
+                        )}
+                        {devrelForm.communityRequirements && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Community Scope</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px' }}>{devrelForm.communityRequirements}</div>
+                          </div>
+                        )}
+                        {devrelForm.openSourceRequirements && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Open-Source Scope</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px' }}>{devrelForm.openSourceRequirements}</div>
+                          </div>
+                        )}
+                        {devrelForm.developerContentRequirements && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Developer Content Scope</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px' }}>{devrelForm.developerContentRequirements}</div>
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Expected Outcome</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{devrelForm.expectedOutcome}</div>
+                        </div>
+                        {devrelForm.referenceLinks && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Reference Links</div>
+                            <div style={{ color: '#00D9FF', marginTop: '2px', wordBreak: 'break-all' }}>{devrelForm.referenceLinks}</div>
+                          </div>
+                        )}
+                        {devrelForm.additionalRequirements && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Additional Requirements</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{devrelForm.additionalRequirements}</div>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {requirementSubService === 'CUSTOM' && (
+                      <>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Selected Service Components</div>
+                          <div style={{ color: '#00D9FF', fontWeight: '600', marginTop: '2px' }}>
+                            {[
+                              customForm.selectedServices.strategicPlan && 'Strategic Plan',
+                              customForm.selectedServices.content && 'Content for Your Company',
+                              customForm.selectedServices.devrel && 'DevRel Plan'
+                            ].filter(Boolean).join(', ')}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Requirements / Scope Description</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{customForm.requirements}</div>
+                        </div>
+                        {customForm.expectedOutcome && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Expected Outcome</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{customForm.expectedOutcome}</div>
+                          </div>
+                        )}
+                        {customForm.additionalRequirements && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Additional Requirements</div>
+                            <div style={{ color: '#CBD5E1', marginTop: '2px' }}>{customForm.additionalRequirements}</div>
+                          </div>
+                        )}
+                        {customForm.referenceLinks && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Reference Links</div>
+                            <div style={{ color: '#00D9FF', marginTop: '2px', wordBreak: 'break-all' }}>{customForm.referenceLinks}</div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: YOUR REQUEST PRICE */}
+              {requirementStep === 3 && (
+                <div>
+                  <div style={{ background: 'rgba(6, 17, 26, 0.95)', border: '1px solid var(--portal-border)', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Configured Service
+                        </div>
+                        <h4 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#F8FAFC', margin: '4px 0 0 0' }}>
+                          {configuredPriceData?.serviceLabel || 'Company Boost Sprint'}
+                        </h4>
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Authoritative Sprint Fee
+                        </div>
+                        <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#00D9FF', fontFamily: 'monospace' }}>
+                          ${configuredPriceData?.price || 799}.00 <span style={{ fontSize: '0.9rem', color: '#94A3B8' }}>{configuredPriceData?.currency || 'USD'}</span>
+                        </div>
+                        <div style={{ display: 'inline-block', marginTop: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700' }}>
+                          ✓ {configuredPriceData?.pricingStatus || 'CONFIGURED'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Breakdown Table */}
+                    {configuredPriceData?.breakdown && configuredPriceData.breakdown.length > 0 && (
+                      <div style={{ borderTop: '1px solid var(--portal-border)', paddingTop: '1rem', marginTop: '1rem' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+                          Itemized Scope Breakdown
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {configuredPriceData.breakdown.map((item, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', padding: '6px 0', borderBottom: idx < configuredPriceData.breakdown.length - 1 ? '1px dashed rgba(255,255,255,0.06)' : undefined }}>
+                              <span style={{ color: '#CBD5E1' }}>• {item.item}</span>
+                              <span style={{ fontWeight: '700', color: '#F8FAFC', fontFamily: 'monospace' }}>${item.amount}.00 USD</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ background: 'rgba(0, 217, 255, 0.05)', border: '1px solid rgba(0, 217, 255, 0.2)', borderRadius: '10px', padding: '1rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <CreditCard size={22} color="#00D9FF" style={{ flexShrink: 0 }} />
+                    <div style={{ fontSize: '0.82rem', color: '#CBD5E1', lineHeight: '1.5' }}>
+                      Pricing is dynamically configured and validated server-side. Clicking <strong>Confirm & Continue</strong> will create your sprint ticket and direct you to the existing secure checkout. You will not be charged until you confirm payment authorization.
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              className="portal-modal-footer"
+              style={{
+                padding: '1.25rem 1.5rem',
+                borderTop: '1px solid var(--portal-border)',
+                background: 'rgba(6, 17, 26, 0.95)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexShrink: 0
+              }}
+            >
+              {requirementStep === 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="portal-btn-secondary"
+                    onClick={() => setIsRequirementModalOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="portal-btn-primary"
+                    onClick={handleProceedToReview}
+                  >
+                    Review Requirements →
+                  </button>
+                </>
+              )}
+
+              {requirementStep === 2 && (
+                <>
+                  <button
+                    type="button"
+                    className="portal-btn-secondary"
+                    onClick={() => setRequirementStep(1)}
+                  >
+                    ← Back to Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="portal-btn-primary"
+                    onClick={handleProceedToPricing}
+                    disabled={calculatingPrice}
+                  >
+                    {calculatingPrice ? 'Configuring Price...' : 'Continue to Pricing →'}
+                  </button>
+                </>
+              )}
+
+              {requirementStep === 3 && (
+                <>
+                  <button
+                    type="button"
+                    className="portal-btn-secondary"
+                    onClick={() => setRequirementStep(2)}
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    type="button"
+                    className="portal-btn-primary"
+                    onClick={handleConfirmAndProceedToPayment}
+                    disabled={isSubmittingRequest}
+                    style={{ background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)', color: '#030303', fontWeight: '800' }}
+                  >
+                    {isSubmittingRequest ? 'Creating Ticket...' : 'Confirm & Continue →'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3B. REQUEST MORE LEADS REQUIREMENT MODAL (Company Lead - Simplified 2-Step Flow) */}
+      {isLeadReqModalOpen && (
+        <div className="lead-req-modal-overlay" onClick={() => setIsLeadReqModalOpen(false)}>
+          <div
+            className="lead-req-modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="lead-req-modal-header">
+              <div>
+                <div className="lead-req-header-top">
+                  <span className="lead-req-badge">
+                    COMPANY LEAD
+                  </span>
+                  <span className="lead-req-subtitle">• Dedicated Outbound Research Sprint</span>
+                </div>
+                <h3 className="lead-req-title">
+                  Request More Leads
+                </h3>
+                <div style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '3px' }}>
+                  Tell us how many leads you need.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="lead-req-close-btn"
+                onClick={() => setIsLeadReqModalOpen(false)}
+                title="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Stepper Progress Bar (Simplified 2-Step) */}
+            <div className="lead-req-stepper">
+              {[
+                { num: 1, label: '1. Number of Leads' },
+                { num: 2, label: '2. Pricing & Payment' }
+              ].map((s) => (
+                <div
+                  key={s.num}
+                  className={`lead-req-step-item ${
+                    leadReqStep === s.num ? 'active' : leadReqStep > s.num ? 'completed' : 'inactive'
+                  }`}
+                >
+                  <span className="lead-req-step-num">
+                    {leadReqStep > s.num ? '✓' : s.num}
+                  </span>
+                  <span>{s.label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Body */}
+            <div className="lead-req-modal-body">
+              {/* STEP 1: HOW MANY LEADS DO YOU WANT? */}
+              {leadReqStep === 1 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div className="lead-req-info-card" style={{ marginBottom: 0 }}>
+                    <div className="lead-req-info-title">
+                      How many leads do you want?
+                    </div>
+                    <div className="lead-req-info-text">
+                      Enter the target volume of leads for your outbound sprint. Our research specialists will prospect and verify decision-makers matching your company criteria.
+                    </div>
+                  </div>
+
+                  <div className="lead-req-form-group" style={{ marginBottom: 0 }}>
+                    <label className="lead-req-label" htmlFor="lead-input-count">
+                      Number of Leads Required <span style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <input
+                      id="lead-input-count"
+                      type="number"
+                      min="1"
+                      max="5000"
+                      step="1"
+                      className={`lead-req-input ${leadReqErrors.leadsCount ? 'error' : ''}`}
+                      placeholder="e.g. 50"
+                      value={leadReqForm.leadsCount}
+                      onChange={(e) => {
+                        setLeadReqForm({ leadsCount: e.target.value });
+                        if (leadReqErrors.leadsCount) {
+                          setLeadReqErrors({});
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleProceedLeadToPricing();
+                        }
+                      }}
+                      autoFocus
+                    />
+                    {leadReqErrors.leadsCount ? (
+                      <div className="lead-req-error-msg" id="lead-error-count">
+                        {leadReqErrors.leadsCount}
+                      </div>
+                    ) : (
+                      <div className="lead-req-hint">
+                        Standard sprint provides 50 fully verified leads.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: PRICING & PAYMENT */}
+              {leadReqStep === 2 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div className="lead-req-elevated-card" style={{ padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Your Request
+                        </div>
+                        <h4 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#F5F5F5', margin: '4px 0 0 0' }}>
+                          {leadPriceData?.serviceLabel || 'Company Lead Target Research'}
+                        </h4>
+                        <div style={{ fontSize: '0.9rem', color: '#00D9FF', fontWeight: '700', marginTop: '4px' }}>
+                          {leadReqForm.leadsCount} Verified Leads
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Price
+                        </div>
+                        <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#00D9FF', fontFamily: 'monospace' }}>
+                          ${leadPriceData?.price || 499}.00 <span style={{ fontSize: '0.9rem', color: '#94A3B8' }}>{leadPriceData?.currency || 'USD'}</span>
+                        </div>
+                        <div style={{ display: 'inline-block', marginTop: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700' }}>
+                          ✓ {leadPriceData?.pricingStatus || 'CONFIGURED'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Breakdown Table if available from backend */}
+                    {leadPriceData?.breakdown && leadPriceData.breakdown.length > 0 && (
+                      <div style={{ borderTop: '1px solid rgba(0, 217, 255, 0.12)', paddingTop: '1rem', marginTop: '1rem' }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '0.65rem' }}>
+                          Itemized Scope Breakdown
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {leadPriceData.breakdown.map((item, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '4px 0', borderBottom: idx < leadPriceData.breakdown.length - 1 ? '1px dashed rgba(255,255,255,0.06)' : undefined }}>
+                              <span style={{ color: '#CBD5E1' }}>• {item.item}</span>
+                              <span style={{ fontWeight: '700', color: '#F5F5F5', fontFamily: 'monospace' }}>${item.amount}.00 USD</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="lead-req-info-card" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: 0 }}>
+                    <CreditCard size={22} color="#00D9FF" style={{ flexShrink: 0 }} />
+                    <div style={{ fontSize: '0.82rem', color: '#CBD5E1', lineHeight: '1.5' }}>
+                      Pricing is strictly validated server-side. Clicking <strong>Proceed to Payment</strong> will create your sprint ticket and launch the payment gateway.
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="lead-req-modal-footer">
+              {leadReqStep === 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="lead-req-btn-secondary"
+                    onClick={() => setIsLeadReqModalOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    id="btn-lead-step1-continue"
+                    type="button"
+                    className="lead-req-btn-primary"
+                    onClick={handleProceedLeadToPricing}
+                    disabled={calculatingLeadPrice}
+                  >
+                    {calculatingLeadPrice ? 'Calculating Price...' : 'Continue →'}
+                  </button>
+                </>
+              )}
+
+              {leadReqStep === 2 && (
+                <>
+                  <button
+                    type="button"
+                    className="lead-req-btn-secondary"
+                    onClick={() => setLeadReqStep(1)}
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    id="btn-lead-step2-confirm"
+                    type="button"
+                    className="lead-req-btn-primary"
+                    onClick={handleConfirmLeadRequestAndPay}
+                    disabled={isSubmittingRequest}
+                    style={{ background: '#00D9FF', color: '#06111A', fontWeight: '800' }}
+                  >
+                    {isSubmittingRequest ? 'Creating Sprint Ticket...' : 'Proceed to Payment →'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 4. PAYMENT CONFIRMATION MODAL */}
       {pendingPaymentTicket && (
         <div className="portal-modal-overlay" onClick={() => setPendingPaymentTicket(null)}>
@@ -3703,6 +5611,108 @@ export default function UserDashboard({ user, onLogout }) {
                 alt="Full Branded Poster"
                 style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: '8px', objectFit: 'contain' }}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. HELP & SUPPORT CONCIERGE MODAL */}
+      {isHelpModalOpen && (
+        <div className="portal-modal-overlay" onClick={() => setIsHelpModalOpen(false)}>
+          <div
+            className="portal-modal-card"
+            style={{ maxWidth: '600px', width: '92%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="portal-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  background: 'rgba(0, 217, 255, 0.1)',
+                  border: '1px solid rgba(0, 217, 255, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#00D9FF'
+                }}>
+                  <HelpCircle size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: '700', margin: 0, color: '#FFFFFF' }}>
+                    Dedicated Client Concierge
+                  </h3>
+                  <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '2px' }}>
+                    CreativeGini Enterprise Support & Guidance
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '4px' }}
+                onClick={() => setIsHelpModalOpen(false)}
+                aria-label="Close Help Modal"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="portal-modal-body" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <p style={{ color: 'var(--portal-text-secondary)', fontSize: '0.9rem', lineHeight: '1.6', margin: 0 }}>
+                Have questions regarding your deliverables, ticket timelines, custom sprint scoping, or revision requests? Your dedicated concierge team is available to assist you.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+                <div style={{ padding: '14px 16px', borderRadius: '10px', background: '#06111A', border: '1px solid var(--portal-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#00D9FF', fontSize: '0.82rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <Mail size={16} /> Direct Email Concierge
+                  </div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#F5F5F5', marginTop: '6px' }}>
+                    concierge@creativegini.com
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#94A3B8', marginTop: '4px' }}>
+                    Monitored directly by Senior Engagement Leads
+                  </div>
+                </div>
+
+                <div style={{ padding: '14px 16px', borderRadius: '10px', background: '#06111A', border: '1px solid var(--portal-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10B981', fontSize: '0.82rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <Clock size={16} /> Guaranteed SLA
+                  </div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#F5F5F5', marginTop: '6px' }}>
+                    &lt; 2 Hours Response Time
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#94A3B8', marginTop: '4px' }}>
+                    Standard response for active subscription tiers
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(0, 217, 255, 0.04)', border: '1px solid rgba(0, 217, 255, 0.15)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <ShieldCheck size={18} color="#00D9FF" style={{ flexShrink: 0 }} />
+                <div style={{ fontSize: '0.82rem', color: '#CBD5E1', lineHeight: '1.4' }}>
+                  All conversations and uploaded client brand assets are protected under the CreativeGini Mutual Confidentiality & NDA framework.
+                </div>
+              </div>
+            </div>
+
+            <div className="portal-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <a
+                href="mailto:concierge@creativegini.com?subject=CreativeGini Concierge Inquiry"
+                className="portal-btn-primary"
+                style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                onClick={() => setIsHelpModalOpen(false)}
+              >
+                <Mail size={15} /> Compose Email
+              </a>
+              <button
+                type="button"
+                className="portal-btn-secondary"
+                onClick={() => setIsHelpModalOpen(false)}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
