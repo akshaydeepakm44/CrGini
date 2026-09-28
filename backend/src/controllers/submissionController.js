@@ -36,11 +36,6 @@ import {
   sendTicketCompletedEmail,
 } from '../services/emailService.js';
 
-export {
-  hasServiceTypeAccess,
-  resolveRequest,
-};
-
 /**
  * Resolve a submission by either:
  * - PostgreSQL UUID
@@ -139,6 +134,13 @@ export const createSubmission = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Only the assigned specialist team or Admin can submit work.',
+      });
+    }
+
+    if (request.status === 'COMPLETED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot submit work on a ticket that has already been approved and completed.',
       });
     }
 

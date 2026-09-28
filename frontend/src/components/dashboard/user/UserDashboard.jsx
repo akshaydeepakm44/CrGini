@@ -160,6 +160,27 @@ export default function UserDashboard({ user, onLogout }) {
   });
   const [lightboxPoster, setLightboxPoster] = useState(null);
 
+  // Helper to generate authenticated media URLs with token for audio/video/image tags and download links
+  const getAuthenticatedAssetUrl = (asset, action = 'stream') => {
+    if (!asset) return '';
+    const token = localStorage.getItem('cg_auth_token') || '';
+    if (asset.id) {
+      if (action === 'download') {
+        return api.getAssetDownloadUrl(asset.id);
+      }
+      return api.getAssetStreamUrl(asset.id);
+    }
+    if (asset.dataUrl) return asset.dataUrl;
+    if (asset.url && (asset.url.startsWith('data:') || asset.url.startsWith('blob:'))) return asset.url;
+    if (asset.url && (asset.url.startsWith('http') || asset.url.startsWith('/'))) {
+      return token ? `${asset.url}${asset.url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}` : asset.url;
+    }
+    if (asset.streamUrl) {
+      return token ? `${asset.streamUrl}${asset.streamUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}` : asset.streamUrl;
+    }
+    return '';
+  };
+
   // Requirement Modal State (Multi-step flow for Company Boost)
   const [isRequirementModalOpen, setIsRequirementModalOpen] = useState(false);
   const [requirementSubService, setRequirementSubService] = useState('STRATEGIC_PLAN'); // 'STRATEGIC_PLAN' | 'CONTENT' | 'DEVREL' | 'CUSTOM'
@@ -2904,22 +2925,34 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                             <FileText size={20} style={{ color: '#FFB000', flexShrink: 0 }} />
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#F8FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {onboardingAssets.strategicPlan.name}
+                                {onboardingAssets.strategicPlan.name || 'Company Strategic Plan.pdf'}
                               </div>
                               <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
                                 {onboardingAssets.strategicPlan.size || 'PDF Document'}
                               </div>
                             </div>
                           </div>
-                          <a
-                            href={onboardingAssets.strategicPlan.streamUrl || onboardingAssets.strategicPlan.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="portal-btn-secondary"
-                            style={{ padding: '6px 12px', fontSize: '0.78rem', flexShrink: 0, textDecoration: 'none' }}
-                          >
-                            <Eye size={14} /> View Plan
-                          </a>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            <a
+                              href={getAuthenticatedAssetUrl(onboardingAssets.strategicPlan, 'stream')}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="portal-btn-secondary"
+                              style={{ padding: '6px 12px', fontSize: '0.78rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}
+                              title="View Document"
+                            >
+                              <Eye size={14} /> View PDF
+                            </a>
+                            <a
+                              href={getAuthenticatedAssetUrl(onboardingAssets.strategicPlan, 'download')}
+                              download
+                              className="portal-btn-secondary"
+                              style={{ padding: '6px 9px', fontSize: '0.78rem', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+                              title="Download Strategic Plan"
+                            >
+                              <Download size={14} />
+                            </a>
+                          </div>
                         </div>
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#94A3B8', fontSize: '0.82rem' }}>
@@ -3014,29 +3047,40 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                         {onboardingAssets.poster ? (
                           <div style={{ position: 'relative' }}>
                             <img
-                              src={onboardingAssets.poster.streamUrl || onboardingAssets.poster.url}
+                              src={getAuthenticatedAssetUrl(onboardingAssets.poster, 'stream')}
                               alt="Company Poster"
-                              style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
+                              style={{ width: '100%', height: '140px', objectFit: 'contain', background: '#030712', borderRadius: '6px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
                               onClick={() => setLightboxPoster(onboardingAssets.poster)}
                               title="Click to expand poster"
                             />
-                            <button
-                              type="button"
-                              onClick={() => setLightboxPoster(onboardingAssets.poster)}
-                              style={{ position: 'absolute', bottom: '6px', right: '6px', background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '4px', padding: '3px 6px', color: '#fff', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
-                            >
-                              <Eye size={12} /> View
-                            </button>
+                            <div style={{ position: 'absolute', bottom: '6px', right: '6px', display: 'flex', gap: '4px' }}>
+                              <button
+                                type="button"
+                                onClick={() => setLightboxPoster(onboardingAssets.poster)}
+                                style={{ background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', padding: '3px 8px', color: '#fff', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
+                                title="Expand Poster"
+                              >
+                                <Eye size={12} /> View
+                              </button>
+                              <a
+                                href={getAuthenticatedAssetUrl(onboardingAssets.poster, 'download')}
+                                download
+                                style={{ background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', padding: '3px 6px', color: '#fff', fontSize: '0.7rem', display: 'flex', alignItems: 'center', textDecoration: 'none' }}
+                                title="Download Poster"
+                              >
+                                <Download size={12} />
+                              </a>
+                            </div>
                           </div>
                         ) : (
-                          <div style={{ height: '110px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748B', gap: '4px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+                          <div style={{ height: '140px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748B', gap: '4px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
                             <Image size={24} style={{ color: '#00D9FF', opacity: 0.7 }} />
                             <span style={{ fontSize: '0.72rem' }}>Poster in production</span>
                           </div>
                         )}
                       </div>
 
-                      {/* Video Preview */}
+                      {/* Video Preview with Native Player */}
                       <div style={{ background: 'rgba(6, 17, 26, 0.85)', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
                         <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '6px' }}>
                           1 Video
@@ -3047,14 +3091,15 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                               controls
                               playsInline
                               preload="metadata"
-                              style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '6px', background: '#000', border: '1px solid rgba(255,255,255,0.1)' }}
+                              style={{ width: '100%', height: '140px', objectFit: 'contain', borderRadius: '6px', background: '#000', border: '1px solid rgba(255,255,255,0.1)' }}
+                              src={getAuthenticatedAssetUrl(onboardingAssets.video, 'stream')}
                             >
-                              <source src={onboardingAssets.video.streamUrl || onboardingAssets.video.url} type={onboardingAssets.video.type || 'video/mp4'} />
+                              <source src={getAuthenticatedAssetUrl(onboardingAssets.video, 'stream')} type={onboardingAssets.video.type || 'video/mp4'} />
                               Your browser does not support inline video preview.
                             </video>
                           </div>
                         ) : (
-                          <div style={{ height: '110px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748B', gap: '4px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+                          <div style={{ height: '140px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748B', gap: '4px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
                             <Video size={24} style={{ color: '#00D9FF', opacity: 0.7 }} />
                             <span style={{ fontSize: '0.72rem' }}>Video in production</span>
                           </div>
@@ -3148,22 +3193,34 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                             <FileText size={20} style={{ color: '#a855f7', flexShrink: 0 }} />
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#F8FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {onboardingAssets.devrelPlan.name}
+                                {onboardingAssets.devrelPlan.name || 'Company DevRel Plan.pdf'}
                               </div>
                               <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
                                 {onboardingAssets.devrelPlan.size || 'PDF Document'}
                               </div>
                             </div>
                           </div>
-                          <a
-                            href={onboardingAssets.devrelPlan.streamUrl || onboardingAssets.devrelPlan.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="portal-btn-secondary"
-                            style={{ padding: '6px 12px', fontSize: '0.78rem', flexShrink: 0, textDecoration: 'none' }}
-                          >
-                            <Eye size={14} /> View Plan
-                          </a>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            <a
+                              href={getAuthenticatedAssetUrl(onboardingAssets.devrelPlan, 'stream')}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="portal-btn-secondary"
+                              style={{ padding: '6px 12px', fontSize: '0.78rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}
+                              title="View Document"
+                            >
+                              <Eye size={14} /> View Plan
+                            </a>
+                            <a
+                              href={getAuthenticatedAssetUrl(onboardingAssets.devrelPlan, 'download')}
+                              download
+                              className="portal-btn-secondary"
+                              style={{ padding: '6px 9px', fontSize: '0.78rem', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+                              title="Download DevRel Plan"
+                            >
+                              <Download size={14} />
+                            </a>
+                          </div>
                         </div>
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#94A3B8', fontSize: '0.82rem' }}>
@@ -5598,16 +5655,27 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                 </h4>
                 <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{lightboxPoster.size || 'Image Deliverable'}</div>
               </div>
-              <button
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
-                onClick={() => setLightboxPoster(null)}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <a
+                  href={getAuthenticatedAssetUrl(lightboxPoster, 'download')}
+                  download
+                  className="portal-btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  title="Download Image"
+                >
+                  <Download size={13} /> Download
+                </a>
+                <button
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center' }}
+                  onClick={() => setLightboxPoster(null)}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
             <div style={{ textAlign: 'center', maxHeight: '75vh', overflow: 'auto' }}>
               <img
-                src={lightboxPoster.streamUrl || lightboxPoster.url}
+                src={getAuthenticatedAssetUrl(lightboxPoster, 'stream')}
                 alt="Full Branded Poster"
                 style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: '8px', objectFit: 'contain' }}
               />

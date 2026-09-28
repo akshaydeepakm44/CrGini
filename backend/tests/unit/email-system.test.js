@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import {
   sendRequestCreatedEmail,
@@ -21,7 +21,7 @@ import {
   clearEmailDedupeCache,
   getTicketUrl,
   formatServiceType,
-} from './src/services/emailService.js';
+} from '../../src/services/emailService.js';
 
 async function runTests() {
   console.log('====================================================');
@@ -317,6 +317,7 @@ async function runTests() {
   if (failed > 0) {
     process.exit(1);
   }
+  process.exit(0);
 }
 
 runTests().catch(err => {

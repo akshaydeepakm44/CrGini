@@ -509,7 +509,12 @@ export const getCompanyOnboardingAssets = async (req, res) => {
       if (String(userCompanyId) !== String(targetCompanyId)) {
         return res.status(403).json({ success: false, message: 'Forbidden: You cannot access assets of another company.' });
       }
-    } else if (!['ADMIN', 'COMPANY_BOOST'].includes(req.user.role)) {
+    } else if (
+      !['ADMIN', 'COMPANY_BOOST'].includes(req.user.role) &&
+      !req.user.company_boost &&
+      !req.user.companyBoost &&
+      !(req.user.dashboardAccess && req.user.dashboardAccess.companyBoost)
+    ) {
       return res.status(403).json({ success: false, message: 'Forbidden: Insufficient privileges.' });
     }
 
@@ -566,6 +571,7 @@ export const getCompanyOnboardingAssets = async (req, res) => {
             type: file.type,
             url: file.url,
             streamUrl: `/api/assets/${file.id}/stream`,
+            downloadUrl: `/api/assets/${file.id}/download`,
             createdAt: file.created_at
           };
 
@@ -681,22 +687,37 @@ export const saveCompanyOnboardingAssets = async (req, res) => {
       submission = insertSub.rows[0];
     }
 
-    const { poster, video, strategicPlan, devrelPlan } = req.body;
+    const { poster, video, strategicPlan, devrelPlan } = req.body || {};
 
-    // Helper to upsert a file
+    // Helper to safely upsert an onboarding file without duplicate rows or corrupting existing assets
     const upsertFile = async (tag, fileData, defaultMime) => {
       if (!fileData) return;
-      // Remove previous matching file
+
+      // If file already exists and was not replaced (has id and no new dataUrl), verify and keep it intact
+      if (fileData.id && !fileData.dataUrl) {
+        const existingCheck = await query(
+          `SELECT id FROM submission_files WHERE id = $1 AND submission_id = $2`,
+          [fileData.id, submission.id]
+        );
+        if (existingCheck.rows.length > 0) {
+          // Untouched file remains valid in the submission
+          return;
+        }
+      }
+
+      const url = fileData.dataUrl || fileData.url || '';
+      if (!url) return;
+
+      // Remove previous matching file for this tag in this submission
       await query(`
         DELETE FROM submission_files
         WHERE submission_id = $1 AND (name ILIKE $2 OR ($3 != '' AND type ILIKE $3))
       `, [submission.id, `[${tag}]%`, defaultMime ? `${defaultMime}%` : '']);
 
-      // Insert new file
+      // Insert new or replaced file
       const fileName = `[${tag}] ${fileData.name || tag}`;
       const mime = fileData.mimeType || fileData.type || (tag === 'Poster' ? 'image/png' : tag === 'Video' ? 'video/mp4' : 'application/pdf');
       const size = fileData.size ? (typeof fileData.size === 'number' ? `${(fileData.size / 1024).toFixed(1)} KB` : String(fileData.size)) : 'Unknown';
-      const url = fileData.dataUrl || fileData.url || '';
 
       await query(`
         INSERT INTO submission_files (submission_id, name, url, size, type, created_at)

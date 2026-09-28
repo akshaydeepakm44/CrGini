@@ -26,10 +26,30 @@ const router = express.Router();
 // Onboarding routes for internal teams (Company Boost, Company Lead, Landing Page)
 router.get('/onboarding/clients', protect, authorize('ADMIN', 'COMPANY_BOOST', 'COMPANY_LEAD', 'LANDING_PAGE'), getOnboardingClients);
 
+// Authorization helper for Company Boost onboarding
+const authorizeCompanyBoost = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Access denied. No authenticated user.' });
+  }
+  if (
+    req.user.role === 'ADMIN' ||
+    req.user.role === 'COMPANY_BOOST' ||
+    req.user.company_boost === true ||
+    req.user.companyBoost === true ||
+    (req.user.dashboardAccess && req.user.dashboardAccess.companyBoost === true)
+  ) {
+    return next();
+  }
+  return res.status(403).json({
+    success: false,
+    message: 'Forbidden: Insufficient privileges for Company Boost onboarding assets.'
+  });
+};
+
 // Company Boost Onboarding
 router.get('/my-company/onboarding-assets', protect, getCompanyOnboardingAssets);
 router.get('/:companyId/onboarding-assets', protect, getCompanyOnboardingAssets);
-router.post('/:companyId/onboarding-assets', protect, authorize('ADMIN', 'COMPANY_BOOST'), saveCompanyOnboardingAssets);
+router.post('/:companyId/onboarding-assets', protect, authorizeCompanyBoost, saveCompanyOnboardingAssets);
 
 // Company UI / Landing Page Onboarding
 router.get('/my-company/ui-onboarding-assets', protect, getCompanyUiOnboardingAssets);

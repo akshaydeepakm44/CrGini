@@ -15,10 +15,10 @@ backend/
 ├── README.md                    # Backend architecture and API documentation
 └── src/
     ├── server.js                # Express app initialization, CORS policy, route mounting
-    ├── seed.js                  # Database seeder script with demo users and service tickets
+    ├── seed-pg.js               # PostgreSQL database seeder script (dev environments only)
     │
     ├── config/
-    │   └── db.js                # Mongoose connection manager with auto-reconnect logic
+    │   └── postgres.js          # PostgreSQL connection manager & query helpers
     │
     ├── controllers/             # Request handling and business logic
     │   ├── authController.js         # User registration, login, readyState check, token verification
@@ -31,15 +31,16 @@ backend/
     ├── middleware/              # Express middlewares
     │   └── auth.js                   # JWT validation (`protect`) & role authorization (`authorize`)
     │
-    ├── models/                  # Mongoose data models
-    │   ├── ActivityLog.js       # Audit timeline events (action, user, timestamp, metadata)
-    │   ├── Company.js           # Client organization profile, industry, pre-researched leads
-    │   ├── Message.js           # Ticket conversation thread messages
-    │   ├── Notification.js      # Notification items with read/unread tracking
-    │   ├── Payment.js           # Transaction audit log (amount, status, payment method)
-    │   ├── Request.js           # Service request tickets (status, team, specialist, pricing)
-    │   ├── Submission.js        # Versioned deliverables (files, review feedback, approval)
-    │   └── User.js              # User model with bcrypt password hashing, roles, and dashboardAccess
+    ├── repositories/            # PostgreSQL Data Access Layer
+    │   ├── activityLogRepository.js  # Audit timeline events
+    │   ├── assetRepository.js        # Unified media library & asset joins
+    │   ├── companyRepository.js      # Client organization profile, industry, research, leads
+    │   ├── messageRepository.js      # Ticket conversation thread messages
+    │   ├── notificationRepository.js # Notification items with read/unread tracking
+    │   ├── paymentRepository.js      # Transaction audit log (amount, status, payment method)
+    │   ├── requestRepository.js      # Service request tickets (status, team, specialist, pricing)
+    │   ├── submissionRepository.js   # Versioned deliverables (files, review feedback, approval)
+    │   └── userRepository.js         # User model with bcrypt password hashing, roles, and dashboardAccess
     │
     └── routes/                  # API route endpoints
         ├── adminRoutes.js       # Admin oversight: /api/admin/users, /api/admin/team-members, /api/admin/activity-logs

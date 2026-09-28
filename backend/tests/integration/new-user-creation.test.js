@@ -5,9 +5,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
-import { query, connectPostgres } from './src/config/postgres.js';
+import { query, connectPostgres } from '../../src/config/postgres.js';
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -53,7 +53,7 @@ async function runNewUserCreationSuite() {
     console.log('[Step 1]: Admin logs in...');
     const adminLoginRes = await request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email: 'team@creativegini.com', password: process.env.EMAIL_PASSWORD || 'Admin@2026' })
+      body: JSON.stringify({ email: 'team@creativegini.com', password: process.env.ADMIN_PASSWORD || 'Admin@2026' })
     });
 
     if (adminLoginRes.ok && adminLoginRes.data?.token) {

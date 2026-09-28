@@ -14,7 +14,7 @@
   --portal-surface-hover: #0E2032;
   --portal-surface-card: #0A1826;
   --portal-input-bg: #040C12;
-  
+
   --portal-border: rgba(0, 217, 255, 0.14);
   --portal-border-hover: rgba(0, 217, 255, 0.35);
   --portal-border-gold: rgba(255, 176, 0, 0.35);
@@ -26,12 +26,12 @@
   --portal-primary-light: rgba(0, 217, 255, 0.12);
   --portal-accent: #FFB000;
   --portal-accent-light: rgba(255, 176, 0, 0.14);
-  
+
   --portal-text-primary: #F5F5F5;
   --portal-text-secondary: #CBD5E1;
   --portal-text-muted: #94A3B8;
   --portal-text-dim: #8492A6;
-  
+
   --portal-success: #10B981;
   --portal-success-light: rgba(16, 185, 129, 0.14);
   --portal-warning: #F59E0B;
@@ -1478,7 +1478,8 @@ body:has(.portal-root) {
 
 /* ==========================================================================
    MODALS & WORKSPACE DIALOGS
-   =======================================================================.portal-modal-overlay,
+   ========================================================================== */
+.portal-modal-overlay,
 .portal-shell-modal-overlay,
 .portal-modal-backdrop,
 .lead-req-modal-overlay {
@@ -1495,6 +1496,29 @@ body:has(.portal-root) {
   box-sizing: border-box;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* On desktop, keep modals scoped to main/right content area so sidebar remains visible and accessible */
+@media (min-width: 1025px) {
+  .portal-root .portal-modal-overlay,
+  .portal-root .portal-shell-modal-overlay,
+  .portal-root .portal-modal-backdrop,
+  .portal-root .lead-req-modal-overlay {
+    left: 260px;
+    width: calc(100vw - 260px);
+  }
+
+  .portal-root:has(.portal-sidebar.collapsed) .portal-modal-overlay,
+  .portal-root:has(.portal-sidebar.collapsed) .portal-shell-modal-overlay,
+  .portal-root:has(.portal-sidebar.collapsed) .portal-modal-backdrop,
+  .portal-root:has(.portal-sidebar.collapsed) .lead-req-modal-overlay {
+    left: 76px;
+    width: calc(100vw - 76px);
+  }
+
+  .portal-sidebar {
+    z-index: 1250;
+  }
 }
 
 /* Prevent background page scrolling when any modal is open */
@@ -4660,4 +4684,29 @@ body.modal-open .dashboard-content-scroll {
   line-height: 1.4;
   word-break: break-word;
 }
-
+
+.portal-modal-close-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94A3B8;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.portal-modal-close-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #EF4444;
+}
+
+.asset-lightbox-meta {
+  min-width: 0;
+  flex: 1;
+}

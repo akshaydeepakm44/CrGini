@@ -14,12 +14,19 @@ creativegini-main/
 │   ├── package.json              # Backend dependencies and scripts
 │   ├── package-lock.json
 │   ├── README.md                 # Backend architecture and API documentation
+│   ├── tests/                    # Automated test suites (unit, integration, security, e2e)
+│   │   ├── unit/                 # Unit tests (email formatting, deep links, deduplication)
+│   │   ├── integration/          # Integration tests (SMTP handshake, password reset, user creation)
+│   │   ├── security/             # Security tests (tenant isolation, IDOR prevention)
+│   │   └── e2e/                  # End-to-end tests (onboarding workflows, asset pipelines, request lifecycle)
 │   └── src/
 │       ├── server.js             # Express application entry point & CORS configuration
-│       ├── seed.js               # Database seeder (creates default admin, specialists, clients)
+│       ├── seed-pg.js            # PostgreSQL database seeder (dev environments only)
 │       ├── config/
-│       │   └── db.js             # MongoDB Mongoose connection manager with auto-reconnect
+│       │   └── postgres.js       # PostgreSQL pg pool connection manager & query helper
 │       ├── controllers/          # Business logic handlers
+│       │   ├── adminController.js        # Admin oversight, specialist assignment, activity logs
+│       │   ├── assetController.js        # Media library & onboarding asset queries
 │       │   ├── authController.js         # User authentication, JWT issuance, profile lookup
 │       │   ├── companyController.js      # Client company profile & pre-researched leads
 │       │   ├── notificationController.js # In-app notification creation & read management
@@ -28,21 +35,23 @@ creativegini-main/
 │       │   └── userController.js         # Client & internal team member CRUD, permissions, audit
 │       ├── middleware/
 │       │   └── auth.js                   # JWT verification & role-based route guards
-│       ├── models/               # Mongoose schema definitions
-│       │   ├── ActivityLog.js    # Audit trail for ticket lifecycle events
-│       │   ├── Company.js        # Client company profiles & intelligence records
-│       │   ├── Message.js        # Ticket-specific request conversation messages
-│       │   ├── Notification.js   # In-app notifications with read/unread tracking
-│       │   ├── Payment.js        # Payment records & invoice transaction ledger
-│       │   ├── Request.js        # Service requests & tickets (status, pricing, assignments)
-│       │   ├── Submission.js     # Versioned deliverables (files, links, reviews)
-│       │   └── User.js           # Accounts, hashed passwords (bcrypt), roles, dashboard permissions
-│       └── routes/               # Express API route declarations
-│           ├── adminRoutes.js    # /api/admin (users, team-members, permissions, audit logs)
-│           ├── authRoutes.js     # /api/auth (login, session verification)
-│           ├── companyRoutes.js  # /api/company (company profiles & lead intelligence)
-│           ├── notificationRoutes.js # /api/notifications (feed & mark-as-read)
-│           └── requestRoutes.js  # /api/requests (tickets, submissions, reviews, chat, payments)
+│       ├── repositories/         # PostgreSQL Data Access Layer
+│       │   ├── activityLogRepository.js  # Audit trail for ticket lifecycle events
+│       │   ├── assetRepository.js        # Asset queries & unified media joins
+│       │   ├── companyRepository.js      # Client company profiles, research & leads
+│       │   ├── messageRepository.js      # Ticket-specific request conversation messages
+│       │   ├── notificationRepository.js # In-app notifications with read/unread tracking
+│       │   ├── paymentRepository.js      # Payment records & invoice transaction ledger
+│       │   ├── requestRepository.js      # Service requests & tickets (status, pricing, assignments)
+│       │   ├── submissionRepository.js   # Versioned deliverables (files, links, reviews)
+│       │   └── userRepository.js         # Accounts, hashed passwords (bcrypt), roles, permissions
+│       ├── routes/               # Express API route declarations
+│       │   ├── adminRoutes.js    # /api/admin (users, team-members, permissions, audit logs)
+│       │   ├── assetRoutes.js    # /api/assets (media library)
+│       │   ├── authRoutes.js     # /api/auth (login, session verification)
+│       │   ├── companyRoutes.js  # /api/company (company profiles, research, leads)
+│       │   ├── notificationRoutes.js # /api/notifications (feed & mark-as-read)
+│       │   └── requestRoutes.js  # /api/requests (tickets, submissions, reviews, chat, payments)
 │
 ├── frontend/                     # React 18 + Vite Web Application
 │   ├── index.html                # HTML document template

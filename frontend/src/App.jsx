@@ -19,7 +19,6 @@ import AdminDashboard from './components/dashboard/admin/AdminDashboard';
 import CompanyLeadDashboard from './components/dashboard/internal/CompanyLeadDashboard';
 import CompanyBoostDashboard from './components/dashboard/internal/CompanyBoostDashboard';
 import LandingPageDashboard from './components/dashboard/internal/LandingPageDashboard';
-import './styles/portal.css';
 import { api } from './services/api';
 
 gsap.registerPlugin(ScrollTrigger);

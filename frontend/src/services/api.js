@@ -1,6 +1,53 @@
 // CreativeGini API Client Service
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const getApiBase = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/+$/, '');
+  }
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    const hostname = window.location.hostname;
+    if (hostname && !hostname.includes('localhost') && !hostname.includes('127.0.0.1')) {
+      return `${window.location.origin}/api`;
+    }
+  }
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE = getApiBase();
+
+/**
+ * Safely parse JSON from response without throwing SyntaxError on HTML or non-JSON payloads
+ */
+const safeJson = async (res) => {
+  try {
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const parsed = await res.json();
+      return parsed !== null && parsed !== undefined ? parsed : {};
+    }
+  } catch (e) {
+    // ignore parse error on HTML or non-JSON error pages
+  }
+  return {};
+};
+
+/**
+ * Safely parse API response without throwing JSON syntax errors on HTML error pages
+ */
+const parseApiResponse = async (res, defaultErrorMessage = 'Request failed') => {
+  const data = await safeJson(res);
+  if (!res.ok) {
+    if (res.status === 413) {
+      throw new Error('Upload payload is too large. Please upload files under 25MB or compress your media.');
+    }
+    const message = data?.message || `${defaultErrorMessage} (Server returned HTTP ${res.status})`;
+    throw new Error(message);
+  }
+  if (!data || data.success === false) {
+    throw new Error(data?.message || defaultErrorMessage);
+  }
+  return data;
+};
 
 const getHeaders = (includeAuth = true) => {
   const headers = {
@@ -23,7 +70,7 @@ export const api = {
       headers: getHeaders(false),
       body: JSON.stringify({ email, password })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Login failed. Please check credentials.');
     }
@@ -35,7 +82,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/auth/me`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Session expired');
     }
@@ -53,7 +100,7 @@ export const api = {
       headers: getHeaders(false),
       body: JSON.stringify({ email: email?.trim() })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) {
       throw new Error(data.message || 'Unable to request password reset. Please try again.');
     }
@@ -65,7 +112,7 @@ export const api = {
       method: 'GET',
       headers: getHeaders(false)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.valid) {
       throw new Error(data.message || 'This password reset link is invalid or has expired.');
     }
@@ -78,7 +125,7 @@ export const api = {
       headers: getHeaders(false),
       body: JSON.stringify({ token: token?.trim(), password })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Unable to reset password. Please check requirements and try again.');
     }
@@ -91,7 +138,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ currentPassword, newPassword })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to change password. Please check your current password and try again.');
     }
@@ -103,7 +150,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/company/my-company`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch company details');
     }
@@ -114,7 +161,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/company/my-company/leads`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch company leads');
     }
@@ -125,7 +172,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/company/my-company/leads/${leadId}`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch lead details');
     }
@@ -137,7 +184,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/requests`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch requests');
     }
@@ -148,7 +195,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/requests/${id}`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Ticket not found');
     }
@@ -161,7 +208,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to calculate request price');
     }
@@ -174,7 +221,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to create ticket request');
     }
@@ -187,7 +234,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ paymentMethod })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Payment processing failed');
     }
@@ -198,7 +245,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/requests/${requestId}/messages`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to load conversation');
     }
@@ -211,7 +258,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ text, isProgressUpdate })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to send message');
     }
@@ -224,7 +271,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ status, note })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to update ticket status');
     }
@@ -236,7 +283,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/requests/${ticketId}/submissions`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch deliverables');
     }
@@ -249,7 +296,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to submit deliverables');
     }
@@ -262,7 +309,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ feedback })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to approve work');
     }
@@ -275,7 +322,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ feedback })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to request changes');
     }
@@ -286,7 +333,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/requests/${ticketId}/submissions/version/${version}`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch submission version');
     }
@@ -299,7 +346,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to assign ticket');
     }
@@ -311,7 +358,7 @@ export const api = {
       method: 'POST',
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to start work');
     }
@@ -324,7 +371,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ reason })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to execute administrative override');
     }
@@ -335,7 +382,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/requests/${ticketId}/activity`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to load activity logs');
     }
@@ -347,7 +394,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/notifications`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to load notifications');
     }
@@ -359,7 +406,7 @@ export const api = {
       method: 'PATCH',
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to mark notification read');
     }
@@ -371,7 +418,7 @@ export const api = {
       method: 'PATCH',
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to mark all notifications read');
     }
@@ -385,7 +432,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(clientPayload)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to create client');
     }
@@ -396,7 +443,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/admin/users`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to load users');
     }
@@ -407,7 +454,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/admin/users/${id}`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to load user details');
     }
@@ -420,7 +467,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to update user');
     }
@@ -432,7 +479,7 @@ export const api = {
       method: 'POST',
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to reset password');
     }
@@ -445,7 +492,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ status })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to update user status');
     }
@@ -457,7 +504,7 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to delete client user');
     }
@@ -468,7 +515,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/admin/team-members`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch team members');
     }
@@ -481,7 +528,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to create team user');
     }
@@ -494,7 +541,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ dashboardAccess })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to update dashboard permissions');
     }
@@ -506,7 +553,7 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to delete team member');
     }
@@ -519,7 +566,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to generate email preview');
     }
@@ -532,7 +579,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to send welcome email');
     }
@@ -552,7 +599,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/assets${queryString}`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch media assets');
     }
@@ -563,7 +610,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/assets/${assetId}`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch asset metadata');
     }
@@ -585,7 +632,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/company/my-company/onboarding-assets`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch onboarding assets');
     }
@@ -596,7 +643,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/company/${companyId}/onboarding-assets`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch company onboarding assets');
     }
@@ -609,18 +656,14 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.message || 'Failed to save onboarding assets');
-    }
-    return data;
+    return await parseApiResponse(res, 'Failed to save onboarding assets');
   },
 
   async getOnboardingClients() {
     const res = await fetch(`${API_BASE}/company/onboarding/clients`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch onboarding clients');
     }
@@ -632,7 +675,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/company/my-company/ui-onboarding-assets`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch UI onboarding assets');
     }
@@ -643,7 +686,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/company/${companyId}/ui-onboarding-assets`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch company UI onboarding assets');
     }
@@ -656,11 +699,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.message || 'Failed to save UI onboarding assets');
-    }
-    return data;
+    return await parseApiResponse(res, 'Failed to save UI onboarding assets');
   },
 
   // Company Lead Onboarding Samples (First 5 Sample Leads & PDFs)
@@ -668,7 +707,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/company/my-company/lead-onboarding-assets`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch lead onboarding assets');
     }
@@ -679,7 +718,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/company/${companyId}/lead-onboarding-assets`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch company lead onboarding assets');
     }
@@ -692,11 +731,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.message || 'Failed to save lead onboarding work');
-    }
-    return data;
+    return await parseApiResponse(res, 'Failed to save lead onboarding work');
   },
 
   // Company Lead Specialist & Management APIs
@@ -704,7 +739,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/company/${companyId}`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch company profile');
     }
@@ -715,7 +750,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/company/${companyId}/leads`, {
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to fetch company leads');
     }
@@ -728,7 +763,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify({ researchSummary })
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to update company research study');
     }
@@ -741,7 +776,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to add lead');
     }
@@ -754,7 +789,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to update lead');
     }
@@ -766,7 +801,7 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to delete lead');
     }
@@ -779,7 +814,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to add stakeholder');
     }
@@ -791,7 +826,7 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders(true)
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Failed to delete stakeholder');
     }

@@ -107,6 +107,9 @@ export const getTransporter = () => {
 
     try {
       transporterInstance = nodemailer.createTransport({
+        pool: true,
+        maxConnections: 3,
+        maxMessages: 100,
         host,
         port,
         secure,
@@ -434,6 +437,20 @@ const sendEmail = async ({ to, subject, html, text, event, dedupeKey, attachment
 
   const from = process.env.EMAIL_FROM || 'CreativeGini <team@creativegini.com>';
   const transporter = getTransporter();
+
+  // If destination is a simulated or test domain (*.test, *.invalid, *.example), record and return simulated delivery safely
+  const isTestRecipient = to.toLowerCase().endsWith('.test') || to.toLowerCase().endsWith('.invalid') || to.toLowerCase().endsWith('.example');
+  if (isTestRecipient) {
+    console.log(`[EMAIL TEST SIMULATION] [${event}] to ${to} (Subject: ${subject})`);
+    return {
+      success: true,
+      simulated: true,
+      to,
+      subject,
+      event,
+      attachmentsCount: (attachments || []).length
+    };
+  }
 
   // If SMTP is not configured or running with placeholder credentials, run in simulation mode
   if (!transporter) {
@@ -1610,13 +1627,58 @@ export const sendPasswordResetEmail = async ({
  *   - Link to relevant internal dashboard / client profile
  * - Do NOT send this email to the client!
  * - Sender: CreativeGini <team@creativegini.com>
+ // ============================================================================
+// 10. NEW CLIENT ONBOARDING TEAM EMAILS (Company Lead, Boost, UI)
+// ============================================================================
+
+/**
+ * Shared helper to generate company info table HTML
  */
-export const buildInternalNewClientEmailTemplate = ({
+const buildCompanyInfoTableHtml = ({ companyName, contactPerson, clientEmail, companyWebsite, industry, companyInfo }) => {
+  return `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(15, 23, 42, 0.7); border: 1px solid #1E293B; border-radius: 8px; margin-bottom: 24px;">
+      <tr>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #1E293B; width: 36%; font-size: 13px; color: #94A3B8;">Company / Client</td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #1E293B; font-size: 13px; font-weight: 700; color: #F8FAFC;">${companyName}</td>
+      </tr>
+      <tr>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #94A3B8;">Contact Person</td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #1E293B; font-size: 13px; font-weight: 600; color: #F8FAFC;">${contactPerson || 'N/A'}</td>
+      </tr>
+      <tr>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #94A3B8;">Client Email</td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #00E5FF; font-family: monospace;">${clientEmail}</td>
+      </tr>
+      <tr>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #94A3B8;">Website</td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #00E5FF;">
+          ${companyWebsite && companyWebsite !== 'N/A' ? `<a href="${companyWebsite}" target="_blank" style="color: #00E5FF; text-decoration: underline;">${companyWebsite}</a>` : 'N/A'}
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 12px 16px; ${companyInfo ? 'border-bottom: 1px solid #1E293B;' : ''} font-size: 13px; color: #94A3B8;">Industry</td>
+        <td style="padding: 12px 16px; ${companyInfo ? 'border-bottom: 1px solid #1E293B;' : ''} font-size: 13px; color: #F8FAFC;">${industry || 'Technology / SaaS'}</td>
+      </tr>
+      ${companyInfo ? `
+      <tr>
+        <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; vertical-align: top;">Overview / Brief</td>
+        <td style="padding: 12px 16px; font-size: 13px; color: #CBD5E1; line-height: 1.5;">${companyInfo}</td>
+      </tr>
+      ` : ''}
+    </table>
+  `.trim();
+};
+
+/**
+ * Company Lead Team Onboarding Template
+ */
+export const buildInternalLeadOnboardingEmailTemplate = ({
   companyName,
   contactPerson,
   companyWebsite,
   industry,
   clientEmail,
+  companyInfo,
   dashboardUrl
 }) => {
   return `
@@ -1625,7 +1687,7 @@ export const buildInternalNewClientEmailTemplate = ({
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>New Client Onboarding Preparation Required</title>
+  <title>Company Lead - New Client Onboarding</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #030812; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #E2E8F0;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #030812; min-height: 100vh; padding: 30px 15px;">
@@ -1635,91 +1697,34 @@ export const buildInternalNewClientEmailTemplate = ({
           <!-- HEADER -->
           <tr>
             <td style="padding: 28px 32px; background: linear-gradient(135deg, #0B192C 0%, #030812 100%); border-bottom: 1px solid #1E293B;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td>
-                    <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.1em; color: #FFB000; text-transform: uppercase; background: rgba(255, 176, 0, 0.12); padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(255, 176, 0, 0.3);">
-                      INTERNAL TEAM NOTIFICATION
-                    </span>
-                    <h1 style="margin: 14px 0 6px 0; font-size: 20px; font-weight: 800; color: #F8FAFC;">
-                      New Client Onboarding Required
-                    </h1>
-                    <p style="margin: 0; font-size: 13px; color: #94A3B8;">
-                      A new client has been created in CreativeGini and the team needs to prepare the initial company samples/workspace.
-                    </p>
-                  </td>
-                </tr>
-              </table>
+              <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.1em; color: #00E5FF; text-transform: uppercase; background: rgba(0, 229, 255, 0.12); padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(0, 229, 255, 0.3);">
+                COMPANY LEAD &middot; ONBOARDING DISPATCH
+              </span>
+              <h1 style="margin: 14px 0 6px 0; font-size: 20px; font-weight: 800; color: #F8FAFC;">
+                New Client Onboarded: ${companyName}
+              </h1>
+              <p style="margin: 0; font-size: 13px; color: #94A3B8; line-height: 1.5;">
+                A new client has been onboarded into CreativeGini. The <strong>Company Lead team</strong> needs to start and submit the required onboarding sample work.
+              </p>
             </td>
           </tr>
 
           <!-- BODY DETAILS -->
           <tr>
             <td style="padding: 28px 32px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(15, 23, 42, 0.6); border: 1px solid #1E293B; border-radius: 8px; margin-bottom: 24px;">
-                <tr>
-                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; width: 38%; font-size: 13px; color: #94A3B8;">Client / Company</td>
-                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; font-weight: 700; color: #F8FAFC;">${companyName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #94A3B8;">Contact Person</td>
-                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; font-weight: 600; color: #F8FAFC;">${contactPerson || 'N/A'}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #94A3B8;">Client Email</td>
-                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #00D9FF;">${clientEmail}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #94A3B8;">Company Website</td>
-                  <td style="padding: 14px 18px; border-bottom: 1px solid #1E293B; font-size: 13px; color: #00D9FF;">${companyWebsite || 'N/A'}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 14px 18px; font-size: 13px; color: #94A3B8;">Industry</td>
-                  <td style="padding: 14px 18px; font-size: 13px; color: #F8FAFC;">${industry || 'Technology / SaaS'}</td>
-                </tr>
-              </table>
+              ${buildCompanyInfoTableHtml({ companyName, contactPerson, clientEmail, companyWebsite, industry, companyInfo })}
 
-              <!-- REQUIRED DELIVERABLES NOTICE FOR ALL 3 TEAMS -->
-              <div style="margin-bottom: 24px;">
-                <!-- 1. Company Boost Team -->
-                <div style="background: rgba(255, 176, 0, 0.06); border: 1px solid rgba(255, 176, 0, 0.25); border-radius: 8px; padding: 16px; margin-bottom: 12px;">
-                  <div style="font-size: 12px; font-weight: 700; color: #FFB000; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-                    ⚡ Company Boost Team Action Items
-                  </div>
-                  <div style="font-size: 13px; color: #CBD5E1; line-height: 1.6;">
-                    Please prepare the 4 initial onboarding materials for this workspace:<br>
-                    &bull; <strong>1 Sample Poster</strong> (Branded Visual Marketing Asset)<br>
-                    &bull; <strong>1 Sample Video</strong> (Introductory Product Showcase Demo)<br>
-                    &bull; <strong>Strategic Plan</strong> (Company-specific growth & positioning strategy)<br>
-                    &bull; <strong>DevRel Plan</strong> (Technical Developer Relations & outreach plan)
-                  </div>
+              <!-- ACTION ITEMS CARD -->
+              <div style="background: rgba(0, 229, 255, 0.05); border: 1px solid rgba(0, 229, 255, 0.25); border-radius: 8px; padding: 20px; margin-bottom: 26px;">
+                <div style="font-size: 13px; font-weight: 700; color: #00E5FF; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">
+                  🎯 Required Company Lead Deliverables:
                 </div>
-
-                <!-- 2. Company Lead Team -->
-                <div style="background: rgba(0, 217, 255, 0.06); border: 1px solid rgba(0, 217, 255, 0.25); border-radius: 8px; padding: 16px; margin-bottom: 12px;">
-                  <div style="font-size: 12px; font-weight: 700; color: #00D9FF; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-                    🎯 Company Lead Team Action Items
-                  </div>
-                  <div style="font-size: 13px; color: #CBD5E1; line-height: 1.6;">
-                    Please research and upload the initial sample data from your Company Lead dashboard:<br>
-                    &bull; <strong>Company Study / Research</strong> (Market analysis & target positioning)<br>
-                    &bull; <strong>At least 5 Sample Leads</strong> (Verified/researched accounts matching ICP)<br>
-                    &bull; <strong>Key Stakeholders</strong> (Important decision-makers & contacts)<br>
-                    &bull; <strong>Stakeholder Titles/Roles</strong> (Executive & technical titles)<br>
-                    &bull; <strong>LinkedIn Profiles</strong> (Direct URLs for verified profiles)
-                  </div>
-                </div>
-
-                <!-- 3. Company UI Team -->
-                <div style="background: rgba(168, 85, 247, 0.06); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; padding: 16px;">
-                  <div style="font-size: 12px; font-weight: 700; color: #C084FC; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-                    🎨 Company UI Team Action Items
-                  </div>
-                  <div style="font-size: 13px; color: #CBD5E1; line-height: 1.6;">
-                    Please prepare the initial UI/UX assessment and enhancement sample work:<br>
-                    &bull; <strong>Initial UI/UX Analysis</strong> (Heuristic review & responsive audit)<br>
-                    &bull; <strong>Sample Landing Page Enhancement Work</strong> (Visual redesign & conversion recommendations)
-                  </div>
+                <div style="font-size: 13px; color: #CBD5E1; line-height: 1.8;">
+                  &bull; <strong>Company Study / Research:</strong> Market research, buyer persona analysis & ICP definitions.<br>
+                  &bull; <strong>First 5 Sample Leads:</strong> Verified research leads matching client criteria.<br>
+                  &bull; <strong>Key People / Stakeholders:</strong> High-priority executive stakeholders with titles and roles.<br>
+                  &bull; <strong>LinkedIn Profiles:</strong> Validated executive LinkedIn profile URLs.<br>
+                  &bull; <strong>Lead PDF / Dossier:</strong> Upload a dedicated PDF document for each of the 5 sample leads.
                 </div>
               </div>
 
@@ -1727,8 +1732,8 @@ export const buildInternalNewClientEmailTemplate = ({
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td align="center">
-                    <a href="${dashboardUrl}" target="_blank" style="display: inline-block; padding: 12px 28px; background: #FFB000; color: #040810; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 6px; box-shadow: 0 4px 12px rgba(255, 176, 0, 0.25);">
-                      Open Team Dashboard &rarr;
+                    <a href="${dashboardUrl}" target="_blank" style="display: inline-block; padding: 13px 32px; background: #00E5FF; color: #040810; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 229, 255, 0.3);">
+                      Open Company Lead Workspace &rarr;
                     </a>
                   </td>
                 </tr>
@@ -1740,7 +1745,7 @@ export const buildInternalNewClientEmailTemplate = ({
           <tr>
             <td style="padding: 20px 32px; background: #040914; border-top: 1px solid #1E293B; text-align: center;">
               <p style="margin: 0; font-size: 11px; color: #64748B;">
-                CreativeGini &middot; Internal Operational Dispatch &middot; team@creativegini.com
+                CreativeGini &middot; Internal Operations Dispatch &middot; team@creativegini.com
               </p>
             </td>
           </tr>
@@ -1753,16 +1758,194 @@ export const buildInternalNewClientEmailTemplate = ({
   `.trim();
 };
 
-export const sendInternalNewClientNotification = async ({
-  recipients,
+/**
+ * Company Boost Team Onboarding Template
+ */
+export const buildInternalBoostOnboardingEmailTemplate = ({
+  companyName,
+  contactPerson,
+  companyWebsite,
+  industry,
+  clientEmail,
+  companyInfo,
+  dashboardUrl
+}) => {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Company Boost - New Client Onboarding</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #030812; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #E2E8F0;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #030812; min-height: 100vh; padding: 30px 15px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #081120; border: 1px solid #1E293B; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+          <!-- HEADER -->
+          <tr>
+            <td style="padding: 28px 32px; background: linear-gradient(135deg, #0B192C 0%, #030812 100%); border-bottom: 1px solid #1E293B;">
+              <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.1em; color: #FFB000; text-transform: uppercase; background: rgba(255, 176, 0, 0.12); padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(255, 176, 0, 0.3);">
+                COMPANY BOOST &middot; ONBOARDING DISPATCH
+              </span>
+              <h1 style="margin: 14px 0 6px 0; font-size: 20px; font-weight: 800; color: #F8FAFC;">
+                New Client Onboarded: ${companyName}
+              </h1>
+              <p style="margin: 0; font-size: 13px; color: #94A3B8; line-height: 1.5;">
+                A new client has been onboarded into CreativeGini. The <strong>Company Boost team</strong> needs to start and submit the required onboarding sample work.
+              </p>
+            </td>
+          </tr>
+
+          <!-- BODY DETAILS -->
+          <tr>
+            <td style="padding: 28px 32px;">
+              ${buildCompanyInfoTableHtml({ companyName, contactPerson, clientEmail, companyWebsite, industry, companyInfo })}
+
+              <!-- ACTION ITEMS CARD -->
+              <div style="background: rgba(255, 176, 0, 0.05); border: 1px solid rgba(255, 176, 0, 0.25); border-radius: 8px; padding: 20px; margin-bottom: 26px;">
+                <div style="font-size: 13px; font-weight: 700; color: #FFB000; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">
+                  ⚡ Required Company Boost Deliverables:
+                </div>
+                <div style="font-size: 13px; color: #CBD5E1; line-height: 1.8;">
+                  &bull; <strong>Strategic Plan:</strong> Comprehensive client-specific positioning and growth plan (PDF).<br>
+                  &bull; <strong>Content (Image):</strong> High-resolution branded visual showcase / creative graphic.<br>
+                  &bull; <strong>Content (Poster):</strong> Branded marketing visual poster.<br>
+                  &bull; <strong>DevRel Plan:</strong> Technical Developer Relations and community roadmap (PDF).
+                </div>
+              </div>
+
+              <!-- ACTION BUTTON -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center">
+                    <a href="${dashboardUrl}" target="_blank" style="display: inline-block; padding: 13px 32px; background: #FFB000; color: #040810; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 6px; box-shadow: 0 4px 14px rgba(255, 176, 0, 0.3);">
+                      Open Company Boost Workspace &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="padding: 20px 32px; background: #040914; border-top: 1px solid #1E293B; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #64748B;">
+                CreativeGini &middot; Internal Operations Dispatch &middot; team@creativegini.com
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+};
+
+/**
+ * Company UI / Landing Page Team Onboarding Template
+ */
+export const buildInternalUiOnboardingEmailTemplate = ({
+  companyName,
+  contactPerson,
+  companyWebsite,
+  industry,
+  clientEmail,
+  companyInfo,
+  dashboardUrl
+}) => {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Company UI - New Client Onboarding</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #030812; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #E2E8F0;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #030812; min-height: 100vh; padding: 30px 15px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #081120; border: 1px solid #1E293B; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+          <!-- HEADER -->
+          <tr>
+            <td style="padding: 28px 32px; background: linear-gradient(135deg, #0B192C 0%, #030812 100%); border-bottom: 1px solid #1E293B;">
+              <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.1em; color: #C084FC; text-transform: uppercase; background: rgba(168, 85, 247, 0.12); padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(168, 85, 247, 0.3);">
+                COMPANY UI &middot; ONBOARDING DISPATCH
+              </span>
+              <h1 style="margin: 14px 0 6px 0; font-size: 20px; font-weight: 800; color: #F8FAFC;">
+                New Client Onboarded: ${companyName}
+              </h1>
+              <p style="margin: 0; font-size: 13px; color: #94A3B8; line-height: 1.5;">
+                A new client has been onboarded into CreativeGini. The <strong>Company UI / Landing Page team</strong> needs to start and submit the required onboarding sample work.
+              </p>
+            </td>
+          </tr>
+
+          <!-- BODY DETAILS -->
+          <tr>
+            <td style="padding: 28px 32px;">
+              ${buildCompanyInfoTableHtml({ companyName, contactPerson, clientEmail, companyWebsite, industry, companyInfo })}
+
+              <!-- ACTION ITEMS CARD -->
+              <div style="background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; padding: 20px; margin-bottom: 26px;">
+                <div style="font-size: 13px; font-weight: 700; color: #C084FC; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">
+                  🎨 Required Company UI Deliverables:
+                </div>
+                <div style="font-size: 13px; color: #CBD5E1; line-height: 1.8;">
+                  &bull; <strong>Initial UI/UX Analysis:</strong> Heuristic usability analysis, visual UX audit & mobile responsiveness review.<br>
+                  &bull; <strong>Sample Landing Page Enhancement:</strong> Visual design concept, component modernization & conversion optimization sample.
+                </div>
+              </div>
+
+              <!-- ACTION BUTTON -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center">
+                    <a href="${dashboardUrl}" target="_blank" style="display: inline-block; padding: 13px 32px; background: #A855F7; color: #FFFFFF; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 6px; box-shadow: 0 4px 14px rgba(168, 85, 247, 0.3);">
+                      Open Landing Page Workspace &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="padding: 20px 32px; background: #040914; border-top: 1px solid #1E293B; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #64748B;">
+                CreativeGini &middot; Internal Operations Dispatch &middot; team@creativegini.com
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+};
+
+/**
+ * Dispatch Company Lead Onboarding Notification Email
+ */
+export const sendInternalLeadOnboardingNotification = async ({
+  recipients = [],
   client,
   company,
   dashboardUrl
 }) => {
   try {
-    if (!recipients || recipients.length === 0) {
-      console.warn('[EMAIL WARNING] sendInternalNewClientNotification: No recipients specified.');
-      return { success: false, reason: 'no_recipients' };
+    const validRecipients = recipients.filter(r => Boolean(r && (typeof r === 'string' ? r.trim() : r.email)));
+    if (validRecipients.length === 0) {
+      console.log(`[ONBOARDING NOTICE] No active COMPANY_LEAD team members to notify for ${company?.name || 'client'}.`);
+      return { success: true, count: 0, reason: 'no_recipients' };
     }
 
     const companyName = company?.name || 'New Client Company';
@@ -1770,79 +1953,290 @@ export const sendInternalNewClientNotification = async ({
     const clientEmail = client?.email || company?.email || 'N/A';
     const companyWebsite = company?.website || 'N/A';
     const industry = company?.industry || 'Technology / SaaS';
-    const resolvedUrl = dashboardUrl || `${(process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '')}/company-boost`;
+    const companyInfo = company?.companyInfo || '';
+    const resolvedUrl = dashboardUrl || `${(process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '')}/company-lead`;
 
-    const subject = `[Internal] New Client Created: ${companyName} - Initial Workspace Preparation Required`;
-
-    const html = buildInternalNewClientEmailTemplate({
+    const subject = `[Action Required] New Client Onboarded: ${companyName} - Prepare Sample Leads`;
+    const html = buildInternalLeadOnboardingEmailTemplate({
       companyName,
       contactPerson,
       companyWebsite,
       industry,
       clientEmail,
+      companyInfo,
       dashboardUrl: resolvedUrl
     });
 
-    const text = `[INTERNAL TEAM NOTIFICATION]
+    const text = `[COMPANY LEAD ONBOARDING DISPATCH]
 
-A new client has been created in CreativeGini and the internal teams need to prepare the required sample work.
+A new client has been onboarded: ${companyName}.
+Your team needs to start and submit the required sample work.
 
-Company Details:
-- Client / Company Name: ${companyName}
+Client Information:
+- Company: ${companyName}
 - Contact Person: ${contactPerson}
-- Company Website: ${companyWebsite}
+- Email: ${clientEmail}
+- Website: ${companyWebsite}
 - Industry: ${industry}
-- Client Email: ${clientEmail}
 
----
-COMPANY BOOST TEAM ACTION ITEMS:
-1. 1 Sample Poster (Branded Visual)
-2. 1 Sample Video (Introductory Demo)
-3. Strategic Plan (Company-specific growth strategy)
-4. DevRel Plan (Technical Developer Relations plan)
-
-COMPANY LEAD TEAM ACTION ITEMS:
+Required Deliverables:
 1. Company Study / Research
 2. At least 5 Sample Leads
-3. Key Stakeholders
-4. Stakeholder Titles/Roles
-5. LinkedIn Profiles
+3. Key People / Stakeholders
+4. LinkedIn Profiles
+5. Lead PDF / Dossier for each sample lead
 
-COMPANY UI TEAM ACTION ITEMS:
-1. Initial UI/UX analysis
-2. Sample landing page enhancement work
----
-
-Link to Workspace: ${resolvedUrl}
+Open Company Lead Workspace: ${resolvedUrl}
 
 - CreativeGini Internal Ops <team@creativegini.com>`;
 
     const results = [];
-    for (const recipient of recipients) {
-      const email = typeof recipient === 'string' ? recipient : recipient.email;
-      if (!email || !email.trim()) continue;
-      // CRITICAL: Safety check ensuring client email is never sent this notification
-      if (email.toLowerCase().trim() === clientEmail.toLowerCase().trim()) {
-        console.warn(`[EMAIL SAFETY] Skipped sending internal onboarding notification to client address: ${email}`);
-        continue;
-      }
+    for (const recipient of validRecipients) {
+      const email = typeof recipient === 'string' ? recipient.trim() : recipient.email?.trim();
+      if (!email || email.toLowerCase() === clientEmail.toLowerCase()) continue;
 
       const res = await sendEmail({
-        to: email.trim(),
+        to: email,
         subject,
         html,
         text,
-        event: 'INTERNAL_CLIENT_CREATED',
-        dedupeKey: `internal-new-client-${company?.id || company?._id}-${email.trim().toLowerCase()}`
+        event: 'INTERNAL_CLIENT_CREATED_LEAD',
+        dedupeKey: `internal-lead-onboarding-${company?.id || company?._id}-${email.toLowerCase()}`
       });
       results.push({ email, ...res });
     }
 
     return { success: true, count: results.length, results };
   } catch (err) {
-    console.error('[EMAIL ERROR] sendInternalNewClientNotification:', err.message);
+    console.error('[EMAIL ERROR] sendInternalLeadOnboardingNotification:', err.message);
     return { success: false, error: err.message };
   }
+};
+
+/**
+ * Dispatch Company Boost Onboarding Notification Email
+ */
+export const sendInternalBoostOnboardingNotification = async ({
+  recipients = [],
+  client,
+  company,
+  dashboardUrl
+}) => {
+  try {
+    const validRecipients = recipients.filter(r => Boolean(r && (typeof r === 'string' ? r.trim() : r.email)));
+    if (validRecipients.length === 0) {
+      console.log(`[ONBOARDING NOTICE] No active COMPANY_BOOST team members to notify for ${company?.name || 'client'}.`);
+      return { success: true, count: 0, reason: 'no_recipients' };
+    }
+
+    const companyName = company?.name || 'New Client Company';
+    const contactPerson = client?.name || company?.contactPerson || 'N/A';
+    const clientEmail = client?.email || company?.email || 'N/A';
+    const companyWebsite = company?.website || 'N/A';
+    const industry = company?.industry || 'Technology / SaaS';
+    const companyInfo = company?.companyInfo || '';
+    const resolvedUrl = dashboardUrl || `${(process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '')}/company-boost`;
+
+    const subject = `[Action Required] New Client Onboarded: ${companyName} - Prepare Boost Sample Work`;
+    const html = buildInternalBoostOnboardingEmailTemplate({
+      companyName,
+      contactPerson,
+      companyWebsite,
+      industry,
+      clientEmail,
+      companyInfo,
+      dashboardUrl: resolvedUrl
+    });
+
+    const text = `[COMPANY BOOST ONBOARDING DISPATCH]
+
+A new client has been onboarded: ${companyName}.
+Your team needs to start and submit the required sample work.
+
+Client Information:
+- Company: ${companyName}
+- Contact Person: ${contactPerson}
+- Email: ${clientEmail}
+- Website: ${companyWebsite}
+- Industry: ${industry}
+
+Required Deliverables:
+1. Strategic Plan (PDF)
+2. Content (Image)
+3. Content (Poster)
+4. DevRel Plan (PDF)
+
+Open Company Boost Workspace: ${resolvedUrl}
+
+- CreativeGini Internal Ops <team@creativegini.com>`;
+
+    const results = [];
+    for (const recipient of validRecipients) {
+      const email = typeof recipient === 'string' ? recipient.trim() : recipient.email?.trim();
+      if (!email || email.toLowerCase() === clientEmail.toLowerCase()) continue;
+
+      const res = await sendEmail({
+        to: email,
+        subject,
+        html,
+        text,
+        event: 'INTERNAL_CLIENT_CREATED_BOOST',
+        dedupeKey: `internal-boost-onboarding-${company?.id || company?._id}-${email.toLowerCase()}`
+      });
+      results.push({ email, ...res });
+    }
+
+    return { success: true, count: results.length, results };
+  } catch (err) {
+    console.error('[EMAIL ERROR] sendInternalBoostOnboardingNotification:', err.message);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Dispatch Company UI / Landing Page Onboarding Notification Email
+ */
+export const sendInternalUiOnboardingNotification = async ({
+  recipients = [],
+  client,
+  company,
+  dashboardUrl
+}) => {
+  try {
+    const validRecipients = recipients.filter(r => Boolean(r && (typeof r === 'string' ? r.trim() : r.email)));
+    if (validRecipients.length === 0) {
+      console.log(`[ONBOARDING NOTICE] No active LANDING_PAGE team members to notify for ${company?.name || 'client'}.`);
+      return { success: true, count: 0, reason: 'no_recipients' };
+    }
+
+    const companyName = company?.name || 'New Client Company';
+    const contactPerson = client?.name || company?.contactPerson || 'N/A';
+    const clientEmail = client?.email || company?.email || 'N/A';
+    const companyWebsite = company?.website || 'N/A';
+    const industry = company?.industry || 'Technology / SaaS';
+    const companyInfo = company?.companyInfo || '';
+    const resolvedUrl = dashboardUrl || `${(process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '')}/landing-page`;
+
+    const subject = `[Action Required] New Client Onboarded: ${companyName} - Prepare UI Sample Work`;
+    const html = buildInternalUiOnboardingEmailTemplate({
+      companyName,
+      contactPerson,
+      companyWebsite,
+      industry,
+      clientEmail,
+      companyInfo,
+      dashboardUrl: resolvedUrl
+    });
+
+    const text = `[COMPANY UI ONBOARDING DISPATCH]
+
+A new client has been onboarded: ${companyName}.
+Your team needs to start and submit the required sample work.
+
+Client Information:
+- Company: ${companyName}
+- Contact Person: ${contactPerson}
+- Email: ${clientEmail}
+- Website: ${companyWebsite}
+- Industry: ${industry}
+
+Required Deliverables:
+1. Initial UI/UX Analysis (PDF)
+2. Sample Landing Page Enhancement
+
+Open Landing Page Workspace: ${resolvedUrl}
+
+- CreativeGini Internal Ops <team@creativegini.com>`;
+
+    const results = [];
+    for (const recipient of validRecipients) {
+      const email = typeof recipient === 'string' ? recipient.trim() : recipient.email?.trim();
+      if (!email || email.toLowerCase() === clientEmail.toLowerCase()) continue;
+
+      const res = await sendEmail({
+        to: email,
+        subject,
+        html,
+        text,
+        event: 'INTERNAL_CLIENT_CREATED_UI',
+        dedupeKey: `internal-ui-onboarding-${company?.id || company?._id}-${email.toLowerCase()}`
+      });
+      results.push({ email, ...res });
+    }
+
+    return { success: true, count: results.length, results };
+  } catch (err) {
+    console.error('[EMAIL ERROR] sendInternalUiOnboardingNotification:', err.message);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Master Coordinator to notify all three internal teams upon client onboarding
+ */
+export const sendInternalClientOnboardingEmails = async ({
+  client,
+  company,
+  leadRecipients = [],
+  boostRecipients = [],
+  uiRecipients = [],
+  portalBase
+}) => {
+  const base = (portalBase || process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '');
+
+  let leadResult, boostResult, uiResult;
+  try {
+    leadResult = await sendInternalLeadOnboardingNotification({
+      recipients: leadRecipients,
+      client,
+      company,
+      dashboardUrl: `${base}/company-lead`
+    });
+  } catch (err) {
+    leadResult = { success: false, error: err.message };
+  }
+
+  try {
+    boostResult = await sendInternalBoostOnboardingNotification({
+      recipients: boostRecipients,
+      client,
+      company,
+      dashboardUrl: `${base}/company-boost`
+    });
+  } catch (err) {
+    boostResult = { success: false, error: err.message };
+  }
+
+  try {
+    uiResult = await sendInternalUiOnboardingNotification({
+      recipients: uiRecipients,
+      client,
+      company,
+      dashboardUrl: `${base}/landing-page`
+    });
+  } catch (err) {
+    uiResult = { success: false, error: err.message };
+  }
+
+  return { lead: leadResult, boost: boostResult, ui: uiResult };
+};
+
+/**
+ * Backward compatibility wrapper
+ */
+export const sendInternalNewClientNotification = async ({
+  recipients = [],
+  client,
+  company,
+  dashboardUrl
+}) => {
+  const base = (dashboardUrl || process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '');
+  return sendInternalLeadOnboardingNotification({
+    recipients,
+    client,
+    company,
+    dashboardUrl: base
+  });
 };
 
 

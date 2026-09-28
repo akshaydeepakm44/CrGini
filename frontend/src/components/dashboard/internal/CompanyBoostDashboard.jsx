@@ -39,7 +39,9 @@ import {
   Sparkles,
   Plus,
   Download,
-  Trash2
+  Trash2,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import PortalCosmicBackground from '../common/PortalCosmicBackground';
@@ -90,6 +92,8 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
   const [prepStrategicPlan, setPrepStrategicPlan] = useState(null);
   const [prepDevrelPlan, setPrepDevrelPlan] = useState(null);
   const [isSavingOnboarding, setIsSavingOnboarding] = useState(false);
+  const [saveOnboardingStatus, setSaveOnboardingStatus] = useState('idle'); // 'idle' | 'saving' | 'success' | 'error'
+  const [saveOnboardingError, setSaveOnboardingError] = useState('');
   const [onboardingSearchQuery, setOnboardingSearchQuery] = useState('');
   const [onboardingStatusFilter, setOnboardingStatusFilter] = useState('ALL');
 
@@ -142,6 +146,8 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
     setSelectedOnboardingClient(client);
     setLoadingOnboarding(true);
     setIsPrepModalOpen(true);
+    setSaveOnboardingStatus('idle');
+    setSaveOnboardingError('');
     try {
       const res = await api.getCompanyOnboardingAssets(client.id);
       if (res?.assets) {
@@ -162,9 +168,35 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
     }
   };
 
+  const getMediaPreviewUrl = (asset) => {
+    if (!asset) return '';
+    if (asset.dataUrl) return asset.dataUrl;
+    if (asset.id) return api.getAssetStreamUrl(asset.id);
+    if (asset.url && (asset.url.startsWith('data:') || asset.url.startsWith('blob:'))) return asset.url;
+    const token = localStorage.getItem('cg_auth_token') || '';
+    if (asset.streamUrl) return token ? `${asset.streamUrl}?token=${encodeURIComponent(token)}` : asset.streamUrl;
+    return asset.url || '';
+  };
+
   const handleFileUpload = (type, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Client-side file size guards to prevent server 413 rejections
+    const maxVideoSize = 25 * 1024 * 1024; // 25MB
+    const maxDocSize = 15 * 1024 * 1024;   // 15MB
+
+    if (type === 'video' && file.size > maxVideoSize) {
+      alert(`The selected video is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Please select a compressed showcase video under 25MB.`);
+      e.target.value = '';
+      return;
+    }
+
+    if (type !== 'video' && file.size > maxDocSize) {
+      alert(`The selected file is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Please select a file under 15MB.`);
+      e.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -178,6 +210,8 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
       else if (type === 'video') setPrepVideo(fileData);
       else if (type === 'strategicPlan') setPrepStrategicPlan(fileData);
       else if (type === 'devrelPlan') setPrepDevrelPlan(fileData);
+      setSaveOnboardingStatus('idle');
+      setSaveOnboardingError('');
     };
     reader.readAsDataURL(file);
   };
@@ -186,19 +220,30 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
     if (!selectedOnboardingClient) return;
     try {
       setIsSavingOnboarding(true);
+      setSaveOnboardingStatus('saving');
+      setSaveOnboardingError('');
+
       await api.saveCompanyOnboardingAssets(selectedOnboardingClient.id, {
         poster: prepPoster,
         video: prepVideo,
         strategicPlan: prepStrategicPlan,
         devrelPlan: prepDevrelPlan
       });
-      alert('Onboarding sample assets saved successfully!');
-      setIsPrepModalOpen(false);
-      // Reload onboarding clients
+
+      setSaveOnboardingStatus('success');
+
+      // Refresh onboarding list
       const clients = await api.getOnboardingClients().catch(() => []);
       setOnboardingClients(clients || []);
+
+      setTimeout(() => {
+        setIsPrepModalOpen(false);
+        setSaveOnboardingStatus('idle');
+      }, 1200);
     } catch (err) {
-      alert('Failed to save onboarding assets: ' + err.message);
+      console.error('Failed to save onboarding assets:', err);
+      setSaveOnboardingStatus('error');
+      setSaveOnboardingError(err.message || 'Failed to save onboarding assets');
     } finally {
       setIsSavingOnboarding(false);
     }
@@ -1682,9 +1727,9 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                           <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{prepStrategicPlan.size || 'Ready'}</div>
                         </div>
                         <div style={{ display: 'flex', gap: '6px' }}>
-                          {(prepStrategicPlan.url || prepStrategicPlan.streamUrl) && (
+                          {(prepStrategicPlan.url || prepStrategicPlan.streamUrl || prepStrategicPlan.id) && (
                             <a
-                              href={prepStrategicPlan.url || prepStrategicPlan.streamUrl}
+                              href={getMediaPreviewUrl(prepStrategicPlan)}
                               target="_blank"
                               rel="noreferrer"
                               className="portal-btn-secondary"
@@ -1774,7 +1819,7 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                       }}>
                         <div style={{ height: '120px', borderRadius: '6px', overflow: 'hidden', marginBottom: '8px', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <img
-                            src={prepPoster.dataUrl || prepPoster.url || prepPoster.streamUrl}
+                            src={getMediaPreviewUrl(prepPoster)}
                             alt="Poster Preview"
                             style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }}
                           />
@@ -1862,7 +1907,7 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                       }}>
                         <div style={{ height: '120px', borderRadius: '6px', overflow: 'hidden', marginBottom: '8px', background: '#000' }}>
                           <video
-                            src={prepVideo.dataUrl || prepVideo.url || prepVideo.streamUrl}
+                            src={getMediaPreviewUrl(prepVideo)}
                             controls
                             playsInline
                             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
@@ -1960,9 +2005,9 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                           <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{prepDevrelPlan.size || 'Ready'}</div>
                         </div>
                         <div style={{ display: 'flex', gap: '6px' }}>
-                          {(prepDevrelPlan.url || prepDevrelPlan.streamUrl) && (
+                          {(prepDevrelPlan.url || prepDevrelPlan.streamUrl || prepDevrelPlan.id) && (
                             <a
-                              href={prepDevrelPlan.url || prepDevrelPlan.streamUrl}
+                              href={getMediaPreviewUrl(prepDevrelPlan)}
                               target="_blank"
                               rel="noreferrer"
                               className="portal-btn-secondary"
@@ -2016,6 +2061,42 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
               )}
             </div>
 
+            {saveOnboardingError && (
+              <div style={{
+                margin: '0 24px 14px',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                color: '#FCA5A5',
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{saveOnboardingError}</span>
+              </div>
+            )}
+
+            {saveOnboardingStatus === 'success' && (
+              <div style={{
+                margin: '0 24px 14px',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                background: 'rgba(16, 185, 129, 0.12)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                color: '#34D399',
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+                <span>Onboarding sample assets saved successfully!</span>
+              </div>
+            )}
+
             <div className="portal-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button
                 type="button"
@@ -2023,7 +2104,7 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                 onClick={() => setIsPrepModalOpen(false)}
                 disabled={isSavingOnboarding}
               >
-                Cancel
+                Close
               </button>
               <button
                 type="button"
@@ -2031,13 +2112,34 @@ export default function CompanyBoostDashboard({ user, onLogout }) {
                 onClick={handleSaveOnboardingAssets}
                 disabled={isSavingOnboarding}
                 style={{
-                  background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
-                  color: '#030303',
+                  background: saveOnboardingStatus === 'success'
+                    ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                    : saveOnboardingStatus === 'error'
+                    ? 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)'
+                    : 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
+                  color: saveOnboardingStatus === 'error' ? '#FFFFFF' : '#030303',
                   fontWeight: '700',
-                  padding: '8px 20px'
+                  padding: '8px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
                 }}
               >
-                {isSavingOnboarding ? 'Saving Assets...' : 'Save Onboarding Samples'}
+                {isSavingOnboarding ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Saving Assets...
+                  </>
+                ) : saveOnboardingStatus === 'success' ? (
+                  <>
+                    <CheckCircle2 size={16} /> Saved Successfully
+                  </>
+                ) : saveOnboardingStatus === 'error' ? (
+                  <>
+                    <RefreshCw size={16} /> Retry Save Assets
+                  </>
+                ) : (
+                  'Save Onboarding Samples'
+                )}
               </button>
             </div>
           </div>

@@ -25,6 +25,7 @@ import {
   buildWelcomeEmailTemplate,
   sendWelcomeEmail,
   sendInternalNewClientNotification,
+  sendInternalClientOnboardingEmails,
   getEmailHistory,
   clearEmailHistory,
   clearEmailDedupeCache
@@ -127,64 +128,70 @@ export const createClientUser = async (req, res) => {
       details: `Admin ${req.user.name} created client user ${clientName} for company ${compName} (${userEmail}).`
     });
 
-    // 4. Notify internal team members (Company Boost, Company Lead, UI team)
+    // 4. Resolve active internal team members strictly by role and active status
     try {
-      const internalUsersRes = await query(`
-        SELECT id, name, email, role, company_boost, company_lead, company_ui
+      const activeSpecialistsRes = await query(`
+        SELECT id, name, email, role, status, company_lead, company_boost, company_ui
         FROM users
-        WHERE is_deleted = false AND (
-          role IN ('COMPANY_BOOST', 'COMPANY_LEAD', 'LANDING_PAGE')
-          OR company_boost = true
-          OR company_lead = true
-          OR company_ui = true
-        )
+        WHERE is_deleted = false
+          AND status = 'ACTIVE'
+          AND (
+            role IN ('COMPANY_LEAD', 'COMPANY_BOOST', 'LANDING_PAGE')
+            OR (role NOT IN ('ADMIN', 'USER') AND (company_lead = true OR company_boost = true OR company_ui = true))
+          )
+        ORDER BY created_at ASC
       `);
 
-      const boostMembers = internalUsersRes.rows.filter(u => u.role === 'COMPANY_BOOST' || u.company_boost);
-      const leadMembers = internalUsersRes.rows.filter(u => u.role === 'COMPANY_LEAD' || u.company_lead);
-      const uiMembers = internalUsersRes.rows.filter(u => u.role === 'LANDING_PAGE' || u.company_ui);
+      const leadMembers = activeSpecialistsRes.rows.filter(
+        u => u.role === 'COMPANY_LEAD' || (u.company_lead && u.role !== 'ADMIN' && u.role !== 'USER')
+      );
+      const boostMembers = activeSpecialistsRes.rows.filter(
+        u => u.role === 'COMPANY_BOOST' || (u.company_boost && u.role !== 'ADMIN' && u.role !== 'USER')
+      );
+      const uiMembers = activeSpecialistsRes.rows.filter(
+        u => u.role === 'LANDING_PAGE' || (u.company_ui && u.role !== 'ADMIN' && u.role !== 'USER')
+      );
 
-      const recipientEmails = new Set();
-      if (boostMembers.length > 0) {
-        boostMembers.forEach(u => recipientEmails.add(u.email));
-      } else {
-        recipientEmails.add('boost@creativegini.com');
+      const clientEmailClean = (userEmail || '').toLowerCase().trim();
+
+      const leadEmails = Array.from(new Set(
+        leadMembers.map(u => u.email?.trim()).filter(e => Boolean(e) && e.toLowerCase() !== clientEmailClean)
+      ));
+      const boostEmails = Array.from(new Set(
+        boostMembers.map(u => u.email?.trim()).filter(e => Boolean(e) && e.toLowerCase() !== clientEmailClean)
+      ));
+      const uiEmails = Array.from(new Set(
+        uiMembers.map(u => u.email?.trim()).filter(e => Boolean(e) && e.toLowerCase() !== clientEmailClean)
+      ));
+
+      if (leadEmails.length === 0) {
+        console.warn(`[ONBOARDING WARNING] No active COMPANY_LEAD team members registered in users table for client "${compName}".`);
+      }
+      if (boostEmails.length === 0) {
+        console.warn(`[ONBOARDING WARNING] No active COMPANY_BOOST team members registered in users table for client "${compName}".`);
+      }
+      if (uiEmails.length === 0) {
+        console.warn(`[ONBOARDING WARNING] No active LANDING_PAGE team members registered in users table for client "${compName}".`);
       }
 
-      if (leadMembers.length > 0) {
-        leadMembers.forEach(u => recipientEmails.add(u.email));
-      } else {
-        recipientEmails.add('lead@creativegini.com');
-      }
-
-      if (uiMembers.length > 0) {
-        uiMembers.forEach(u => recipientEmails.add(u.email));
-      } else {
-        recipientEmails.add('ui@creativegini.com');
-      }
-
-      // Ensure client's own email is strictly never in internal recipients
-      recipientEmails.delete(userEmail.toLowerCase().trim());
-
-      // Create in-app notifications for all matching internal users
-      const allInternalUsers = [...new Map(internalUsersRes.rows.map(u => [u.id, u])).values()];
-      for (const internalUser of allInternalUsers) {
+      // Create in-app notifications for all matching active internal specialists
+      for (const internalUser of activeSpecialistsRes.rows) {
+        if (internalUser.email?.toLowerCase().trim() === clientEmailClean) continue;
         try {
           await createNotification({
             userId: internalUser.id,
             type: 'ASSIGNMENT',
-            title: `New Client Created: ${compName}`,
-            message: `A new client has been created in CreativeGini and the team needs to prepare the initial company samples/workspace.`
+            title: `New Client Onboarded: ${compName}`,
+            message: `A new client (${compName}) has been onboarded. Please prepare and submit the required sample work for your team.`
           });
         } catch (notifErr) {
           console.warn('[INTERNAL NOTIF WARNING]:', notifErr.message);
         }
       }
 
-      // Dispatch internal notification emails
+      // Dispatch team-specific internal notification emails
       const portalBase = (process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '');
-      await sendInternalNewClientNotification({
-        recipients: Array.from(recipientEmails),
+      await sendInternalClientOnboardingEmails({
         client: { name: clientName, email: userEmail },
         company: {
           id: company.id,
@@ -192,9 +199,13 @@ export const createClientUser = async (req, res) => {
           contactPerson: clientName,
           website: website || null,
           industry: industry || 'Technology / SaaS',
-          email: userEmail
+          email: userEmail,
+          companyInfo: companyInfo || null
         },
-        dashboardUrl: `${portalBase}/company-boost`
+        leadRecipients: leadEmails,
+        boostRecipients: boostEmails,
+        uiRecipients: uiEmails,
+        portalBase
       });
     } catch (notifErr) {
       console.error('[INTERNAL ONBOARDING NOTIFICATION ERROR]:', notifErr);

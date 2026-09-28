@@ -39,13 +39,29 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+
+// Dedicated body-parser error handler to ensure JSON responses on large payloads / malformed JSON
+app.use((err, req, res, next) => {
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({
+      success: false,
+      message: 'Request payload is too large. Please upload files under 50MB.'
+    });
+  }
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({
+      success: false,
+      message: 'Malformed JSON payload.'
+    });
+  }
+  next(err);
+});
 
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/company', companyRoutes);
-app.use('/api/companies', companyRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);

@@ -7,9 +7,14 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch-path=src src/server.js",
-    "seed": "node src/seed.js",
-    "test:email": "node test-email-system.js",
-    "test:workflow": "node test-integration-workflow.js"
+    "seed": "node src/seed-pg.js",
+    "test": "node tests/unit/email-system.test.js",
+    "test:unit": "node tests/unit/email-system.test.js",
+    "test:email": "node tests/unit/email-system.test.js",
+    "test:security": "node tests/security/tenant-isolation-idor.test.js",
+    "test:workflow": "node tests/e2e/ticket-email-lifecycle.test.js",
+    "test:e2e": "node tests/e2e/onboarding-workflow.test.js",
+    "test:integration": "node tests/integration/email-complete-audit.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -17,7 +22,6 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.5.2",
     "nodemailer": "^10.0.10",
     "pg": "^8.23.0"
   }

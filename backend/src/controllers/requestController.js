@@ -48,9 +48,6 @@ import {
 
 import { query } from '../config/postgres.js';
 
-// Re-export for submissionController which imports from here
-export { hasServiceTypeAccess, resolveRequest };
-
 // Helper to generate unique Ticket ID
 export const generateTicketId = async () => {
   const result = await query(`
@@ -377,6 +374,13 @@ export const assignTicket = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden' });
     }
 
+    if (request.status === 'COMPLETED') {
+      return res.status(400).json({ success: false, message: 'Cannot reassign a completed ticket.' });
+    }
+    if (request.status === 'CLIENT_REVIEW' || request.status === 'WORK_SUBMITTED' || request.status === 'WORK_RESUBMITTED') {
+      return res.status(400).json({ success: false, message: 'Cannot reassign a ticket that is currently in client review.' });
+    }
+
     let assignedUser = null;
     if (assignedTo) {
       assignedUser = await findUserById(assignedTo);
@@ -451,6 +455,10 @@ export const startWork = async (req, res) => {
 
     if (req.user.role !== 'ADMIN' && !hasServiceTypeAccess(req.user, request.serviceType)) {
       return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    if (request.status === 'COMPLETED') {
+      return res.status(400).json({ success: false, message: 'Cannot start work on a ticket that has already been completed.' });
     }
 
     const wasAlreadyInProgress = request.status === 'IN_PROGRESS';
@@ -573,6 +581,30 @@ export const getTicketActivity = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
     }
 
+    // Role security check
+    const { role } = req.user;
+    if (role === 'USER') {
+      const userCompanyId = req.user.companyId
+        ? String(req.user.companyId.id || req.user.companyId._id || req.user.companyId)
+        : null;
+      const requestCompanyId = request.companyId
+        ? String(request.companyId.id || request.companyId._id || request.companyId)
+        : null;
+      const userId = req.user.id || req.user._id;
+      const requestUserId = String(request.userId?.id || request.userId?._id || request.userId || request.user_id);
+      if (userCompanyId !== requestCompanyId && requestUserId !== String(userId)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to view activity for this ticket'
+        });
+      }
+    } else if (role !== 'ADMIN' && !hasServiceTypeAccess(req.user, request.serviceType)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view ticket activity outside your permitted dashboards'
+      });
+    }
+
     const logs = await findActivityLogsByRequestId(request.id);
 
     return res.json({
@@ -610,6 +642,31 @@ export const updateRequestStatus = async (req, res) => {
     }
 
     const previousStatus = request.status;
+
+    // Reject transitions from COMPLETED (unless using admin-override endpoint)
+    if (previousStatus === 'COMPLETED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Completed tickets cannot be reopened or changed via status update.'
+      });
+    }
+
+    // Reject direct completion from early request states
+    if ((previousStatus === 'REQUEST_CREATED' || previousStatus === 'PAYMENT_COMPLETED') && status === 'COMPLETED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status transition: A newly created ticket cannot be marked completed directly without work and review.'
+      });
+    }
+
+    // Reject reverting from CLIENT_REVIEW to ASSIGNED
+    if ((previousStatus === 'CLIENT_REVIEW' || previousStatus === 'WORK_SUBMITTED' || previousStatus === 'WORK_RESUBMITTED') && status === 'ASSIGNED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status transition: Tickets under client review cannot be reverted to assigned.'
+      });
+    }
+
     const updatedRequest = await updateRequest(request.id, { status });
 
     await createActivityLog({
@@ -674,6 +731,37 @@ export const processPayment = async (req, res) => {
     const request = await resolveRequest(req.params.id);
     if (!request) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    // Role & Tenant Security: Only client owner or admin can pay
+    if (req.user.role === 'USER') {
+      const userCompanyId = req.user.companyId
+        ? String(req.user.companyId.id || req.user.companyId._id || req.user.companyId)
+        : null;
+      const requestCompanyId = request.companyId
+        ? String(request.companyId.id || request.companyId._id || request.companyId)
+        : null;
+      const userId = String(req.user.id || req.user._id);
+      const requestUserId = String(request.userId?.id || request.userId?._id || request.userId || request.user_id);
+      if (userCompanyId !== requestCompanyId && requestUserId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to process payment for this ticket.'
+        });
+      }
+    } else if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only clients or administrators can process ticket payments.'
+      });
+    }
+
+    // Duplicate payment prevention
+    if (request.paymentStatus === 'PAID') {
+      return res.status(400).json({
+        success: false,
+        message: 'This ticket has already been paid.'
+      });
     }
 
     const updates = { paymentStatus: 'PAID' };
@@ -805,11 +893,6 @@ export const getMessages = async (req, res) => {
 // @access  Private
 export const sendMessage = async (req, res) => {
   try {
-    const { text, isProgressUpdate } = req.body;
-    if (!text || !text.trim()) {
-      return res.status(400).json({ success: false, message: 'Message text is required' });
-    }
-
     const request = await resolveRequest(req.params.id);
     if (!request) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
@@ -831,6 +914,13 @@ export const sendMessage = async (req, res) => {
         message: `Forbidden: You do not have permission to post messages to ${request.serviceType}.`
       });
     }
+
+    const rawText = req.body.text || req.body.message;
+    const isProgressUpdate = Boolean(req.body.isProgressUpdate);
+    if (!rawText || !rawText.trim()) {
+      return res.status(400).json({ success: false, message: 'Message text is required' });
+    }
+    const text = rawText.trim();
 
     const message = await createMessage({
       requestId: request.id,

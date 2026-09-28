@@ -12,8 +12,8 @@ module.exports = {
         POSTGRES_PORT: 5432,
         POSTGRES_DB: 'creativegini',
         POSTGRES_USER: 'creativegini_app',
-        POSTGRES_PASSWORD: 'Akhil@08082004hema',
-        JWT_SECRET: 'creativegini_jwt_secret_2026_production_key_secure',
+        POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD || '',
+        JWT_SECRET: process.env.JWT_SECRET || '',
         CLIENT_URL: 'https://www.creativegini.com,https://creativegini.com,http://57.128.31.115,http://localhost:5173,http://localhost:5174'
       },
       watch: false,

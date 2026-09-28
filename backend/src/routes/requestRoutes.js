@@ -71,7 +71,4 @@ router.route('/:id/submissions/:submissionId/approve')
 router.route('/:id/submissions/:submissionId/request-changes')
   .post(protect, requestChanges);
 
-router.route('/:id/submissions/:submissionId/changes')
-  .post(protect, requestChanges);
-
 export default router;

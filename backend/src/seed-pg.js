@@ -5,6 +5,11 @@ import { query, connectPostgres } from './config/postgres.js';
 dotenv.config();
 
 const seedData = async () => {
+  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_PRODUCTION_SEED) {
+    console.error('[CRITICAL SAFEGUARD] seed-pg.js execution is strictly prohibited in production environment.');
+    process.exit(1);
+  }
+
   try {
     await connectPostgres();
     console.log('[Seed-PG] Connected to PostgreSQL. Clearing existing data...');

@@ -1,9 +1,6 @@
-import { findAssets, findAssetById, ensureAssetIndexes } from '../repositories/assetRepository.js';
+import { findAssets, findAssetById } from '../repositories/assetRepository.js';
 import fs from 'fs';
 import path from 'path';
-
-// Run index creation on startup
-ensureAssetIndexes().catch(() => {});
 
 /**
  * Check if the authenticated user has authorization to access the given asset
@@ -231,9 +228,12 @@ export const streamAsset = async (req, res) => {
         // HTTP 206 Range Request handling
         const parts = range.replace(/bytes=/, '').split('-');
         const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+        let end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+        if (end >= totalSize) {
+          end = totalSize - 1;
+        }
 
-        if (start >= totalSize || end >= totalSize || start > end) {
+        if (isNaN(start) || start >= totalSize || start > end) {
           res.setHeader('Content-Range', `bytes */${totalSize}`);
           return res.status(416).send('Requested range not satisfiable');
         }
@@ -270,9 +270,12 @@ export const streamAsset = async (req, res) => {
         if (range) {
           const parts = range.replace(/bytes=/, '').split('-');
           const start = parseInt(parts[0], 10);
-          const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+          let end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+          if (end >= totalSize) {
+            end = totalSize - 1;
+          }
 
-          if (start >= totalSize || end >= totalSize || start > end) {
+          if (isNaN(start) || start >= totalSize || start > end) {
             res.setHeader('Content-Range', `bytes */${totalSize}`);
             return res.status(416).send('Requested range not satisfiable');
           }

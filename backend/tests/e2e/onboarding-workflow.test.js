@@ -5,9 +5,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
-import { query, connectPostgres } from './src/config/postgres.js';
+import { query, connectPostgres } from '../../src/config/postgres.js';
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -116,9 +116,9 @@ async function runWorkflowTestSuite() {
     // STEPS 3, 4, 5: Verify new client visible in internal team workspaces
     // -------------------------------------------------------------------------
     console.log('\n[Steps 3-5]: Verifying Client A appears in internal team onboarding workspaces...');
-    const onboardingClientsRes = await request('/companies/onboarding/clients', {}, adminToken);
+    const onboardingClientsRes = await request('/company/onboarding/clients', {}, adminToken);
     const clientsList = onboardingClientsRes.data?.clients || (Array.isArray(onboardingClientsRes.data) ? onboardingClientsRes.data : []);
-    assert(onboardingClientsRes.ok && Array.isArray(clientsList), 'GET /api/companies/onboarding/clients succeeded');
+    assert(onboardingClientsRes.ok && Array.isArray(clientsList), 'GET /api/company/onboarding/clients succeeded');
     
     const clientInList = clientsList.find(c => c.id === clientACompanyId);
     assert(Boolean(clientInList), 'Client A appears in onboarding client list');
@@ -133,18 +133,18 @@ async function runWorkflowTestSuite() {
     console.log('\n[Step 7]: Company Lead adds 5 sample leads, key people, and uploads lead PDFs...');
     
     // Save Company Study / Research
-    const researchRes = await request(`/companies/${clientACompanyId}/research`, {
+    const researchRes = await request(`/company/${clientACompanyId}/research`, {
       method: 'PUT',
       body: JSON.stringify({ researchSummary: 'Quantum Pulse operates in quantum algorithm acceleration. Primary buyers are Head of Quantum, CTO, and VP Engineering.' })
     }, adminToken);
     assert(researchRes.ok, 'Company Lead research/study saved successfully');
 
     // Add 2 Key People
-    await request(`/companies/${clientACompanyId}/key-people`, {
+    await request(`/company/${clientACompanyId}/key-people`, {
       method: 'POST',
       body: JSON.stringify({ name: 'Dr. Elena Rostova', role: 'Chief Scientific Officer', contact: 'elena@quantumpulse.io', socialProfile: 'https://linkedin.com/in/elena-rostova' })
     }, adminToken);
-    await request(`/companies/${clientACompanyId}/key-people`, {
+    await request(`/company/${clientACompanyId}/key-people`, {
       method: 'POST',
       body: JSON.stringify({ name: 'Marcus Sterling', role: 'Head of Quantum Infrastructure', contact: 'marcus@quantumpulse.io', socialProfile: 'https://linkedin.com/in/marcus-sterling' })
     }, adminToken);
@@ -160,7 +160,7 @@ async function runWorkflowTestSuite() {
 
     const createdLeadIds = [];
     for (const l of sampleLeadsData) {
-      const addLeadRes = await request(`/companies/${clientACompanyId}/leads`, {
+      const addLeadRes = await request(`/company/${clientACompanyId}/leads`, {
         method: 'POST',
         body: JSON.stringify(l)
       }, adminToken);
@@ -173,7 +173,7 @@ async function runWorkflowTestSuite() {
     for (let i = 0; i < createdLeadIds.length; i++) {
       const leadId = createdLeadIds[i];
       const leadName = sampleLeadsData[i].name;
-      const pdfUploadRes = await request(`/companies/${clientACompanyId}/lead-onboarding-assets`, {
+      const pdfUploadRes = await request(`/company/${clientACompanyId}/lead-onboarding-assets`, {
         method: 'POST',
         body: JSON.stringify({
           leadId,
@@ -194,7 +194,7 @@ async function runWorkflowTestSuite() {
     // STEPS 8, 9, 10: Verify Client A can see 5 leads, PDF links, and Assets
     // -------------------------------------------------------------------------
     console.log('\n[Steps 8-10]: Verifying Client A sees 5 leads with associated PDFs and in Assets...');
-    const clientCompanyRes = await request('/companies/my-company', {}, clientAToken);
+    const clientCompanyRes = await request('/company/my-company', {}, clientAToken);
     assert(clientCompanyRes.ok && clientCompanyRes.data?.company, 'Client A can fetch company workspace');
     const clientLeadsList = clientCompanyRes.data.company.leads || [];
     assert(clientLeadsList.length === 5, `Client A sees exactly 5 leads (found: ${clientLeadsList.length})`);
@@ -215,7 +215,7 @@ async function runWorkflowTestSuite() {
     // STEP 11, 12: Company Boost Submits: Strategic Plan, Poster, Image, DevRel Plan
     // -------------------------------------------------------------------------
     console.log('\n[Steps 11-12]: Company Boost uploads sample work and verifies in Client A Assets...');
-    const boostUploadRes = await request(`/companies/${clientACompanyId}/onboarding-assets`, {
+    const boostUploadRes = await request(`/company/${clientACompanyId}/onboarding-assets`, {
       method: 'POST',
       body: JSON.stringify({
         strategicPlan: {
@@ -255,7 +255,7 @@ async function runWorkflowTestSuite() {
     // STEPS 13, 14: Company UI Submits: UI/UX Analysis, Sample Landing Page
     // -------------------------------------------------------------------------
     console.log('\n[Steps 13-14]: Company UI uploads sample work and verifies in Client A Assets...');
-    const uiUploadRes = await request(`/companies/${clientACompanyId}/ui-onboarding-assets`, {
+    const uiUploadRes = await request(`/company/${clientACompanyId}/ui-onboarding-assets`, {
       method: 'POST',
       body: JSON.stringify({
         uiAnalysis: {
@@ -339,7 +339,7 @@ async function runWorkflowTestSuite() {
     const clientBToken = clientBLogin.data.token;
 
     // Client B fetches company leads
-    const clientBCompanyRes = await request('/companies/my-company', {}, clientBToken);
+    const clientBCompanyRes = await request('/company/my-company', {}, clientBToken);
     const clientBLeads = clientBCompanyRes.data?.company?.leads || [];
     assert(clientBLeads.length === 0, 'Client B sees 0 leads (cannot see Client A leads)');
 

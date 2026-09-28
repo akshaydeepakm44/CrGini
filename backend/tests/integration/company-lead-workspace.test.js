@@ -1,4 +1,4 @@
-import { query } from './src/config/postgres.js';
+import { query } from '../../src/config/postgres.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
