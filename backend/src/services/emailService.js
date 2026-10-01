@@ -154,8 +154,9 @@ export const verifySmtpConnection = async () => {
     };
   }
 
+  let testTransporter = null;
   try {
-    const testTransporter = nodemailer.createTransport({
+    testTransporter = nodemailer.createTransport({
       host,
       port,
       secure,
@@ -177,6 +178,12 @@ export const verifySmtpConnection = async () => {
       configured: true,
       error: err.message
     };
+  } finally {
+    try {
+      testTransporter?.close?.();
+    } catch {
+      // Ignore close errors
+    }
   }
 };
 
