@@ -76,6 +76,9 @@ async function runCompleteEmailAudit() {
     // -------------------------------------------------------------------------
     console.log('[Test 1]: Verifying SMTP configuration and live handshake...');
     const smtpRes = await verifySmtpConnection();
+    if (!smtpRes.success) {
+      console.error('[SMTP VERIFY FAILED DIAGNOSTIC]:', smtpRes);
+    }
     assert(smtpRes.success === true, `SMTP connection succeeded: ${smtpRes.message}`);
     assert(process.env.EMAIL_USER === 'team@creativegini.com', 'EMAIL_USER is team@creativegini.com');
     assert((process.env.EMAIL_FROM || '').includes('team@creativegini.com'), 'EMAIL_FROM contains team@creativegini.com');

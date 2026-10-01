@@ -277,11 +277,10 @@ async function runTestSuite() {
 
   const leadStudyDataUrl = createSamplePdfDataUrl('MinIO Lead Study Dossier');
   const pitchDeckDataUrl = createSamplePdfDataUrl('MinIO Pitch Deck Presentation');
-  const keyPeopleDataUrl = createSamplePdfDataUrl('MinIO Key People Executive Directory');
 
   let uploadedFileRecords = [];
 
-  await asyncTest('Lead Specialist uploads lead dossier with 3 PDFs via existing Data URL API', async () => {
+  await asyncTest('Lead Specialist uploads lead dossier with 2 PDFs and Key People Emails', async () => {
     const res = await req(`/company/${testCompany.id}/lead-onboarding-assets`, {
       method: 'POST',
       body: JSON.stringify({
@@ -290,7 +289,7 @@ async function runTestSuite() {
         website: 'https://cloudscale.ai',
         leadStudy: { name: 'CloudScale - Lead Study.pdf', size: 10240, type: 'application/pdf', dataUrl: leadStudyDataUrl },
         pitchDeck: { name: 'CloudScale - Pitch Deck.pdf', size: 11000, type: 'application/pdf', dataUrl: pitchDeckDataUrl },
-        keyPeople: { name: 'CloudScale - Key People.pdf', size: 9000, type: 'application/pdf', dataUrl: keyPeopleDataUrl },
+        keyPeopleEmails: ['alex@cloudscale.ai', 'sarah@cloudscale.ai'],
       })
     }, tokenLead);
 
@@ -307,7 +306,7 @@ async function runTestSuite() {
       WHERE r.company_id = $1
     `, [testCompany.id]);
 
-    assert(dbFiles.rows.length >= 3, `Expected at least 3 submission_files, found ${dbFiles.rows.length}`);
+    assert(dbFiles.rows.length >= 2, `Expected at least 2 submission_files, found ${dbFiles.rows.length}`);
     uploadedFileRecords = dbFiles.rows;
 
     for (const file of dbFiles.rows) {
@@ -325,7 +324,6 @@ async function runTestSuite() {
 
   const studyFile = uploadedFileRecords.find(f => f.name.includes('Lead Study'));
   const pitchFile = uploadedFileRecords.find(f => f.name.includes('Pitch Deck'));
-  const kpFile = uploadedFileRecords.find(f => f.name.includes('Key People'));
 
   await asyncTest('Client can stream own Lead Study from MinIO (200 OK)', async () => {
     const res = await req(`/assets/${studyFile.id}/stream`, {}, tokenClient);
@@ -351,20 +349,19 @@ async function runTestSuite() {
     assert(res.data.includes('MinIO Pitch Deck Presentation'), 'Downloaded content matches stored object');
   });
 
-  // --- SECTION 4: KEY PEOPLE PAYMENT ENTITLEMENT ---
-  console.log('\n--- TEST GROUP 4: Key People Entitlement via MinIO ---');
+  // --- SECTION 4: KEY PEOPLE PAYMENT ENTITLEMENT & EMAIL VISIBILITY ---
+  console.log('\n--- TEST GROUP 4: Key People Payment Entitlement & Protected Access ---');
 
-  await asyncTest('Direct streaming of locked sample Key People document returns 403 Forbidden', async () => {
-    const res = await req(`/assets/${kpFile.id}/stream`, {}, tokenClient);
-    assert.strictEqual(res.status, 403, `Expected 403 Forbidden for locked Key People, got ${res.status}`);
+  await asyncTest('Key People emails are locked and hidden from client before payment', async () => {
+    const res = await req(`/company/${testCompany.id}/lead-onboarding-assets`, {}, tokenClient);
+    assert.strictEqual(res.status, 200);
+    const lead = res.data?.leads?.[0];
+    assert(lead, 'Lead exists');
+    assert.strictEqual(lead.isKeyPeopleLocked, true, 'Key people is locked');
+    assert.deepStrictEqual(lead.keyPeopleEmails, [], 'Key people emails are hidden/empty before payment');
   });
 
-  await asyncTest('Direct download of locked sample Key People document returns 403 Forbidden', async () => {
-    const res = await req(`/assets/${kpFile.id}/download`, {}, tokenClient);
-    assert.strictEqual(res.status, 403, `Expected 403 Forbidden for locked Key People, got ${res.status}`);
-  });
-
-  await asyncTest('After Key People $199 unlock payment, document streams successfully from MinIO', async () => {
+  await asyncTest('After Key People $199 unlock payment, emails are revealed to client', async () => {
     // Initiate unlock ticket
     const unlockRes = await req('/company/my-company/unlock-key-people', { method: 'POST' }, tokenClient);
     assert.strictEqual(unlockRes.status, 200);
@@ -377,10 +374,12 @@ async function runTestSuite() {
     }, tokenClient);
     assert.strictEqual(payRes.status, 200);
 
-    // Stream unlocked Key People
-    const streamRes = await req(`/assets/${kpFile.id}/stream`, {}, tokenClient);
-    assert.strictEqual(streamRes.status, 200, `Expected 200 OK after payment, got ${streamRes.status}`);
-    assert(streamRes.data.includes('MinIO Key People Executive Directory'), 'Unlocked Key People dossier streams correctly');
+    // Fetch onboarding assets after payment
+    const assetsRes = await req(`/company/${testCompany.id}/lead-onboarding-assets`, {}, tokenClient);
+    assert.strictEqual(assetsRes.status, 200);
+    const lead = assetsRes.data?.leads?.[0];
+    assert.strictEqual(lead.isKeyPeopleLocked, false, 'Key people is unlocked after payment');
+    assert(lead.keyPeopleEmails.includes('alex@cloudscale.ai'), 'Key people email is revealed');
   });
 
   // --- SECTION 5: SAFE DOCUMENT REPLACEMENT ---
