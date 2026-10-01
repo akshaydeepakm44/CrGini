@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { query, pool } from '../src/config/postgres.js';
+import pool, { query } from '../src/config/postgres.js';
 import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
