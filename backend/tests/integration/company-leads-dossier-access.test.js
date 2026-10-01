@@ -179,7 +179,7 @@ async function runTestSuite() {
   console.log('\n--- TEST GROUP 2: Lead Team Upload 3 Documents per Lead ---');
 
   let sampleLeadRecord = null;
-  await asyncTest('Lead Specialist successfully uploads Lead 01 with Lead Study, Pitch Deck, and Key People', async () => {
+  await asyncTest('Lead Specialist successfully uploads Lead 01 with Lead Study, Pitch Deck, and Key People Emails', async () => {
     const res = await req(`/company/${companyA.id}/lead-onboarding-assets`, {
       method: 'POST',
       body: JSON.stringify({
@@ -188,13 +188,14 @@ async function runTestSuite() {
         website: 'https://novaintelligence.ai',
         leadStudy: { name: 'Nova - Lead Study.pdf', size: 10240, type: 'application/pdf', dataUrl: SAMPLE_PDF_BASE64 },
         pitchDeck: { name: 'Nova - Pitch Deck.pdf', size: 12400, type: 'application/pdf', dataUrl: SAMPLE_PDF_BASE64 },
-        keyPeople: { name: 'Nova - Key People.pdf', size: 8500, type: 'application/pdf', dataUrl: SAMPLE_PDF_BASE64 }
+        keyPeopleEmails: ['sarah.connor@novaintelligence.ai', 'john.doe@novaintelligence.ai']
       })
     }, tokenLead);
     assert.strictEqual(res.status, 200);
     assert(res.data?.success, 'Success is true');
     sampleLeadRecord = res.data.lead;
     assert.strictEqual(sampleLeadRecord.companyName, 'Nova Intelligence Inc');
+    assert.strictEqual(sampleLeadRecord.keyPeople?.count, 2);
   });
 
   // --- SECTION 3: REPLACING INDIVIDUAL DOCUMENT ---
@@ -219,7 +220,7 @@ async function runTestSuite() {
   console.log('\n--- TEST GROUP 4: User Dashboard 5-Column Structure & Access Control ---');
 
   let clientALeads = null;
-  await asyncTest('Client A fetches own company leads and receives 5-column metadata', async () => {
+  await asyncTest('Client A fetches own company leads and receives 5-column metadata with Key People locked and emails hidden', async () => {
     const res = await req('/company/my-company/lead-onboarding-assets', {}, tokenA);
     assert.strictEqual(res.status, 200);
     assert(Array.isArray(res.data?.leads), 'Leads is an array');
@@ -234,7 +235,9 @@ async function runTestSuite() {
     assert(lead.pitchDeck && lead.pitchDeck.streamUrl, 'Pitch Deck has streamUrl');
     assert(lead.keyPeople, 'Key People object exists');
     assert.strictEqual(lead.keyPeople.isLocked, true, 'Key People is locked before payment');
-    assert.strictEqual(lead.keyPeople.streamUrl, null, 'Key People streamUrl is null while locked');
+    assert.strictEqual(lead.keyPeople.emails, undefined, 'Key People emails array must NOT be exposed before payment');
+    assert.strictEqual(lead.email, null, 'lead.email must NOT be exposed before payment');
+    assert(!lead.notes.includes('sarah.connor@novaintelligence.ai'), 'Emails must not leak in notes before payment');
   });
 
   await asyncTest('Client A can stream own Lead Study (200 OK)', async () => {
@@ -249,13 +252,6 @@ async function runTestSuite() {
     const downloadUrl = lead.pitchDeck.downloadUrl;
     const res = await req(downloadUrl.replace('/api', ''), {}, tokenA);
     assert.strictEqual(res.status, 200);
-  });
-
-  await asyncTest('Direct asset access to locked Key People is strictly blocked with 403', async () => {
-    const lead = clientALeads[0];
-    const kpId = lead.keyPeople.id;
-    const res = await req(`/assets/${kpId}/stream`, {}, tokenA);
-    assert.strictEqual(res.status, 403, `Expected 403 Forbidden for locked Key People, got ${res.status}`);
   });
 
   // --- SECTION 5: UNLOCK KEY PEOPLE WORKFLOW ---
@@ -280,19 +276,16 @@ async function runTestSuite() {
     assert.strictEqual(res.data?.payment?.status, 'PAID');
   });
 
-  await asyncTest('After payment, Client A sees Key People as unlocked with valid streamUrl', async () => {
+  await asyncTest('After payment, Client A sees Key People as unlocked with email addresses revealed', async () => {
     const res = await req('/company/my-company/lead-onboarding-assets', {}, tokenA);
     assert.strictEqual(res.status, 200);
     const lead = res.data.leads[0];
     assert.strictEqual(lead.keyPeople.isLocked, false);
-    assert(lead.keyPeople.streamUrl, 'Key people streamUrl is now populated');
-  });
-
-  await asyncTest('After payment, Client A can stream Key People dossier (200 OK)', async () => {
-    const leadRes = await req('/company/my-company/lead-onboarding-assets', {}, tokenA);
-    const kpStreamUrl = leadRes.data.leads[0].keyPeople.streamUrl;
-    const res = await req(kpStreamUrl.replace('/api', ''), {}, tokenA);
-    assert.strictEqual(res.status, 200);
+    assert(Array.isArray(lead.keyPeople.emails), 'Key people emails array is now populated');
+    assert.strictEqual(lead.keyPeople.emails.length, 2);
+    assert(lead.keyPeople.emails.includes('sarah.connor@novaintelligence.ai'));
+    assert(lead.keyPeople.emails.includes('john.doe@novaintelligence.ai'));
+    assert.strictEqual(lead.email, 'sarah.connor@novaintelligence.ai');
   });
 
   // --- SECTION 6: ADDITIONAL PAID LEADS INCLUDE KEY PEOPLE ---
@@ -309,20 +302,20 @@ async function runTestSuite() {
         website: 'https://apexadditional.com',
         leadStudy: { name: 'Apex - Lead Study.pdf', size: 10240, type: 'application/pdf', dataUrl: SAMPLE_PDF_BASE64 },
         pitchDeck: { name: 'Apex - Pitch Deck.pdf', size: 11000, type: 'application/pdf', dataUrl: SAMPLE_PDF_BASE64 },
-        keyPeople: { name: 'Apex - Key People.pdf', size: 9000, type: 'application/pdf', dataUrl: SAMPLE_PDF_BASE64 }
+        keyPeopleEmails: ['apex.lead@apexadditional.com']
       })
     }, tokenLead);
     assert.strictEqual(res.status, 200);
   });
 
-  await asyncTest('Client B receives additional lead with Key People AUTOMATICALLY UNLOCKED (isLocked: false, streamUrl present)', async () => {
+  await asyncTest('Client B receives additional lead with Key People AUTOMATICALLY UNLOCKED (isLocked: false, emails present)', async () => {
     const res = await req('/company/my-company/lead-onboarding-assets', {}, tokenB);
     assert.strictEqual(res.status, 200);
     const additionalLead = res.data.leads.find(l => l.companyName === 'Additional Apex Corp');
     assert(additionalLead, 'Additional lead found');
     assert.strictEqual(additionalLead.isAdditionalLead, true);
     assert.strictEqual(additionalLead.keyPeople.isLocked, false, 'Additional lead Key People must NOT be locked');
-    assert(additionalLead.keyPeople.streamUrl, 'Additional lead Key People has active streamUrl without paying extra $199');
+    assert.deepStrictEqual(additionalLead.keyPeople.emails, ['apex.lead@apexadditional.com']);
   });
 
   // --- SECTION 7: CROSS-TENANT IDOR SECURITY ---

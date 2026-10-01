@@ -2410,39 +2410,45 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                               {/* 5. Key People */}
                               <td style={{ textAlign: 'center' }}>
                                 {isKpUnlocked ? (
-                                  keyPeoplePdf && (keyPeoplePdf.streamUrl || keyPeoplePdf.id) ? (
-                                    <button
-                                      type="button"
-                                      className="portal-btn-primary"
-                                      style={{
-                                        padding: '5px 12px',
-                                        fontSize: '0.8rem',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '5px',
-                                        fontWeight: '600',
-                                        margin: '0 auto',
-                                        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.35) 100%)',
-                                        borderColor: 'rgba(16, 185, 129, 0.45)'
-                                      }}
-                                      onClick={() => setViewingLeadPdf({
-                                        title: `${companyName} — Key People`,
-                                        documentType: 'Key People',
-                                        companyName,
-                                        streamUrl: getAuthenticatedAssetUrl(keyPeoplePdf),
-                                        downloadUrl: getAuthenticatedAssetUrl(keyPeoplePdf, 'download'),
-                                        fileName: `${companyName.replace(/\s+/g, '_')}_Key_People.pdf`
-                                      })}
-                                      title={`View Key People PDF for ${companyName}`}
-                                    >
-                                      <FileText size={13} />
-                                      <span>View</span>
-                                    </button>
-                                  ) : (
-                                    <span style={{ fontSize: '0.76rem', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                      <Clock size={11} /> Pending
-                                    </span>
-                                  )
+                                  (() => {
+                                    const emails = Array.isArray(lead.keyPeople?.emails) && lead.keyPeople.emails.length > 0
+                                      ? lead.keyPeople.emails
+                                      : (lead.email ? [lead.email] : []);
+                                    if (emails.length > 0) {
+                                      return (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                                          {emails.map((em, eIdx) => (
+                                            <a
+                                              key={eIdx}
+                                              href={`mailto:${em}`}
+                                              style={{
+                                                fontSize: '0.78rem',
+                                                color: '#34d399',
+                                                fontWeight: '600',
+                                                textDecoration: 'none',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                background: 'rgba(16, 185, 129, 0.1)',
+                                                border: '1px solid rgba(16, 185, 129, 0.25)',
+                                                padding: '2px 8px',
+                                                borderRadius: '4px'
+                                              }}
+                                              title={`Email ${em}`}
+                                            >
+                                              <Mail size={11} />
+                                              <span>{em}</span>
+                                            </a>
+                                          ))}
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <span style={{ fontSize: '0.76rem', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                        <Clock size={11} /> Pending
+                                      </span>
+                                    );
+                                  })()
                                 ) : (
                                   <button
                                     type="button"

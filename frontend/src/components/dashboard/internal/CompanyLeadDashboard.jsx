@@ -98,7 +98,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
   const [loadingClientDetails, setLoadingClientDetails] = useState(false);
   const [uploadingLeadPdfId, setUploadingLeadPdfId] = useState(null);
 
-  // Sample Lead form state (Fields: Company Name, Company Website URL, Lead Study PDF, Pitch Deck PDF, Key People PDF)
+  // Sample Lead form state (Fields: Company Name, Company Website URL, Lead Study PDF, Pitch Deck PDF, Key People Emails)
   const [sampleLeadForm, setSampleLeadForm] = useState({
     companyName: '',
     website: '',
@@ -106,14 +106,14 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     leadStudyFileName: '',
     pitchDeckFile: null,
     pitchDeckFileName: '',
-    keyPeopleFile: null,
-    keyPeopleFileName: ''
+    keyPeopleEmails: []
   });
+  const [keyPersonEmailInput, setKeyPersonEmailInput] = useState('');
+  const [keyPersonEmailError, setKeyPersonEmailError] = useState('');
   const [isSubmittingSampleLead, setIsSubmittingSampleLead] = useState(false);
   const [viewingLeadPdf, setViewingLeadPdf] = useState(null);
   const leadStudyInputRef = useRef(null);
   const pitchDeckInputRef = useRef(null);
-  const keyPeopleInputRef = useRef(null);
 
   // New Lead form state
   const [newLeadForm, setNewLeadForm] = useState({
@@ -293,9 +293,40 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     }
   };
 
-  // Submit sample lead (Fields: Company Name, Company Website URL, Lead Study PDF, Pitch Deck PDF, Key People PDF)
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const handleAddKeyPersonEmail = () => {
+    const trimmed = keyPersonEmailInput.trim().toLowerCase();
+    if (!trimmed) {
+      setKeyPersonEmailError('Please enter an email address.');
+      return;
+    }
+    if (!emailRegex.test(trimmed)) {
+      setKeyPersonEmailError('Please enter a valid email address (e.g. name@company.com).');
+      return;
+    }
+    if (sampleLeadForm.keyPeopleEmails.includes(trimmed)) {
+      setKeyPersonEmailError('This email address has already been added.');
+      return;
+    }
+    setSampleLeadForm(prev => ({
+      ...prev,
+      keyPeopleEmails: [...prev.keyPeopleEmails, trimmed]
+    }));
+    setKeyPersonEmailInput('');
+    setKeyPersonEmailError('');
+  };
+
+  const handleRemoveKeyPersonEmail = (indexToRemove) => {
+    setSampleLeadForm(prev => ({
+      ...prev,
+      keyPeopleEmails: prev.keyPeopleEmails.filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
+
+  // Submit sample lead (Fields: Company Name, Company Website URL, Lead Study PDF, Pitch Deck PDF, Key People Emails)
   const handleSubmitSampleLead = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!selectedOnboardingClient) return;
 
     if (!sampleLeadForm.companyName.trim()) {
@@ -314,8 +345,21 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       return;
     }
 
-    if (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && !sampleLeadForm.keyPeopleFile) {
-      alert('Please attach at least one PDF document (Lead Study, Pitch Deck, or Key People).');
+    // Automatically include any pending input in the email input field
+    let currentEmails = [...sampleLeadForm.keyPeopleEmails];
+    const pendingInput = keyPersonEmailInput.trim().toLowerCase();
+    if (pendingInput) {
+      if (!emailRegex.test(pendingInput)) {
+        alert(`Invalid email address format: "${pendingInput}".`);
+        return;
+      }
+      if (!currentEmails.includes(pendingInput)) {
+        currentEmails.push(pendingInput);
+      }
+    }
+
+    if (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && currentEmails.length === 0) {
+      alert('Please attach at least one document (Lead Study or Pitch Deck) or add at least one Key Person email.');
       return;
     }
 
@@ -333,7 +377,6 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     try {
       if (sampleLeadForm.leadStudyFile) checkFile(sampleLeadForm.leadStudyFile, 'Lead Study');
       if (sampleLeadForm.pitchDeckFile) checkFile(sampleLeadForm.pitchDeckFile, 'Pitch Deck');
-      if (sampleLeadForm.keyPeopleFile) checkFile(sampleLeadForm.keyPeopleFile, 'Key People');
     } catch (valErr) {
       alert(valErr.message);
       return;
@@ -357,10 +400,9 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
         });
       };
 
-      const [leadStudyDoc, pitchDeckDoc, keyPeopleDoc] = await Promise.all([
+      const [leadStudyDoc, pitchDeckDoc] = await Promise.all([
         readFileAsDataUrl(sampleLeadForm.leadStudyFile),
-        readFileAsDataUrl(sampleLeadForm.pitchDeckFile),
-        readFileAsDataUrl(sampleLeadForm.keyPeopleFile)
+        readFileAsDataUrl(sampleLeadForm.pitchDeckFile)
       ]);
 
       const leadIndex = clientLeads.length + 1;
@@ -370,7 +412,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
         website: cleanWebsite,
         leadStudy: leadStudyDoc,
         pitchDeck: pitchDeckDoc,
-        keyPeople: keyPeopleDoc
+        keyPeopleEmails: currentEmails
       });
 
       setSampleLeadForm({
@@ -380,12 +422,12 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
         leadStudyFileName: '',
         pitchDeckFile: null,
         pitchDeckFileName: '',
-        keyPeopleFile: null,
-        keyPeopleFileName: ''
+        keyPeopleEmails: []
       });
+      setKeyPersonEmailInput('');
+      setKeyPersonEmailError('');
       if (leadStudyInputRef.current) leadStudyInputRef.current.value = '';
       if (pitchDeckInputRef.current) pitchDeckInputRef.current.value = '';
-      if (keyPeopleInputRef.current) keyPeopleInputRef.current.value = '';
 
       await refreshClientData(selectedOnboardingClient.id);
       alert('Sample lead submitted successfully.');
@@ -2524,8 +2566,8 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                             </div>
                           </div>
 
-                          {/* Row 2: 3 PDF Document Fields */}
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+                          {/* Row 2: 2 PDF Document Fields (Lead Study & Pitch Deck) */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginBottom: '14px' }}>
                             {/* Lead Study PDF */}
                             <div>
                               <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
@@ -2647,67 +2689,113 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                 </span>
                               </div>
                             </div>
+                          </div>
 
-                            {/* Key People PDF */}
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                                Key People PDF <span style={{ color: '#94A3B8', fontSize: '0.72rem' }}>(Optional)</span>
+                          {/* Key People Email Input Section */}
+                          <div style={{
+                            marginBottom: '16px',
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            border: '1px solid rgba(255, 255, 255, 0.07)',
+                            borderRadius: '8px',
+                            padding: '12px 14px'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                              <label style={{ fontSize: '0.8rem', fontWeight: '700', color: '#CBD5E1' }}>
+                                Key People
                               </label>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <label
-                                  htmlFor="sample-lead-keypeople-upload"
-                                  className="portal-btn-secondary"
-                                  style={{
-                                    padding: '7px 12px',
-                                    fontSize: '0.78rem',
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    flexShrink: 0
-                                  }}
-                                >
-                                  <Upload size={13} color="#00D9FF" />
-                                  <span>{sampleLeadForm.keyPeopleFile ? 'Change PDF' : 'Choose PDF'}</span>
-                                </label>
+                              <span style={{ fontSize: '0.74rem', color: '#94A3B8' }}>
+                                Add the key decision-makers or relevant contacts for this company.
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <div style={{ position: 'relative', flex: 1 }}>
+                                <Mail size={14} color="#00D9FF" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
                                 <input
-                                  id="sample-lead-keypeople-upload"
-                                  ref={keyPeopleInputRef}
-                                  type="file"
-                                  accept=".pdf,application/pdf"
-                                  style={{ display: 'none' }}
+                                  type="email"
+                                  className="portal-form-input"
+                                  style={{ paddingLeft: '32px', height: '36px', fontSize: '0.82rem' }}
+                                  placeholder="e.g. keyperson@company.com"
+                                  value={keyPersonEmailInput}
                                   onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-                                        alert('Please select a valid PDF file.');
-                                        e.target.value = '';
-                                        return;
-                                      }
-                                      if (file.size > 25 * 1024 * 1024) {
-                                        alert('PDF file exceeds the maximum size limit of 25MB.');
-                                        e.target.value = '';
-                                        return;
-                                      }
-                                      setSampleLeadForm(prev => ({
-                                        ...prev,
-                                        keyPeopleFile: file,
-                                        keyPeopleFileName: file.name
-                                      }));
+                                    setKeyPersonEmailInput(e.target.value);
+                                    if (keyPersonEmailError) setKeyPersonEmailError('');
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleAddKeyPersonEmail();
                                     }
                                   }}
                                 />
-                                <span style={{
-                                  fontSize: '0.75rem',
-                                  color: sampleLeadForm.keyPeopleFileName ? '#34d399' : '#64748B',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap'
-                                }} title={sampleLeadForm.keyPeopleFileName}>
-                                  {sampleLeadForm.keyPeopleFileName || 'No PDF chosen'}
-                                </span>
                               </div>
+                              <button
+                                type="button"
+                                className="portal-btn-secondary"
+                                onClick={handleAddKeyPersonEmail}
+                                style={{
+                                  padding: '0 14px',
+                                  height: '36px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: '600',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <Plus size={14} color="#00D9FF" />
+                                <span>+ Add Key Person</span>
+                              </button>
                             </div>
+
+                            {keyPersonEmailError && (
+                              <div style={{ fontSize: '0.74rem', color: '#ef4444', marginTop: '4px' }}>
+                                {keyPersonEmailError}
+                              </div>
+                            )}
+
+                            {sampleLeadForm.keyPeopleEmails.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
+                                {sampleLeadForm.keyPeopleEmails.map((email, idx) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '6px 12px',
+                                      background: 'rgba(0, 217, 255, 0.06)',
+                                      border: '1px solid rgba(0, 217, 255, 0.2)',
+                                      borderRadius: '6px',
+                                      fontSize: '0.8rem'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#F5F5F5' }}>
+                                      <Mail size={13} color="#00D9FF" />
+                                      <span style={{ fontWeight: '500' }}>{email}</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveKeyPersonEmail(idx)}
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: '#ef4444',
+                                        cursor: 'pointer',
+                                        fontSize: '0.74rem',
+                                        fontWeight: '600',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px'
+                                      }}
+                                      title="Remove email"
+                                    >
+                                      [Remove]
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
 
                           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
@@ -2716,15 +2804,15 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                 ? 'Enter company name to begin'
                                 : !sampleLeadForm.website.trim()
                                 ? 'Enter website URL'
-                                : (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && !sampleLeadForm.keyPeopleFile)
-                                ? 'Attach at least one PDF (Lead Study recommended)'
+                                : (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && sampleLeadForm.keyPeopleEmails.length === 0 && !keyPersonEmailInput.trim())
+                                ? 'Attach at least one PDF or add a Key Person email'
                                 : 'Ready to save lead'}
                             </span>
                             <button
                               type="submit"
                               id="btn-submit-sample-lead"
                               className="portal-btn-primary"
-                              disabled={isSubmittingSampleLead || !sampleLeadForm.companyName.trim() || !sampleLeadForm.website.trim() || (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && !sampleLeadForm.keyPeopleFile)}
+                              disabled={isSubmittingSampleLead || !sampleLeadForm.companyName.trim() || !sampleLeadForm.website.trim() || (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && sampleLeadForm.keyPeopleEmails.length === 0 && !keyPersonEmailInput.trim())}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
                             >
                               <Plus size={14} />
@@ -2901,7 +2989,42 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                       </td>
                                       <td>{renderDocCell(leadStudyDoc, 'leadStudy', 'Lead Study')}</td>
                                       <td>{renderDocCell(pitchDeckDoc, 'pitchDeck', 'Pitch Deck')}</td>
-                                      <td>{renderDocCell(keyPeopleDoc, 'keyPeople', 'Key People')}</td>
+                                      <td>
+                                        {(() => {
+                                          const kpEmails = Array.isArray(lead.keyPeople?.emails) && lead.keyPeople.emails.length > 0
+                                            ? lead.keyPeople.emails
+                                            : (lead.email ? [lead.email] : []);
+                                          if (kpEmails.length > 0) {
+                                            return (
+                                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                {kpEmails.map((em, eIdx) => (
+                                                  <a
+                                                    key={eIdx}
+                                                    href={`mailto:${em}`}
+                                                    style={{
+                                                      fontSize: '0.76rem',
+                                                      color: '#00D9FF',
+                                                      textDecoration: 'none',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      gap: '4px'
+                                                    }}
+                                                    title={`Email ${em}`}
+                                                  >
+                                                    <Mail size={11} />
+                                                    <span>{em}</span>
+                                                  </a>
+                                                ))}
+                                              </div>
+                                            );
+                                          }
+                                          return (
+                                            <span style={{ fontSize: '0.74rem', color: '#64748B' }}>
+                                              No email added
+                                            </span>
+                                          );
+                                        })()}
+                                      </td>
                                       <td style={{ textAlign: 'right' }}>
                                         <button
                                           type="button"

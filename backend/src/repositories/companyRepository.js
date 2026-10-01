@@ -48,13 +48,23 @@ const mapCompany = (row) => {
       fileName: `${companyName} - Pitch Deck.pdf`
     } : null;
 
-    const keyPeople = kpRef ? {
-      id: kpAssetId,
-      assetId: kpAssetId,
-      streamUrl: kpRef,
-      downloadUrl: kpAssetId ? `/api/assets/${kpAssetId}/download` : kpRef,
-      fileName: `${companyName} - Key People.pdf`
-    } : null;
+    let keyPeople = null;
+    if (kpAssetId || (kpRef && (kpRef.includes('/api/assets/') || kpRef.endsWith('.pdf')))) {
+      keyPeople = {
+        id: kpAssetId,
+        assetId: kpAssetId,
+        streamUrl: kpRef,
+        downloadUrl: kpAssetId ? `/api/assets/${kpAssetId}/download` : kpRef,
+        fileName: `${companyName} - Key People.pdf`
+      };
+    } else if (kpRef) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const emails = kpRef.split(',').map(s => s.trim().toLowerCase()).filter(s => emailRegex.test(s));
+      keyPeople = {
+        count: emails.length,
+        emails
+      };
+    }
 
     return {
       ...l,

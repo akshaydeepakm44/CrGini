@@ -1293,32 +1293,41 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
         downloadUrl: pitchFromNotes[1]
       } : null);
 
-      // 3. Key People
-      const kpFile = filesByTag.get(`${slotIndex}_keypeople`) || filesByTag.get(`${lead.id}_keypeople`);
-      const kpFromNotes = notes.match(/\[Key People:\s*([^\]]+)\]/);
+      // 3. Key People (Email addresses, no PDF)
+      let kpEmails = [];
+      const kpNotesMatch = notes.match(/\[Key People:\s*([^\]]+)\]/i);
+      if (kpNotesMatch && kpNotesMatch[1]) {
+        const rawParts = kpNotesMatch[1].split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        kpEmails = rawParts.filter(part => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(part));
+      }
+      if (kpEmails.length === 0 && lead.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email.trim())) {
+        kpEmails = [lead.email.trim().toLowerCase()];
+      }
+
       let keyPeople = null;
-      if (kpFile) {
+      if (keyPeopleUnlocked) {
         keyPeople = {
-          id: kpFile.id,
-          name: kpFile.name,
-          isLocked: !keyPeopleUnlocked,
-          streamUrl: keyPeopleUnlocked ? kpFile.streamUrl : null,
-          downloadUrl: keyPeopleUnlocked ? kpFile.downloadUrl : null,
-          size: kpFile.size,
-          type: kpFile.type
+          isLocked: false,
+          count: kpEmails.length,
+          emails: kpEmails
         };
-      } else if (kpFromNotes) {
+      } else {
         keyPeople = {
-          id: null,
-          name: `${companyName} - Key People.pdf`,
-          isLocked: !keyPeopleUnlocked,
-          streamUrl: keyPeopleUnlocked ? kpFromNotes[1] : null,
-          downloadUrl: keyPeopleUnlocked ? kpFromNotes[1] : null
+          isLocked: true,
+          count: kpEmails.length
+          // emails array is strictly omitted when locked
         };
       }
 
+      // Security: Strip email addresses from notes if locked
+      const sanitizedNotes = keyPeopleUnlocked
+        ? notes
+        : notes.replace(/\[Key People:\s*[^\]]+\]/gi, '[Key People: Locked]');
+
       return {
         ...lead,
+        email: keyPeopleUnlocked ? (kpEmails[0] || lead.email || null) : null,
+        notes: sanitizedNotes,
         companyName,
         company: companyName,
         website: websiteUrl,
@@ -1354,7 +1363,7 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
   }
 };
 
-// @desc    Save a lead and/or upload its Lead Study, Pitch Deck, and Key People PDF documents
+// @desc    Save a lead and/or upload its Lead Study and Pitch Deck PDF documents and Key People emails
 // @route   POST /api/company/:companyId/lead-onboarding-assets
 // @access  Private (ADMIN, COMPANY_LEAD)
 export const saveCompanyLeadOnboardingAssets = async (req, res) => {
@@ -1406,17 +1415,75 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
       return res.status(400).json({ success: false, message: 'A valid HTTP or HTTPS company website URL is required.' });
     }
 
-    // Identify provided files:
-    // Lead Study PDF, Pitch Deck PDF, Key People PDF
-    // Also support single `file` property for backwards compatibility
-    const leadStudyDoc = req.body.leadStudy || req.body.leadStudyFile || (!req.body.pitchDeck && !req.body.keyPeople ? req.body.file : null);
-    const pitchDeckDoc = req.body.pitchDeck || req.body.pitchDeckFile || (req.body.file?.docType === 'pitch' ? req.body.file : null);
-    const keyPeopleDoc = req.body.keyPeople || req.body.keyPeopleFile || (req.body.file?.docType === 'keypeople' ? req.body.file : null);
+    // 3. Process Key People Emails (no PDF, no MinIO)
+    let rawKpEmails = req.body.keyPeopleEmails ?? req.body.keyPeopleEmail;
+    if (rawKpEmails === undefined && (typeof req.body.keyPeople === 'string' || Array.isArray(req.body.keyPeople))) {
+      rawKpEmails = req.body.keyPeople;
+    }
+    if (rawKpEmails === undefined && leadData?.keyPeopleEmails) {
+      rawKpEmails = leadData.keyPeopleEmails;
+    }
 
-    if (!leadStudyDoc && !pitchDeckDoc && !keyPeopleDoc && !req.body.file) {
+    let inputKpEmails = [];
+    if (Array.isArray(rawKpEmails)) {
+      inputKpEmails = rawKpEmails.map(e => typeof e === 'string' ? e.trim() : (e?.email ? String(e.email).trim() : '')).filter(Boolean);
+    } else if (typeof rawKpEmails === 'string') {
+      inputKpEmails = rawKpEmails.split(',').map(e => e.trim()).filter(Boolean);
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    for (const email of inputKpEmails) {
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid email address format: "${email}".`
+        });
+      }
+    }
+
+    const uniqueKpEmails = [];
+    for (const email of inputKpEmails) {
+      const lower = email.toLowerCase();
+      if (uniqueKpEmails.includes(lower)) {
+        return res.status(400).json({
+          success: false,
+          message: `Duplicate email address found: "${lower}". Each key person email must be unique.`
+        });
+      }
+      uniqueKpEmails.push(lower);
+    }
+
+    // Retain existing key people emails if updating existing lead and none were explicitly provided
+    if (rawKpEmails === undefined && existingLead?.notes) {
+      const existingKpMatch = existingLead.notes.match(/\[Key People:\s*([^\]]+)\]/i);
+      if (existingKpMatch && existingKpMatch[1]) {
+        const parts = existingKpMatch[1].split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        for (const p of parts) {
+          if (emailRegex.test(p) && !uniqueKpEmails.includes(p)) {
+            uniqueKpEmails.push(p);
+          }
+        }
+      }
+      if (uniqueKpEmails.length === 0 && existingLead.email && emailRegex.test(existingLead.email.trim())) {
+        uniqueKpEmails.push(existingLead.email.trim().toLowerCase());
+      }
+    }
+
+    // Identify provided files:
+    // Lead Study PDF, Pitch Deck PDF (No Key People PDF)
+    // Also support single `file` property for backwards compatibility
+    const leadStudyDoc = req.body.leadStudy || req.body.leadStudyFile || (!req.body.pitchDeck ? req.body.file : null);
+    const pitchDeckDoc = req.body.pitchDeck || req.body.pitchDeckFile || (req.body.file?.docType === 'pitch' ? req.body.file : null);
+
+    const existingHasAssets = existingLead && (
+      (existingLead.notes && (existingLead.notes.includes('[Lead Study:') || existingLead.notes.includes('[Pitch Deck:') || existingLead.notes.includes('[Key People:'))) ||
+      existingLead.email
+    );
+
+    if (!leadStudyDoc && !pitchDeckDoc && uniqueKpEmails.length === 0 && !req.body.file && !existingHasAssets) {
       return res.status(400).json({
         success: false,
-        message: 'At least one lead document (Lead Study, Pitch Deck, or Key People) PDF is required.'
+        message: 'At least one lead document (Lead Study or Pitch Deck) or Key People email is required.'
       });
     }
 
@@ -1440,8 +1507,7 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
     try {
       if (leadStudyDoc) validatePdf(leadStudyDoc, 'Lead Study');
       if (pitchDeckDoc) validatePdf(pitchDeckDoc, 'Pitch Deck');
-      if (keyPeopleDoc) validatePdf(keyPeopleDoc, 'Key People');
-      if (req.body.file && !leadStudyDoc && !pitchDeckDoc && !keyPeopleDoc) validatePdf(req.body.file, 'Company details');
+      if (req.body.file && !leadStudyDoc && !pitchDeckDoc) validatePdf(req.body.file, 'Company details');
     } catch (valErr) {
       return res.status(400).json({ success: false, message: valErr.message });
     }
@@ -1589,7 +1655,6 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
 
     let studyRecord = null;
     let pitchRecord = null;
-    let kpRecord = null;
 
     if (leadStudyDoc) {
       studyRecord = await storeFile(leadStudyDoc, 'Lead Study', 'Lead Study');
@@ -1597,28 +1662,41 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
     if (pitchDeckDoc) {
       pitchRecord = await storeFile(pitchDeckDoc, 'Pitch Deck', 'Pitch Deck');
     }
-    if (keyPeopleDoc) {
-      kpRecord = await storeFile(keyPeopleDoc, 'Key People', 'Key People');
-    }
 
-    const primaryRecord = studyRecord || pitchRecord || kpRecord;
+    const primaryRecord = studyRecord || pitchRecord;
 
     const leadTypeStr = (isAdditional || cleanIndex > 5) ? 'ADDITIONAL' : 'SAMPLE';
     let notesWithMeta = `[Website: ${website}]\n[Lead Type: ${leadTypeStr}]`;
-    if (studyRecord) notesWithMeta += `\n[Lead Study: ${studyRecord.streamUrl}]\n[Lead PDF: ${studyRecord.streamUrl}]`;
-    if (pitchRecord) notesWithMeta += `\n[Pitch Deck: ${pitchRecord.streamUrl}]`;
-    if (kpRecord) notesWithMeta += `\n[Key People: ${kpRecord.streamUrl}]`;
+    if (studyRecord) {
+      notesWithMeta += `\n[Lead Study: ${studyRecord.streamUrl}]\n[Lead PDF: ${studyRecord.streamUrl}]`;
+    } else if (existingLead?.notes) {
+      const existingStudy = existingLead.notes.match(/\[Lead Study:\s*([^\]]+)\]/) || existingLead.notes.match(/\[Lead PDF:\s*([^\]]+)\]/);
+      if (existingStudy) notesWithMeta += `\n[Lead Study: ${existingStudy[1]}]\n[Lead PDF: ${existingStudy[1]}]`;
+    }
+
+    if (pitchRecord) {
+      notesWithMeta += `\n[Pitch Deck: ${pitchRecord.streamUrl}]`;
+    } else if (existingLead?.notes) {
+      const existingPitch = existingLead.notes.match(/\[Pitch Deck:\s*([^\]]+)\]/);
+      if (existingPitch) notesWithMeta += `\n[Pitch Deck: ${existingPitch[1]}]`;
+    }
+
+    if (uniqueKpEmails.length > 0) {
+      notesWithMeta += `\n[Key People: ${uniqueKpEmails.join(', ')}]`;
+    }
     if (req.body.ticketId) notesWithMeta += `\n[Ticket: ${req.body.ticketId}]`;
 
     // Update or insert the lead in company_leads
     let savedLead = null;
+    const primaryEmail = uniqueKpEmails[0] || req.body.email || leadData?.email || existingLead?.email || null;
+
     if (leadId) {
       const resLead = await query(`
         UPDATE company_leads
-        SET name = $1, lead_company = $1, linkedin = $2, status = 'VERIFIED', notes = $3, updated_at = NOW()
-        WHERE id = $4
+        SET name = $1, lead_company = $1, email = $2, linkedin = $3, status = 'VERIFIED', notes = $4, updated_at = NOW()
+        WHERE id = $5
         RETURNING *
-      `, [companyName, website, notesWithMeta, leadId]);
+      `, [companyName, primaryEmail, website, notesWithMeta, leadId]);
       savedLead = resLead.rows[0];
     } else {
       const insLead = await query(`
@@ -1634,13 +1712,19 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
         companyName,
         req.body.title || leadData?.title || null,
         companyName,
-        req.body.email || leadData?.email || null,
+        primaryEmail,
         website,
         req.body.location || leadData?.location || null,
         notesWithMeta
       ]);
       savedLead = insLead.rows[0];
     }
+
+    const keyPeopleObj = {
+      isLocked: false,
+      count: uniqueKpEmails.length,
+      emails: uniqueKpEmails
+    };
 
     return res.json({
       success: true,
@@ -1653,7 +1737,7 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
         slotIndex: cleanIndex,
         leadStudy: studyRecord,
         pitchDeck: pitchRecord,
-        keyPeople: kpRecord,
+        keyPeople: keyPeopleObj,
         pdf: studyRecord || primaryRecord
       },
       fileUrl: primaryRecord?.streamUrl || null,
