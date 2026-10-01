@@ -8,7 +8,7 @@ CreativeGini is an enterprise full-stack platform combining a futuristic public 
 
 ```text
 creativegini-main/
-├── backend/                      # Node.js + Express + MongoDB REST API
+├── backend/                      # Node.js + Express + PostgreSQL REST API
 │   ├── .env                      # Environment configuration (active)
 │   ├── .env.example              # Environment template
 │   ├── package.json              # Backend dependencies and scripts
@@ -205,7 +205,7 @@ creativegini-main/
 
 ### Prerequisites
 - **Node.js**: v18.0.0 or higher
-- **MongoDB**: Active connection (MongoDB Atlas URI configured in `backend/.env`)
+- **PostgreSQL**: Active PostgreSQL instance (v14+ configured in `backend/.env`)
 
 ### 1. Backend Setup
 ```bash

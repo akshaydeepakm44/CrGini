@@ -328,8 +328,9 @@ async function runPasswordResetSuite() {
       failed++;
     }
 
-    // Clean up: clear rate limits
+    // Clean up: clear rate limits both locally and on running server daemon
     clearForgotPasswordRateLimits();
+    await request('/auth/reset-rate-limits', { method: 'POST' }).catch(() => {});
 
     // Verify Admin account is still 100% intact and unaffected
     console.log('\n[Verification]: Verifying Admin account credentials untouched...');

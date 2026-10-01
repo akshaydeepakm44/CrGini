@@ -1115,7 +1115,7 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
 
     // Get up to 5 initial sample leads
     const leadsRes = await query(`
-      SELECT id, name, title, lead_company AS company, email, linkedin, location, status, notes, source_reference, created_at
+      SELECT id, name, title, lead_company AS company, email, linkedin, location, status, notes, created_at
       FROM company_leads
       WHERE company_id = $1
       ORDER BY created_at ASC
@@ -1159,6 +1159,7 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
               type: file.type,
               url: file.url,
               streamUrl: `/api/assets/${file.id}/stream`,
+              downloadUrl: `/api/assets/${file.id}/download`,
               createdAt: file.created_at
             });
           }
@@ -1168,14 +1169,32 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
 
     const mappedLeads = leadsRes.rows.map((lead, i) => {
       const slotIndex = i + 1;
-      const pdf = filesByTag.get(slotIndex) || (lead.source_reference ? {
+      const pdfFromNotes = (lead.notes || '').match(/\[Lead PDF:\s*([^\]]+)\]/);
+      const pdfStreamUrl = pdfFromNotes ? pdfFromNotes[1] : null;
+      const websiteFromNotes = (lead.notes || '').match(/\[Website:\s*([^\]]+)\]/);
+      const websiteUrl = (lead.linkedin && /^https?:\/\//i.test(lead.linkedin)) ? lead.linkedin : (websiteFromNotes ? websiteFromNotes[1] : (lead.linkedin || ''));
+      const companyName = lead.company || lead.name;
+
+      const fileRecord = filesByTag.get(slotIndex);
+      const pdf = fileRecord ? {
+        id: fileRecord.id,
+        name: fileRecord.name,
+        streamUrl: fileRecord.streamUrl,
+        downloadUrl: fileRecord.downloadUrl,
+        size: fileRecord.size,
+        type: fileRecord.type
+      } : (pdfStreamUrl ? {
         id: null,
-        name: `${lead.name} Profile.pdf`,
-        streamUrl: lead.source_reference
+        name: `${companyName} - Company Details.pdf`,
+        streamUrl: pdfStreamUrl,
+        downloadUrl: pdfStreamUrl
       } : null);
 
       return {
         ...lead,
+        companyName,
+        company: companyName,
+        website: websiteUrl,
         slotIndex,
         pdf
       };
@@ -1218,6 +1237,46 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
     }
 
     const { leadIndex, leadId, leadData, file } = req.body;
+
+    // Support both direct fields and nested leadData
+    const rawCompanyName = req.body.companyName || req.body.leadName || req.body.name || leadData?.companyName || leadData?.company || leadData?.name;
+    const rawWebsite = req.body.website || req.body.websiteUrl || req.body.url || leadData?.website || leadData?.websiteUrl || leadData?.linkedin;
+
+    let existingLead = null;
+    if (leadId) {
+      const curRes = await query(`SELECT * FROM company_leads WHERE id = $1`, [leadId]);
+      if (curRes.rows.length > 0) {
+        existingLead = curRes.rows[0];
+      }
+    }
+
+    const companyName = rawCompanyName ? String(rawCompanyName).trim() : (existingLead?.lead_company || existingLead?.name || '');
+    const notesWebsite = existingLead?.notes ? (existingLead.notes.match(/\[Website:\s*([^\]]+)\]/)?.[1]) : null;
+    const website = rawWebsite ? String(rawWebsite).trim() : (existingLead?.linkedin || notesWebsite || '');
+
+    // 1. Validate Company Name
+    if (!companyName) {
+      return res.status(400).json({ success: false, message: 'Company name is required.' });
+    }
+
+    // 2. Validate Company Website URL (must be valid HTTP/HTTPS URL)
+    const urlPattern = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
+    if (!website || !urlPattern.test(website)) {
+      return res.status(400).json({ success: false, message: 'A valid HTTP or HTTPS company website URL is required.' });
+    }
+
+    // 3. Validate Company Details PDF (must be present and must be a PDF)
+    if (!file || (!file.dataUrl && !file.url)) {
+      return res.status(400).json({ success: false, message: 'Company details PDF document is required.' });
+    }
+
+    const fileNameLower = (file.name || '').toLowerCase();
+    const mimeLower = (file.type || file.mimeType || '').toLowerCase();
+    const isPdf = fileNameLower.endsWith('.pdf') || mimeLower.includes('pdf') || (typeof file.dataUrl === 'string' && file.dataUrl.startsWith('data:application/pdf'));
+    if (!isPdf) {
+      return res.status(400).json({ success: false, message: 'Uploaded document must be a PDF file.' });
+    }
+
     let cleanIndex = null;
     if (leadId) {
       const idxRes = await query(`
@@ -1230,7 +1289,12 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
     }
     if (!cleanIndex) {
       const parsed = parseInt(leadIndex, 10);
-      cleanIndex = !isNaN(parsed) && parsed >= 1 && parsed <= 5 ? parsed : 1;
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 5) {
+        cleanIndex = parsed;
+      } else {
+        const countRes = await query('SELECT COUNT(*)::int as count FROM company_leads WHERE company_id = $1', [targetCompanyId]);
+        cleanIndex = Math.min(5, (countRes.rows[0]?.count || 0) + 1);
+      }
     }
     const tag = `Lead 0${cleanIndex}`;
 
@@ -1286,77 +1350,40 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
       submission = insertSub.rows[0];
     }
 
-    let fileRecord = null;
-    let streamUrl = null;
+    // Delete existing file for this tag slot in existing asset storage
+    await query(`
+      DELETE FROM submission_files
+      WHERE submission_id = $1 AND name ILIKE $2
+    `, [submission.id, `[${tag}]%`]);
 
-    if (file && (file.dataUrl || file.url)) {
-      await query(`
-        DELETE FROM submission_files
-        WHERE submission_id = $1 AND name ILIKE $2
-      `, [submission.id, `[${tag}]%`]);
+    const fileName = `[${tag}] ${companyName} - Company Details.pdf`;
+    const mime = file.type || file.mimeType || 'application/pdf';
+    const size = file.size ? (typeof file.size === 'number' ? `${(file.size / 1024).toFixed(1)} KB` : String(file.size)) : 'Unknown';
+    const url = file.dataUrl || file.url || '';
 
-      const leadName = leadData?.name ? leadData.name.trim() : `Sample Lead ${cleanIndex}`;
-      const fileName = `[${tag}] ${leadName} - Executive Lead Profile.pdf`;
-      const mime = file.type || file.mimeType || 'application/pdf';
-      const size = file.size ? (typeof file.size === 'number' ? `${(file.size / 1024).toFixed(1)} KB` : String(file.size)) : 'Unknown';
-      const url = file.dataUrl || file.url || '';
+    const insFile = await query(`
+      INSERT INTO submission_files (submission_id, name, url, size, type, created_at)
+      VALUES ($1, $2, $3, $4, $5, NOW())
+      RETURNING *
+    `, [submission.id, fileName, url, size, mime]);
+    const fileRecord = insFile.rows[0];
+    const streamUrl = `/api/assets/${fileRecord.id}/stream`;
+    const downloadUrl = `/api/assets/${fileRecord.id}/download`;
 
-      const insFile = await query(`
-        INSERT INTO submission_files (submission_id, name, url, size, type, created_at)
-        VALUES ($1, $2, $3, $4, $5, NOW())
-        RETURNING *
-      `, [submission.id, fileName, url, size, mime]);
-      fileRecord = insFile.rows[0];
-      streamUrl = `/api/assets/${fileRecord.id}/stream`;
-    }
+    // Notes format with website and asset stream link
+    const notesWithMeta = `[Website: ${website}]\n[Lead PDF: ${streamUrl}]`;
 
     // Now update or insert the lead in company_leads
     let savedLead = null;
     if (leadId) {
-      const updateFields = [];
-      const updateValues = [];
-      let valIdx = 1;
-
-      if (leadData?.name) { updateFields.push(`name = $${valIdx++}`); updateValues.push(leadData.name.trim()); }
-      if (leadData?.title !== undefined) { updateFields.push(`title = $${valIdx++}`); updateValues.push(leadData.title); }
-      if (leadData?.company !== undefined) { updateFields.push(`lead_company = $${valIdx++}`); updateValues.push(leadData.company); }
-      if (leadData?.email !== undefined) { updateFields.push(`email = $${valIdx++}`); updateValues.push(leadData.email); }
-      if (leadData?.linkedin !== undefined) { updateFields.push(`linkedin = $${valIdx++}`); updateValues.push(leadData.linkedin); }
-      if (leadData?.location !== undefined) { updateFields.push(`location = $${valIdx++}`); updateValues.push(leadData.location); }
-      
-      let finalNotes = leadData?.notes;
-      if (streamUrl) {
-        if (finalNotes === undefined) {
-          const cur = await query(`SELECT notes FROM company_leads WHERE id = $1`, [leadId]);
-          finalNotes = cur.rows[0]?.notes || '';
-        }
-        const stripped = (finalNotes || '').replace(/\[Lead PDF:\s*[^\]]+\]/g, '').trim();
-        finalNotes = stripped ? `${stripped}\n[Lead PDF: ${streamUrl}]` : `[Lead PDF: ${streamUrl}]`;
-        updateFields.push(`status = $${valIdx++}`);
-        updateValues.push('VERIFIED');
-      } else if (leadData?.status) {
-        updateFields.push(`status = $${valIdx++}`);
-        updateValues.push(leadData.status);
-      }
-      
-      if (finalNotes !== undefined) {
-        updateFields.push(`notes = $${valIdx++}`);
-        updateValues.push(finalNotes);
-      }
-      updateFields.push(`updated_at = NOW()`);
-
-      updateValues.push(leadId);
       const resLead = await query(`
         UPDATE company_leads
-        SET ${updateFields.join(', ')}
-        WHERE id = $${valIdx}
+        SET name = $1, lead_company = $1, linkedin = $2, status = 'VERIFIED', notes = $3, updated_at = NOW()
+        WHERE id = $4
         RETURNING *
-      `, updateValues);
+      `, [companyName, website, notesWithMeta, leadId]);
       savedLead = resLead.rows[0];
-    } else if (leadData && leadData.name) {
-      const baseNotes = (leadData.notes || 'Onboarding Sample Lead with verified documentation.').replace(/\[Lead PDF:\s*[^\]]+\]/g, '').trim();
-      const finalNotes = streamUrl ? `${baseNotes}\n[Lead PDF: ${streamUrl}]` : baseNotes;
-
+    } else {
       const insLead = await query(`
         INSERT INTO company_leads (
           company_id, name, title, lead_company, email, linkedin, location,
@@ -1367,28 +1394,39 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
         ) RETURNING *
       `, [
         targetCompanyId,
-        leadData.name.trim(),
-        leadData.title || null,
-        leadData.company || null,
-        leadData.email || null,
-        leadData.linkedin || null,
-        leadData.location || null,
-        finalNotes
+        companyName,
+        req.body.title || leadData?.title || null,
+        companyName,
+        req.body.email || leadData?.email || null,
+        website,
+        req.body.location || leadData?.location || null,
+        notesWithMeta
       ]);
       savedLead = insLead.rows[0];
     }
 
     return res.json({
       success: true,
-      message: `Lead ${cleanIndex} onboarding work saved successfully.`,
+      message: `Sample lead for ${companyName} saved successfully.`,
       ticketId: request.ticket_id,
-      lead: savedLead,
+      lead: {
+        ...savedLead,
+        companyName: savedLead.lead_company || savedLead.name,
+        website: savedLead.linkedin,
+        pdf: {
+          id: fileRecord.id,
+          name: fileRecord.name,
+          streamUrl,
+          downloadUrl
+        }
+      },
       fileUrl: streamUrl,
-      file: fileRecord ? {
+      file: {
         id: fileRecord.id,
         name: fileRecord.name,
-        streamUrl
-      } : null
+        streamUrl,
+        downloadUrl
+      }
     });
   } catch (error) {
     console.error('[Save Lead Onboarding Assets Error]:', error);

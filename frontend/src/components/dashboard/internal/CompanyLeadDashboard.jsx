@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -96,6 +96,16 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
   const [clientKeyPeople, setClientKeyPeople] = useState([]);
   const [loadingClientDetails, setLoadingClientDetails] = useState(false);
   const [uploadingLeadPdfId, setUploadingLeadPdfId] = useState(null);
+
+  // Sample Lead form state (exact fields: Company Name, Company Website URL, Company Details PDF)
+  const [sampleLeadForm, setSampleLeadForm] = useState({
+    companyName: '',
+    website: '',
+    file: null,
+    fileName: ''
+  });
+  const [isSubmittingSampleLead, setIsSubmittingSampleLead] = useState(false);
+  const samplePdfInputRef = useRef(null);
 
   // New Lead form state
   const [newLeadForm, setNewLeadForm] = useState({
@@ -218,13 +228,26 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       socialProfile: ''
     });
 
+    setSampleLeadForm({
+      companyName: '',
+      website: '',
+      file: null,
+      fileName: ''
+    });
+    if (samplePdfInputRef.current) {
+      samplePdfInputRef.current.value = '';
+    }
+
     try {
       setLoadingClientDetails(true);
-      const res = await api.getCompanyLeads(client.id);
+      const [res, onbRes] = await Promise.all([
+        api.getCompanyLeads(client.id),
+        api.getCompanyLeadOnboardingAssets(client.id).catch(() => null)
+      ]);
       if (res && res.company) {
         setClientResearch(res.company.researchSummary || '');
       }
-      setClientLeads(res.leads || []);
+      setClientLeads(onbRes?.leads?.length ? onbRes.leads : (res.leads || []));
       setClientKeyPeople(res.keyPeople || []);
     } catch (err) {
       console.error('Failed to load client leads data:', err);
@@ -236,14 +259,15 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
   // Refresh client data after updates
   const refreshClientData = async (companyId) => {
     try {
-      const [leadsRes, clientsRes] = await Promise.all([
+      const [leadsRes, onbRes, clientsRes] = await Promise.all([
         api.getCompanyLeads(companyId),
+        api.getCompanyLeadOnboardingAssets(companyId).catch(() => null),
         api.getOnboardingClients()
       ]);
       if (leadsRes && leadsRes.company) {
         setClientResearch(leadsRes.company.researchSummary || '');
       }
-      setClientLeads(leadsRes.leads || []);
+      setClientLeads(onbRes?.leads?.length ? onbRes.leads : (leadsRes.leads || []));
       setClientKeyPeople(leadsRes.keyPeople || []);
       setOnboardingClients(clientsRes || []);
 
@@ -254,6 +278,68 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       }
     } catch (err) {
       console.error('Failed to refresh client data:', err);
+    }
+  };
+
+  // Submit sample lead (Exact structure: Company Name, Company Website URL, Company Details PDF)
+  const handleSubmitSampleLead = async (e) => {
+    e.preventDefault();
+    if (!selectedOnboardingClient) return;
+
+    if (!sampleLeadForm.companyName.trim()) {
+      alert('Company Name is required.');
+      return;
+    }
+
+    const urlPattern = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
+    if (!sampleLeadForm.website.trim() || !urlPattern.test(sampleLeadForm.website.trim())) {
+      alert('Please enter a valid HTTP or HTTPS Company Website URL.');
+      return;
+    }
+
+    if (!sampleLeadForm.file) {
+      alert('Company Details PDF document is required.');
+      return;
+    }
+
+    try {
+      setIsSubmittingSampleLead(true);
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const leadIndex = clientLeads.length + 1;
+          await api.saveCompanyLeadOnboardingAssets(selectedOnboardingClient.id, {
+            leadIndex: Math.min(5, leadIndex),
+            companyName: sampleLeadForm.companyName.trim(),
+            website: sampleLeadForm.website.trim(),
+            file: {
+              name: sampleLeadForm.file.name,
+              size: sampleLeadForm.file.size,
+              type: sampleLeadForm.file.type || 'application/pdf',
+              dataUrl: event.target.result
+            }
+          });
+          setSampleLeadForm({
+            companyName: '',
+            website: '',
+            file: null,
+            fileName: ''
+          });
+          if (samplePdfInputRef.current) {
+            samplePdfInputRef.current.value = '';
+          }
+          await refreshClientData(selectedOnboardingClient.id);
+          alert('Sample lead submitted successfully.');
+        } catch (err) {
+          alert('Failed to submit sample lead: ' + err.message);
+        } finally {
+          setIsSubmittingSampleLead(false);
+        }
+      };
+      reader.readAsDataURL(sampleLeadForm.file);
+    } catch (err) {
+      alert('Failed to read PDF file: ' + err.message);
+      setIsSubmittingSampleLead(false);
     }
   };
 
@@ -358,10 +444,13 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       reader.onload = async (event) => {
         try {
           const leadIndex = clientLeads.findIndex(l => l.id === lead.id);
+          const compName = lead.companyName || lead.company || lead.name;
+          const compWeb = lead.website || (lead.notes?.match(/\[Website:\s*([^\]]+)\]/)?.[1]) || lead.linkedin;
           await api.saveCompanyLeadOnboardingAssets(selectedOnboardingClient.id, {
             leadId: lead.id,
             leadIndex: leadIndex >= 0 ? leadIndex + 1 : 1,
-            leadName: lead.name,
+            companyName: compName,
+            website: compWeb,
             file: {
               name: file.name,
               size: file.size,
@@ -2322,226 +2411,105 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                         </span>
                       </div>
 
-                      {/* Add Lead Form */}
+                      {/* Clean 3-Field Sample Lead Submission Form */}
                       <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '16px' }}>
                         <h5 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Plus size={15} color="#00D9FF" /> Add Sample Lead
                         </h5>
-                        <form onSubmit={handleAddLead}>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                        <form onSubmit={handleSubmitSampleLead}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginBottom: '14px' }}>
                             <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Lead Full Name *</label>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
+                                Company Name <span style={{ color: '#ef4444' }}>*</span>
+                              </label>
                               <input
                                 type="text"
                                 className="portal-form-input"
-                                placeholder="e.g. Alex Morgan"
-                                value={newLeadForm.name}
-                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, name: e.target.value }))}
+                                placeholder="e.g. Acme Corporation"
+                                value={sampleLeadForm.companyName}
+                                onChange={(e) => setSampleLeadForm(prev => ({ ...prev, companyName: e.target.value }))}
                                 required
                               />
                             </div>
                             <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Job Title</label>
-                              <input
-                                type="text"
-                                className="portal-form-input"
-                                placeholder="e.g. VP of Engineering / CTO"
-                                value={newLeadForm.title}
-                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, title: e.target.value }))}
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Target Company</label>
-                              <input
-                                type="text"
-                                className="portal-form-input"
-                                placeholder="e.g. Datacore Global"
-                                value={newLeadForm.company}
-                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, company: e.target.value }))}
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Location</label>
-                              <input
-                                type="text"
-                                className="portal-form-input"
-                                placeholder="e.g. San Francisco, CA"
-                                value={newLeadForm.location}
-                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, location: e.target.value }))}
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Corporate Email</label>
-                              <input
-                                type="email"
-                                className="portal-form-input"
-                                placeholder="alex@datacore.io"
-                                value={newLeadForm.email}
-                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, email: e.target.value }))}
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>LinkedIn Profile URL</label>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
+                                Company Website URL <span style={{ color: '#ef4444' }}>*</span>
+                              </label>
                               <input
                                 type="url"
                                 className="portal-form-input"
-                                placeholder="https://linkedin.com/in/alex-morgan"
-                                value={newLeadForm.linkedin}
-                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, linkedin: e.target.value }))}
+                                placeholder="https://example.com"
+                                value={sampleLeadForm.website}
+                                onChange={(e) => setSampleLeadForm(prev => ({ ...prev, website: e.target.value }))}
+                                required
                               />
                             </div>
                             <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Verification Status</label>
-                              <select
-                                className="portal-form-input"
-                                value={newLeadForm.status}
-                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, status: e.target.value }))}
-                              >
-                                <option value="PENDING">PENDING</option>
-                                <option value="RESEARCHED">RESEARCHED</option>
-                                <option value="VERIFIED">VERIFIED (Requires Research Notes)</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Research / Verification Notes</label>
-                              <input
-                                type="text"
-                                className="portal-form-input"
-                                placeholder="e.g. Verified corporate email via SMTP; active role on LinkedIn"
-                                value={newLeadForm.notes}
-                                onChange={(e) => setNewLeadForm(prev => ({ ...prev, notes: e.target.value }))}
-                              />
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
+                                Company Details PDF <span style={{ color: '#ef4444' }}>*</span>
+                              </label>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <label
+                                  className="portal-btn-secondary"
+                                  style={{
+                                    padding: '8px 14px',
+                                    fontSize: '0.8rem',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  <Upload size={14} color="#00D9FF" />
+                                  <span>{sampleLeadForm.file ? 'Change PDF' : 'Select PDF'}</span>
+                                  <input
+                                    ref={samplePdfInputRef}
+                                    type="file"
+                                    accept=".pdf,application/pdf"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+                                          alert('Please select a valid PDF file.');
+                                          e.target.value = '';
+                                          return;
+                                        }
+                                        setSampleLeadForm(prev => ({
+                                          ...prev,
+                                          file,
+                                          fileName: file.name
+                                        }));
+                                      }
+                                    }}
+                                  />
+                                </label>
+                                <span style={{
+                                  fontSize: '0.78rem',
+                                  color: sampleLeadForm.fileName ? '#34d399' : '#64748B',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {sampleLeadForm.fileName || 'No PDF selected (required)'}
+                                </span>
+                              </div>
                             </div>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                             <button
                               type="submit"
                               className="portal-btn-primary"
-                              disabled={isAddingLead}
+                              disabled={isSubmittingSampleLead || !sampleLeadForm.companyName.trim() || !sampleLeadForm.website.trim() || !sampleLeadForm.file}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
                             >
                               <Plus size={14} />
-                              <span>{isAddingLead ? 'Adding Lead...' : 'Add Sample Lead'}</span>
+                              <span>{isSubmittingSampleLead ? 'Uploading Sample Lead...' : 'Submit Sample Lead'}</span>
                             </button>
                           </div>
                         </form>
                       </div>
-
-                      {/* Editing Lead Modal / Inline Box */}
-                      {editingLead && (
-                        <div style={{ background: 'rgba(0, 217, 255, 0.06)', border: '1px solid rgba(0, 217, 255, 0.3)', borderRadius: '8px', padding: '16px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                            <h5 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#00D9FF', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <Edit2 size={14} /> Edit Lead: {editingLead.name}
-                            </h5>
-                            <button
-                              type="button"
-                              onClick={() => setEditingLead(null)}
-                              style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
-                            >
-                              <X size={15} />
-                            </button>
-                          </div>
-                          <form onSubmit={handleUpdateLead}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Name *</label>
-                                <input
-                                  type="text"
-                                  className="portal-form-input"
-                                  value={editingLead.name || ''}
-                                  onChange={(e) => setEditingLead(prev => ({ ...prev, name: e.target.value }))}
-                                  required
-                                />
-                              </div>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Title</label>
-                                <input
-                                  type="text"
-                                  className="portal-form-input"
-                                  value={editingLead.title || ''}
-                                  onChange={(e) => setEditingLead(prev => ({ ...prev, title: e.target.value }))}
-                                />
-                              </div>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Company</label>
-                                <input
-                                  type="text"
-                                  className="portal-form-input"
-                                  value={editingLead.company || ''}
-                                  onChange={(e) => setEditingLead(prev => ({ ...prev, company: e.target.value }))}
-                                />
-                              </div>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Location</label>
-                                <input
-                                  type="text"
-                                  className="portal-form-input"
-                                  value={editingLead.location || ''}
-                                  onChange={(e) => setEditingLead(prev => ({ ...prev, location: e.target.value }))}
-                                />
-                              </div>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Email</label>
-                                <input
-                                  type="email"
-                                  className="portal-form-input"
-                                  value={editingLead.email || ''}
-                                  onChange={(e) => setEditingLead(prev => ({ ...prev, email: e.target.value }))}
-                                />
-                              </div>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>LinkedIn URL</label>
-                                <input
-                                  type="url"
-                                  className="portal-form-input"
-                                  value={editingLead.linkedin || ''}
-                                  onChange={(e) => setEditingLead(prev => ({ ...prev, linkedin: e.target.value }))}
-                                />
-                              </div>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Status</label>
-                                <select
-                                  className="portal-form-input"
-                                  value={editingLead.status || 'PENDING'}
-                                  onChange={(e) => setEditingLead(prev => ({ ...prev, status: e.target.value }))}
-                                >
-                                  <option value="PENDING">PENDING</option>
-                                  <option value="RESEARCHED">RESEARCHED</option>
-                                  <option value="VERIFIED">VERIFIED (Requires Research Notes)</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94A3B8', marginBottom: '3px' }}>Notes</label>
-                                <input
-                                  type="text"
-                                  className="portal-form-input"
-                                  value={editingLead.notes || ''}
-                                  onChange={(e) => setEditingLead(prev => ({ ...prev, notes: e.target.value }))}
-                                />
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                              <button
-                                type="button"
-                                className="portal-btn-secondary"
-                                onClick={() => setEditingLead(null)}
-                                style={{ padding: '5px 12px', fontSize: '0.8rem' }}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="submit"
-                                className="portal-btn-primary"
-                                disabled={isUpdatingLead}
-                                style={{ padding: '5px 14px', fontSize: '0.8rem' }}
-                              >
-                                {isUpdatingLead ? 'Saving...' : 'Update Lead'}
-                              </button>
-                            </div>
-                          </form>
-                        </div>
-                      )}
 
                       {/* Current Leads Table */}
                       <div>
@@ -2557,121 +2525,115 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                             <table className="request-table">
                               <thead>
                                 <tr>
-                                  <th>Name</th>
-                                  <th>Title</th>
-                                  <th>Company</th>
-                                  <th>Location</th>
-                                  <th>Email</th>
-                                  <th>LinkedIn</th>
-                                  <th>Lead PDF / Dossier</th>
-                                  <th>Status</th>
-                                  <th>Verification Notes</th>
-                                  <th style={{ textAlign: 'right' }}>Actions</th>
+                                  <th style={{ width: '50px' }}>#</th>
+                                  <th>Company Name</th>
+                                  <th>Company Website</th>
+                                  <th>Company Details PDF</th>
+                                  <th style={{ textAlign: 'right', width: '80px' }}>Actions</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {clientLeads.map((lead) => (
-                                  <tr key={lead.id}>
-                                    <td style={{ fontWeight: '600', color: '#F5F5F5' }}>{lead.name}</td>
-                                    <td style={{ color: '#CBD5E1' }}>{lead.title || '—'}</td>
-                                    <td style={{ color: '#00D9FF' }}>{lead.company || '—'}</td>
-                                    <td style={{ color: '#94A3B8' }}>{lead.location || '—'}</td>
-                                    <td>
-                                      {lead.email ? (
-                                        <a href={`mailto:${lead.email}`} style={{ color: '#00D9FF', textDecoration: 'none', fontSize: '0.8rem' }}>
-                                          {lead.email}
-                                        </a>
-                                      ) : (
-                                        <span style={{ color: '#64748B' }}>—</span>
-                                      )}
-                                    </td>
-                                    <td>
-                                      {lead.linkedin ? (
-                                        <a href={lead.linkedin} target="_blank" rel="noreferrer" style={{ color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', fontSize: '0.78rem' }}>
-                                          Profile <ExternalLink size={10} />
-                                        </a>
-                                      ) : (
-                                        <span style={{ color: '#64748B' }}>—</span>
-                                      )}
-                                    </td>
-                                    <td>
-                                      {uploadingLeadPdfId === lead.id ? (
-                                        <span style={{ fontSize: '0.75rem', color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                          <Clock size={12} className="spin" /> Uploading PDF...
-                                        </span>
-                                      ) : (lead.source_reference || lead.sourceReference) ? (
-                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                {clientLeads.map((lead, idx) => {
+                                  const companyName = lead.companyName || lead.company || lead.name || '—';
+                                  const website = lead.website || (lead.notes?.match(/\[Website:\s*([^\]]+)\]/)?.[1]) || lead.linkedin;
+                                  const pdfUrl = lead.pdf?.streamUrl || lead.source_reference || lead.sourceReference || (lead.notes?.match(/\[Lead PDF:\s*([^\]]+)\]/)?.[1]);
+
+                                  return (
+                                    <tr key={lead.id || idx}>
+                                      <td style={{ fontWeight: '600', color: '#94A3B8' }}>{lead.slotIndex || idx + 1}</td>
+                                      <td style={{ fontWeight: '600', color: '#F5F5F5' }}>
+                                        {website && /^https?:\/\//i.test(website) ? (
                                           <a
-                                            href={lead.source_reference || lead.sourceReference}
+                                            href={website}
                                             target="_blank"
-                                            rel="noreferrer"
-                                            className="portal-btn-secondary"
-                                            style={{ padding: '3px 8px', fontSize: '0.75rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                            title="View Lead PDF"
+                                            rel="noopener noreferrer"
+                                            style={{ color: '#F5F5F5', textDecoration: 'none' }}
+                                            onMouseEnter={(e) => { e.currentTarget.style.color = '#00D9FF'; }}
+                                            onMouseLeave={(e) => { e.currentTarget.style.color = '#F5F5F5'; }}
+                                            title={`Visit ${companyName} website`}
                                           >
-                                            <FileText size={12} />
-                                            <span>View PDF</span>
+                                            {companyName}
                                           </a>
-                                          <label
-                                            className="portal-btn-secondary"
-                                            style={{ padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                            title="Replace Lead PDF"
+                                        ) : (
+                                          <span>{companyName}</span>
+                                        )}
+                                      </td>
+                                      <td>
+                                        {website ? (
+                                          <a
+                                            href={website.startsWith('http') ? website : `https://${website}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{ color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none', fontSize: '0.82rem' }}
                                           >
-                                            <Upload size={11} />
+                                            <span>{website}</span>
+                                            <ExternalLink size={11} />
+                                          </a>
+                                        ) : (
+                                          <span style={{ color: '#64748B' }}>—</span>
+                                        )}
+                                      </td>
+                                      <td>
+                                        {uploadingLeadPdfId === lead.id ? (
+                                          <span style={{ fontSize: '0.75rem', color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                            <Clock size={12} className="spin" /> Uploading PDF...
+                                          </span>
+                                        ) : pdfUrl ? (
+                                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                            <a
+                                              href={pdfUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="portal-btn-secondary"
+                                              style={{ padding: '3px 10px', fontSize: '0.75rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                              title="View Company Details PDF"
+                                            >
+                                              <FileText size={12} />
+                                              <span>View PDF</span>
+                                            </a>
+                                            <label
+                                              className="portal-btn-secondary"
+                                              style={{ padding: '3px 10px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                              title="Replace Company Details PDF"
+                                            >
+                                              <Upload size={11} color="#00D9FF" />
+                                              <span>Replace PDF</span>
+                                              <input
+                                                type="file"
+                                                accept=".pdf,application/pdf"
+                                                style={{ display: 'none' }}
+                                                onChange={(e) => handleUploadLeadPdf(lead, e)}
+                                              />
+                                            </label>
+                                          </div>
+                                        ) : (
+                                          <label
+                                            className="portal-btn-primary"
+                                            style={{
+                                              padding: '3px 10px',
+                                              fontSize: '0.75rem',
+                                              cursor: 'pointer',
+                                              background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
+                                              color: '#030303',
+                                              fontWeight: '700',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }}
+                                            title="Upload Company Details PDF"
+                                          >
+                                            <Upload size={12} />
+                                            <span>Upload PDF</span>
                                             <input
                                               type="file"
-                                              accept=".pdf"
+                                              accept=".pdf,application/pdf"
                                               style={{ display: 'none' }}
                                               onChange={(e) => handleUploadLeadPdf(lead, e)}
                                             />
                                           </label>
-                                        </div>
-                                      ) : (
-                                        <label
-                                          className="portal-btn-primary"
-                                          style={{
-                                            padding: '3px 10px',
-                                            fontSize: '0.75rem',
-                                            cursor: 'pointer',
-                                            background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
-                                            color: '#030303',
-                                            fontWeight: '700',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '4px'
-                                          }}
-                                          title="Upload Lead PDF Documentation"
-                                        >
-                                          <Upload size={12} />
-                                          <span>Upload PDF</span>
-                                          <input
-                                            type="file"
-                                            accept=".pdf"
-                                            style={{ display: 'none' }}
-                                            onChange={(e) => handleUploadLeadPdf(lead, e)}
-                                          />
-                                        </label>
-                                      )}
-                                    </td>
-                                    <td>
-                                      <span className={`status-pill ${(lead.status || 'PENDING').toUpperCase()}`}>
-                                        {lead.status || 'PENDING'}
-                                      </span>
-                                    </td>
-                                    <td style={{ fontSize: '0.78rem', color: '#94A3B8', maxWidth: '200px' }} className="cell-truncate" title={lead.notes || ''}>
-                                      {lead.notes || '—'}
-                                    </td>
-                                    <td style={{ textAlign: 'right' }}>
-                                      <div style={{ display: 'inline-flex', gap: '6px' }}>
-                                        <button
-                                          type="button"
-                                          className="portal-btn-secondary"
-                                          style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                                          onClick={() => setEditingLead(lead)}
-                                          title="Edit or Verify Lead"
-                                        >
-                                          <Edit2 size={12} />
-                                        </button>
+                                        )}
+                                      </td>
+                                      <td style={{ textAlign: 'right' }}>
                                         <button
                                           type="button"
                                           className="portal-btn-secondary"
@@ -2679,12 +2641,12 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                           onClick={() => handleDeleteLead(lead.id)}
                                           title="Delete Lead"
                                         >
-                                          <Trash2 size={12} />
+                                          <Trash2 size={13} />
                                         </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>

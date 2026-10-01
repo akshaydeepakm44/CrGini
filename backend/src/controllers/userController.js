@@ -131,37 +131,47 @@ export const createClientUser = async (req, res) => {
     // 4. Resolve active internal team members strictly by role and active status
     try {
       const activeSpecialistsRes = await query(`
-        SELECT id, name, email, role, status, company_lead, company_boost, company_ui
+        SELECT id, name, email, role, status, company_lead, company_boost, company_ui, company_id
         FROM users
         WHERE is_deleted = false
           AND status = 'ACTIVE'
+          AND role != 'ADMIN'
           AND (
             role IN ('COMPANY_LEAD', 'COMPANY_BOOST', 'LANDING_PAGE')
-            OR (role NOT IN ('ADMIN', 'USER') AND (company_lead = true OR company_boost = true OR company_ui = true))
+            OR company_lead = true
+            OR company_boost = true
+            OR company_ui = true
           )
         ORDER BY created_at ASC
       `);
 
-      const leadMembers = activeSpecialistsRes.rows.filter(
-        u => u.role === 'COMPANY_LEAD' || (u.company_lead && u.role !== 'ADMIN' && u.role !== 'USER')
-      );
-      const boostMembers = activeSpecialistsRes.rows.filter(
-        u => u.role === 'COMPANY_BOOST' || (u.company_boost && u.role !== 'ADMIN' && u.role !== 'USER')
-      );
-      const uiMembers = activeSpecialistsRes.rows.filter(
-        u => u.role === 'LANDING_PAGE' || (u.company_ui && u.role !== 'ADMIN' && u.role !== 'USER')
-      );
-
       const clientEmailClean = (userEmail || '').toLowerCase().trim();
 
+      // Ensure no client user (including newly created) and no admin is included
+      const isInternalMember = (u) =>
+        !u.company_id &&
+        u.id !== user.id &&
+        u.email?.toLowerCase().trim() !== clientEmailClean &&
+        u.role !== 'ADMIN';
+
+      const leadMembers = activeSpecialistsRes.rows.filter(
+        u => isInternalMember(u) && (u.role === 'COMPANY_LEAD' || Boolean(u.company_lead))
+      );
+      const boostMembers = activeSpecialistsRes.rows.filter(
+        u => isInternalMember(u) && (u.role === 'COMPANY_BOOST' || Boolean(u.company_boost))
+      );
+      const uiMembers = activeSpecialistsRes.rows.filter(
+        u => isInternalMember(u) && (u.role === 'LANDING_PAGE' || Boolean(u.company_ui))
+      );
+
       const leadEmails = Array.from(new Set(
-        leadMembers.map(u => u.email?.trim()).filter(e => Boolean(e) && e.toLowerCase() !== clientEmailClean)
+        leadMembers.map(u => u.email?.trim()).filter(Boolean)
       ));
       const boostEmails = Array.from(new Set(
-        boostMembers.map(u => u.email?.trim()).filter(e => Boolean(e) && e.toLowerCase() !== clientEmailClean)
+        boostMembers.map(u => u.email?.trim()).filter(Boolean)
       ));
       const uiEmails = Array.from(new Set(
-        uiMembers.map(u => u.email?.trim()).filter(e => Boolean(e) && e.toLowerCase() !== clientEmailClean)
+        uiMembers.map(u => u.email?.trim()).filter(Boolean)
       ));
 
       if (leadEmails.length === 0) {
@@ -175,8 +185,16 @@ export const createClientUser = async (req, res) => {
       }
 
       // Create in-app notifications for all matching active internal specialists
-      for (const internalUser of activeSpecialistsRes.rows) {
-        if (internalUser.email?.toLowerCase().trim() === clientEmailClean) continue;
+      const allNotifiedInternalUsers = [
+        ...leadMembers,
+        ...boostMembers,
+        ...uiMembers
+      ].reduce((acc, current) => {
+        if (!acc.some(u => u.id === current.id)) acc.push(current);
+        return acc;
+      }, []);
+
+      for (const internalUser of allNotifiedInternalUsers) {
         try {
           await createNotification({
             userId: internalUser.id,
@@ -190,7 +208,15 @@ export const createClientUser = async (req, res) => {
       }
 
       // Dispatch team-specific internal notification emails
-      const portalBase = (process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '');
+      let portalBase = (process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '');
+      const originHeader = req.headers.origin || req.headers.referer;
+      if (originHeader) {
+        try {
+          const parsed = new URL(originHeader);
+          portalBase = `${parsed.protocol}//${parsed.host}`;
+        } catch (_) {}
+      }
+
       await sendInternalClientOnboardingEmails({
         client: { name: clientName, email: userEmail },
         company: {
@@ -200,7 +226,7 @@ export const createClientUser = async (req, res) => {
           website: website || null,
           industry: industry || 'Technology / SaaS',
           email: userEmail,
-          companyInfo: companyInfo || null
+          companyInfo: companyInfo || description || null
         },
         leadRecipients: leadEmails,
         boostRecipients: boostEmails,

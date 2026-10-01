@@ -153,6 +153,10 @@ export default function UserDashboard({ user, onLogout }) {
     landingPageEnhancement: 'Pending'
   });
 
+  // Company Lead Workspace & Onboarding Assets State
+  const [leadOnboardingAssets, setLeadOnboardingAssets] = useState(null);
+  const [viewingLeadPdf, setViewingLeadPdf] = useState(null);
+
   const [customServices, setCustomServices] = useState({
     strategicPlan: false,
     content: false,
@@ -266,12 +270,13 @@ export default function UserDashboard({ user, onLogout }) {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [companyData, requestsData, notifsData, onbData, uiOnbData] = await Promise.all([
+      const [companyData, requestsData, notifsData, onbData, uiOnbData, leadOnbData] = await Promise.all([
         api.getMyCompany().catch(() => user?.company || null),
         api.getRequests().catch(() => []),
         api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 })),
         api.getMyOnboardingAssets().catch(() => null),
-        api.getMyUiOnboardingAssets().catch(() => null)
+        api.getMyUiOnboardingAssets().catch(() => null),
+        api.getMyLeadOnboardingAssets().catch(() => null)
       ]);
       if (companyData) setCompany(companyData);
       setRequests(requestsData);
@@ -287,6 +292,9 @@ export default function UserDashboard({ user, onLogout }) {
         setUiOnboardingAssets(uiOnbData.assets);
         setUiOnboardingStatus(uiOnbData.status || {});
       }
+      if (leadOnbData) {
+        setLeadOnboardingAssets(leadOnbData);
+      }
     } catch (err) {
       console.error('Error loading user dashboard data:', err);
     } finally {
@@ -299,6 +307,7 @@ export default function UserDashboard({ user, onLogout }) {
     setActiveNav(navKey);
     setSelectedTicket(null);
     setSelectedLeadDetail(null);
+    setViewingLeadPdf(null);
     setIsRequestModalOpen(false);
     setIsRequirementModalOpen(false);
     setIsLeadReqModalOpen(false);
@@ -326,6 +335,7 @@ export default function UserDashboard({ user, onLogout }) {
   useEffect(() => {
     setSelectedTicket(null);
     setSelectedLeadDetail(null);
+    setViewingLeadPdf(null);
     setIsRequestModalOpen(false);
     setIsRequirementModalOpen(false);
     setIsLeadReqModalOpen(false);
@@ -349,10 +359,13 @@ export default function UserDashboard({ user, onLogout }) {
       if (selectedLeadDetail) {
         setSelectedLeadDetail(null);
       }
+      if (viewingLeadPdf) {
+        setViewingLeadPdf(null);
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [isRequestModalOpen, isRequirementModalOpen, isLeadReqModalOpen, selectedTicket, selectedLeadDetail]);
+  }, [isRequestModalOpen, isRequirementModalOpen, isLeadReqModalOpen, selectedTicket, selectedLeadDetail, viewingLeadPdf]);
 
   useEffect(() => {
     loadData();
@@ -361,7 +374,9 @@ export default function UserDashboard({ user, onLogout }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (isLeadReqModalOpen) {
+        if (viewingLeadPdf) {
+          setViewingLeadPdf(null);
+        } else if (isLeadReqModalOpen) {
           setIsLeadReqModalOpen(false);
         } else if (isRequirementModalOpen) {
           setIsRequirementModalOpen(false);
@@ -389,7 +404,7 @@ export default function UserDashboard({ user, onLogout }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    isLeadReqModalOpen, isRequirementModalOpen, isMobileDrawerOpen, viewingInvoice, selectedLeadDetail, isRequestModalOpen, pendingPaymentTicket, selectedTicket,
+    viewingLeadPdf, isLeadReqModalOpen, isRequirementModalOpen, isMobileDrawerOpen, viewingInvoice, selectedLeadDetail, isRequestModalOpen, pendingPaymentTicket, selectedTicket,
     isHelpModalOpen, isNotificationsOpen, isProfileMenuOpen
   ]);
 
@@ -876,7 +891,10 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
   const pendingPayments = requests.filter(r => r.paymentStatus === 'PENDING');
   
   // Real database-driven Company Leads metrics
-  const leadsList = Array.isArray(company?.initialLeads) ? company.initialLeads : [];
+  const leadsList = Array.isArray(leadOnboardingAssets?.leads) && leadOnboardingAssets.leads.length > 0
+    ? leadOnboardingAssets.leads
+    : (Array.isArray(company?.initialLeads) ? company.initialLeads : (Array.isArray(company?.leads) ? company.leads : []));
+  const sampleLeads = leadsList.slice(0, 5);
   const verifiedLeadsCount = leadsList.filter(
     l => (l.status || '').toUpperCase() === 'VERIFIED' && Boolean(l.notes && l.notes.trim().length > 0)
   ).length;
@@ -2197,229 +2215,123 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                 )}
               </div>
 
-              {/* Lead List Card with Search, Filter & Lead Details */}
+              {/* Initial Free / Sample Company Leads Table (First 5 Sample Leads) */}
               <div className="portal-card" style={{ marginBottom: '1.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
                   <div>
                     <h4 style={{ fontSize: '1.1rem', fontWeight: '700', margin: '0 0 0.25rem 0', color: '#F5F5F5' }}>
-                      Researched Company Leads ({filteredCompanyLeads.length})
+                      Sample Company Leads ({sampleLeads.length} / 5)
                     </h4>
                     <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>
-                      Verified decision-makers and target account contacts.
+                      Complimentary onboarding sample leads researched specifically for your target market.
                     </p>
                   </div>
-
-                  {/* Filter Pills */}
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {[
-                      { key: 'ALL', label: `All (${totalLeadsCount})` },
-                      { key: 'VERIFIED', label: `Verified (${verifiedLeadsCount})` },
-                      { key: 'PENDING', label: `Pending (${pendingLeadsCount})` },
-                      { key: 'RESEARCHED', label: `Researched (${researchedLeadsCount})` },
-                    ].map(f => (
-                      <button
-                        key={f.key}
-                        onClick={() => setLeadStatusFilter(f.key)}
-                        style={{
-                          background: leadStatusFilter === f.key ? '#00D9FF' : 'rgba(255, 255, 255, 0.05)',
-                          color: leadStatusFilter === f.key ? '#000000' : '#cbd5e1',
-                          border: leadStatusFilter === f.key ? '1px solid #00D9FF' : '1px solid rgba(255, 255, 255, 0.1)',
-                          borderRadius: '20px',
-                          padding: '4px 12px',
-                          fontSize: '0.78rem',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
-                {/* Search Bar & Sort Dropdown */}
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
-                  <div style={{ position: 'relative', flex: '1', minWidth: '220px' }}>
-                    <Search size={15} color="#64748b" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type="text"
-                      className="portal-input"
-                      placeholder="Search by name, title, target company, location, or notes..."
-                      value={leadSearchQuery}
-                      onChange={(e) => setLeadSearchQuery(e.target.value)}
-                      style={{ paddingLeft: '36px', height: '38px', fontSize: '0.85rem' }}
-                    />
-                    {leadSearchQuery && (
-                      <button
-                        onClick={() => setLeadSearchQuery('')}
-                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-
-                  <select
-                    className="portal-select"
-                    value={leadSortBy}
-                    onChange={(e) => setLeadSortBy(e.target.value)}
-                    style={{ width: '160px', height: '38px', fontSize: '0.85rem' }}
-                  >
-                    <option value="NEWEST">Newest First</option>
-                    <option value="NAME_ASC">Name (A-Z)</option>
-                    <option value="COMPANY">Company (A-Z)</option>
-                  </select>
-                </div>
-
-                {/* Table of Leads */}
-                <div className="request-table-wrapper">
+                {/* Table of Sample Leads */}
+                <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
                   <table className="request-table">
                     <thead>
                       <tr>
-                        <th>Lead Name</th>
-                        <th>Job Title</th>
-                        <th>Target Company</th>
-                        <th>Location</th>
-                        <th>Direct Contact</th>
-                        <th>LinkedIn</th>
-                        <th>Lead PDF / Dossier</th>
-                        <th>Status</th>
-                        <th>Action</th>
+                        <th style={{ width: '38%' }}>Lead Company Name</th>
+                        <th style={{ width: '38%' }}>Company Website</th>
+                        <th style={{ width: '24%', textAlign: 'center' }}>View Company Details</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {totalLeadsCount === 0 ? (
+                      {sampleLeads.length === 0 ? (
                         <tr>
-                          <td colSpan="9" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#94a3b8' }}>
+                          <td colSpan="3" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#94a3b8' }}>
                             <Users size={32} color="#64748b" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
-                            <div style={{ fontWeight: '600', color: '#e2e8f0', marginBottom: '0.25rem' }}>No leads available yet.</div>
-                            <div style={{ fontSize: '0.85rem' }}>Your initial sample leads (minimum 5) will appear here once prepared by our Company Lead team.</div>
-                          </td>
-                        </tr>
-                      ) : filteredCompanyLeads.length === 0 ? (
-                        <tr>
-                          <td colSpan="9" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-                            <div>No leads match your filter or search query.</div>
-                            <button
-                              className="portal-btn-secondary"
-                              style={{ marginTop: '0.5rem', fontSize: '0.78rem' }}
-                              onClick={() => { setLeadSearchQuery(''); setLeadStatusFilter('ALL'); }}
-                            >
-                              Reset Filters
-                            </button>
+                            <div style={{ fontWeight: '600', color: '#e2e8f0', marginBottom: '0.25rem' }}>Sample leads are being prepared.</div>
+                            <div style={{ fontSize: '0.85rem' }}>
+                              Your 5 initial sample leads and company details PDFs are being researched by our Company Lead team. They will appear here once verified.
+                            </div>
                           </td>
                         </tr>
                       ) : (
-                        filteredCompanyLeads.map((lead, idx) => {
-                          const statusUpper = (lead.status || 'PENDING').toUpperCase();
-                          const isVerified = statusUpper === 'VERIFIED' && Boolean(lead.notes && lead.notes.trim().length > 0);
-                          const isPending = statusUpper === 'PENDING';
-                          const isResearched = statusUpper === 'RESEARCHED';
+                        sampleLeads.map((lead, idx) => {
+                          const companyName = lead.companyName || lead.lead_company || lead.company || lead.name || `Sample Lead ${idx + 1}`;
+                          let rawWeb = (lead.website || lead.linkedin || (lead.notes?.match(/https?:\/\/[^\s\]]+/)?.[0]) || '').trim();
+                          const websiteUrl = rawWeb ? (/^https?:\/\//i.test(rawWeb) ? rawWeb : `https://${rawWeb}`) : '';
+                          const pdfUrl = lead.pdf?.streamUrl || lead.source_reference || lead.sourceReference || (lead.pdf?.id ? api.getAssetStreamUrl(lead.pdf.id) : '');
+                          const pdfDownloadUrl = lead.pdf?.downloadUrl || (lead.pdf?.id ? api.getAssetDownloadUrl(lead.pdf.id) : pdfUrl);
 
                           return (
                             <tr key={lead.id || idx}>
                               <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                  <span style={{ fontWeight: '600', color: '#F5F5F5' }}>{lead.name}</span>
-                                  {idx < 5 && (
-                                    <span style={{
-                                      fontSize: '0.68rem',
-                                      padding: '1px 6px',
-                                      borderRadius: '4px',
-                                      background: 'rgba(168, 85, 247, 0.15)',
-                                      border: '1px solid rgba(168, 85, 247, 0.3)',
-                                      color: '#c084fc',
-                                      fontWeight: '700'
-                                    }}>
-                                      Sample Lead {idx + 1}
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td style={{ color: '#94a3b8' }}>
-                                {lead.title || 'Not available'}
-                              </td>
-                              <td style={{ fontWeight: '500', color: '#00D9FF' }}>
-                                {lead.company || 'Not available'}
-                              </td>
-                              <td style={{ color: '#94a3b8' }}>
-                                {lead.location || 'Not available'}
-                              </td>
-                              <td>
-                                {lead.email ? (
-                                  <a href={`mailto:${lead.email}`} style={{ color: '#00D9FF', textDecoration: 'none' }}>
-                                    {lead.email}
-                                  </a>
-                                ) : (
-                                  <span style={{ color: '#64748b' }}>Not available</span>
-                                )}
-                              </td>
-                              <td>
-                                {lead.linkedin ? (
+                                {websiteUrl ? (
                                   <a
-                                    href={lead.linkedin}
+                                    href={websiteUrl}
                                     target="_blank"
-                                    rel="noreferrer"
-                                    style={{ color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}
-                                  >
-                                    Profile <ExternalLink size={11} />
-                                  </a>
-                                ) : (
-                                  <span style={{ color: '#64748b' }}>—</span>
-                                )}
-                              </td>
-                              <td>
-                                {(lead.source_reference || lead.sourceReference) ? (
-                                  <a
-                                    href={lead.source_reference || lead.sourceReference}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="portal-btn-primary"
+                                    rel="noopener noreferrer"
                                     style={{
-                                      padding: '4px 10px',
-                                      fontSize: '0.78rem',
+                                      fontWeight: '600',
+                                      color: '#F5F5F5',
+                                      textDecoration: 'none',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '5px',
-                                      textDecoration: 'none',
-                                      background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
-                                      color: '#030303',
-                                      fontWeight: '700'
+                                      gap: '6px'
                                     }}
+                                    title={`Visit ${companyName} website`}
                                   >
-                                    <FileText size={12} /> View Lead PDF
+                                    <span>{companyName}</span>
+                                    <ExternalLink size={12} color="#00D9FF" />
                                   </a>
                                 ) : (
-                                  <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                    <Clock size={11} /> In Preparation
-                                  </span>
+                                  <span style={{ fontWeight: '600', color: '#F5F5F5' }}>{companyName}</span>
                                 )}
                               </td>
                               <td>
-                                {isVerified ? (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(52, 211, 153, 0.3)', color: '#34d399' }}>
-                                    <CheckCircle2 size={11} /> VERIFIED
-                                  </span>
-                                ) : isResearched ? (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: 'rgba(0, 217, 255, 0.15)', border: '1px solid rgba(0, 217, 255, 0.3)', color: '#00D9FF' }}>
-                                    <Search size={11} /> RESEARCHED
-                                  </span>
+                                {websiteUrl ? (
+                                  <a
+                                    href={websiteUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                      color: '#00D9FF',
+                                      textDecoration: 'none',
+                                      wordBreak: 'break-all',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px'
+                                    }}
+                                  >
+                                    <span>{websiteUrl}</span>
+                                    <ExternalLink size={12} />
+                                  </a>
                                 ) : (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#fbbf24' }}>
-                                    <Clock size={11} /> PENDING
-                                  </span>
+                                  <span style={{ color: '#64748B' }}>In preparation</span>
                                 )}
                               </td>
-                              <td>
-                                <button
-                                  type="button"
-                                  className="portal-btn-secondary"
-                                  style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-                                  onClick={() => setSelectedLeadDetail(lead)}
-                                >
-                                  <Eye size={12} /> Details
-                                </button>
+                              <td style={{ textAlign: 'center' }}>
+                                {pdfUrl ? (
+                                  <button
+                                    type="button"
+                                    className="portal-btn-primary"
+                                    style={{
+                                      padding: '6px 14px',
+                                      fontSize: '0.82rem',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      fontWeight: '600'
+                                    }}
+                                    onClick={() => setViewingLeadPdf({
+                                      companyName,
+                                      website: websiteUrl,
+                                      streamUrl: pdfUrl,
+                                      downloadUrl: pdfDownloadUrl
+                                    })}
+                                  >
+                                    <FileText size={14} />
+                                    <span>View Details</span>
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: '0.78rem', color: '#94A3B8', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <Clock size={12} /> In Preparation
+                                  </span>
+                                )}
                               </td>
                             </tr>
                           );
@@ -2428,6 +2340,27 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                     </tbody>
                   </table>
                 </div>
+
+                {/* Status Notice if fewer than 5 sample leads exist */}
+                {sampleLeads.length > 0 && sampleLeads.length < 5 && (
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '10px 14px',
+                    borderRadius: '6px',
+                    background: 'rgba(0, 217, 255, 0.05)',
+                    border: '1px solid rgba(0, 217, 255, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '0.82rem',
+                    color: '#94a3b8'
+                  }}>
+                    <Clock size={14} color="#00D9FF" />
+                    <span>
+                      Displaying {sampleLeads.length} of 5 initial sample leads. Our team is finalizing research for the remaining {5 - sampleLeads.length} sample lead(s).
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Identified Key Stakeholders Table */}
@@ -2591,6 +2524,134 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                   </table>
                 </div>
               </div>
+
+              {/* COMPANY LEAD DETAILS PDF VIEWER MODAL */}
+              {viewingLeadPdf && (
+                <div
+                  className="portal-modal-overlay"
+                  onClick={() => setViewingLeadPdf(null)}
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.85)',
+                    backdropFilter: 'blur(6px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999,
+                    padding: '16px'
+                  }}
+                >
+                  <div
+                    className="portal-modal-card"
+                    style={{
+                      maxWidth: '960px',
+                      width: '100%',
+                      maxHeight: '92vh',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      background: '#0d1117',
+                      border: '1px solid var(--portal-border)',
+                      borderRadius: '12px',
+                      boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7)',
+                      overflow: 'hidden'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Header */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '14px 20px',
+                      borderBottom: '1px solid var(--portal-border)',
+                      background: 'rgba(255, 255, 255, 0.02)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          width: '34px',
+                          height: '34px',
+                          borderRadius: '8px',
+                          background: 'rgba(0, 217, 255, 0.1)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#00D9FF'
+                        }}>
+                          <FileText size={18} />
+                        </div>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#F5F5F5' }}>
+                            {viewingLeadPdf.companyName} — Company Details
+                          </h4>
+                          {viewingLeadPdf.website && (
+                            <a
+                              href={viewingLeadPdf.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: '0.78rem', color: '#00D9FF', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <span>{viewingLeadPdf.website}</span>
+                              <ExternalLink size={10} />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <a
+                          href={getAuthenticatedAssetUrl({ url: viewingLeadPdf.downloadUrl || viewingLeadPdf.streamUrl }, 'download')}
+                          download={`${viewingLeadPdf.companyName}_Details.pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="portal-btn-primary"
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '0.82rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            textDecoration: 'none'
+                          }}
+                        >
+                          <Download size={14} />
+                          <span>Download PDF</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setViewingLeadPdf(null)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#94a3b8',
+                            cursor: 'pointer',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          title="Close viewer"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* PDF Reader Embed/Iframe */}
+                    <div style={{ flex: 1, height: '70vh', background: '#161b22', position: 'relative' }}>
+                      <iframe
+                        src={getAuthenticatedAssetUrl({ url: viewingLeadPdf.streamUrl })}
+                        title={`${viewingLeadPdf.companyName} PDF Dossier`}
+                        style={{ width: '100%', height: '100%', border: 'none' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* LEAD DETAIL MODAL */}
               {selectedLeadDetail && (

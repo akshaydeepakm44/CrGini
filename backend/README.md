@@ -1,6 +1,6 @@
 # CreativeGini Backend API Service
 
-The CreativeGini backend is a RESTful API built with **Node.js (ES Modules)**, **Express**, and **MongoDB (Mongoose)**. It provides authentication, role-based access control, service request tracking, payment simulation, versioned deliverable submissions, ticket conversations, and in-app notifications.
+The CreativeGini backend is a RESTful API built with **Node.js (ES Modules)**, **Express**, and **PostgreSQL (pg)**. It provides authentication, role-based access control, service request tracking, payment simulation, versioned deliverable submissions, ticket conversations, and in-app notifications.
 
 ---
 
@@ -8,9 +8,9 @@ The CreativeGini backend is a RESTful API built with **Node.js (ES Modules)**, *
 
 ```text
 backend/
-├── .env                         # Active environment variables (PORT, MONGODB_URI, JWT_SECRET)
+├── .env                         # Active environment variables (PORT, POSTGRES_*, JWT_SECRET, etc.)
 ├── .env.example                 # Template for environment configuration
-├── package.json                 # Dependencies (express, mongoose, jsonwebtoken, bcryptjs, cors, dotenv)
+├── package.json                 # Dependencies (express, pg, jsonwebtoken, bcryptjs, cors, dotenv, nodemailer)
 ├── package-lock.json
 ├── README.md                    # Backend architecture and API documentation
 └── src/
@@ -40,10 +40,12 @@ backend/
     │   ├── paymentRepository.js      # Transaction audit log (amount, status, payment method)
     │   ├── requestRepository.js      # Service request tickets (status, team, specialist, pricing)
     │   ├── submissionRepository.js   # Versioned deliverables (files, review feedback, approval)
+    │   ├── passwordResetRepository.js # Password recovery tokens with SHA-256 hash storage
     │   └── userRepository.js         # User model with bcrypt password hashing, roles, and dashboardAccess
     │
     └── routes/                  # API route endpoints
         ├── adminRoutes.js       # Admin oversight: /api/admin/users, /api/admin/team-members, /api/admin/activity-logs
+        ├── assetRoutes.js       # Media asset streaming & download endpoints
         ├── authRoutes.js        # Authentication: /api/auth/login, /api/auth/me
         ├── companyRoutes.js     # Company data: /api/company/my-company
         ├── notificationRoutes.js # Notifications: /api/notifications
@@ -61,7 +63,7 @@ backend/
 ### Service Requests & Tickets (`/api/requests`)
 - `GET /api/requests` — Returns tickets accessible to the user (filtered by role and permissions).
 - `POST /api/requests` — Creates a new service request (status: `REQUEST_CREATED`).
-- `GET /api/requests/:id` — Returns full ticket details (accepts MongoDB `_id` or `ticketId` e.g. `CG-1001`).
+- `GET /api/requests/:id` — Returns full ticket details (accepts PostgreSQL UUID `id` or string `ticketId` e.g. `CG-1001`).
 - `POST /api/requests/:id/pay` — Simulates payment; **automatically assigns** the ticket to the active specialist team and dispatches an assignment notification.
 - `PATCH /api/requests/:id/status` — Updates ticket status (e.g. `IN_PROGRESS`). Regular specialists cannot mark `COMPLETED` directly.
 - `POST /api/requests/:id/start-work` — Marks ticket `IN_PROGRESS` and logs `WORK_STARTED`.

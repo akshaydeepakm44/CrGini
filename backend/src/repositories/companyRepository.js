@@ -6,12 +6,28 @@ const mapCompany = (row) => {
   const leads = (row.initial_leads || []).map(l => {
     const pdfMatch = (l.notes || '').match(/\[Lead PDF:\s*([^\]]+)\]/);
     const source_reference = pdfMatch ? pdfMatch[1] : null;
-    const cleanNotes = (l.notes || '').replace(/\[Lead PDF:\s*[^\]]+\]/g, '').trim();
+    const cleanNotes = (l.notes || '').replace(/\[Lead PDF:\s*[^\]]+\]/g, '').replace(/\[Website:\s*[^\]]+\]/g, '').trim();
+    const websiteMatch = (l.notes || '').match(/\[Website:\s*([^\]]+)\]/);
+    const website = (l.linkedin && /^https?:\/\//i.test(l.linkedin)) ? l.linkedin : (websiteMatch ? websiteMatch[1] : (l.linkedin || ''));
+    const companyName = l.company || l.lead_company || l.name;
+    const assetIdMatch = source_reference ? source_reference.match(/\/api\/assets\/([a-f0-9\-]+)\/stream/i) : null;
+    const assetId = assetIdMatch ? assetIdMatch[1] : null;
+    const downloadUrl = assetId ? `/api/assets/${assetId}/download` : source_reference;
+
     return {
       ...l,
+      companyName,
+      website,
       notes: cleanNotes,
       source_reference,
-      sourceReference: source_reference
+      sourceReference: source_reference,
+      pdf: source_reference ? {
+        id: assetId,
+        assetId,
+        streamUrl: source_reference,
+        downloadUrl,
+        fileName: `${companyName} - Company Details.pdf`
+      } : null
     };
   });
 
@@ -417,12 +433,28 @@ export const getCompanyLeads = async (companyId) => {
   return result.rows.map(r => {
     const pdfMatch = (r.notes || '').match(/\[Lead PDF:\s*([^\]]+)\]/);
     const source_reference = pdfMatch ? pdfMatch[1] : null;
-    const cleanNotes = (r.notes || '').replace(/\[Lead PDF:\s*[^\]]+\]/g, '').trim();
+    const cleanNotes = (r.notes || '').replace(/\[Lead PDF:\s*[^\]]+\]/g, '').replace(/\[Website:\s*[^\]]+\]/g, '').trim();
+    const websiteMatch = (r.notes || '').match(/\[Website:\s*([^\]]+)\]/);
+    const website = (r.linkedin && /^https?:\/\//i.test(r.linkedin)) ? r.linkedin : (websiteMatch ? websiteMatch[1] : (r.linkedin || ''));
+    const companyName = r.lead_company || r.name;
+    const assetIdMatch = source_reference ? source_reference.match(/\/api\/assets\/([a-f0-9\-]+)\/stream/i) : null;
+    const assetId = assetIdMatch ? assetIdMatch[1] : null;
+    const downloadUrl = assetId ? `/api/assets/${assetId}/download` : source_reference;
+
     return {
       ...r,
+      companyName,
+      website,
       notes: cleanNotes,
       source_reference,
-      sourceReference: source_reference
+      sourceReference: source_reference,
+      pdf: source_reference ? {
+        id: assetId,
+        assetId,
+        streamUrl: source_reference,
+        downloadUrl,
+        fileName: `${companyName} - Company Details.pdf`
+      } : null
     };
   });
 };

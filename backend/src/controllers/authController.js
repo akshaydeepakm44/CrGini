@@ -181,10 +181,14 @@ export const getMe = async (req, res) => {
 const GENERIC_FORGOT_SUCCESS =
   'If an account exists for this email, a password reset link has been sent.';
 
-// In-memory sliding-window rate limiter (Max 5 requests per 15 mins per IP/email)
+// In-memory sliding-window rate limiter
+// Email limit: Max 5 requests per 15 mins per email address (anti-harassment)
+// IP limit: Max 30 requests per 15 mins per IP (office/NAT friendly), 100 for localhost/loopback
 const forgotPasswordRateLimits = new Map();
 const FORGOT_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const FORGOT_RATE_LIMIT_MAX_ATTEMPTS = 5;
+const FORGOT_RATE_LIMIT_EMAIL_ATTEMPTS = 5;
+const FORGOT_RATE_LIMIT_IP_ATTEMPTS = 30;
+const FORGOT_RATE_LIMIT_LOOPBACK_ATTEMPTS = 100;
 
 // Periodically clean up expired rate limit entries
 setInterval(() => {
@@ -205,21 +209,43 @@ export const clearForgotPasswordRateLimits = () => {
 
 const checkAndRecordRateLimit = (ip, email) => {
   const now = Date.now();
-  const keys = [];
-  if (ip && ip !== 'unknown') keys.push(`ip:${ip}`);
-  if (email) keys.push(`email:${email}`);
+  const checks = [];
+
+  const isLoopback =
+    !ip ||
+    ip === 'unknown' ||
+    ip === '127.0.0.1' ||
+    ip === '::1' ||
+    ip === '::ffff:127.0.0.1' ||
+    ip === 'localhost';
+
+  if (email) {
+    checks.push({
+      key: `email:${email}`,
+      max: FORGOT_RATE_LIMIT_EMAIL_ATTEMPTS,
+    });
+  }
+
+  if (ip && ip !== 'unknown') {
+    checks.push({
+      key: `ip:${ip}`,
+      max: isLoopback
+        ? FORGOT_RATE_LIMIT_LOOPBACK_ATTEMPTS
+        : FORGOT_RATE_LIMIT_IP_ATTEMPTS,
+    });
+  }
 
   // Check if any tracked key exceeds threshold
-  for (const key of keys) {
+  for (const { key, max } of checks) {
     const history = forgotPasswordRateLimits.get(key) || [];
     const recent = history.filter((t) => now - t < FORGOT_RATE_LIMIT_WINDOW_MS);
-    if (recent.length >= FORGOT_RATE_LIMIT_MAX_ATTEMPTS) {
+    if (recent.length >= max) {
       return true; // Rate limited
     }
   }
 
   // Record this attempt across all relevant keys
-  for (const key of keys) {
+  for (const { key } of checks) {
     const history = forgotPasswordRateLimits.get(key) || [];
     const recent = history.filter((t) => now - t < FORGOT_RATE_LIMIT_WINDOW_MS);
     recent.push(now);
@@ -316,7 +342,14 @@ export const forgotPassword = async (req, res) => {
           if (
             allowedOrigins.includes(originBase) ||
             parsed.hostname === 'localhost' ||
-            parsed.hostname === '127.0.0.1'
+            parsed.hostname === '127.0.0.1' ||
+            allowedOrigins.some((ao) => {
+              try {
+                return new URL(ao).hostname === parsed.hostname;
+              } catch (_) {
+                return false;
+              }
+            })
           ) {
             portalBase = originBase;
           }
@@ -324,7 +357,7 @@ export const forgotPassword = async (req, res) => {
       }
 
       const resetUrl = `${portalBase}/reset-password?token=${encodeURIComponent(rawToken)}`;
-      console.log(`[Auth Recovery Link]: ${resetUrl}`);
+      console.log(`[Auth Info]: Password recovery email generated for user ID: ${userId}`);
 
       // 7. Dispatch branded recovery email (async non-blocking)
       try {
