@@ -1385,11 +1385,19 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
 
     const companyName = rawCompanyName ? String(rawCompanyName).trim() : (existingLead?.lead_company || existingLead?.name || '');
     const notesWebsite = existingLead?.notes ? (existingLead.notes.match(/\[Website:\s*([^\]]+)\]/)?.[1]) : null;
-    const website = rawWebsite ? String(rawWebsite).trim() : (existingLead?.linkedin || notesWebsite || '');
+    let website = rawWebsite ? String(rawWebsite).trim() : (existingLead?.linkedin || notesWebsite || '');
 
     // 1. Validate Company Name
     if (!companyName) {
       return res.status(400).json({ success: false, message: 'Company name is required.' });
+    }
+
+    // Auto-normalize website: if scheme is missing, check if it has a valid domain structure
+    const domainRegex = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(\/.*)?$/i;
+    if (website && !/^https?:\/\//i.test(website)) {
+      if (domainRegex.test(website)) {
+        website = `https://${website}`;
+      }
     }
 
     // 2. Validate Company Website URL (must be valid HTTP/HTTPS URL)

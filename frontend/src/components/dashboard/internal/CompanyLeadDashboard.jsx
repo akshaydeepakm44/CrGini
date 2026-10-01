@@ -303,27 +303,25 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       return;
     }
 
+    let cleanWebsite = sampleLeadForm.website.trim();
+    if (cleanWebsite && !/^https?:\/\//i.test(cleanWebsite)) {
+      cleanWebsite = 'https://' + cleanWebsite;
+    }
+
     const urlPattern = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
-    if (!sampleLeadForm.website.trim() || !urlPattern.test(sampleLeadForm.website.trim())) {
-      alert('Please enter a valid HTTP or HTTPS Company Website URL.');
+    if (!cleanWebsite || !urlPattern.test(cleanWebsite)) {
+      alert('Please enter a valid HTTP or HTTPS Company Website URL (e.g. https://example.com).');
       return;
     }
 
-    if (!sampleLeadForm.leadStudyFile) {
-      alert('Lead Study PDF document is required.');
-      return;
-    }
-    if (!sampleLeadForm.pitchDeckFile) {
-      alert('Pitch Deck PDF document is required.');
-      return;
-    }
-    if (!sampleLeadForm.keyPeopleFile) {
-      alert('Key People PDF document is required.');
+    if (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && !sampleLeadForm.keyPeopleFile) {
+      alert('Please attach at least one PDF document (Lead Study, Pitch Deck, or Key People).');
       return;
     }
 
     const maxSizeBytes = 25 * 1024 * 1024;
     const checkFile = (file, label) => {
+      if (!file) return;
       if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
         throw new Error(`${label} must be a valid PDF document.`);
       }
@@ -333,9 +331,9 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     };
 
     try {
-      checkFile(sampleLeadForm.leadStudyFile, 'Lead Study');
-      checkFile(sampleLeadForm.pitchDeckFile, 'Pitch Deck');
-      checkFile(sampleLeadForm.keyPeopleFile, 'Key People');
+      if (sampleLeadForm.leadStudyFile) checkFile(sampleLeadForm.leadStudyFile, 'Lead Study');
+      if (sampleLeadForm.pitchDeckFile) checkFile(sampleLeadForm.pitchDeckFile, 'Pitch Deck');
+      if (sampleLeadForm.keyPeopleFile) checkFile(sampleLeadForm.keyPeopleFile, 'Key People');
     } catch (valErr) {
       alert(valErr.message);
       return;
@@ -345,6 +343,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       setIsSubmittingSampleLead(true);
 
       const readFileAsDataUrl = (file) => {
+        if (!file) return Promise.resolve(null);
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (event) => resolve({
@@ -368,7 +367,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       await api.saveCompanyLeadOnboardingAssets(selectedOnboardingClient.id, {
         leadIndex: Math.min(5, leadIndex),
         companyName: sampleLeadForm.companyName.trim(),
-        website: sampleLeadForm.website.trim(),
+        website: cleanWebsite,
         leadStudy: leadStudyDoc,
         pitchDeck: pitchDeckDoc,
         keyPeople: keyPeopleDoc
@@ -2509,11 +2508,17 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                 Company Website URL <span style={{ color: '#ef4444' }}>*</span>
                               </label>
                               <input
-                                type="url"
+                                type="text"
                                 className="portal-form-input"
-                                placeholder="https://example.com"
+                                placeholder="e.g. acme.com or https://acme.com"
                                 value={sampleLeadForm.website}
                                 onChange={(e) => setSampleLeadForm(prev => ({ ...prev, website: e.target.value }))}
+                                onBlur={(e) => {
+                                  const val = e.target.value.trim();
+                                  if (val && !/^https?:\/\//i.test(val)) {
+                                    setSampleLeadForm(prev => ({ ...prev, website: `https://${val}` }));
+                                  }
+                                }}
                                 required
                               />
                             </div>
@@ -2524,10 +2529,11 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                             {/* Lead Study PDF */}
                             <div>
                               <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                                Lead Study PDF <span style={{ color: '#ef4444' }}>*</span>
+                                Lead Study PDF <span style={{ color: '#00D9FF', fontSize: '0.72rem' }}>(Recommended)</span>
                               </label>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <label
+                                  htmlFor="sample-lead-study-upload"
                                   className="portal-btn-secondary"
                                   style={{
                                     padding: '7px 12px',
@@ -2541,33 +2547,34 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                 >
                                   <Upload size={13} color="#00D9FF" />
                                   <span>{sampleLeadForm.leadStudyFile ? 'Change PDF' : 'Choose PDF'}</span>
-                                  <input
-                                    ref={leadStudyInputRef}
-                                    type="file"
-                                    accept=".pdf,application/pdf"
-                                    style={{ display: 'none' }}
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) {
-                                        if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-                                          alert('Please select a valid PDF file.');
-                                          e.target.value = '';
-                                          return;
-                                        }
-                                        if (file.size > 25 * 1024 * 1024) {
-                                          alert('PDF file exceeds the maximum size limit of 25MB.');
-                                          e.target.value = '';
-                                          return;
-                                        }
-                                        setSampleLeadForm(prev => ({
-                                          ...prev,
-                                          leadStudyFile: file,
-                                          leadStudyFileName: file.name
-                                        }));
-                                      }
-                                    }}
-                                  />
                                 </label>
+                                <input
+                                  id="sample-lead-study-upload"
+                                  ref={leadStudyInputRef}
+                                  type="file"
+                                  accept=".pdf,application/pdf"
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+                                        alert('Please select a valid PDF file.');
+                                        e.target.value = '';
+                                        return;
+                                      }
+                                      if (file.size > 25 * 1024 * 1024) {
+                                        alert('PDF file exceeds the maximum size limit of 25MB.');
+                                        e.target.value = '';
+                                        return;
+                                      }
+                                      setSampleLeadForm(prev => ({
+                                        ...prev,
+                                        leadStudyFile: file,
+                                        leadStudyFileName: file.name
+                                      }));
+                                    }
+                                  }}
+                                />
                                 <span style={{
                                   fontSize: '0.75rem',
                                   color: sampleLeadForm.leadStudyFileName ? '#34d399' : '#64748B',
@@ -2575,7 +2582,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap'
                                 }} title={sampleLeadForm.leadStudyFileName}>
-                                  {sampleLeadForm.leadStudyFileName || 'No PDF chosen (required)'}
+                                  {sampleLeadForm.leadStudyFileName || 'No PDF chosen'}
                                 </span>
                               </div>
                             </div>
@@ -2583,10 +2590,11 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                             {/* Pitch Deck PDF */}
                             <div>
                               <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                                Pitch Deck PDF <span style={{ color: '#ef4444' }}>*</span>
+                                Pitch Deck PDF <span style={{ color: '#94A3B8', fontSize: '0.72rem' }}>(Optional)</span>
                               </label>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <label
+                                  htmlFor="sample-lead-pitch-upload"
                                   className="portal-btn-secondary"
                                   style={{
                                     padding: '7px 12px',
@@ -2600,33 +2608,34 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                 >
                                   <Upload size={13} color="#00D9FF" />
                                   <span>{sampleLeadForm.pitchDeckFile ? 'Change PDF' : 'Choose PDF'}</span>
-                                  <input
-                                    ref={pitchDeckInputRef}
-                                    type="file"
-                                    accept=".pdf,application/pdf"
-                                    style={{ display: 'none' }}
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) {
-                                        if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-                                          alert('Please select a valid PDF file.');
-                                          e.target.value = '';
-                                          return;
-                                        }
-                                        if (file.size > 25 * 1024 * 1024) {
-                                          alert('PDF file exceeds the maximum size limit of 25MB.');
-                                          e.target.value = '';
-                                          return;
-                                        }
-                                        setSampleLeadForm(prev => ({
-                                          ...prev,
-                                          pitchDeckFile: file,
-                                          pitchDeckFileName: file.name
-                                        }));
-                                      }
-                                    }}
-                                  />
                                 </label>
+                                <input
+                                  id="sample-lead-pitch-upload"
+                                  ref={pitchDeckInputRef}
+                                  type="file"
+                                  accept=".pdf,application/pdf"
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+                                        alert('Please select a valid PDF file.');
+                                        e.target.value = '';
+                                        return;
+                                      }
+                                      if (file.size > 25 * 1024 * 1024) {
+                                        alert('PDF file exceeds the maximum size limit of 25MB.');
+                                        e.target.value = '';
+                                        return;
+                                      }
+                                      setSampleLeadForm(prev => ({
+                                        ...prev,
+                                        pitchDeckFile: file,
+                                        pitchDeckFileName: file.name
+                                      }));
+                                    }
+                                  }}
+                                />
                                 <span style={{
                                   fontSize: '0.75rem',
                                   color: sampleLeadForm.pitchDeckFileName ? '#34d399' : '#64748B',
@@ -2634,7 +2643,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap'
                                 }} title={sampleLeadForm.pitchDeckFileName}>
-                                  {sampleLeadForm.pitchDeckFileName || 'No PDF chosen (required)'}
+                                  {sampleLeadForm.pitchDeckFileName || 'No PDF chosen'}
                                 </span>
                               </div>
                             </div>
@@ -2642,10 +2651,11 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                             {/* Key People PDF */}
                             <div>
                               <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                                Key People PDF <span style={{ color: '#ef4444' }}>*</span>
+                                Key People PDF <span style={{ color: '#94A3B8', fontSize: '0.72rem' }}>(Optional)</span>
                               </label>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <label
+                                  htmlFor="sample-lead-keypeople-upload"
                                   className="portal-btn-secondary"
                                   style={{
                                     padding: '7px 12px',
@@ -2659,33 +2669,34 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                 >
                                   <Upload size={13} color="#00D9FF" />
                                   <span>{sampleLeadForm.keyPeopleFile ? 'Change PDF' : 'Choose PDF'}</span>
-                                  <input
-                                    ref={keyPeopleInputRef}
-                                    type="file"
-                                    accept=".pdf,application/pdf"
-                                    style={{ display: 'none' }}
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) {
-                                        if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-                                          alert('Please select a valid PDF file.');
-                                          e.target.value = '';
-                                          return;
-                                        }
-                                        if (file.size > 25 * 1024 * 1024) {
-                                          alert('PDF file exceeds the maximum size limit of 25MB.');
-                                          e.target.value = '';
-                                          return;
-                                        }
-                                        setSampleLeadForm(prev => ({
-                                          ...prev,
-                                          keyPeopleFile: file,
-                                          keyPeopleFileName: file.name
-                                        }));
-                                      }
-                                    }}
-                                  />
                                 </label>
+                                <input
+                                  id="sample-lead-keypeople-upload"
+                                  ref={keyPeopleInputRef}
+                                  type="file"
+                                  accept=".pdf,application/pdf"
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+                                        alert('Please select a valid PDF file.');
+                                        e.target.value = '';
+                                        return;
+                                      }
+                                      if (file.size > 25 * 1024 * 1024) {
+                                        alert('PDF file exceeds the maximum size limit of 25MB.');
+                                        e.target.value = '';
+                                        return;
+                                      }
+                                      setSampleLeadForm(prev => ({
+                                        ...prev,
+                                        keyPeopleFile: file,
+                                        keyPeopleFileName: file.name
+                                      }));
+                                    }
+                                  }}
+                                />
                                 <span style={{
                                   fontSize: '0.75rem',
                                   color: sampleLeadForm.keyPeopleFileName ? '#34d399' : '#64748B',
@@ -2693,17 +2704,27 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap'
                                 }} title={sampleLeadForm.keyPeopleFileName}>
-                                  {sampleLeadForm.keyPeopleFileName || 'No PDF chosen (required)'}
+                                  {sampleLeadForm.keyPeopleFileName || 'No PDF chosen'}
                                 </span>
                               </div>
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '0.76rem', color: '#94A3B8' }}>
+                              {!sampleLeadForm.companyName.trim()
+                                ? 'Enter company name to begin'
+                                : !sampleLeadForm.website.trim()
+                                ? 'Enter website URL'
+                                : (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && !sampleLeadForm.keyPeopleFile)
+                                ? 'Attach at least one PDF (Lead Study recommended)'
+                                : 'Ready to save lead'}
+                            </span>
                             <button
                               type="submit"
+                              id="btn-submit-sample-lead"
                               className="portal-btn-primary"
-                              disabled={isSubmittingSampleLead || !sampleLeadForm.companyName.trim() || !sampleLeadForm.website.trim() || !sampleLeadForm.leadStudyFile || !sampleLeadForm.pitchDeckFile || !sampleLeadForm.keyPeopleFile}
+                              disabled={isSubmittingSampleLead || !sampleLeadForm.companyName.trim() || !sampleLeadForm.website.trim() || (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && !sampleLeadForm.keyPeopleFile)}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
                             >
                               <Plus size={14} />

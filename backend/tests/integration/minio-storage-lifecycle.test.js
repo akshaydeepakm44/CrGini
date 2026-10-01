@@ -255,9 +255,9 @@ async function runTestSuite() {
   // Setup test users & companies
   const ts = Date.now();
   const compRes = await query(`
-    INSERT INTO companies (name, email, website, industry)
-    VALUES ($1, $2, $3, $4) RETURNING *
-  `, [`MinIO Corp ${ts}`, `minio-${ts}@test.com`, 'https://miniocorp.example.com', 'Cloud Infrastructure']);
+    INSERT INTO companies (name, email, website, industry, contact_person)
+    VALUES ($1, $2, $3, $4, $5) RETURNING *
+  `, [`MinIO Corp ${ts}`, `minio-${ts}@test.com`, 'https://miniocorp.example.com', 'Cloud Infrastructure', `Contact ${ts}`]);
   const testCompany = compRes.rows[0];
 
   const userRes = await query(`
@@ -460,9 +460,9 @@ async function runTestSuite() {
 
   // Create Tenant B
   const compBRes = await query(`
-    INSERT INTO companies (name, email, website, industry)
-    VALUES ($1, $2, $3, $4) RETURNING *
-  `, [`Tenant B Corp ${ts}`, `tenantb-${ts}@test.com`, 'https://tenantb.com', 'Finance']);
+    INSERT INTO companies (name, email, website, industry, contact_person)
+    VALUES ($1, $2, $3, $4, $5) RETURNING *
+  `, [`Tenant B Corp ${ts}`, `tenantb-${ts}@test.com`, 'https://tenantb.com', 'Finance', `Contact B ${ts}`]);
   const companyB = compBRes.rows[0];
 
   const userBRes = await query(`
