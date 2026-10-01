@@ -4,15 +4,57 @@ const mapCompany = (row) => {
   if (!row) return null;
 
   const leads = (row.initial_leads || []).map(l => {
-    const pdfMatch = (l.notes || '').match(/\[Lead PDF:\s*([^\]]+)\]/);
+    const pdfMatch = (l.notes || '').match(/\[Lead PDF:\s*([^\]]+)\]/) || (l.notes || '').match(/\[Lead Study:\s*([^\]]+)\]/);
+    const pitchMatch = (l.notes || '').match(/\[Pitch Deck:\s*([^\]]+)\]/);
+    const kpMatch = (l.notes || '').match(/\[Key People:\s*([^\]]+)\]/);
     const source_reference = pdfMatch ? pdfMatch[1] : null;
-    const cleanNotes = (l.notes || '').replace(/\[Lead PDF:\s*[^\]]+\]/g, '').replace(/\[Website:\s*[^\]]+\]/g, '').trim();
+    const cleanNotes = (l.notes || '')
+      .replace(/\[Lead PDF:\s*[^\]]+\]/g, '')
+      .replace(/\[Lead Study:\s*[^\]]+\]/g, '')
+      .replace(/\[Pitch Deck:\s*[^\]]+\]/g, '')
+      .replace(/\[Key People:\s*[^\]]+\]/g, '')
+      .replace(/\[Lead Type:\s*[^\]]+\]/g, '')
+      .replace(/\[Ticket:\s*[^\]]+\]/g, '')
+      .replace(/\[Website:\s*[^\]]+\]/g, '')
+      .trim();
     const websiteMatch = (l.notes || '').match(/\[Website:\s*([^\]]+)\]/);
     const website = (l.linkedin && /^https?:\/\//i.test(l.linkedin)) ? l.linkedin : (websiteMatch ? websiteMatch[1] : (l.linkedin || ''));
     const companyName = l.company || l.lead_company || l.name;
     const assetIdMatch = source_reference ? source_reference.match(/\/api\/assets\/([a-f0-9\-]+)\/stream/i) : null;
     const assetId = assetIdMatch ? assetIdMatch[1] : null;
     const downloadUrl = assetId ? `/api/assets/${assetId}/download` : source_reference;
+
+    const pitchRef = pitchMatch ? pitchMatch[1] : null;
+    const pitchAssetMatch = pitchRef ? pitchRef.match(/\/api\/assets\/([a-f0-9\-]+)\/stream/i) : null;
+    const pitchAssetId = pitchAssetMatch ? pitchAssetMatch[1] : null;
+
+    const kpRef = kpMatch ? kpMatch[1] : null;
+    const kpAssetMatch = kpRef ? kpRef.match(/\/api\/assets\/([a-f0-9\-]+)\/stream/i) : null;
+    const kpAssetId = kpAssetMatch ? kpAssetMatch[1] : null;
+
+    const leadStudy = source_reference ? {
+      id: assetId,
+      assetId,
+      streamUrl: source_reference,
+      downloadUrl,
+      fileName: `${companyName} - Lead Study.pdf`
+    } : null;
+
+    const pitchDeck = pitchRef ? {
+      id: pitchAssetId,
+      assetId: pitchAssetId,
+      streamUrl: pitchRef,
+      downloadUrl: pitchAssetId ? `/api/assets/${pitchAssetId}/download` : pitchRef,
+      fileName: `${companyName} - Pitch Deck.pdf`
+    } : null;
+
+    const keyPeople = kpRef ? {
+      id: kpAssetId,
+      assetId: kpAssetId,
+      streamUrl: kpRef,
+      downloadUrl: kpAssetId ? `/api/assets/${kpAssetId}/download` : kpRef,
+      fileName: `${companyName} - Key People.pdf`
+    } : null;
 
     return {
       ...l,
@@ -21,13 +63,10 @@ const mapCompany = (row) => {
       notes: cleanNotes,
       source_reference,
       sourceReference: source_reference,
-      pdf: source_reference ? {
-        id: assetId,
-        assetId,
-        streamUrl: source_reference,
-        downloadUrl,
-        fileName: `${companyName} - Company Details.pdf`
-      } : null
+      leadStudy,
+      pitchDeck,
+      keyPeople,
+      pdf: leadStudy
     };
   });
 

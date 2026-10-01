@@ -439,6 +439,42 @@ export const api = {
     return data;
   },
 
+  async adminGetBulkOnboardingTemplate() {
+    const res = await fetch(`${API_BASE}/admin/users/bulk-template`, {
+      headers: getHeaders(true)
+    });
+    if (!res.ok) {
+      throw new Error('Failed to download bulk onboarding template');
+    }
+    return await res.text();
+  },
+
+  async adminValidateBulkOnboarding(csvText) {
+    const res = await fetch(`${API_BASE}/admin/users/bulk-validate`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({ csvText })
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to validate bulk CSV');
+    }
+    return data;
+  },
+
+  async adminCreateBulkOnboarding({ batchId, csvText }) {
+    const res = await fetch(`${API_BASE}/admin/users/bulk-create`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify({ batchId, csvText })
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to execute bulk onboarding');
+    }
+    return data;
+  },
+
   async adminGetUsers() {
     const res = await fetch(`${API_BASE}/admin/users`, {
       headers: getHeaders(true)
@@ -732,6 +768,14 @@ export const api = {
       body: JSON.stringify(payload)
     });
     return await parseApiResponse(res, 'Failed to save lead onboarding work');
+  },
+
+  async unlockKeyPeople(companyId = 'my-company') {
+    const res = await fetch(`${API_BASE}/company/${companyId}/unlock-key-people`, {
+      method: 'POST',
+      headers: getHeaders(true)
+    });
+    return await parseApiResponse(res, 'Failed to unlock Key People');
   },
 
   // Company Lead Specialist & Management APIs

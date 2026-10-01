@@ -35,6 +35,8 @@ import {
   AlertCircle,
   FileText,
   FileCheck,
+  FileSpreadsheet,
+  Download,
   Upload,
   RotateCcw,
   ExternalLink,
@@ -141,6 +143,25 @@ export default function AdminDashboard({ user, onLogout }) {
     successData: null
   });
 
+  // Client Onboarding Mode: 'single' | 'bulk'
+  const [onboardingMode, setOnboardingMode] = useState('single');
+
+  // Bulk Client Onboarding State
+  const [bulkWorkflow, setBulkWorkflow] = useState({
+    step: 1, // 1: Upload CSV, 2: Preview & Validation, 3: Result Summary
+    file: null,
+    fileName: '',
+    csvText: '',
+    isValidating: false,
+    isSubmitting: false,
+    validationError: '',
+    batchId: null,
+    summary: null,
+    previewRows: [],
+    filter: 'ALL', // 'ALL' | 'READY' | 'ISSUES'
+    result: null
+  });
+
   const [toastNotice, setToastNotice] = useState(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
@@ -231,6 +252,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
   // Open the create client user workflow
   const handleOpenCreateWorkflow = () => {
+    setOnboardingMode('single');
     setCreateWorkflow({
       isOpen: true,
       step: 1,
@@ -245,13 +267,51 @@ export default function AdminDashboard({ user, onLogout }) {
       isSubmitting: false,
       successData: null
     });
+    setBulkWorkflow({
+      step: 1,
+      file: null,
+      fileName: '',
+      csvText: '',
+      isValidating: false,
+      isSubmitting: false,
+      validationError: '',
+      batchId: null,
+      summary: null,
+      previewRows: [],
+      filter: 'ALL',
+      result: null
+    });
   };
 
-  // Submit client user creation form
+  // Submit client user creation form (Single Onboarding)
   const handleCreateAccount = async (e) => {
     e.preventDefault();
-    if (!createWorkflow.companyName?.trim() || !createWorkflow.contactPerson?.trim() || !createWorkflow.email?.trim() || !createWorkflow.password?.trim()) {
-      alert('Please provide Company Name, Client Name, Email, and Temporary Password.');
+    const contactPerson = createWorkflow.contactPerson?.trim();
+    const compName = createWorkflow.companyName?.trim();
+    const email = createWorkflow.email?.trim();
+    const password = createWorkflow.password?.trim();
+    const website = createWorkflow.website?.trim();
+    const industry = createWorkflow.industry?.trim();
+
+    if (!contactPerson || !compName || !email || !password || !website || !industry) {
+      alert('Please provide Client Name, Email, Company Name, Temporary Password, Website, and Industry Type.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+
+    if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+      alert('Temporary password must be at least 8 characters and contain at least one letter and one number.');
+      return;
+    }
+
+    const urlRegex = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
+    if (!urlRegex.test(website)) {
+      alert('Website must be a valid HTTP or HTTPS URL (e.g. https://example.com).');
       return;
     }
 
@@ -259,15 +319,15 @@ export default function AdminDashboard({ user, onLogout }) {
       setCreateWorkflow(prev => ({ ...prev, isSubmitting: true }));
 
       const payload = {
-        companyName: createWorkflow.companyName.trim(),
-        contactPerson: createWorkflow.contactPerson.trim(),
-        email: createWorkflow.email.trim(),
+        companyName: compName,
+        contactPerson: contactPerson,
+        email: email,
         phone: createWorkflow.phone?.trim() || '',
-        website: createWorkflow.website?.trim() || '',
-        industry: createWorkflow.industry?.trim() || 'Enterprise SaaS / AI',
+        website: website,
+        industry: industry,
         companyInfo: createWorkflow.companyInfo?.trim() || '',
         researchSummary: '',
-        password: createWorkflow.password.trim(),
+        password: password,
         initialLeads: [],
         initialKeyPeople: []
       };
@@ -279,14 +339,14 @@ export default function AdminDashboard({ user, onLogout }) {
         isSubmitting: false,
         step: 2,
         successData: {
-          clientName: createWorkflow.contactPerson.trim(),
-          email: createWorkflow.email.trim(),
-          companyName: createWorkflow.companyName.trim(),
+          clientName: contactPerson,
+          email: email,
+          companyName: compName,
           status: res.user?.status || 'ACTIVE'
         }
       }));
 
-      showNotice(`Client account created successfully for ${createWorkflow.email}.`);
+      showNotice(`Client account created successfully for ${email}.`);
       await loadAdminData();
     } catch (err) {
       console.error('Failed to create client user:', err);
@@ -295,9 +355,146 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   };
 
+  // Download Bulk CSV Template
+  const handleDownloadTemplate = async () => {
+    try {
+      const csvText = await api.adminGetBulkOnboardingTemplate();
+      const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'creativegini_bulk_onboarding_template.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Failed to download CSV template: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  // Download Bulk Error Report CSV
+  const handleDownloadErrorReport = () => {
+    if (!bulkWorkflow.result?.skippedRecords?.length) return;
+    const headers = ['Row Number', 'Client Name', 'Email', 'Company Name', 'Website', 'Industry Type', 'Error Reason'];
+    const escapeCsv = (str) => `"${String(str || '').replace(/"/g, '""')}"`;
+    const rows = bulkWorkflow.result.skippedRecords.map(r => [
+      r.rowNumber || '',
+      escapeCsv(r.clientName),
+      escapeCsv(r.email),
+      escapeCsv(r.companyName),
+      escapeCsv(r.website),
+      escapeCsv(r.industry),
+      escapeCsv(r.reason)
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'creativegini_bulk_onboarding_error_report.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Handle CSV file selection or drop
+  const handleCsvFileChange = (file) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv') {
+      alert('Please select a valid .csv file.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setBulkWorkflow(prev => ({
+        ...prev,
+        file,
+        fileName: file.name,
+        csvText: e.target.result,
+        validationError: ''
+      }));
+    };
+    reader.onerror = () => {
+      alert('Failed to read the selected file. Please try again.');
+    };
+    reader.readAsText(file);
+  };
+
+  // Validate CSV and move to Preview step
+  const handleValidateCsv = async () => {
+    if (!bulkWorkflow.csvText) {
+      alert('Please upload a CSV file first.');
+      return;
+    }
+    try {
+      setBulkWorkflow(prev => ({ ...prev, isValidating: true, validationError: '' }));
+      const result = await api.adminValidateBulkOnboarding(bulkWorkflow.csvText);
+      setBulkWorkflow(prev => ({
+        ...prev,
+        isValidating: false,
+        step: 2,
+        batchId: result.batchId,
+        summary: result.summary,
+        previewRows: result.previewRows || [],
+        filter: 'ALL'
+      }));
+    } catch (err) {
+      console.error('CSV validation error:', err);
+      setBulkWorkflow(prev => ({
+        ...prev,
+        isValidating: false,
+        validationError: err.message || 'Validation failed. Please verify CSV structure.'
+      }));
+    }
+  };
+
+  // Execute Bulk Client Creation
+  const handleExecuteBulkCreation = async () => {
+    if (!bulkWorkflow.batchId && !bulkWorkflow.csvText) return;
+    try {
+      setBulkWorkflow(prev => ({ ...prev, isSubmitting: true }));
+      const res = await api.adminCreateBulkOnboarding({
+        batchId: bulkWorkflow.batchId,
+        csvText: bulkWorkflow.csvText
+      });
+      setBulkWorkflow(prev => ({
+        ...prev,
+        isSubmitting: false,
+        step: 3,
+        result: res
+      }));
+      showNotice(`Bulk onboarding completed: ${res.createdCount} client(s) created.`);
+      await loadAdminData();
+    } catch (err) {
+      console.error('Bulk creation error:', err);
+      alert('Bulk onboarding failed: ' + (err.message || 'Unknown error'));
+      setBulkWorkflow(prev => ({ ...prev, isSubmitting: false }));
+    }
+  };
+
+  const handleResetBulkWorkflow = () => {
+    setBulkWorkflow({
+      step: 1,
+      file: null,
+      fileName: '',
+      csvText: '',
+      isValidating: false,
+      isSubmitting: false,
+      validationError: '',
+      batchId: null,
+      summary: null,
+      previewRows: [],
+      filter: 'ALL',
+      result: null
+    });
+  };
+
   // Finish Workflow (Success Done)
   const handleFinishWorkflow = async () => {
     setCreateWorkflow(prev => ({ ...prev, isOpen: false }));
+    handleResetBulkWorkflow();
     await loadAdminData();
   };
 
@@ -914,7 +1111,7 @@ export default function AdminDashboard({ user, onLogout }) {
                 onClick={handleOpenCreateWorkflow}
               >
                 <UserPlus size={16} />
-                <span>Create Client User</span>
+                <span>Client Onboarding</span>
               </button>
             )}
 
@@ -2745,17 +2942,18 @@ export default function AdminDashboard({ user, onLogout }) {
         )}
       </div>
 
-      {/* ADMIN CREATE CLIENT USER MODAL */}
+      {/* ADMIN CLIENT ONBOARDING MODAL (SINGLE & BULK) */}
       {createWorkflow.isOpen && (
-        <div className="portal-modal-overlay" onClick={() => setCreateWorkflow(prev => ({ ...prev, isOpen: false }))}>
+        <div className="portal-modal-overlay" onClick={() => { if (!createWorkflow.isSubmitting && !bulkWorkflow.isSubmitting) handleFinishWorkflow(); }}>
           <div
             className="portal-modal-card"
             style={{
-              maxWidth: createWorkflow.step === 2 ? '540px' : '680px',
-              width: '100%',
+              maxWidth: (onboardingMode === 'bulk' && bulkWorkflow.step === 2) ? '980px' : (onboardingMode === 'single' && createWorkflow.step === 2 ? '540px' : '720px'),
+              width: '95vw',
               display: 'flex',
               flexDirection: 'column',
-              maxHeight: '90vh'
+              maxHeight: '92vh',
+              transition: 'max-width 0.25s ease'
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2763,228 +2961,798 @@ export default function AdminDashboard({ user, onLogout }) {
             <div className="portal-modal-header" style={{ borderBottom: '1px solid var(--portal-border)', paddingBottom: '0.85rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(0, 229, 255, 0.12)', color: '#00D9FF', border: '1px solid rgba(0, 229, 255, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {createWorkflow.step === 1 ? <UserPlus size={20} /> : <CheckCircle2 size={20} />}
+                  {onboardingMode === 'single' ? (
+                    createWorkflow.step === 1 ? <UserPlus size={20} /> : <CheckCircle2 size={20} />
+                  ) : (
+                    bulkWorkflow.step === 3 ? <CheckCircle2 size={20} /> : <FileSpreadsheet size={20} />
+                  )}
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: '#F5F5F5' }}>
-                    {createWorkflow.step === 1 ? 'Create User' : 'Account Created'}
+                    Client Onboarding
                   </h3>
                   <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
-                    {createWorkflow.step === 1 ? 'Enter client credentials and company details' : 'Account created successfully'}
+                    {onboardingMode === 'single'
+                      ? (createWorkflow.step === 1 ? 'Enter client credentials and company details' : 'Account provisioned successfully')
+                      : (bulkWorkflow.step === 1 ? 'Upload CSV file to provision multiple client accounts' : bulkWorkflow.step === 2 ? 'Review validation summary and preview records' : 'Bulk onboarding completed')}
                   </span>
                 </div>
               </div>
               <button
                 type="button"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-                onClick={() => setCreateWorkflow(prev => ({ ...prev, isOpen: false }))}
+                onClick={handleFinishWorkflow}
+                disabled={createWorkflow.isSubmitting || bulkWorkflow.isSubmitting}
                 title="Close"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* STEP 1: USER DETAILS FORM */}
-            {createWorkflow.step === 1 && (
-              <form onSubmit={handleCreateAccount} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-                <div className="portal-modal-body" style={{ overflowY: 'auto', flex: 1 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div className="portal-form-group">
-                      <label className="portal-form-label">Client Name *</label>
-                      <input
-                        className="portal-form-input"
-                        value={createWorkflow.contactPerson}
-                        onChange={e => setCreateWorkflow({ ...createWorkflow, contactPerson: e.target.value })}
-                        placeholder="e.g. John Smith"
-                        required
-                      />
-                    </div>
-
-                    <div className="portal-form-group">
-                      <label className="portal-form-label">Email *</label>
-                      <input
-                        type="email"
-                        className="portal-form-input"
-                        value={createWorkflow.email}
-                        onChange={e => setCreateWorkflow({ ...createWorkflow, email: e.target.value })}
-                        placeholder="john@example.com"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div className="portal-form-group">
-                      <label className="portal-form-label">Company Name *</label>
-                      <input
-                        className="portal-form-input"
-                        value={createWorkflow.companyName}
-                        onChange={e => setCreateWorkflow({ ...createWorkflow, companyName: e.target.value })}
-                        placeholder="e.g. ABC Technologies"
-                        required
-                      />
-                    </div>
-
-                    <div className="portal-form-group">
-                      <label className="portal-form-label">Temporary Password *</label>
-                      <input
-                        className="portal-form-input"
-                        value={createWorkflow.password}
-                        onChange={e => setCreateWorkflow({ ...createWorkflow, password: e.target.value })}
-                        placeholder="Client@123"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div className="portal-form-group">
-                      <label className="portal-form-label">Phone</label>
-                      <input
-                        className="portal-form-input"
-                        value={createWorkflow.phone}
-                        onChange={e => setCreateWorkflow({ ...createWorkflow, phone: e.target.value })}
-                        placeholder="+1 (555) 019-2834"
-                      />
-                    </div>
-
-                    <div className="portal-form-group">
-                      <label className="portal-form-label">Website</label>
-                      <input
-                        className="portal-form-input"
-                        value={createWorkflow.website}
-                        onChange={e => setCreateWorkflow({ ...createWorkflow, website: e.target.value })}
-                        placeholder="https://abctech.com"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="portal-form-group">
-                    <label className="portal-form-label">Industry</label>
-                    <input
-                      className="portal-form-input"
-                      value={createWorkflow.industry}
-                      onChange={e => setCreateWorkflow({ ...createWorkflow, industry: e.target.value })}
-                      placeholder="Enterprise SaaS / AI"
-                    />
-                  </div>
-
-                  <div className="portal-form-group" style={{ marginBottom: 0 }}>
-                    <label className="portal-form-label">Description / Summary</label>
-                    <textarea
-                      className="portal-form-textarea"
-                      rows="3"
-                      value={createWorkflow.companyInfo}
-                      onChange={e => setCreateWorkflow({ ...createWorkflow, companyInfo: e.target.value })}
-                      placeholder="Initial details and market positioning..."
-                    />
-                  </div>
-                </div>
-
-                <div className="portal-modal-footer">
-                  <button
-                    type="button"
-                    className="portal-btn-secondary"
-                    onClick={() => setCreateWorkflow(prev => ({ ...prev, isOpen: false }))}
-                    disabled={createWorkflow.isSubmitting}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="portal-btn-primary"
-                    disabled={createWorkflow.isSubmitting}
-                  >
-                    {createWorkflow.isSubmitting ? (
-                      <>
-                        <RefreshCw size={14} className="portal-spin" />
-                        Creating Account...
-                      </>
-                    ) : (
-                      'Create Account'
-                    )}
-                  </button>
-                </div>
-              </form>
+            {/* SEGMENTED CONTROL: SINGLE ONBOARDING VS BULK ONBOARDING */}
+            {((onboardingMode === 'single' && createWorkflow.step === 1) || (onboardingMode === 'bulk' && bulkWorkflow.step === 1)) && (
+              <div style={{
+                display: 'flex',
+                borderBottom: '1px solid var(--portal-border)',
+                background: 'rgba(255, 255, 255, 0.02)',
+                padding: '0 1.25rem'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setOnboardingMode('single')}
+                  disabled={createWorkflow.isSubmitting || bulkWorkflow.isSubmitting}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '0.75rem 1.25rem',
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: onboardingMode === 'single' ? '2px solid #00D9FF' : '2px solid transparent',
+                    color: onboardingMode === 'single' ? '#00D9FF' : '#94A3B8',
+                    fontWeight: onboardingMode === 'single' ? '700' : '500',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <UserPlus size={16} />
+                  Single Onboarding
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOnboardingMode('bulk')}
+                  disabled={createWorkflow.isSubmitting || bulkWorkflow.isSubmitting}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '0.75rem 1.25rem',
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: onboardingMode === 'bulk' ? '2px solid #00D9FF' : '2px solid transparent',
+                    color: onboardingMode === 'bulk' ? '#00D9FF' : '#94A3B8',
+                    fontWeight: onboardingMode === 'bulk' ? '700' : '500',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <FileSpreadsheet size={16} />
+                  Bulk Onboarding
+                </button>
+              </div>
             )}
 
-            {/* STEP 2: ACCOUNT CREATED SUCCESS */}
-            {createWorkflow.step === 2 && (
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                <div className="portal-modal-body" style={{ flex: 1, padding: '2rem 1.75rem 1.5rem', textAlign: 'center' }}>
-                  <div style={{
-                    width: '56px',
-                    height: '56px',
-                    borderRadius: '50%',
-                    background: 'rgba(16, 185, 129, 0.15)',
-                    color: '#10B981',
-                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 1.25rem'
-                  }}>
-                    <CheckCircle2 size={32} />
-                  </div>
-                  <h4 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#F8FAFC', margin: '0 0 0.5rem 0' }}>
-                    Account Created Successfully
-                  </h4>
-                  <p style={{ fontSize: '0.88rem', color: '#94A3B8', margin: '0 0 1.5rem 0' }}>
-                    The client account and company workspace have been successfully provisioned.
-                  </p>
+            {/* ========================================================= */}
+            {/* OPTION 1: SINGLE ONBOARDING VIEW                          */}
+            {/* ========================================================= */}
+            {onboardingMode === 'single' && (
+              <>
+                {/* STEP 1: 6-FIELD FORM */}
+                {createWorkflow.step === 1 && (
+                  <form onSubmit={handleCreateAccount} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                    <div className="portal-modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="portal-form-group">
+                          <label className="portal-form-label">Client Name *</label>
+                          <input
+                            className="portal-form-input"
+                            value={createWorkflow.contactPerson}
+                            onChange={e => setCreateWorkflow({ ...createWorkflow, contactPerson: e.target.value })}
+                            placeholder="e.g. John Doe"
+                            required
+                          />
+                        </div>
 
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid var(--portal-border)',
-                    borderRadius: '10px',
-                    padding: '1.25rem',
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '1rem',
-                    textAlign: 'left',
-                    maxWidth: '460px',
-                    margin: '0 auto'
-                  }}>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '2px' }}>Client Name</span>
-                      <strong style={{ color: '#F8FAFC', fontSize: '0.92rem' }}>{createWorkflow.successData?.clientName}</strong>
+                        <div className="portal-form-group">
+                          <label className="portal-form-label">Email *</label>
+                          <input
+                            type="email"
+                            className="portal-form-input"
+                            value={createWorkflow.email}
+                            onChange={e => setCreateWorkflow({ ...createWorkflow, email: e.target.value })}
+                            placeholder="john@example.com"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="portal-form-group">
+                          <label className="portal-form-label">Company Name *</label>
+                          <input
+                            className="portal-form-input"
+                            value={createWorkflow.companyName}
+                            onChange={e => setCreateWorkflow({ ...createWorkflow, companyName: e.target.value })}
+                            placeholder="e.g. ABC Technologies"
+                            required
+                          />
+                        </div>
+
+                        <div className="portal-form-group">
+                          <label className="portal-form-label">Temporary Password *</label>
+                          <input
+                            className="portal-form-input"
+                            value={createWorkflow.password}
+                            onChange={e => setCreateWorkflow({ ...createWorkflow, password: e.target.value })}
+                            placeholder="Client@123"
+                            required
+                          />
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '3px', display: 'block' }}>
+                            Min 8 characters, at least 1 letter and 1 number
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="portal-form-group">
+                          <label className="portal-form-label">Website *</label>
+                          <input
+                            type="url"
+                            className="portal-form-input"
+                            value={createWorkflow.website}
+                            onChange={e => setCreateWorkflow({ ...createWorkflow, website: e.target.value })}
+                            placeholder="https://abctech.com"
+                            required
+                          />
+                        </div>
+
+                        <div className="portal-form-group">
+                          <label className="portal-form-label">Industry Type *</label>
+                          <input
+                            className="portal-form-input"
+                            value={createWorkflow.industry}
+                            onChange={e => setCreateWorkflow({ ...createWorkflow, industry: e.target.value })}
+                            placeholder="Enterprise SaaS / AI"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="portal-form-group">
+                          <label className="portal-form-label">Phone (Optional)</label>
+                          <input
+                            className="portal-form-input"
+                            value={createWorkflow.phone}
+                            onChange={e => setCreateWorkflow({ ...createWorkflow, phone: e.target.value })}
+                            placeholder="+1 (555) 019-2834"
+                          />
+                        </div>
+
+                        <div className="portal-form-group">
+                          <label className="portal-form-label">Description / Summary (Optional)</label>
+                          <input
+                            className="portal-form-input"
+                            value={createWorkflow.companyInfo}
+                            onChange={e => setCreateWorkflow({ ...createWorkflow, companyInfo: e.target.value })}
+                            placeholder="Market positioning, goals..."
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '2px' }}>Email</span>
-                      <strong style={{ color: '#00D9FF', fontSize: '0.92rem' }}>{createWorkflow.successData?.email}</strong>
+
+                    <div className="portal-modal-footer">
+                      <button
+                        type="button"
+                        className="portal-btn-secondary"
+                        onClick={handleFinishWorkflow}
+                        disabled={createWorkflow.isSubmitting}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="portal-btn-primary"
+                        disabled={createWorkflow.isSubmitting}
+                      >
+                        {createWorkflow.isSubmitting ? (
+                          <>
+                            <RefreshCw size={14} className="portal-spin" />
+                            Creating Account...
+                          </>
+                        ) : (
+                          'Create Account'
+                        )}
+                      </button>
                     </div>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '2px' }}>Company Name</span>
-                      <strong style={{ color: '#F8FAFC', fontSize: '0.92rem' }}>{createWorkflow.successData?.companyName}</strong>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '2px' }}>Account Status</span>
-                      <span style={{
-                        display: 'inline-block',
-                        fontSize: '0.75rem',
-                        fontWeight: '700',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
+                  </form>
+                )}
+
+                {/* STEP 2: ACCOUNT CREATED SUCCESS */}
+                {createWorkflow.step === 2 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <div className="portal-modal-body" style={{ flex: 1, padding: '2rem 1.75rem 1.5rem', textAlign: 'center' }}>
+                      <div style={{
+                        width: '56px',
+                        height: '56px',
+                        borderRadius: '50%',
                         background: 'rgba(16, 185, 129, 0.15)',
-                        color: '#34d399',
-                        border: '1px solid rgba(52, 211, 153, 0.35)'
+                        color: '#10B981',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 1.25rem'
                       }}>
-                        {createWorkflow.successData?.status || 'ACTIVE'}
-                      </span>
+                        <CheckCircle2 size={32} />
+                      </div>
+                      <h4 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#F8FAFC', margin: '0 0 0.5rem 0' }}>
+                        Account Created Successfully
+                      </h4>
+                      <p style={{ fontSize: '0.88rem', color: '#94A3B8', margin: '0 0 1.5rem 0' }}>
+                        The client account and company workspace have been successfully provisioned.
+                      </p>
+
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid var(--portal-border)',
+                        borderRadius: '10px',
+                        padding: '1.25rem',
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '1rem',
+                        textAlign: 'left',
+                        maxWidth: '460px',
+                        margin: '0 auto'
+                      }}>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '2px' }}>Client Name</span>
+                          <strong style={{ color: '#F8FAFC', fontSize: '0.92rem' }}>{createWorkflow.successData?.clientName}</strong>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '2px' }}>Email</span>
+                          <strong style={{ color: '#00D9FF', fontSize: '0.92rem' }}>{createWorkflow.successData?.email}</strong>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '2px' }}>Company Name</span>
+                          <strong style={{ color: '#F8FAFC', fontSize: '0.92rem' }}>{createWorkflow.successData?.companyName}</strong>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '2px' }}>Account Status</span>
+                          <span style={{
+                            display: 'inline-block',
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            color: '#34d399',
+                            border: '1px solid rgba(52, 211, 153, 0.35)'
+                          }}>
+                            {createWorkflow.successData?.status || 'ACTIVE'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="portal-modal-footer" style={{ justifyContent: 'center', borderTop: '1px solid var(--portal-border)', paddingTop: '0.85rem' }}>
+                      <button
+                        type="button"
+                        className="portal-btn-primary"
+                        style={{ minWidth: '140px' }}
+                        onClick={handleFinishWorkflow}
+                      >
+                        Done
+                      </button>
                     </div>
                   </div>
-                </div>
+                )}
+              </>
+            )}
 
-                <div className="portal-modal-footer" style={{ justifyContent: 'center', borderTop: '1px solid var(--portal-border)', paddingTop: '0.85rem' }}>
-                  <button
-                    type="button"
-                    className="portal-btn-primary"
-                    style={{ minWidth: '140px' }}
-                    onClick={handleFinishWorkflow}
-                  >
-                    Done
-                  </button>
-                </div>
+            {/* ========================================================= */}
+            {/* OPTION 2: BULK ONBOARDING VIEW                            */}
+            {/* ========================================================= */}
+            {onboardingMode === 'bulk' && (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                {/* STEP 1: DOWNLOAD TEMPLATE & UPLOAD CSV */}
+                {bulkWorkflow.step === 1 && (
+                  <>
+                    <div className="portal-modal-body" style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      {/* Guidance & Template Download Bar */}
+                      <div style={{
+                        background: 'rgba(0, 217, 255, 0.05)',
+                        border: '1px solid rgba(0, 217, 255, 0.2)',
+                        borderRadius: '10px',
+                        padding: '1rem 1.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '1rem',
+                        flexWrap: 'wrap'
+                      }}>
+                        <div>
+                          <div style={{ fontWeight: '700', color: '#F8FAFC', fontSize: '0.92rem', marginBottom: '2px' }}>
+                            Need the official CSV format?
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
+                            Download the template containing the 6 required headers: Client Name, Email, Company Name, Temporary Password, Website, Industry Type.
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="portal-btn-secondary"
+                          onClick={handleDownloadTemplate}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+                        >
+                          <Download size={15} />
+                          Download CSV Template
+                        </button>
+                      </div>
+
+                      {/* Dropzone */}
+                      <div
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                            handleCsvFileChange(e.dataTransfer.files[0]);
+                          }
+                        }}
+                        style={{
+                          border: '2px dashed rgba(255, 255, 255, 0.18)',
+                          borderRadius: '12px',
+                          padding: '2.5rem 1.5rem',
+                          textAlign: 'center',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={() => document.getElementById('bulk-csv-input')?.click()}
+                      >
+                        <input
+                          id="bulk-csv-input"
+                          type="file"
+                          accept=".csv,text/csv"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleCsvFileChange(e.target.files[0]);
+                            }
+                          }}
+                        />
+
+                        {bulkWorkflow.fileName ? (
+                          <>
+                            <div style={{
+                              width: '54px',
+                              height: '54px',
+                              borderRadius: '50%',
+                              background: 'rgba(16, 185, 129, 0.15)',
+                              color: '#10B981',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginBottom: '0.75rem'
+                            }}>
+                              <FileCheck size={28} />
+                            </div>
+                            <div style={{ fontWeight: '700', color: '#F8FAFC', fontSize: '1rem', marginBottom: '4px' }}>
+                              {bulkWorkflow.fileName}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
+                              {formatFileSize(bulkWorkflow.file?.size)} • Ready to validate
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleResetBulkWorkflow();
+                              }}
+                              style={{
+                                marginTop: '0.75rem',
+                                background: 'none',
+                                border: 'none',
+                                color: '#F87171',
+                                fontSize: '0.82rem',
+                                cursor: 'pointer',
+                                textDecoration: 'underline'
+                              }}
+                            >
+                              Choose a different file
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{
+                              width: '54px',
+                              height: '54px',
+                              borderRadius: '50%',
+                              background: 'rgba(0, 217, 255, 0.1)',
+                              color: '#00D9FF',
+                              border: '1px solid rgba(0, 217, 255, 0.25)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginBottom: '0.75rem'
+                            }}>
+                              <Upload size={26} />
+                            </div>
+                            <div style={{ fontWeight: '700', color: '#F8FAFC', fontSize: '1rem', marginBottom: '4px' }}>
+                              Upload Client CSV
+                            </div>
+                            <div style={{ fontSize: '0.82rem', color: '#94A3B8', maxWidth: '380px', lineHeight: 1.4 }}>
+                              Drag and drop your populated client CSV file here, or click to browse from your computer.
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Validation Error Alert */}
+                      {bulkWorkflow.validationError && (
+                        <div style={{
+                          background: 'rgba(239, 68, 68, 0.12)',
+                          border: '1px solid rgba(239, 68, 68, 0.4)',
+                          borderRadius: '8px',
+                          padding: '0.85rem 1rem',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '10px',
+                          color: '#FCA5A5',
+                          fontSize: '0.85rem'
+                        }}>
+                          <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+                          <div>
+                            <strong style={{ display: 'block', color: '#F87171', marginBottom: '2px' }}>CSV Validation Error</strong>
+                            {bulkWorkflow.validationError}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="portal-modal-footer">
+                      <button
+                        type="button"
+                        className="portal-btn-secondary"
+                        onClick={handleFinishWorkflow}
+                        disabled={bulkWorkflow.isValidating}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="portal-btn-primary"
+                        onClick={handleValidateCsv}
+                        disabled={!bulkWorkflow.csvText || bulkWorkflow.isValidating}
+                      >
+                        {bulkWorkflow.isValidating ? (
+                          <>
+                            <RefreshCw size={14} className="portal-spin" />
+                            Validating CSV...
+                          </>
+                        ) : (
+                          'Validate & Preview CSV'
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {/* STEP 2: VALIDATION SUMMARY & PREVIEW TABLE */}
+                {bulkWorkflow.step === 2 && (
+                  <>
+                    <div className="portal-modal-body" style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem 1.25rem' }}>
+                      {/* Summary Metrics Bar */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                        gap: '0.65rem'
+                      }}>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '0.75rem', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Total Rows</span>
+                          <strong style={{ fontSize: '1.25rem', color: '#F8FAFC' }}>{bulkWorkflow.summary?.totalRows || 0}</strong>
+                        </div>
+                        <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', padding: '0.75rem', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#34D399', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Valid / Ready</span>
+                          <strong style={{ fontSize: '1.25rem', color: '#34D399' }}>{bulkWorkflow.summary?.validRows || 0}</strong>
+                        </div>
+                        <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', padding: '0.75rem', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#FBBF24', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>CSV Duplicates</span>
+                          <strong style={{ fontSize: '1.25rem', color: '#FBBF24' }}>{bulkWorkflow.summary?.duplicateCsvEmails || 0}</strong>
+                        </div>
+                        <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', padding: '0.75rem', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#FBBF24', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>In Database</span>
+                          <strong style={{ fontSize: '1.25rem', color: '#FBBF24' }}>{bulkWorkflow.summary?.duplicateDbEmails || 0}</strong>
+                        </div>
+                        <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '0.75rem', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#F87171', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Invalid Rows</span>
+                          <strong style={{ fontSize: '1.25rem', color: '#F87171' }}>{bulkWorkflow.summary?.invalidRows || 0}</strong>
+                        </div>
+                      </div>
+
+                      {/* Filter Segmented Control */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          {[
+                            { key: 'ALL', label: `All (${bulkWorkflow.previewRows.length})` },
+                            { key: 'READY', label: `Ready (${bulkWorkflow.summary?.validRows || 0})` },
+                            { key: 'ISSUES', label: `Issues (${bulkWorkflow.summary?.invalidRows || 0})` }
+                          ].map(f => (
+                            <button
+                              key={f.key}
+                              type="button"
+                              onClick={() => setBulkWorkflow(prev => ({ ...prev, filter: f.key }))}
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '0.78rem',
+                                fontWeight: '600',
+                                border: '1px solid',
+                                cursor: 'pointer',
+                                background: bulkWorkflow.filter === f.key ? '#00D9FF' : 'rgba(255, 255, 255, 0.05)',
+                                borderColor: bulkWorkflow.filter === f.key ? '#00D9FF' : 'var(--portal-border)',
+                                color: bulkWorkflow.filter === f.key ? '#030303' : '#94A3B8'
+                              }}
+                            >
+                              {f.label}
+                            </button>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
+                          Only <strong style={{ color: '#34D399' }}>{bulkWorkflow.summary?.validRows || 0} valid record(s)</strong> will be provisioned.
+                        </div>
+                      </div>
+
+                      {/* Preview Table */}
+                      <div style={{
+                        overflowX: 'auto',
+                        border: '1px solid var(--portal-border)',
+                        borderRadius: '8px',
+                        background: 'rgba(0, 0, 0, 0.25)',
+                        maxHeight: '340px',
+                        overflowY: 'auto'
+                      }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+                          <thead>
+                            <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--portal-border)', color: '#94A3B8', position: 'sticky', top: 0, zIndex: 1 }}>
+                              <th style={{ padding: '8px 12px' }}>#</th>
+                              <th style={{ padding: '8px 12px' }}>Client Name</th>
+                              <th style={{ padding: '8px 12px' }}>Email</th>
+                              <th style={{ padding: '8px 12px' }}>Company</th>
+                              <th style={{ padding: '8px 12px' }}>Website</th>
+                              <th style={{ padding: '8px 12px' }}>Industry</th>
+                              <th style={{ padding: '8px 12px' }}>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {bulkWorkflow.previewRows
+                              .filter(r => {
+                                if (bulkWorkflow.filter === 'READY') return r.isValid;
+                                if (bulkWorkflow.filter === 'ISSUES') return !r.isValid;
+                                return true;
+                              })
+                              .map(row => (
+                                <tr key={row.rowNumber} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                                  <td style={{ padding: '8px 12px', color: '#64748B' }}>{row.rowNumber}</td>
+                                  <td style={{ padding: '8px 12px', color: '#F8FAFC', fontWeight: '600' }}>{row.clientName || '—'}</td>
+                                  <td style={{ padding: '8px 12px', color: '#00D9FF' }}>{row.email || '—'}</td>
+                                  <td style={{ padding: '8px 12px', color: '#CBD5E1' }}>{row.companyName || '—'}</td>
+                                  <td style={{ padding: '8px 12px', color: '#94A3B8', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {row.website || '—'}
+                                  </td>
+                                  <td style={{ padding: '8px 12px', color: '#CBD5E1' }}>{row.industry || '—'}</td>
+                                  <td style={{ padding: '8px 12px' }}>
+                                    {row.isValid ? (
+                                      <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        background: 'rgba(16, 185, 129, 0.15)',
+                                        color: '#34D399',
+                                        border: '1px solid rgba(16, 185, 129, 0.35)',
+                                        borderRadius: '4px',
+                                        padding: '2px 8px',
+                                        fontSize: '0.74rem',
+                                        fontWeight: '700'
+                                      }}>
+                                        <Check size={12} /> Ready
+                                      </span>
+                                    ) : (
+                                      <div>
+                                        <span style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          background: row.status === 'DUPLICATE_CSV' || row.status === 'DUPLICATE_DB' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                          color: row.status === 'DUPLICATE_CSV' || row.status === 'DUPLICATE_DB' ? '#FBBF24' : '#F87171',
+                                          border: `1px solid ${row.status === 'DUPLICATE_CSV' || row.status === 'DUPLICATE_DB' ? 'rgba(245, 158, 11, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
+                                          borderRadius: '4px',
+                                          padding: '2px 8px',
+                                          fontSize: '0.74rem',
+                                          fontWeight: '700'
+                                        }}>
+                                          <AlertCircle size={12} />
+                                          {row.status === 'DUPLICATE_CSV' ? 'Duplicate in CSV' : row.status === 'DUPLICATE_DB' ? 'In Database' : 'Invalid'}
+                                        </span>
+                                        <div style={{ fontSize: '0.72rem', color: '#FCA5A5', marginTop: '3px', maxWidth: '240px' }}>
+                                          {row.error}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="portal-modal-footer" style={{ justifyContent: 'space-between' }}>
+                      <button
+                        type="button"
+                        className="portal-btn-secondary"
+                        onClick={() => setBulkWorkflow(prev => ({ ...prev, step: 1 }))}
+                        disabled={bulkWorkflow.isSubmitting}
+                      >
+                        Back to Upload
+                      </button>
+                      <button
+                        type="button"
+                        className="portal-btn-primary"
+                        onClick={handleExecuteBulkCreation}
+                        disabled={bulkWorkflow.isSubmitting || !bulkWorkflow.summary?.validRows}
+                      >
+                        {bulkWorkflow.isSubmitting ? (
+                          <>
+                            <RefreshCw size={14} className="portal-spin" />
+                            Creating {bulkWorkflow.summary?.validRows} Clients...
+                          </>
+                        ) : (
+                          `Confirm & Create (${bulkWorkflow.summary?.validRows || 0} Clients)`
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {/* STEP 3: RESULT SUMMARY */}
+                {bulkWorkflow.step === 3 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                    <div className="portal-modal-body" style={{ overflowY: 'auto', flex: 1, padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      {/* Result Hero Header */}
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '50%',
+                          background: 'rgba(16, 185, 129, 0.15)',
+                          color: '#10B981',
+                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '0 auto 1rem'
+                        }}>
+                          <CheckCircle2 size={32} />
+                        </div>
+                        <h4 style={{ fontSize: '1.3rem', fontWeight: '800', color: '#F8FAFC', margin: '0 0 0.5rem 0' }}>
+                          Bulk Onboarding Completed
+                        </h4>
+                        <p style={{ fontSize: '0.88rem', color: '#94A3B8', margin: 0 }}>
+                          Client accounts and company workspaces have been provisioned in PostgreSQL.
+                        </p>
+                      </div>
+
+                      {/* Stat Badges */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                        gap: '0.75rem',
+                        maxWidth: '560px',
+                        margin: '0 auto',
+                        width: '100%'
+                      }}>
+                        <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '10px', padding: '0.9rem', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#34D399', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Clients Created</span>
+                          <strong style={{ fontSize: '1.4rem', color: '#34D399' }}>{bulkWorkflow.result?.createdCount || 0}</strong>
+                        </div>
+                        <div style={{ background: 'rgba(0, 217, 255, 0.08)', border: '1px solid rgba(0, 217, 255, 0.3)', borderRadius: '10px', padding: '0.9rem', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#00D9FF', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Emails Triggered</span>
+                          <strong style={{ fontSize: '1.4rem', color: '#00D9FF' }}>{bulkWorkflow.result?.emailsTriggered || 0}</strong>
+                        </div>
+                        <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '10px', padding: '0.9rem', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#FBBF24', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Records Skipped</span>
+                          <strong style={{ fontSize: '1.4rem', color: '#FBBF24' }}>{bulkWorkflow.result?.skippedCount || 0}</strong>
+                        </div>
+                      </div>
+
+                      {/* Skipped Records Breakdown */}
+                      {bulkWorkflow.result?.skippedRecords?.length > 0 && (
+                        <div style={{
+                          border: '1px solid rgba(245, 158, 11, 0.3)',
+                          borderRadius: '10px',
+                          background: 'rgba(245, 158, 11, 0.03)',
+                          padding: '1rem',
+                          marginTop: '0.5rem'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ fontWeight: '700', color: '#FBBF24', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <AlertTriangle size={16} />
+                              Skipped Records ({bulkWorkflow.result.skippedRecords.length})
+                            </div>
+                            <button
+                              type="button"
+                              className="portal-btn-secondary"
+                              onClick={handleDownloadErrorReport}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', padding: '4px 10px' }}
+                            >
+                              <Download size={13} />
+                              Download Error Report
+                            </button>
+                          </div>
+
+                          <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', textAlign: 'left' }}>
+                              <thead>
+                                <tr style={{ color: '#94A3B8', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                                  <th style={{ padding: '6px 8px' }}>#</th>
+                                  <th style={{ padding: '6px 8px' }}>Client</th>
+                                  <th style={{ padding: '6px 8px' }}>Email</th>
+                                  <th style={{ padding: '6px 8px' }}>Reason</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {bulkWorkflow.result.skippedRecords.map((sk, idx) => (
+                                  <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                                    <td style={{ padding: '6px 8px', color: '#64748B' }}>{sk.rowNumber || idx + 1}</td>
+                                    <td style={{ padding: '6px 8px', color: '#F8FAFC' }}>{sk.clientName || '—'}</td>
+                                    <td style={{ padding: '6px 8px', color: '#00D9FF' }}>{sk.email}</td>
+                                    <td style={{ padding: '6px 8px', color: '#FCA5A5' }}>{sk.reason}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="portal-modal-footer" style={{ justifyContent: 'center', gap: '1rem', borderTop: '1px solid var(--portal-border)', paddingTop: '0.85rem' }}>
+                      <button
+                        type="button"
+                        className="portal-btn-secondary"
+                        onClick={handleResetBulkWorkflow}
+                      >
+                        Onboard More Clients
+                      </button>
+                      <button
+                        type="button"
+                        className="portal-btn-primary"
+                        style={{ minWidth: '130px' }}
+                        onClick={handleFinishWorkflow}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

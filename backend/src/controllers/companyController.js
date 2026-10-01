@@ -1113,14 +1113,23 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Company not found.' });
     }
 
-    // Get up to 5 initial sample leads
+    // Get all leads for the company (both initial sample leads and additional leads)
     const leadsRes = await query(`
       SELECT id, name, title, lead_company AS company, email, linkedin, location, status, notes, created_at
       FROM company_leads
       WHERE company_id = $1
       ORDER BY created_at ASC
-      LIMIT 5
     `, [targetCompanyId]);
+
+    // Check if the company has paid for Key People access
+    const kpPaymentRes = await query(`
+      SELECT id FROM requests
+      WHERE company_id = $1 AND service_type = 'COMPANY_LEAD'
+        AND (title ILIKE '%Key People%' OR description ILIKE '%Key People%')
+        AND payment_status = 'PAID'
+      LIMIT 1
+    `, [targetCompanyId]);
+    const isKeyPeoplePaid = kpPaymentRes.rows.length > 0;
 
     // Check for onboarding request
     const reqRes = await query(`
@@ -1131,64 +1140,120 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
       ORDER BY r.created_at ASC LIMIT 1
     `, [targetCompanyId]);
 
+    const ticketId = reqRes.rows[0]?.ticket_id || null;
+
+    // Get all submission files for this company's COMPANY_LEAD requests
+    const filesRes = await query(`
+      SELECT sf.id, sf.name, sf.url, sf.size, sf.type, sf.created_at, r.ticket_id, r.id as request_id, r.payment_status, r.status as request_status
+      FROM submission_files sf
+      JOIN submissions s ON sf.submission_id = s.id
+      JOIN requests r ON s.request_id = r.id
+      WHERE r.company_id = $1 AND r.service_type = 'COMPANY_LEAD'
+      ORDER BY sf.created_at ASC
+    `, [targetCompanyId]);
+
     const filesByTag = new Map();
-    let ticketId = null;
 
-    if (reqRes.rows.length > 0) {
-      ticketId = reqRes.rows[0].ticket_id;
-      const subRes = await query(`
-        SELECT id FROM submissions WHERE request_id = $1 ORDER BY version ASC LIMIT 1
-      `, [reqRes.rows[0].id]);
+    for (const file of filesRes.rows) {
+      const cleanFile = {
+        id: file.id,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        url: file.url,
+        streamUrl: `/api/assets/${file.id}/stream`,
+        downloadUrl: `/api/assets/${file.id}/download`,
+        createdAt: file.created_at
+      };
 
-      if (subRes.rows.length > 0) {
-        const filesRes = await query(`
-          SELECT id, name, url, size, type, created_at
-          FROM submission_files
-          WHERE submission_id = $1
-          ORDER BY created_at ASC
-        `, [subRes.rows[0].id]);
+      // Match lead index or uuid tag
+      const leadMatch = file.name.match(/^\[Lead\s*([0-9a-fA-F-]+|\d+)\]/i);
+      const leadKey = leadMatch ? (isNaN(parseInt(leadMatch[1], 10)) ? leadMatch[1] : parseInt(leadMatch[1], 10)) : null;
 
-        for (const file of filesRes.rows) {
-          const match = file.name.match(/^\[Lead\s*0?([1-5])\]/i);
-          if (match) {
-            const idx = parseInt(match[1], 10);
-            filesByTag.set(idx, {
-              id: file.id,
-              name: file.name,
-              size: file.size,
-              type: file.type,
-              url: file.url,
-              streamUrl: `/api/assets/${file.id}/stream`,
-              downloadUrl: `/api/assets/${file.id}/download`,
-              createdAt: file.created_at
-            });
-          }
-        }
+      // Detect doc type
+      const isStudy = /\[(Lead\s*Study|Study)\]/i.test(file.name) || (/^\[Lead\s*\d+\]/i.test(file.name) && !/\[(Pitch|Key)/i.test(file.name));
+      const isPitch = /\[(Pitch\s*Deck|Pitch)\]/i.test(file.name);
+      const isKeyPeople = /\[(Key\s*People|KeyPeople)\]/i.test(file.name);
+
+      if (leadKey) {
+        if (isStudy) filesByTag.set(`${leadKey}_study`, cleanFile);
+        if (isPitch) filesByTag.set(`${leadKey}_pitch`, cleanFile);
+        if (isKeyPeople) filesByTag.set(`${leadKey}_keypeople`, cleanFile);
       }
     }
 
     const mappedLeads = leadsRes.rows.map((lead, i) => {
       const slotIndex = i + 1;
-      const pdfFromNotes = (lead.notes || '').match(/\[Lead PDF:\s*([^\]]+)\]/);
-      const pdfStreamUrl = pdfFromNotes ? pdfFromNotes[1] : null;
-      const websiteFromNotes = (lead.notes || '').match(/\[Website:\s*([^\]]+)\]/);
+      const notes = lead.notes || '';
+      const websiteFromNotes = notes.match(/\[Website:\s*([^\]]+)\]/);
       const websiteUrl = (lead.linkedin && /^https?:\/\//i.test(lead.linkedin)) ? lead.linkedin : (websiteFromNotes ? websiteFromNotes[1] : (lead.linkedin || ''));
       const companyName = lead.company || lead.name;
 
-      const fileRecord = filesByTag.get(slotIndex);
-      const pdf = fileRecord ? {
-        id: fileRecord.id,
-        name: fileRecord.name,
-        streamUrl: fileRecord.streamUrl,
-        downloadUrl: fileRecord.downloadUrl,
-        size: fileRecord.size,
-        type: fileRecord.type
-      } : (pdfStreamUrl ? {
+      // Identify whether this is an additional lead (index > 5, or tagged ADDITIONAL)
+      const isAdditionalLead = slotIndex > 5 || notes.includes('[Lead Type: ADDITIONAL]') || notes.includes('ADDITIONAL');
+
+      // Key People access rule:
+      // - Additional leads from paid sprints have Key People access INCLUDED (no extra payment).
+      // - Free/sample leads require Key People payment unless user is ADMIN or COMPANY_LEAD.
+      const keyPeopleUnlocked = isAdditionalLead || isKeyPeoplePaid || ['ADMIN', 'COMPANY_LEAD'].includes(req.user.role);
+
+      // 1. Lead Study
+      const studyFile = filesByTag.get(`${slotIndex}_study`) || filesByTag.get(`${lead.id}_study`);
+      const studyFromNotes = notes.match(/\[Lead Study:\s*([^\]]+)\]/) || notes.match(/\[Lead PDF:\s*([^\]]+)\]/);
+      const leadStudy = studyFile ? {
+        id: studyFile.id,
+        name: studyFile.name,
+        streamUrl: studyFile.streamUrl,
+        downloadUrl: studyFile.downloadUrl,
+        size: studyFile.size,
+        type: studyFile.type
+      } : (studyFromNotes ? {
         id: null,
-        name: `${companyName} - Company Details.pdf`,
-        streamUrl: pdfStreamUrl,
-        downloadUrl: pdfStreamUrl
+        name: `${companyName} - Lead Study.pdf`,
+        streamUrl: studyFromNotes[1],
+        downloadUrl: studyFromNotes[1]
       } : null);
+
+      // 2. Pitch Deck
+      const pitchFile = filesByTag.get(`${slotIndex}_pitch`) || filesByTag.get(`${lead.id}_pitch`);
+      const pitchFromNotes = notes.match(/\[Pitch Deck:\s*([^\]]+)\]/);
+      const pitchDeck = pitchFile ? {
+        id: pitchFile.id,
+        name: pitchFile.name,
+        streamUrl: pitchFile.streamUrl,
+        downloadUrl: pitchFile.downloadUrl,
+        size: pitchFile.size,
+        type: pitchFile.type
+      } : (pitchFromNotes ? {
+        id: null,
+        name: `${companyName} - Pitch Deck.pdf`,
+        streamUrl: pitchFromNotes[1],
+        downloadUrl: pitchFromNotes[1]
+      } : null);
+
+      // 3. Key People
+      const kpFile = filesByTag.get(`${slotIndex}_keypeople`) || filesByTag.get(`${lead.id}_keypeople`);
+      const kpFromNotes = notes.match(/\[Key People:\s*([^\]]+)\]/);
+      let keyPeople = null;
+      if (kpFile) {
+        keyPeople = {
+          id: kpFile.id,
+          name: kpFile.name,
+          isLocked: !keyPeopleUnlocked,
+          streamUrl: keyPeopleUnlocked ? kpFile.streamUrl : null,
+          downloadUrl: keyPeopleUnlocked ? kpFile.downloadUrl : null,
+          size: kpFile.size,
+          type: kpFile.type
+        };
+      } else if (kpFromNotes) {
+        keyPeople = {
+          id: null,
+          name: `${companyName} - Key People.pdf`,
+          isLocked: !keyPeopleUnlocked,
+          streamUrl: keyPeopleUnlocked ? kpFromNotes[1] : null,
+          downloadUrl: keyPeopleUnlocked ? kpFromNotes[1] : null
+        };
+      }
 
       return {
         ...lead,
@@ -1196,7 +1261,12 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
         company: companyName,
         website: websiteUrl,
         slotIndex,
-        pdf
+        isAdditionalLead: Boolean(isAdditionalLead),
+        keyPeopleUnlocked: Boolean(keyPeopleUnlocked),
+        leadStudy,
+        pitchDeck,
+        keyPeople,
+        pdf: leadStudy // backwards compatibility
       };
     });
 
@@ -1213,7 +1283,8 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
       ticketId,
       leads: mappedLeads,
       count: mappedLeads.length,
-      allPrepared: mappedLeads.length >= 5 && mappedLeads.every(l => l.pdf)
+      isKeyPeoplePaid: Boolean(isKeyPeoplePaid),
+      allPrepared: mappedLeads.length >= 5 && mappedLeads.slice(0, 5).every(l => l.leadStudy)
     });
   } catch (error) {
     console.error('[Get Lead Onboarding Assets Error]:', error);
@@ -1221,7 +1292,7 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
   }
 };
 
-// @desc    Save a sample lead and/or upload its PDF document in the existing Assets system
+// @desc    Save a lead and/or upload its Lead Study, Pitch Deck, and Key People PDF documents
 // @route   POST /api/company/:companyId/lead-onboarding-assets
 // @access  Private (ADMIN, COMPANY_LEAD)
 export const saveCompanyLeadOnboardingAssets = async (req, res) => {
@@ -1236,7 +1307,7 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Company not found.' });
     }
 
-    const { leadIndex, leadId, leadData, file } = req.body;
+    const { leadIndex, leadId, leadData, isAdditional } = req.body;
 
     // Support both direct fields and nested leadData
     const rawCompanyName = req.body.companyName || req.body.leadName || req.body.name || leadData?.companyName || leadData?.company || leadData?.name;
@@ -1265,22 +1336,50 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
       return res.status(400).json({ success: false, message: 'A valid HTTP or HTTPS company website URL is required.' });
     }
 
-    // 3. Validate Company Details PDF (must be present and must be a PDF)
-    if (!file || (!file.dataUrl && !file.url)) {
-      return res.status(400).json({ success: false, message: 'Company details PDF document is required.' });
+    // Identify provided files:
+    // Lead Study PDF, Pitch Deck PDF, Key People PDF
+    // Also support single `file` property for backwards compatibility
+    const leadStudyDoc = req.body.leadStudy || req.body.leadStudyFile || (!req.body.pitchDeck && !req.body.keyPeople ? req.body.file : null);
+    const pitchDeckDoc = req.body.pitchDeck || req.body.pitchDeckFile || (req.body.file?.docType === 'pitch' ? req.body.file : null);
+    const keyPeopleDoc = req.body.keyPeople || req.body.keyPeopleFile || (req.body.file?.docType === 'keypeople' ? req.body.file : null);
+
+    if (!leadStudyDoc && !pitchDeckDoc && !keyPeopleDoc && !req.body.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one lead document (Lead Study, Pitch Deck, or Key People) PDF is required.'
+      });
     }
 
-    const fileNameLower = (file.name || '').toLowerCase();
-    const mimeLower = (file.type || file.mimeType || '').toLowerCase();
-    const isPdf = fileNameLower.endsWith('.pdf') || mimeLower.includes('pdf') || (typeof file.dataUrl === 'string' && file.dataUrl.startsWith('data:application/pdf'));
-    if (!isPdf) {
-      return res.status(400).json({ success: false, message: 'Uploaded document must be a PDF file.' });
+    const validatePdf = (doc, label) => {
+      if (!doc) return;
+      if (!doc.dataUrl && !doc.url) {
+        throw new Error(`${label} PDF document is required.`);
+      }
+      const fileNameLower = (doc.name || '').toLowerCase();
+      const mimeLower = (doc.type || doc.mimeType || '').toLowerCase();
+      const dataUrlStr = typeof doc.dataUrl === 'string' ? doc.dataUrl : (typeof doc.url === 'string' ? doc.url : '');
+      const isPdf = fileNameLower.endsWith('.pdf') || mimeLower.includes('pdf') || dataUrlStr.startsWith('data:application/pdf');
+      if (!isPdf) {
+        throw new Error(`${label} must be a PDF file.`);
+      }
+      if (typeof doc.size === 'number' && doc.size > 25 * 1024 * 1024) {
+        throw new Error(`${label} exceeds the maximum file size of 25MB.`);
+      }
+    };
+
+    try {
+      if (leadStudyDoc) validatePdf(leadStudyDoc, 'Lead Study');
+      if (pitchDeckDoc) validatePdf(pitchDeckDoc, 'Pitch Deck');
+      if (keyPeopleDoc) validatePdf(keyPeopleDoc, 'Key People');
+      if (req.body.file && !leadStudyDoc && !pitchDeckDoc && !keyPeopleDoc) validatePdf(req.body.file, 'Company details');
+    } catch (valErr) {
+      return res.status(400).json({ success: false, message: valErr.message });
     }
 
     let cleanIndex = null;
     if (leadId) {
       const idxRes = await query(`
-        SELECT id FROM company_leads WHERE company_id = $1 ORDER BY created_at ASC LIMIT 5
+        SELECT id FROM company_leads WHERE company_id = $1 ORDER BY created_at ASC
       `, [targetCompanyId]);
       const foundIdx = idxRes.rows.findIndex(r => String(r.id) === String(leadId));
       if (foundIdx !== -1) {
@@ -1289,20 +1388,21 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
     }
     if (!cleanIndex) {
       const parsed = parseInt(leadIndex, 10);
-      if (!isNaN(parsed) && parsed >= 1 && parsed <= 5) {
+      if (!isNaN(parsed) && parsed >= 1) {
         cleanIndex = parsed;
       } else {
         const countRes = await query('SELECT COUNT(*)::int as count FROM company_leads WHERE company_id = $1', [targetCompanyId]);
-        cleanIndex = Math.min(5, (countRes.rows[0]?.count || 0) + 1);
+        cleanIndex = (countRes.rows[0]?.count || 0) + 1;
       }
     }
-    const tag = `Lead 0${cleanIndex}`;
+    const tag = cleanIndex < 10 ? `Lead 0${cleanIndex}` : `Lead ${cleanIndex}`;
 
     const clientUserRes = await query(`
       SELECT id, name, email FROM users WHERE company_id = $1 AND role = 'USER' ORDER BY created_at ASC LIMIT 1
     `, [targetCompanyId]);
     const clientUserId = clientUserRes.rows[0]?.id || req.user.id;
 
+    // Resolve or create ticket
     let request;
     const reqCheck = await query(`
       SELECT * FROM requests 
@@ -1342,38 +1442,72 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
           request_id, ticket_code, version, title, description, status,
           submitted_by, submitted_by_name, submitted_at
         ) VALUES (
-          $1, $2, 1, 'Company Lead Onboarding Deliverables',
-          'Approved onboarding sample leads and PDF profile documentation.',
+          $1, $2, 1, 'Company Lead Deliverables',
+          'Lead research dossiers, pitch decks, and Key People documents.',
           'APPROVED', $3, $4, NOW()
         ) RETURNING *
       `, [request.id, request.ticket_id, req.user.id, req.user.name]);
       submission = insertSub.rows[0];
     }
 
-    // Delete existing file for this tag slot in existing asset storage
-    await query(`
-      DELETE FROM submission_files
-      WHERE submission_id = $1 AND name ILIKE $2
-    `, [submission.id, `[${tag}]%`]);
+    // Helper to store a file in submission_files
+    const storeFile = async (doc, docTypeLabel, nameSuffix) => {
+      if (!doc) return null;
 
-    const fileName = `[${tag}] ${companyName} - Company Details.pdf`;
-    const mime = file.type || file.mimeType || 'application/pdf';
-    const size = file.size ? (typeof file.size === 'number' ? `${(file.size / 1024).toFixed(1)} KB` : String(file.size)) : 'Unknown';
-    const url = file.dataUrl || file.url || '';
+      // Delete existing file for this tag slot and type
+      await query(`
+        DELETE FROM submission_files
+        WHERE submission_id = $1 AND (
+          name ILIKE $2 OR name ILIKE $3
+        )
+      `, [submission.id, `[${tag}][${docTypeLabel}]%`, `[${tag}]%${nameSuffix}%`]);
 
-    const insFile = await query(`
-      INSERT INTO submission_files (submission_id, name, url, size, type, created_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
-      RETURNING *
-    `, [submission.id, fileName, url, size, mime]);
-    const fileRecord = insFile.rows[0];
-    const streamUrl = `/api/assets/${fileRecord.id}/stream`;
-    const downloadUrl = `/api/assets/${fileRecord.id}/download`;
+      const fileName = `[${tag}][${docTypeLabel}] ${companyName} - ${nameSuffix}.pdf`;
+      const mime = doc.type || doc.mimeType || 'application/pdf';
+      const size = doc.size ? (typeof doc.size === 'number' ? `${(doc.size / 1024).toFixed(1)} KB` : String(doc.size)) : 'Unknown';
+      const url = doc.dataUrl || doc.url || '';
 
-    // Notes format with website and asset stream link
-    const notesWithMeta = `[Website: ${website}]\n[Lead PDF: ${streamUrl}]`;
+      const ins = await query(`
+        INSERT INTO submission_files (submission_id, name, url, size, type, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        RETURNING *
+      `, [submission.id, fileName, url, size, mime]);
 
-    // Now update or insert the lead in company_leads
+      const fileRecord = ins.rows[0];
+      return {
+        id: fileRecord.id,
+        name: fileRecord.name,
+        size: fileRecord.size,
+        type: fileRecord.type,
+        streamUrl: `/api/assets/${fileRecord.id}/stream`,
+        downloadUrl: `/api/assets/${fileRecord.id}/download`
+      };
+    };
+
+    let studyRecord = null;
+    let pitchRecord = null;
+    let kpRecord = null;
+
+    if (leadStudyDoc) {
+      studyRecord = await storeFile(leadStudyDoc, 'Lead Study', 'Lead Study');
+    }
+    if (pitchDeckDoc) {
+      pitchRecord = await storeFile(pitchDeckDoc, 'Pitch Deck', 'Pitch Deck');
+    }
+    if (keyPeopleDoc) {
+      kpRecord = await storeFile(keyPeopleDoc, 'Key People', 'Key People');
+    }
+
+    const primaryRecord = studyRecord || pitchRecord || kpRecord;
+
+    const leadTypeStr = (isAdditional || cleanIndex > 5) ? 'ADDITIONAL' : 'SAMPLE';
+    let notesWithMeta = `[Website: ${website}]\n[Lead Type: ${leadTypeStr}]`;
+    if (studyRecord) notesWithMeta += `\n[Lead Study: ${studyRecord.streamUrl}]\n[Lead PDF: ${studyRecord.streamUrl}]`;
+    if (pitchRecord) notesWithMeta += `\n[Pitch Deck: ${pitchRecord.streamUrl}]`;
+    if (kpRecord) notesWithMeta += `\n[Key People: ${kpRecord.streamUrl}]`;
+    if (req.body.ticketId) notesWithMeta += `\n[Ticket: ${req.body.ticketId}]`;
+
+    // Update or insert the lead in company_leads
     let savedLead = null;
     if (leadId) {
       const resLead = await query(`
@@ -1407,30 +1541,144 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
 
     return res.json({
       success: true,
-      message: `Sample lead for ${companyName} saved successfully.`,
+      message: `Lead for ${companyName} saved successfully.`,
       ticketId: request.ticket_id,
       lead: {
         ...savedLead,
         companyName: savedLead.lead_company || savedLead.name,
         website: savedLead.linkedin,
-        pdf: {
-          id: fileRecord.id,
-          name: fileRecord.name,
-          streamUrl,
-          downloadUrl
-        }
+        slotIndex: cleanIndex,
+        leadStudy: studyRecord,
+        pitchDeck: pitchRecord,
+        keyPeople: kpRecord,
+        pdf: studyRecord || primaryRecord
       },
-      fileUrl: streamUrl,
-      file: {
-        id: fileRecord.id,
-        name: fileRecord.name,
-        streamUrl,
-        downloadUrl
-      }
+      fileUrl: primaryRecord?.streamUrl || null,
+      file: primaryRecord
     });
   } catch (error) {
     console.error('[Save Lead Onboarding Assets Error]:', error);
     return res.status(500).json({ success: false, message: 'Failed to save lead onboarding work.' });
   }
 };
+
+// @desc    Initiate or check Key People intelligence unlock access for a company
+// @route   POST /api/company/:companyId/unlock-key-people
+// @access  Private (Client User of company or Admin)
+export const unlockKeyPeople = async (req, res) => {
+  try {
+    const targetCompanyId = (!req.params.companyId || req.params.companyId === 'my-company')
+      ? (req.user.companyId || (req.user.company && (req.user.company.id || req.user.company._id)))
+      : req.params.companyId;
+
+    if (!targetCompanyId) {
+      return res.status(400).json({ success: false, message: 'Company ID required.' });
+    }
+
+    if (req.user.role === 'USER') {
+      const userCompanyId = req.user.companyId || (req.user.company && (req.user.company.id || req.user.company._id));
+      if (String(userCompanyId) !== String(targetCompanyId)) {
+        return res.status(403).json({ success: false, message: 'Forbidden.' });
+      }
+    }
+
+    const company = await findCompanyById(targetCompanyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found.' });
+    }
+
+    // Check if already paid
+    const existingPaid = await query(`
+      SELECT r.id, r.ticket_id FROM requests r
+      WHERE r.company_id = $1 AND r.service_type = 'COMPANY_LEAD'
+        AND (r.title ILIKE '%Key People%' OR r.description ILIKE '%Key People%')
+        AND r.payment_status = 'PAID'
+      LIMIT 1
+    `, [targetCompanyId]);
+
+    if (existingPaid.rows.length > 0) {
+      return res.json({
+        success: true,
+        alreadyUnlocked: true,
+        message: 'Key People intelligence is already unlocked for your company.',
+        ticketId: existingPaid.rows[0].ticket_id
+      });
+    }
+
+    // Check if there is already an existing pending request for Key People
+    const existingPending = await query(`
+      SELECT r.*, r.ticket_id AS "ticketId", r.service_type AS "serviceType"
+      FROM requests r
+      WHERE r.company_id = $1 AND r.service_type = 'COMPANY_LEAD'
+        AND (r.title ILIKE '%Key People%' OR r.description ILIKE '%Key People%')
+        AND r.payment_status != 'PAID'
+      ORDER BY r.created_at DESC LIMIT 1
+    `, [targetCompanyId]);
+
+    if (existingPending.rows.length > 0) {
+      const reqRow = existingPending.rows[0];
+      return res.json({
+        success: true,
+        alreadyUnlocked: false,
+        request: {
+          _id: reqRow.id,
+          id: reqRow.id,
+          ticketId: reqRow.ticket_id,
+          title: reqRow.title,
+          description: reqRow.description,
+          serviceType: reqRow.service_type,
+          price: Number(reqRow.price) || 199,
+          paymentStatus: reqRow.payment_status,
+          status: reqRow.status,
+          priority: reqRow.priority,
+          assignedTeam: reqRow.assigned_team || 'Company Lead Team'
+        }
+      });
+    }
+
+    // Create a new request for Key People unlocking
+    const countRes = await query('SELECT COUNT(*)::int as count FROM requests');
+    const ticketId = `CG-LEAD-KP-${1000 + (countRes.rows[0]?.count || 0) + 1}`;
+    const insertReq = await query(`
+      INSERT INTO requests (
+        ticket_id, user_id, company_id, service_type, title, description,
+        priority, status, price, payment_status, assigned_team, created_at, updated_at
+      ) VALUES (
+        $1, $2, $3, 'COMPANY_LEAD', $4, $5,
+        'HIGH', 'REQUEST_CREATED', 199, 'PENDING', 'Company Lead Team', NOW(), NOW()
+      ) RETURNING *, ticket_id AS "ticketId", service_type AS "serviceType"
+    `, [
+      ticketId,
+      req.user.id || req.user._id,
+      targetCompanyId,
+      `Key People Intelligence Access · ${company.name}`,
+      'Unlock verified Key People documents and executive stakeholder dossiers for company leads.'
+    ]);
+
+    const createdReq = insertReq.rows[0];
+
+    return res.json({
+      success: true,
+      alreadyUnlocked: false,
+      message: 'Key People unlock request created. Complete payment to activate access.',
+      request: {
+        _id: createdReq.id,
+        id: createdReq.id,
+        ticketId: createdReq.ticket_id,
+        title: createdReq.title,
+        description: createdReq.description,
+        serviceType: createdReq.service_type,
+        price: 199,
+        paymentStatus: 'PENDING',
+        status: createdReq.status,
+        priority: 'HIGH',
+        assignedTeam: 'Company Lead Team'
+      }
+    });
+  } catch (error) {
+    console.error('[Unlock Key People Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to initiate Key People unlock.' });
+  }
+};
+
 

@@ -15,7 +15,10 @@ import {
   previewWelcomeEmailHandler,
   sendWelcomeEmailHandler,
   getEmailHistoryHandler,
-  clearEmailHistoryHandler
+  clearEmailHistoryHandler,
+  downloadBulkTemplateHandler,
+  bulkValidateClientsHandler,
+  bulkCreateClientsHandler
 } from '../controllers/userController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -23,6 +26,9 @@ const router = express.Router();
 
 router.use(protect, authorize('ADMIN'));
 
+router.get('/users/bulk-template', downloadBulkTemplateHandler);
+router.post('/users/bulk-validate', bulkValidateClientsHandler);
+router.post('/users/bulk-create', bulkCreateClientsHandler);
 router.post('/users', createClientUser);
 router.post('/team-members', createTeamUser);
 router.get('/users', getAllUsers);

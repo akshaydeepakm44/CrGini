@@ -15,6 +15,7 @@ import {
   saveCompanyUiOnboardingAssets,
   getCompanyLeadOnboardingAssets,
   saveCompanyLeadOnboardingAssets,
+  unlockKeyPeople,
   getOnboardingClients,
   updateCompanyResearchHandler,
   getCompanyLeadsByCompanyId,
@@ -60,6 +61,8 @@ router.post('/:companyId/ui-onboarding-assets', protect, authorize('ADMIN', 'LAN
 router.get('/my-company/lead-onboarding-assets', protect, getCompanyLeadOnboardingAssets);
 router.get('/:companyId/lead-onboarding-assets', protect, getCompanyLeadOnboardingAssets);
 router.post('/:companyId/lead-onboarding-assets', protect, authorize('ADMIN', 'COMPANY_LEAD'), saveCompanyLeadOnboardingAssets);
+router.post('/my-company/unlock-key-people', protect, unlockKeyPeople);
+router.post('/:companyId/unlock-key-people', protect, unlockKeyPeople);
 
 // User Company Lead routes
 router.get('/my-company', protect, getMyCompany);

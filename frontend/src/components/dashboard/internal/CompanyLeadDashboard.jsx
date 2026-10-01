@@ -45,6 +45,7 @@ import WorkSubmissionModal from '../common/WorkSubmissionModal';
 import NotificationPanel from '../common/NotificationPanel';
 import ActivityTimeline from '../common/ActivityTimeline';
 import ChangePasswordSection from '../../common/ChangePasswordSection';
+import PdfViewerModal from '../../common/PdfViewerModal';
 
 export default function CompanyLeadDashboard({ user, onLogout }) {
   const navigate = useNavigate();
@@ -97,15 +98,22 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
   const [loadingClientDetails, setLoadingClientDetails] = useState(false);
   const [uploadingLeadPdfId, setUploadingLeadPdfId] = useState(null);
 
-  // Sample Lead form state (exact fields: Company Name, Company Website URL, Company Details PDF)
+  // Sample Lead form state (Fields: Company Name, Company Website URL, Lead Study PDF, Pitch Deck PDF, Key People PDF)
   const [sampleLeadForm, setSampleLeadForm] = useState({
     companyName: '',
     website: '',
-    file: null,
-    fileName: ''
+    leadStudyFile: null,
+    leadStudyFileName: '',
+    pitchDeckFile: null,
+    pitchDeckFileName: '',
+    keyPeopleFile: null,
+    keyPeopleFileName: ''
   });
   const [isSubmittingSampleLead, setIsSubmittingSampleLead] = useState(false);
-  const samplePdfInputRef = useRef(null);
+  const [viewingLeadPdf, setViewingLeadPdf] = useState(null);
+  const leadStudyInputRef = useRef(null);
+  const pitchDeckInputRef = useRef(null);
+  const keyPeopleInputRef = useRef(null);
 
   // New Lead form state
   const [newLeadForm, setNewLeadForm] = useState({
@@ -231,12 +239,16 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     setSampleLeadForm({
       companyName: '',
       website: '',
-      file: null,
-      fileName: ''
+      leadStudyFile: null,
+      leadStudyFileName: '',
+      pitchDeckFile: null,
+      pitchDeckFileName: '',
+      keyPeopleFile: null,
+      keyPeopleFileName: ''
     });
-    if (samplePdfInputRef.current) {
-      samplePdfInputRef.current.value = '';
-    }
+    if (leadStudyInputRef.current) leadStudyInputRef.current.value = '';
+    if (pitchDeckInputRef.current) pitchDeckInputRef.current.value = '';
+    if (keyPeopleInputRef.current) keyPeopleInputRef.current.value = '';
 
     try {
       setLoadingClientDetails(true);
@@ -281,7 +293,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     }
   };
 
-  // Submit sample lead (Exact structure: Company Name, Company Website URL, Company Details PDF)
+  // Submit sample lead (Fields: Company Name, Company Website URL, Lead Study PDF, Pitch Deck PDF, Key People PDF)
   const handleSubmitSampleLead = async (e) => {
     e.preventDefault();
     if (!selectedOnboardingClient) return;
@@ -297,48 +309,90 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       return;
     }
 
-    if (!sampleLeadForm.file) {
-      alert('Company Details PDF document is required.');
+    if (!sampleLeadForm.leadStudyFile) {
+      alert('Lead Study PDF document is required.');
+      return;
+    }
+    if (!sampleLeadForm.pitchDeckFile) {
+      alert('Pitch Deck PDF document is required.');
+      return;
+    }
+    if (!sampleLeadForm.keyPeopleFile) {
+      alert('Key People PDF document is required.');
+      return;
+    }
+
+    const maxSizeBytes = 25 * 1024 * 1024;
+    const checkFile = (file, label) => {
+      if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+        throw new Error(`${label} must be a valid PDF document.`);
+      }
+      if (file.size > maxSizeBytes) {
+        throw new Error(`${label} exceeds the maximum allowed file size of 25MB.`);
+      }
+    };
+
+    try {
+      checkFile(sampleLeadForm.leadStudyFile, 'Lead Study');
+      checkFile(sampleLeadForm.pitchDeckFile, 'Pitch Deck');
+      checkFile(sampleLeadForm.keyPeopleFile, 'Key People');
+    } catch (valErr) {
+      alert(valErr.message);
       return;
     }
 
     try {
       setIsSubmittingSampleLead(true);
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        try {
-          const leadIndex = clientLeads.length + 1;
-          await api.saveCompanyLeadOnboardingAssets(selectedOnboardingClient.id, {
-            leadIndex: Math.min(5, leadIndex),
-            companyName: sampleLeadForm.companyName.trim(),
-            website: sampleLeadForm.website.trim(),
-            file: {
-              name: sampleLeadForm.file.name,
-              size: sampleLeadForm.file.size,
-              type: sampleLeadForm.file.type || 'application/pdf',
-              dataUrl: event.target.result
-            }
+
+      const readFileAsDataUrl = (file) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => resolve({
+            name: file.name,
+            size: file.size,
+            type: file.type || 'application/pdf',
+            dataUrl: event.target.result
           });
-          setSampleLeadForm({
-            companyName: '',
-            website: '',
-            file: null,
-            fileName: ''
-          });
-          if (samplePdfInputRef.current) {
-            samplePdfInputRef.current.value = '';
-          }
-          await refreshClientData(selectedOnboardingClient.id);
-          alert('Sample lead submitted successfully.');
-        } catch (err) {
-          alert('Failed to submit sample lead: ' + err.message);
-        } finally {
-          setIsSubmittingSampleLead(false);
-        }
+          reader.onerror = (err) => reject(err);
+          reader.readAsDataURL(file);
+        });
       };
-      reader.readAsDataURL(sampleLeadForm.file);
+
+      const [leadStudyDoc, pitchDeckDoc, keyPeopleDoc] = await Promise.all([
+        readFileAsDataUrl(sampleLeadForm.leadStudyFile),
+        readFileAsDataUrl(sampleLeadForm.pitchDeckFile),
+        readFileAsDataUrl(sampleLeadForm.keyPeopleFile)
+      ]);
+
+      const leadIndex = clientLeads.length + 1;
+      await api.saveCompanyLeadOnboardingAssets(selectedOnboardingClient.id, {
+        leadIndex: Math.min(5, leadIndex),
+        companyName: sampleLeadForm.companyName.trim(),
+        website: sampleLeadForm.website.trim(),
+        leadStudy: leadStudyDoc,
+        pitchDeck: pitchDeckDoc,
+        keyPeople: keyPeopleDoc
+      });
+
+      setSampleLeadForm({
+        companyName: '',
+        website: '',
+        leadStudyFile: null,
+        leadStudyFileName: '',
+        pitchDeckFile: null,
+        pitchDeckFileName: '',
+        keyPeopleFile: null,
+        keyPeopleFileName: ''
+      });
+      if (leadStudyInputRef.current) leadStudyInputRef.current.value = '';
+      if (pitchDeckInputRef.current) pitchDeckInputRef.current.value = '';
+      if (keyPeopleInputRef.current) keyPeopleInputRef.current.value = '';
+
+      await refreshClientData(selectedOnboardingClient.id);
+      alert('Sample lead submitted successfully.');
     } catch (err) {
-      alert('Failed to read PDF file: ' + err.message);
+      alert('Failed to submit sample lead: ' + err.message);
+    } finally {
       setIsSubmittingSampleLead(false);
     }
   };
@@ -430,37 +484,55 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     }
   };
 
-  // Upload PDF Documentation for a Lead
-  const handleUploadLeadPdf = async (lead, e) => {
+  // Upload or replace PDF Documentation for a Lead (docType: 'leadStudy' | 'pitchDeck' | 'keyPeople')
+  const handleUploadLeadPdf = async (lead, e, docType = 'leadStudy') => {
     const file = e.target.files?.[0];
     if (!file || !selectedOnboardingClient) return;
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      alert('Please select a PDF document.');
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      alert('Please select a valid PDF document.');
       return;
     }
+    const maxSizeBytes = 25 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      alert('PDF document exceeds the maximum allowed file size of 25MB.');
+      return;
+    }
+
     try {
-      setUploadingLeadPdfId(lead.id);
+      setUploadingLeadPdfId(`${lead.id || lead.slotIndex}_${docType}`);
       const reader = new FileReader();
       reader.onload = async (event) => {
         try {
-          const leadIndex = clientLeads.findIndex(l => l.id === lead.id);
+          const leadIndex = clientLeads.findIndex(l => (lead.id && l.id === lead.id) || (lead.slotIndex && l.slotIndex === lead.slotIndex));
           const compName = lead.companyName || lead.company || lead.name;
           const compWeb = lead.website || (lead.notes?.match(/\[Website:\s*([^\]]+)\]/)?.[1]) || lead.linkedin;
-          await api.saveCompanyLeadOnboardingAssets(selectedOnboardingClient.id, {
+          
+          const payload = {
             leadId: lead.id,
-            leadIndex: leadIndex >= 0 ? leadIndex + 1 : 1,
+            leadIndex: leadIndex >= 0 ? leadIndex + 1 : (lead.slotIndex || 1),
             companyName: compName,
-            website: compWeb,
-            file: {
-              name: file.name,
-              size: file.size,
-              type: file.type || 'application/pdf',
-              dataUrl: event.target.result
-            }
-          });
+            website: compWeb
+          };
+
+          const fileData = {
+            name: file.name,
+            size: file.size,
+            type: file.type || 'application/pdf',
+            dataUrl: event.target.result
+          };
+
+          if (docType === 'pitchDeck') {
+            payload.pitchDeck = fileData;
+          } else if (docType === 'keyPeople') {
+            payload.keyPeople = fileData;
+          } else {
+            payload.leadStudy = fileData;
+          }
+
+          await api.saveCompanyLeadOnboardingAssets(selectedOnboardingClient.id, payload);
           await refreshClientData(selectedOnboardingClient.id);
         } catch (err) {
-          alert('Failed to upload lead PDF: ' + err.message);
+          alert('Failed to upload lead document: ' + err.message);
         } finally {
           setUploadingLeadPdfId(null);
         }
@@ -2411,12 +2483,13 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                         </span>
                       </div>
 
-                      {/* Clean 3-Field Sample Lead Submission Form */}
+                      {/* Clean 5-Field Sample Lead Submission Form */}
                       <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '16px' }}>
                         <h5 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Plus size={15} color="#00D9FF" /> Add Sample Lead
                         </h5>
                         <form onSubmit={handleSubmitSampleLead}>
+                          {/* Row 1: Company Name & Company Website URL */}
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginBottom: '14px' }}>
                             <div>
                               <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
@@ -2444,16 +2517,21 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                 required
                               />
                             </div>
+                          </div>
+
+                          {/* Row 2: 3 PDF Document Fields */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+                            {/* Lead Study PDF */}
                             <div>
                               <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                                Company Details PDF <span style={{ color: '#ef4444' }}>*</span>
+                                Lead Study PDF <span style={{ color: '#ef4444' }}>*</span>
                               </label>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <label
                                   className="portal-btn-secondary"
                                   style={{
-                                    padding: '8px 14px',
-                                    fontSize: '0.8rem',
+                                    padding: '7px 12px',
+                                    fontSize: '0.78rem',
                                     cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -2461,10 +2539,10 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                     flexShrink: 0
                                   }}
                                 >
-                                  <Upload size={14} color="#00D9FF" />
-                                  <span>{sampleLeadForm.file ? 'Change PDF' : 'Select PDF'}</span>
+                                  <Upload size={13} color="#00D9FF" />
+                                  <span>{sampleLeadForm.leadStudyFile ? 'Change PDF' : 'Choose PDF'}</span>
                                   <input
-                                    ref={samplePdfInputRef}
+                                    ref={leadStudyInputRef}
                                     type="file"
                                     accept=".pdf,application/pdf"
                                     style={{ display: 'none' }}
@@ -2476,36 +2554,160 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                           e.target.value = '';
                                           return;
                                         }
+                                        if (file.size > 25 * 1024 * 1024) {
+                                          alert('PDF file exceeds the maximum size limit of 25MB.');
+                                          e.target.value = '';
+                                          return;
+                                        }
                                         setSampleLeadForm(prev => ({
                                           ...prev,
-                                          file,
-                                          fileName: file.name
+                                          leadStudyFile: file,
+                                          leadStudyFileName: file.name
                                         }));
                                       }
                                     }}
                                   />
                                 </label>
                                 <span style={{
-                                  fontSize: '0.78rem',
-                                  color: sampleLeadForm.fileName ? '#34d399' : '#64748B',
+                                  fontSize: '0.75rem',
+                                  color: sampleLeadForm.leadStudyFileName ? '#34d399' : '#64748B',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap'
-                                }}>
-                                  {sampleLeadForm.fileName || 'No PDF selected (required)'}
+                                }} title={sampleLeadForm.leadStudyFileName}>
+                                  {sampleLeadForm.leadStudyFileName || 'No PDF chosen (required)'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Pitch Deck PDF */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
+                                Pitch Deck PDF <span style={{ color: '#ef4444' }}>*</span>
+                              </label>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <label
+                                  className="portal-btn-secondary"
+                                  style={{
+                                    padding: '7px 12px',
+                                    fontSize: '0.78rem',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  <Upload size={13} color="#00D9FF" />
+                                  <span>{sampleLeadForm.pitchDeckFile ? 'Change PDF' : 'Choose PDF'}</span>
+                                  <input
+                                    ref={pitchDeckInputRef}
+                                    type="file"
+                                    accept=".pdf,application/pdf"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+                                          alert('Please select a valid PDF file.');
+                                          e.target.value = '';
+                                          return;
+                                        }
+                                        if (file.size > 25 * 1024 * 1024) {
+                                          alert('PDF file exceeds the maximum size limit of 25MB.');
+                                          e.target.value = '';
+                                          return;
+                                        }
+                                        setSampleLeadForm(prev => ({
+                                          ...prev,
+                                          pitchDeckFile: file,
+                                          pitchDeckFileName: file.name
+                                        }));
+                                      }
+                                    }}
+                                  />
+                                </label>
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  color: sampleLeadForm.pitchDeckFileName ? '#34d399' : '#64748B',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }} title={sampleLeadForm.pitchDeckFileName}>
+                                  {sampleLeadForm.pitchDeckFileName || 'No PDF chosen (required)'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Key People PDF */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
+                                Key People PDF <span style={{ color: '#ef4444' }}>*</span>
+                              </label>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <label
+                                  className="portal-btn-secondary"
+                                  style={{
+                                    padding: '7px 12px',
+                                    fontSize: '0.78rem',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  <Upload size={13} color="#00D9FF" />
+                                  <span>{sampleLeadForm.keyPeopleFile ? 'Change PDF' : 'Choose PDF'}</span>
+                                  <input
+                                    ref={keyPeopleInputRef}
+                                    type="file"
+                                    accept=".pdf,application/pdf"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+                                          alert('Please select a valid PDF file.');
+                                          e.target.value = '';
+                                          return;
+                                        }
+                                        if (file.size > 25 * 1024 * 1024) {
+                                          alert('PDF file exceeds the maximum size limit of 25MB.');
+                                          e.target.value = '';
+                                          return;
+                                        }
+                                        setSampleLeadForm(prev => ({
+                                          ...prev,
+                                          keyPeopleFile: file,
+                                          keyPeopleFileName: file.name
+                                        }));
+                                      }
+                                    }}
+                                  />
+                                </label>
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  color: sampleLeadForm.keyPeopleFileName ? '#34d399' : '#64748B',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }} title={sampleLeadForm.keyPeopleFileName}>
+                                  {sampleLeadForm.keyPeopleFileName || 'No PDF chosen (required)'}
                                 </span>
                               </div>
                             </div>
                           </div>
+
                           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                             <button
                               type="submit"
                               className="portal-btn-primary"
-                              disabled={isSubmittingSampleLead || !sampleLeadForm.companyName.trim() || !sampleLeadForm.website.trim() || !sampleLeadForm.file}
+                              disabled={isSubmittingSampleLead || !sampleLeadForm.companyName.trim() || !sampleLeadForm.website.trim() || !sampleLeadForm.leadStudyFile || !sampleLeadForm.pitchDeckFile || !sampleLeadForm.keyPeopleFile}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
                             >
                               <Plus size={14} />
-                              <span>{isSubmittingSampleLead ? 'Uploading Sample Lead...' : 'Submit Sample Lead'}</span>
+                              <span>{isSubmittingSampleLead ? 'Saving Lead...' : 'Submit / Save Lead'}</span>
                             </button>
                           </div>
                         </form>
@@ -2522,35 +2724,126 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                           </div>
                         ) : (
                           <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
-                            <table className="request-table">
+                            <table className="request-table" style={{ width: '100%', minWidth: '780px' }}>
                               <thead>
                                 <tr>
-                                  <th style={{ width: '50px' }}>#</th>
+                                  <th style={{ width: '45px' }}>#</th>
                                   <th>Company Name</th>
-                                  <th>Company Website</th>
-                                  <th>Company Details PDF</th>
-                                  <th style={{ textAlign: 'right', width: '80px' }}>Actions</th>
+                                  <th>Company URL</th>
+                                  <th>Lead Study</th>
+                                  <th>Pitch Deck</th>
+                                  <th>Key People</th>
+                                  <th style={{ textAlign: 'right', width: '70px' }}>Actions</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {clientLeads.map((lead, idx) => {
                                   const companyName = lead.companyName || lead.company || lead.name || '—';
-                                  const website = lead.website || (lead.notes?.match(/\[Website:\s*([^\]]+)\]/)?.[1]) || lead.linkedin;
-                                  const pdfUrl = lead.pdf?.streamUrl || lead.source_reference || lead.sourceReference || (lead.notes?.match(/\[Lead PDF:\s*([^\]]+)\]/)?.[1]);
+                                  const rawWebsite = lead.website || (lead.notes?.match(/\[Website:\s*([^\]]+)\]/)?.[1]) || lead.linkedin || '';
+                                  const websiteHref = rawWebsite ? (rawWebsite.startsWith('http') ? rawWebsite : `https://${rawWebsite}`) : '';
+                                  const displayUrl = rawWebsite.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+
+                                  const leadStudyDoc = lead.leadStudy || (lead.pdf && !lead.pitchDeck && !lead.keyPeople ? lead.pdf : null);
+                                  const pitchDeckDoc = lead.pitchDeck;
+                                  const keyPeopleDoc = lead.keyPeople;
+
+                                  const renderDocCell = (doc, docType, label) => {
+                                    const uploadKey = `${lead.id || lead.slotIndex}_${docType}`;
+                                    const isUploading = uploadingLeadPdfId === uploadKey;
+
+                                    if (isUploading) {
+                                      return (
+                                        <span style={{ fontSize: '0.74rem', color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                          <Clock size={11} className="spin" /> Uploading...
+                                        </span>
+                                      );
+                                    }
+
+                                    const streamUrl = doc?.streamUrl || (typeof doc === 'string' ? doc : null);
+                                    const downloadUrl = doc?.downloadUrl || streamUrl;
+
+                                    if (streamUrl) {
+                                      return (
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                          <button
+                                            type="button"
+                                            onClick={() => setViewingLeadPdf({
+                                              title: `${companyName} — ${label}`,
+                                              documentType: label,
+                                              companyName,
+                                              streamUrl,
+                                              downloadUrl,
+                                              fileName: `${companyName.replace(/\s+/g, '_')}_${label.replace(/\s+/g, '_')}.pdf`
+                                            })}
+                                            className="portal-btn-secondary"
+                                            style={{ padding: '3px 8px', fontSize: '0.74rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                            title={`View ${label}`}
+                                          >
+                                            <FileText size={11} />
+                                            <span>View</span>
+                                          </button>
+                                          <label
+                                            className="portal-btn-secondary"
+                                            style={{ padding: '3px 8px', fontSize: '0.74rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                            title={`Replace ${label}`}
+                                          >
+                                            <Upload size={11} color="#00D9FF" />
+                                            <span>Replace</span>
+                                            <input
+                                              type="file"
+                                              accept=".pdf,application/pdf"
+                                              style={{ display: 'none' }}
+                                              onChange={(e) => handleUploadLeadPdf(lead, e, docType)}
+                                            />
+                                          </label>
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: '0.74rem', color: '#f59e0b', fontWeight: '500' }}>
+                                          Not Uploaded
+                                        </span>
+                                        <label
+                                          className="portal-btn-primary"
+                                          style={{
+                                            padding: '3px 8px',
+                                            fontSize: '0.74rem',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            fontWeight: '700'
+                                          }}
+                                          title={`Upload ${label}`}
+                                        >
+                                          <Upload size={11} />
+                                          <span>Upload</span>
+                                          <input
+                                            type="file"
+                                            accept=".pdf,application/pdf"
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => handleUploadLeadPdf(lead, e, docType)}
+                                          />
+                                        </label>
+                                      </div>
+                                    );
+                                  };
 
                                   return (
                                     <tr key={lead.id || idx}>
                                       <td style={{ fontWeight: '600', color: '#94A3B8' }}>{lead.slotIndex || idx + 1}</td>
                                       <td style={{ fontWeight: '600', color: '#F5F5F5' }}>
-                                        {website && /^https?:\/\//i.test(website) ? (
+                                        {websiteHref ? (
                                           <a
-                                            href={website}
+                                            href={websiteHref}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             style={{ color: '#F5F5F5', textDecoration: 'none' }}
                                             onMouseEnter={(e) => { e.currentTarget.style.color = '#00D9FF'; }}
                                             onMouseLeave={(e) => { e.currentTarget.style.color = '#F5F5F5'; }}
-                                            title={`Visit ${companyName} website`}
+                                            title={`Visit ${companyName} website in new tab`}
                                           >
                                             {companyName}
                                           </a>
@@ -2558,81 +2851,36 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                           <span>{companyName}</span>
                                         )}
                                       </td>
-                                      <td>
-                                        {website ? (
+                                      <td style={{ maxWidth: '180px' }}>
+                                        {websiteHref ? (
                                           <a
-                                            href={website.startsWith('http') ? website : `https://${website}`}
+                                            href={websiteHref}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            style={{ color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none', fontSize: '0.82rem' }}
+                                            style={{
+                                              color: '#00D9FF',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              textDecoration: 'none',
+                                              fontSize: '0.8rem',
+                                              maxWidth: '170px',
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis',
+                                              whiteSpace: 'nowrap'
+                                            }}
+                                            title={rawWebsite}
                                           >
-                                            <span>{website}</span>
-                                            <ExternalLink size={11} />
+                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayUrl}</span>
+                                            <ExternalLink size={11} style={{ flexShrink: 0 }} />
                                           </a>
                                         ) : (
                                           <span style={{ color: '#64748B' }}>—</span>
                                         )}
                                       </td>
-                                      <td>
-                                        {uploadingLeadPdfId === lead.id ? (
-                                          <span style={{ fontSize: '0.75rem', color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                            <Clock size={12} className="spin" /> Uploading PDF...
-                                          </span>
-                                        ) : pdfUrl ? (
-                                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                                            <a
-                                              href={pdfUrl}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="portal-btn-secondary"
-                                              style={{ padding: '3px 10px', fontSize: '0.75rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                              title="View Company Details PDF"
-                                            >
-                                              <FileText size={12} />
-                                              <span>View PDF</span>
-                                            </a>
-                                            <label
-                                              className="portal-btn-secondary"
-                                              style={{ padding: '3px 10px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                              title="Replace Company Details PDF"
-                                            >
-                                              <Upload size={11} color="#00D9FF" />
-                                              <span>Replace PDF</span>
-                                              <input
-                                                type="file"
-                                                accept=".pdf,application/pdf"
-                                                style={{ display: 'none' }}
-                                                onChange={(e) => handleUploadLeadPdf(lead, e)}
-                                              />
-                                            </label>
-                                          </div>
-                                        ) : (
-                                          <label
-                                            className="portal-btn-primary"
-                                            style={{
-                                              padding: '3px 10px',
-                                              fontSize: '0.75rem',
-                                              cursor: 'pointer',
-                                              background: 'linear-gradient(135deg, #00D9FF 0%, #0284c7 100%)',
-                                              color: '#030303',
-                                              fontWeight: '700',
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: '4px'
-                                            }}
-                                            title="Upload Company Details PDF"
-                                          >
-                                            <Upload size={12} />
-                                            <span>Upload PDF</span>
-                                            <input
-                                              type="file"
-                                              accept=".pdf,application/pdf"
-                                              style={{ display: 'none' }}
-                                              onChange={(e) => handleUploadLeadPdf(lead, e)}
-                                            />
-                                          </label>
-                                        )}
-                                      </td>
+                                      <td>{renderDocCell(leadStudyDoc, 'leadStudy', 'Lead Study')}</td>
+                                      <td>{renderDocCell(pitchDeckDoc, 'pitchDeck', 'Pitch Deck')}</td>
+                                      <td>{renderDocCell(keyPeopleDoc, 'keyPeople', 'Key People')}</td>
                                       <td style={{ textAlign: 'right' }}>
                                         <button
                                           type="button"
@@ -2830,6 +3078,17 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
         </div>
       )}
 
+      {/* Reusable Internal PDF Viewer Modal */}
+      <PdfViewerModal
+        isOpen={Boolean(viewingLeadPdf)}
+        onClose={() => setViewingLeadPdf(null)}
+        title={viewingLeadPdf?.title}
+        documentType={viewingLeadPdf?.documentType}
+        companyName={viewingLeadPdf?.companyName}
+        streamUrl={viewingLeadPdf?.streamUrl}
+        downloadUrl={viewingLeadPdf?.downloadUrl}
+        fileName={viewingLeadPdf?.fileName}
+      />
     </div>
   );
 }

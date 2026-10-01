@@ -1,4 +1,5 @@
 import { findAssets, findAssetById } from '../repositories/assetRepository.js';
+import { query } from '../config/postgres.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -25,6 +26,45 @@ const canUserAccessAsset = (user, asset) => {
   const isUserMatch = Boolean(asset.userId && String(user._id || user.id) === String(asset.userId));
 
   return isCompanyMatch || isUserMatch;
+};
+
+/**
+ * Enforce Key People document protection:
+ * - Free/sample leads: requires Key People payment.
+ * - Additional leads from paid Request More Leads ticket: automatically included.
+ * - Admin and Company Lead specialists: always allowed.
+ */
+export const checkKeyPeopleEntitlement = async (user, asset) => {
+  if (!user || !asset) return false;
+  if (['ADMIN', 'COMPANY_LEAD'].includes(user.role)) return true;
+
+  const fileName = asset.fileName || asset.name || '';
+  const isKeyPeopleDoc = /\[Key\s*People\]/i.test(fileName) || /Key[-_\s]People/i.test(fileName);
+  if (!isKeyPeopleDoc) return true; // not a Key People document
+
+  // If this asset was generated for a paid additional lead sprint (not onboarding sample)
+  const isPaidTicket = (asset.paymentStatus === 'PAID' || asset.payment_status === 'PAID') &&
+    asset.serviceType === 'COMPANY_LEAD' &&
+    asset.ticketCode &&
+    !asset.ticketCode.startsWith('CG-LEAD-ONB-');
+
+  if (isPaidTicket) {
+    return true;
+  }
+
+  // Otherwise, check if user's company has paid for Key People access
+  const companyId = asset.companyId || user.companyId || (user.company && (user.company.id || user.company._id));
+  if (!companyId) return false;
+
+  const kpRes = await query(`
+    SELECT id FROM requests
+    WHERE company_id = $1 AND service_type = 'COMPANY_LEAD'
+      AND (title ILIKE '%Key People%' OR description ILIKE '%Key People%')
+      AND payment_status = 'PAID'
+    LIMIT 1
+  `, [companyId]);
+
+  return kpRes.rows.length > 0;
 };
 
 /**
@@ -163,6 +203,13 @@ export const getAssetById = async (req, res) => {
       });
     }
 
+    if (!(await checkKeyPeopleEntitlement(req.user, asset))) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Key People access requires payment.',
+      });
+    }
+
     // Sanitize storage URL for client metadata response
     const { url, ...safeAsset } = asset;
 
@@ -199,6 +246,13 @@ export const streamAsset = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Forbidden: You do not have permission to access this asset.',
+      });
+    }
+
+    if (!(await checkKeyPeopleEntitlement(req.user, asset))) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Key People access requires payment.',
       });
     }
 
@@ -341,6 +395,13 @@ export const downloadAsset = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Forbidden: You do not have permission to download this asset.',
+      });
+    }
+
+    if (!(await checkKeyPeopleEntitlement(req.user, asset))) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Key People access requires payment.',
       });
     }
 

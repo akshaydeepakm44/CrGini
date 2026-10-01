@@ -42,6 +42,7 @@ const mapAssetRow = (row) => {
     companyName: row.company_name || 'Client Workspace',
     clientName: row.client_name || 'Client User',
     clientEmail: row.client_email || null,
+    paymentStatus: row.payment_status || null,
   };
 };
 
@@ -203,6 +204,7 @@ export const findAssetById = async (assetId) => {
       r.service_type,
       r.user_id,
       r.company_id,
+      r.payment_status,
       c.name AS company_name,
       u.name AS client_name,
       u.email AS client_email

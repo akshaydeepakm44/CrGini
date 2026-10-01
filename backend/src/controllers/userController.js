@@ -30,6 +30,16 @@ import {
   clearEmailHistory,
   clearEmailDedupeCache
 } from '../services/emailService.js';
+import {
+  validateEmail,
+  validatePassword,
+  validateUrl,
+  validateBulkOnboarding,
+  executeBulkOnboarding,
+  getCsvTemplateString,
+  dispatchClientOnboardingWorkflows,
+  CSV_TEMPLATE_HEADERS
+} from '../services/onboardingService.js';
 
 // Helper to generate a friendly secure temporary password
 const generateTempPassword = () => {
@@ -75,6 +85,27 @@ export const createClientUser = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Company name, client name, and email are required.'
+      });
+    }
+
+    if (!validateEmail(userEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format. Please provide a valid email address.'
+      });
+    }
+
+    if (password && !validatePassword(password)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Temporary password must be at least 8 characters and contain at least one letter and one number.'
+      });
+    }
+
+    if (website && website.trim() && !validateUrl(website.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Website must be a valid HTTP or HTTPS URL (e.g. https://example.com).'
       });
     }
 
@@ -128,114 +159,29 @@ export const createClientUser = async (req, res) => {
       details: `Admin ${req.user.name} created client user ${clientName} for company ${compName} (${userEmail}).`
     });
 
-    // 4. Resolve active internal team members strictly by role and active status
-    try {
-      const activeSpecialistsRes = await query(`
-        SELECT id, name, email, role, status, company_lead, company_boost, company_ui, company_id
-        FROM users
-        WHERE is_deleted = false
-          AND status = 'ACTIVE'
-          AND role != 'ADMIN'
-          AND (
-            role IN ('COMPANY_LEAD', 'COMPANY_BOOST', 'LANDING_PAGE')
-            OR company_lead = true
-            OR company_boost = true
-            OR company_ui = true
-          )
-        ORDER BY created_at ASC
-      `);
-
-      const clientEmailClean = (userEmail || '').toLowerCase().trim();
-
-      // Ensure no client user (including newly created) and no admin is included
-      const isInternalMember = (u) =>
-        !u.company_id &&
-        u.id !== user.id &&
-        u.email?.toLowerCase().trim() !== clientEmailClean &&
-        u.role !== 'ADMIN';
-
-      const leadMembers = activeSpecialistsRes.rows.filter(
-        u => isInternalMember(u) && (u.role === 'COMPANY_LEAD' || Boolean(u.company_lead))
-      );
-      const boostMembers = activeSpecialistsRes.rows.filter(
-        u => isInternalMember(u) && (u.role === 'COMPANY_BOOST' || Boolean(u.company_boost))
-      );
-      const uiMembers = activeSpecialistsRes.rows.filter(
-        u => isInternalMember(u) && (u.role === 'LANDING_PAGE' || Boolean(u.company_ui))
-      );
-
-      const leadEmails = Array.from(new Set(
-        leadMembers.map(u => u.email?.trim()).filter(Boolean)
-      ));
-      const boostEmails = Array.from(new Set(
-        boostMembers.map(u => u.email?.trim()).filter(Boolean)
-      ));
-      const uiEmails = Array.from(new Set(
-        uiMembers.map(u => u.email?.trim()).filter(Boolean)
-      ));
-
-      if (leadEmails.length === 0) {
-        console.warn(`[ONBOARDING WARNING] No active COMPANY_LEAD team members registered in users table for client "${compName}".`);
-      }
-      if (boostEmails.length === 0) {
-        console.warn(`[ONBOARDING WARNING] No active COMPANY_BOOST team members registered in users table for client "${compName}".`);
-      }
-      if (uiEmails.length === 0) {
-        console.warn(`[ONBOARDING WARNING] No active LANDING_PAGE team members registered in users table for client "${compName}".`);
-      }
-
-      // Create in-app notifications for all matching active internal specialists
-      const allNotifiedInternalUsers = [
-        ...leadMembers,
-        ...boostMembers,
-        ...uiMembers
-      ].reduce((acc, current) => {
-        if (!acc.some(u => u.id === current.id)) acc.push(current);
-        return acc;
-      }, []);
-
-      for (const internalUser of allNotifiedInternalUsers) {
-        try {
-          await createNotification({
-            userId: internalUser.id,
-            type: 'ASSIGNMENT',
-            title: `New Client Onboarded: ${compName}`,
-            message: `A new client (${compName}) has been onboarded. Please prepare and submit the required sample work for your team.`
-          });
-        } catch (notifErr) {
-          console.warn('[INTERNAL NOTIF WARNING]:', notifErr.message);
-        }
-      }
-
-      // Dispatch team-specific internal notification emails
-      let portalBase = (process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '');
-      const originHeader = req.headers.origin || req.headers.referer;
-      if (originHeader) {
-        try {
-          const parsed = new URL(originHeader);
-          portalBase = `${parsed.protocol}//${parsed.host}`;
-        } catch (_) {}
-      }
-
-      await sendInternalClientOnboardingEmails({
-        client: { name: clientName, email: userEmail },
-        company: {
-          id: company.id,
-          name: compName,
-          contactPerson: clientName,
-          website: website || null,
-          industry: industry || 'Technology / SaaS',
-          email: userEmail,
-          companyInfo: companyInfo || description || null
-        },
-        leadRecipients: leadEmails,
-        boostRecipients: boostEmails,
-        uiRecipients: uiEmails,
-        portalBase
-      });
-    } catch (notifErr) {
-      console.error('[INTERNAL ONBOARDING NOTIFICATION ERROR]:', notifErr);
+    // 4. Dispatch onboarding notifications and emails to internal teams
+    let portalBase = (process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '');
+    const originHeader = req.headers.origin || req.headers.referer;
+    if (originHeader) {
+      try {
+        const parsed = new URL(originHeader);
+        portalBase = `${parsed.protocol}//${parsed.host}`;
+      } catch (_) {}
     }
+
+    await dispatchClientOnboardingWorkflows({
+      client: { name: clientName, email: userEmail },
+      company: {
+        id: company.id,
+        name: compName,
+        contactPerson: clientName,
+        website: website || null,
+        industry: industry || 'Technology / SaaS',
+        email: userEmail,
+        companyInfo: companyInfo || description || null
+      },
+      portalBase
+    });
 
     return res.status(201).json({
       success: true,
@@ -1142,3 +1088,91 @@ export const clearEmailHistoryHandler = async (req, res) => {
     message: 'Email history and dedupe cache cleared successfully.'
   });
 };
+
+// @desc    Download CSV template for bulk onboarding
+// @route   GET /api/admin/users/bulk-template
+// @access  Private (ADMIN only)
+export const downloadBulkTemplateHandler = async (req, res) => {
+  try {
+    const csvContent = getCsvTemplateString();
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="creativegini_bulk_onboarding_template.csv"');
+    return res.status(200).send(csvContent);
+  } catch (error) {
+    console.error('Download bulk template error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to generate CSV template.' });
+  }
+};
+
+// @desc    Validate CSV for bulk client onboarding and generate preview
+// @route   POST /api/admin/users/bulk-validate
+// @access  Private (ADMIN only)
+export const bulkValidateClientsHandler = async (req, res) => {
+  try {
+    const csvText = req.body?.csvText || (typeof req.body === 'string' ? req.body : '');
+    if (!csvText || !csvText.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'No CSV content provided. Please upload a valid CSV file.'
+      });
+    }
+
+    const result = await validateBulkOnboarding(csvText);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error('Bulk validate clients error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to validate bulk CSV. ' + error.message
+    });
+  }
+};
+
+// @desc    Execute bulk client onboarding from previewed batch or CSV
+// @route   POST /api/admin/users/bulk-create
+// @access  Private (ADMIN only)
+export const bulkCreateClientsHandler = async (req, res) => {
+  try {
+    const { batchId, csvText } = req.body;
+    if (!batchId && !csvText) {
+      return res.status(400).json({
+        success: false,
+        message: 'Batch ID or CSV text is required to execute bulk onboarding.'
+      });
+    }
+
+    let portalBase = (process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '');
+    const originHeader = req.headers.origin || req.headers.referer;
+    if (originHeader) {
+      try {
+        const parsed = new URL(originHeader);
+        portalBase = `${parsed.protocol}//${parsed.host}`;
+      } catch (_) {}
+    }
+
+    const result = await executeBulkOnboarding({
+      batchId,
+      csvText,
+      adminUser: req.user,
+      portalBase
+    });
+
+    if (!result.success) {
+      const statusCode = result.isDoubleSubmit ? 409 : 400;
+      return res.status(statusCode).json(result);
+    }
+
+    return res.status(201).json(result);
+  } catch (error) {
+    console.error('Bulk create clients error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to execute bulk onboarding. ' + error.message
+    });
+  }
+};
+
