@@ -1,4 +1,5 @@
 import { query } from '../config/postgres.js';
+import { uploadFile, deleteFile, isDataUrl, isMinioObjectKey } from '../services/storageService.js';
 
 /**
  * Ensure performance indexes exist for fast asset joins.
@@ -247,15 +248,35 @@ export const findOnboardingTicketByUserId = async (userId) => {
 export const replaceSubmissionFiles = async (submissionId, files = []) => {
   if (!submissionId) return [];
 
-  // Remove previous files for this submission
+  // Query previous files for cleanup
+  const oldFilesRes = await query(`SELECT id, url FROM submission_files WHERE submission_id = $1`, [submissionId]);
+  const oldObjectKeys = oldFilesRes.rows
+    .map(r => r.url)
+    .filter(u => isMinioObjectKey(u));
+
+  // Remove previous files from database
   await query(`DELETE FROM submission_files WHERE submission_id = $1`, [submissionId]);
 
   const inserted = [];
   for (const file of files) {
     if (!file) continue;
     const fileName = file.name || file.fileName;
-    const fileUrl = file.url || file.dataUrl;
+    let fileUrl = file.url || file.dataUrl;
     if (!fileName || !fileUrl) continue;
+
+    if (isDataUrl(fileUrl)) {
+      try {
+        const uploadRes = await uploadFile({
+          dataUrl: fileUrl,
+          originalName: fileName,
+          mimeType: file.type || file.mimeType,
+          prefix: `submissions/${submissionId}`,
+        });
+        fileUrl = uploadRes.objectKey;
+      } catch (uploadErr) {
+        console.error('[replaceSubmissionFiles] MinIO upload error, falling back:', uploadErr.message);
+      }
+    }
 
     const res = await query(`
       INSERT INTO submission_files (
@@ -276,6 +297,13 @@ export const replaceSubmissionFiles = async (submissionId, files = []) => {
     ]);
 
     inserted.push(res.rows[0]);
+  }
+
+  // Safely delete old MinIO objects
+  for (const oldKey of oldObjectKeys) {
+    if (!inserted.some(ins => ins.url === oldKey)) {
+      deleteFile(oldKey).catch(err => console.warn('[MinIO cleanup error]:', err.message));
+    }
   }
 
   return inserted;

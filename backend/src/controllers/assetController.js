@@ -1,5 +1,6 @@
 import { findAssets, findAssetById } from '../repositories/assetRepository.js';
 import { query } from '../config/postgres.js';
+import { getFileStream, getObjectStat, isMinioObjectKey } from '../services/storageService.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -355,10 +356,59 @@ export const streamAsset = async (req, res) => {
       }
     }
 
-    // If external mock URL (e.g. https://creativegini.com/files/...), generate a placeholder SVG or redirect
-    if (storageUrl && storageUrl.startsWith('http')) {
-      // In development / demo, if the external file is on a public server, we can redirect or pipe
-      return res.redirect(storageUrl);
+    // Handle MinIO Object Key
+    if (storageUrl && (isMinioObjectKey(storageUrl) || (!storageUrl.startsWith('data:') && !storageUrl.startsWith('http') && !fs.existsSync(storageUrl)))) {
+      try {
+        const stat = await getObjectStat(storageUrl).catch(() => null);
+        const totalSize = stat ? stat.size : null;
+        const effectiveMime = stat?.metaData?.['content-type'] || mimeType;
+        const range = req.headers.range;
+
+        if (range && totalSize !== null) {
+          const parts = range.replace(/bytes=/, '').split('-');
+          const start = parseInt(parts[0], 10);
+          let end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+          if (end >= totalSize) {
+            end = totalSize - 1;
+          }
+
+          if (isNaN(start) || start >= totalSize || start > end) {
+            res.setHeader('Content-Range', `bytes */${totalSize}`);
+            return res.status(416).send('Requested range not satisfiable');
+          }
+
+          const chunkLength = end - start + 1;
+          const stream = await getFileStream(storageUrl, { offset: start, length: chunkLength });
+
+          res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunkLength,
+            'Content-Type': effectiveMime,
+            'Cache-Control': 'private, max-age=86400',
+          });
+          return stream.pipe(res);
+        }
+
+        const stream = await getFileStream(storageUrl);
+        const headers = {
+          'Accept-Ranges': 'bytes',
+          'Content-Type': effectiveMime,
+          'Cache-Control': 'private, max-age=86400',
+        };
+        if (totalSize !== null) {
+          headers['Content-Length'] = totalSize;
+        }
+
+        res.writeHead(200, headers);
+        return stream.pipe(res);
+      } catch (minioErr) {
+        console.error('[AssetController.streamAsset] MinIO fetch error:', minioErr.message);
+        return res.status(404).json({
+          success: false,
+          message: 'Asset media stream unavailable from object storage.',
+        });
+      }
     }
 
     // Default: Content not found
@@ -432,6 +482,33 @@ export const downloadAsset = async (req, res) => {
     // Handle external URL
     if (storageUrl && storageUrl.startsWith('http')) {
       return res.redirect(storageUrl);
+    }
+
+    // Handle MinIO Object Key
+    if (storageUrl && (isMinioObjectKey(storageUrl) || (!storageUrl.startsWith('data:') && !storageUrl.startsWith('http') && !fs.existsSync(storageUrl)))) {
+      try {
+        const stat = await getObjectStat(storageUrl).catch(() => null);
+        const effectiveMime = stat?.metaData?.['content-type'] || mimeType;
+        const stream = await getFileStream(storageUrl);
+
+        const headers = {
+          'Content-Type': effectiveMime,
+          'Content-Disposition': `attachment; filename="${safeFilename}"`,
+          'Cache-Control': 'no-cache',
+        };
+        if (stat?.size) {
+          headers['Content-Length'] = stat.size;
+        }
+
+        res.writeHead(200, headers);
+        return stream.pipe(res);
+      } catch (minioErr) {
+        console.error('[AssetController.downloadAsset] MinIO download error:', minioErr.message);
+        return res.status(404).json({
+          success: false,
+          message: 'Asset file not available for download from object storage.',
+        });
+      }
     }
 
     return res.status(404).json({

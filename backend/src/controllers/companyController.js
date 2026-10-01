@@ -11,6 +11,7 @@ import {
   updateCompany,
 } from '../repositories/companyRepository.js';
 import { query } from '../config/postgres.js';
+import { uploadFile, deleteFile, isDataUrl, isMinioObjectKey } from '../services/storageService.js';
 
 // Verification validation helper
 const isLeadVerified = (lead) => {
@@ -689,7 +690,7 @@ export const saveCompanyOnboardingAssets = async (req, res) => {
 
     const { poster, video, strategicPlan, devrelPlan } = req.body || {};
 
-    // Helper to safely upsert an onboarding file without duplicate rows or corrupting existing assets
+    // Helper to safely upsert an onboarding file with MinIO upload and safe replacement
     const upsertFile = async (tag, fileData, defaultMime) => {
       if (!fileData) return;
 
@@ -705,24 +706,55 @@ export const saveCompanyOnboardingAssets = async (req, res) => {
         }
       }
 
-      const url = fileData.dataUrl || fileData.url || '';
+      let url = fileData.dataUrl || fileData.url || '';
       if (!url) return;
 
-      // Remove previous matching file for this tag in this submission
+      const fileName = `[${tag}] ${fileData.name || tag}`;
+      const mime = fileData.mimeType || fileData.type || (tag === 'Poster' ? 'image/png' : tag === 'Video' ? 'video/mp4' : 'application/pdf');
+      const size = fileData.size ? (typeof fileData.size === 'number' ? `${(fileData.size / 1024).toFixed(1)} KB` : String(fileData.size)) : 'Unknown';
+
+      // Find old files for this tag to delete from MinIO AFTER new file upload & DB insert
+      const oldFilesRes = await query(`
+        SELECT id, url FROM submission_files
+        WHERE submission_id = $1 AND (name ILIKE $2 OR ($3 != '' AND type ILIKE $3))
+      `, [submission.id, `[${tag}]%`, defaultMime ? `${defaultMime}%` : '']);
+      const oldObjectKeys = oldFilesRes.rows
+        .map(r => r.url)
+        .filter(u => isMinioObjectKey(u));
+
+      // If url is a Data URL, upload to MinIO first
+      if (isDataUrl(url)) {
+        try {
+          const uploadRes = await uploadFile({
+            dataUrl: url,
+            originalName: fileData.name || tag,
+            mimeType: mime,
+            prefix: `onboarding/boost/${targetCompanyId}`,
+          });
+          url = uploadRes.objectKey;
+        } catch (uploadErr) {
+          console.error('[saveCompanyOnboardingAssets] MinIO upload error, falling back:', uploadErr.message);
+        }
+      }
+
+      // Remove previous matching file from DB
       await query(`
         DELETE FROM submission_files
         WHERE submission_id = $1 AND (name ILIKE $2 OR ($3 != '' AND type ILIKE $3))
       `, [submission.id, `[${tag}]%`, defaultMime ? `${defaultMime}%` : '']);
 
       // Insert new or replaced file
-      const fileName = `[${tag}] ${fileData.name || tag}`;
-      const mime = fileData.mimeType || fileData.type || (tag === 'Poster' ? 'image/png' : tag === 'Video' ? 'video/mp4' : 'application/pdf');
-      const size = fileData.size ? (typeof fileData.size === 'number' ? `${(fileData.size / 1024).toFixed(1)} KB` : String(fileData.size)) : 'Unknown';
-
       await query(`
         INSERT INTO submission_files (submission_id, name, url, size, type, created_at)
         VALUES ($1, $2, $3, $4, $5, NOW())
       `, [submission.id, fileName, url, size, mime]);
+
+      // Safely delete old MinIO objects now that the new object and DB update succeeded
+      for (const oldKey of oldObjectKeys) {
+        if (oldKey !== url) {
+          deleteFile(oldKey).catch(err => console.warn('[MinIO cleanup error]:', err.message));
+        }
+      }
     };
 
     if (poster) await upsertFile('Poster', poster, 'image');
@@ -1056,20 +1088,50 @@ export const saveCompanyUiOnboardingAssets = async (req, res) => {
 
     const upsertFile = async (tag, fileData, defaultMime) => {
       if (!fileData) return;
+
+      // Find old files for this tag to delete from MinIO AFTER new file upload & DB insert
+      const oldFilesRes = await query(`
+        SELECT id, url FROM submission_files
+        WHERE submission_id = $1 AND name ILIKE $2
+      `, [submission.id, `[${tag}]%`]);
+      const oldObjectKeys = oldFilesRes.rows
+        .map(r => r.url)
+        .filter(u => isMinioObjectKey(u));
+
+      const fileName = `[${tag}] ${fileData.name || tag}`;
+      const mime = fileData.mimeType || fileData.type || defaultMime || 'application/pdf';
+      const size = fileData.size ? (typeof fileData.size === 'number' ? `${(fileData.size / 1024).toFixed(1)} KB` : String(fileData.size)) : 'Unknown';
+      let url = fileData.dataUrl || fileData.url || '';
+
+      if (isDataUrl(url)) {
+        try {
+          const uploadRes = await uploadFile({
+            dataUrl: url,
+            originalName: fileData.name || tag,
+            mimeType: mime,
+            prefix: `onboarding/ui/${targetCompanyId}`,
+          });
+          url = uploadRes.objectKey;
+        } catch (uploadErr) {
+          console.error('[Save UI Onboarding Assets] MinIO upload error, falling back:', uploadErr.message);
+        }
+      }
+
       await query(`
         DELETE FROM submission_files
         WHERE submission_id = $1 AND name ILIKE $2
       `, [submission.id, `[${tag}]%`]);
 
-      const fileName = `[${tag}] ${fileData.name || tag}`;
-      const mime = fileData.mimeType || fileData.type || defaultMime || 'application/pdf';
-      const size = fileData.size ? (typeof fileData.size === 'number' ? `${(fileData.size / 1024).toFixed(1)} KB` : String(fileData.size)) : 'Unknown';
-      const url = fileData.dataUrl || fileData.url || '';
-
       await query(`
         INSERT INTO submission_files (submission_id, name, url, size, type, created_at)
         VALUES ($1, $2, $3, $4, $5, NOW())
       `, [submission.id, fileName, url, size, mime]);
+
+      for (const oldKey of oldObjectKeys) {
+        if (oldKey !== url) {
+          deleteFile(oldKey).catch(err => console.warn('[MinIO cleanup error]:', err.message));
+        }
+      }
     };
 
     if (uiAnalysis) await upsertFile('UI/UX Analysis', uiAnalysis, 'application/pdf');
@@ -1450,11 +1512,42 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
       submission = insertSub.rows[0];
     }
 
-    // Helper to store a file in submission_files
+    // Helper to store a file in submission_files and MinIO
     const storeFile = async (doc, docTypeLabel, nameSuffix) => {
       if (!doc) return null;
 
-      // Delete existing file for this tag slot and type
+      // Find old file url to clean up MinIO AFTER new upload and DB update
+      const oldFilesRes = await query(`
+        SELECT id, url FROM submission_files
+        WHERE submission_id = $1 AND (
+          name ILIKE $2 OR name ILIKE $3
+        )
+      `, [submission.id, `[${tag}][${docTypeLabel}]%`, `[${tag}]%${nameSuffix}%`]);
+      const oldObjectKeys = oldFilesRes.rows
+        .map(r => r.url)
+        .filter(u => isMinioObjectKey(u));
+
+      const fileName = `[${tag}][${docTypeLabel}] ${companyName} - ${nameSuffix}.pdf`;
+      const mime = doc.type || doc.mimeType || 'application/pdf';
+      const size = doc.size ? (typeof doc.size === 'number' ? `${(doc.size / 1024).toFixed(1)} KB` : String(doc.size)) : 'Unknown';
+      let url = doc.dataUrl || doc.url || '';
+
+      // Upload Data URL to MinIO
+      if (isDataUrl(url)) {
+        try {
+          const uploadRes = await uploadFile({
+            dataUrl: url,
+            originalName: `${companyName} - ${nameSuffix}.pdf`,
+            mimeType: mime,
+            prefix: `leads/${targetCompanyId}`,
+          });
+          url = uploadRes.objectKey;
+        } catch (uploadErr) {
+          console.error('[saveCompanyLeadOnboardingAssets] MinIO upload error, falling back:', uploadErr.message);
+        }
+      }
+
+      // Delete existing file for this tag slot and type from DB
       await query(`
         DELETE FROM submission_files
         WHERE submission_id = $1 AND (
@@ -1462,16 +1555,18 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
         )
       `, [submission.id, `[${tag}][${docTypeLabel}]%`, `[${tag}]%${nameSuffix}%`]);
 
-      const fileName = `[${tag}][${docTypeLabel}] ${companyName} - ${nameSuffix}.pdf`;
-      const mime = doc.type || doc.mimeType || 'application/pdf';
-      const size = doc.size ? (typeof doc.size === 'number' ? `${(doc.size / 1024).toFixed(1)} KB` : String(doc.size)) : 'Unknown';
-      const url = doc.dataUrl || doc.url || '';
-
       const ins = await query(`
         INSERT INTO submission_files (submission_id, name, url, size, type, created_at)
         VALUES ($1, $2, $3, $4, $5, NOW())
         RETURNING *
       `, [submission.id, fileName, url, size, mime]);
+
+      // Safely delete old MinIO objects
+      for (const oldKey of oldObjectKeys) {
+        if (oldKey !== url) {
+          deleteFile(oldKey).catch(err => console.warn('[MinIO cleanup error]:', err.message));
+        }
+      }
 
       const fileRecord = ins.rows[0];
       return {

@@ -36,6 +36,11 @@ import {
   sendTicketCompletedEmail,
 } from '../services/emailService.js';
 
+import {
+  uploadFile,
+  isDataUrl,
+} from '../services/storageService.js';
+
 /**
  * Resolve a submission by either:
  * - PostgreSQL UUID
@@ -163,16 +168,29 @@ export const createSubmission = async (req, res) => {
 
     // Store submission files through the repository.
     if (Array.isArray(files) && files.length > 0) {
+      const { addSubmissionFile } = await import('../repositories/submissionRepository.js');
       for (const file of files) {
         if (!file) continue;
 
-        await import('../repositories/submissionRepository.js').then(
-          ({ addSubmissionFile }) =>
-            addSubmissionFile(submission._id, {
-              ...file,
-              url: file.url || file.path || `/uploads/${encodeURIComponent(file.name || 'deliverable')}`
-            })
-        );
+        let fileUrl = file.url || file.dataUrl || file.path || `/uploads/${encodeURIComponent(file.name || 'deliverable')}`;
+        if (isDataUrl(fileUrl)) {
+          try {
+            const uploadResult = await uploadFile({
+              dataUrl: fileUrl,
+              originalName: file.name || 'deliverable',
+              mimeType: file.type || file.mimeType,
+              prefix: `submissions/${submission._id}`,
+            });
+            fileUrl = uploadResult.objectKey;
+          } catch (uploadErr) {
+            console.error('[SubmissionController] MinIO upload error, falling back:', uploadErr.message);
+          }
+        }
+
+        await addSubmissionFile(submission._id, {
+          ...file,
+          url: fileUrl,
+        });
       }
     }
 
