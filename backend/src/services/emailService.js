@@ -107,9 +107,6 @@ export const getTransporter = () => {
 
     try {
       transporterInstance = nodemailer.createTransport({
-        pool: true,
-        maxConnections: 3,
-        maxMessages: 100,
         host,
         port,
         secure,

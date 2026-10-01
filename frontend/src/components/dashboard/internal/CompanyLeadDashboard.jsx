@@ -132,15 +132,6 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
   const [editingLead, setEditingLead] = useState(null);
   const [isUpdatingLead, setIsUpdatingLead] = useState(false);
 
-  // New Key Person form state
-  const [newKeyPersonForm, setNewKeyPersonForm] = useState({
-    name: '',
-    role: '',
-    department: '',
-    contact: '',
-    socialProfile: ''
-  });
-  const [isAddingKeyPerson, setIsAddingKeyPerson] = useState(false);
 
   // Sidebar Collapse, Mobile Drawer, Profile Dropdown
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -228,13 +219,6 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       status: 'PENDING',
       notes: ''
     });
-    setNewKeyPersonForm({
-      name: '',
-      role: '',
-      department: '',
-      contact: '',
-      socialProfile: ''
-    });
 
     setSampleLeadForm({
       companyName: '',
@@ -243,12 +227,12 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       leadStudyFileName: '',
       pitchDeckFile: null,
       pitchDeckFileName: '',
-      keyPeopleFile: null,
-      keyPeopleFileName: ''
+      keyPeopleEmails: []
     });
+    setKeyPersonEmailInput('');
+    setKeyPersonEmailError('');
     if (leadStudyInputRef.current) leadStudyInputRef.current.value = '';
     if (pitchDeckInputRef.current) pitchDeckInputRef.current.value = '';
-    if (keyPeopleInputRef.current) keyPeopleInputRef.current.value = '';
 
     try {
       setLoadingClientDetails(true);
@@ -305,13 +289,13 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
       setKeyPersonEmailError('Please enter a valid email address (e.g. name@company.com).');
       return;
     }
-    if (sampleLeadForm.keyPeopleEmails.includes(trimmed)) {
+    if ((sampleLeadForm.keyPeopleEmails || []).includes(trimmed)) {
       setKeyPersonEmailError('This email address has already been added.');
       return;
     }
     setSampleLeadForm(prev => ({
       ...prev,
-      keyPeopleEmails: [...prev.keyPeopleEmails, trimmed]
+      keyPeopleEmails: [...(prev.keyPeopleEmails || []), trimmed]
     }));
     setKeyPersonEmailInput('');
     setKeyPersonEmailError('');
@@ -320,7 +304,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
   const handleRemoveKeyPersonEmail = (indexToRemove) => {
     setSampleLeadForm(prev => ({
       ...prev,
-      keyPeopleEmails: prev.keyPeopleEmails.filter((_, idx) => idx !== indexToRemove)
+      keyPeopleEmails: (prev.keyPeopleEmails || []).filter((_, idx) => idx !== indexToRemove)
     }));
   };
 
@@ -346,7 +330,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     }
 
     // Automatically include any pending input in the email input field
-    let currentEmails = [...sampleLeadForm.keyPeopleEmails];
+    let currentEmails = [...(sampleLeadForm.keyPeopleEmails || [])];
     const pendingInput = keyPersonEmailInput.trim().toLowerCase();
     if (pendingInput) {
       if (!emailRegex.test(pendingInput)) {
@@ -585,43 +569,6 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     }
   };
 
-  // Add Key Person
-  const handleAddKeyPerson = async (e) => {
-    e.preventDefault();
-    if (!selectedOnboardingClient) return;
-    if (!newKeyPersonForm.name.trim()) {
-      alert('Stakeholder name is required.');
-      return;
-    }
-
-    try {
-      setIsAddingKeyPerson(true);
-      await api.addKeyPerson(selectedOnboardingClient.id, newKeyPersonForm);
-      await refreshClientData(selectedOnboardingClient.id);
-      setNewKeyPersonForm({
-        name: '',
-        role: '',
-        department: '',
-        contact: '',
-        socialProfile: ''
-      });
-    } catch (err) {
-      alert('Failed to add stakeholder: ' + err.message);
-    } finally {
-      setIsAddingKeyPerson(false);
-    }
-  };
-
-  // Delete Key Person
-  const handleDeleteKeyPerson = async (personId) => {
-    if (!confirm('Are you sure you want to delete this stakeholder?')) return;
-    try {
-      await api.deleteKeyPerson(personId);
-      await refreshClientData(selectedOnboardingClient.id);
-    } catch (err) {
-      alert('Failed to delete stakeholder: ' + err.message);
-    }
-  };
 
   const handleOpenTicket = async (ticket, initialTab) => {
     setSelectedTicket(ticket);
@@ -1806,7 +1753,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                     Client Onboarding & Sample Leads Workspace
                   </h3>
                   <p style={{ fontSize: '0.85rem', color: '#94A3B8', margin: 0 }}>
-                    When a new client account is created, the Company Lead team prepares initial sample work: Company Study / Research, at least 5 Sample Leads, and Key Stakeholders with LinkedIn profiles.
+                    When a new client account is created, the Company Lead team prepares initial sample work: Company Study / Research and at least 5 Sample Leads.
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1906,7 +1853,6 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                         <th>Industry & Web</th>
                         <th>Company Study</th>
                         <th>Sample Leads</th>
-                        <th>Key Stakeholders</th>
                         <th>Onboarding State</th>
                         <th style={{ textAlign: 'right' }}>Actions</th>
                       </tr>
@@ -1976,14 +1922,6 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                 <span style={{ fontSize: '0.74rem', color: (ls.leadsWithPdfCount || 0) >= 5 ? '#34d399' : '#00D9FF' }}>
                                   {ls.leadsWithPdfCount || 0} / 5 with PDF Document
                                 </span>
-                              </div>
-                            </td>
-                            <td>
-                              <div style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>
-                                <strong>{ls.keyPeopleCount || 0}</strong> Stakeholders
-                              </div>
-                              <div style={{ fontSize: '0.74rem', color: '#94A3B8' }}>
-                                {ls.linkedInCount || 0} LinkedIn Profiles
                               </div>
                             </td>
                             <td>
@@ -2416,27 +2354,6 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                   <span style={{ fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', padding: '1px 6px', borderRadius: '8px' }}>{clientLeads.length}/5</span>
                 )}
               </button>
-
-              <button
-                type="button"
-                onClick={() => setActivePrepTab('keyPeople')}
-                style={{
-                  padding: '12px 16px',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: activePrepTab === 'keyPeople' ? '2px solid #00D9FF' : '2px solid transparent',
-                  color: activePrepTab === 'keyPeople' ? '#00D9FF' : '#94A3B8',
-                  fontWeight: activePrepTab === 'keyPeople' ? '700' : '500',
-                  fontSize: '0.86rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <UserCheck size={15} />
-                <span>3. Key Stakeholders ({clientKeyPeople.length})</span>
-              </button>
             </div>
 
             {/* Modal Body */}
@@ -2755,9 +2672,9 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                               </div>
                             )}
 
-                            {sampleLeadForm.keyPeopleEmails.length > 0 && (
+                            {(sampleLeadForm.keyPeopleEmails || []).length > 0 && (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
-                                {sampleLeadForm.keyPeopleEmails.map((email, idx) => (
+                                {(sampleLeadForm.keyPeopleEmails || []).map((email, idx) => (
                                   <div
                                     key={idx}
                                     style={{
@@ -2804,7 +2721,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                 ? 'Enter company name to begin'
                                 : !sampleLeadForm.website.trim()
                                 ? 'Enter website URL'
-                                : (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && sampleLeadForm.keyPeopleEmails.length === 0 && !keyPersonEmailInput.trim())
+                                : (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && (sampleLeadForm.keyPeopleEmails || []).length === 0 && !keyPersonEmailInput.trim())
                                 ? 'Attach at least one PDF or add a Key Person email'
                                 : 'Ready to save lead'}
                             </span>
@@ -2812,7 +2729,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                               type="submit"
                               id="btn-submit-sample-lead"
                               className="portal-btn-primary"
-                              disabled={isSubmittingSampleLead || !sampleLeadForm.companyName.trim() || !sampleLeadForm.website.trim() || (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && sampleLeadForm.keyPeopleEmails.length === 0 && !keyPersonEmailInput.trim())}
+                              disabled={isSubmittingSampleLead || !sampleLeadForm.companyName.trim() || !sampleLeadForm.website.trim() || (!sampleLeadForm.leadStudyFile && !sampleLeadForm.pitchDeckFile && (sampleLeadForm.keyPeopleEmails || []).length === 0 && !keyPersonEmailInput.trim())}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
                             >
                               <Plus size={14} />
@@ -3046,159 +2963,6 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                       </div>
                     </div>
                   )}
-
-                  {/* TAB 3: KEY PEOPLE & STAKEHOLDERS */}
-                  {activePrepTab === 'keyPeople' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                      <div style={{ background: 'rgba(168, 85, 247, 0.05)', border: '1px solid rgba(168, 85, 247, 0.2)', borderRadius: '8px', padding: '14px 16px' }}>
-                        <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#C084FC', marginBottom: '4px' }}>
-                          Key Decision-Makers & Stakeholders
-                        </div>
-                        <p style={{ fontSize: '0.82rem', color: '#CBD5E1', margin: 0, lineHeight: '1.5' }}>
-                          Add primary contacts and stakeholders identified for {selectedOnboardingClient.name} with their respective roles and verified LinkedIn profiles.
-                        </p>
-                      </div>
-
-                      {/* Add Stakeholder Form */}
-                      <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--portal-border)', borderRadius: '8px', padding: '16px' }}>
-                        <h5 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Plus size={15} color="#C084FC" /> Add Key Stakeholder
-                        </h5>
-                        <form onSubmit={handleAddKeyPerson}>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }}>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Full Name *</label>
-                              <input
-                                type="text"
-                                className="portal-form-input"
-                                placeholder="e.g. Samantha Wright"
-                                value={newKeyPersonForm.name}
-                                onChange={(e) => setNewKeyPersonForm(prev => ({ ...prev, name: e.target.value }))}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Executive Role / Title *</label>
-                              <input
-                                type="text"
-                                className="portal-form-input"
-                                placeholder="e.g. Chief Operating Officer"
-                                value={newKeyPersonForm.role}
-                                onChange={(e) => setNewKeyPersonForm(prev => ({ ...prev, role: e.target.value }))}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Department</label>
-                              <input
-                                type="text"
-                                className="portal-form-input"
-                                placeholder="e.g. Executive Leadership / Operations"
-                                value={newKeyPersonForm.department}
-                                onChange={(e) => setNewKeyPersonForm(prev => ({ ...prev, department: e.target.value }))}
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>Contact Email</label>
-                              <input
-                                type="email"
-                                className="portal-form-input"
-                                placeholder="samantha@company.com"
-                                value={newKeyPersonForm.contact}
-                                onChange={(e) => setNewKeyPersonForm(prev => ({ ...prev, contact: e.target.value }))}
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>LinkedIn / Social Profile</label>
-                              <input
-                                type="url"
-                                className="portal-form-input"
-                                placeholder="https://linkedin.com/in/samantha-wright"
-                                value={newKeyPersonForm.socialProfile}
-                                onChange={(e) => setNewKeyPersonForm(prev => ({ ...prev, socialProfile: e.target.value }))}
-                              />
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <button
-                              type="submit"
-                              className="portal-btn-primary"
-                              disabled={isAddingKeyPerson}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
-                            >
-                              <Plus size={14} />
-                              <span>{isAddingKeyPerson ? 'Adding...' : 'Add Key Stakeholder'}</span>
-                            </button>
-                          </div>
-                        </form>
-                      </div>
-
-                      {/* Current Stakeholders Table */}
-                      <div>
-                        <h5 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F5F5F5', margin: '0 0 10px 0' }}>
-                          Identified Stakeholders ({clientKeyPeople.length})
-                        </h5>
-                        {clientKeyPeople.length === 0 ? (
-                          <div style={{ padding: '30px', textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', color: '#94A3B8', fontSize: '0.85rem' }}>
-                            No stakeholders added yet. Use the form above to add key company leaders.
-                          </div>
-                        ) : (
-                          <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
-                            <table className="request-table">
-                              <thead>
-                                <tr>
-                                  <th>Name</th>
-                                  <th>Role / Title</th>
-                                  <th>Department</th>
-                                  <th>Contact Email</th>
-                                  <th>LinkedIn / Social Profile</th>
-                                  <th style={{ textAlign: 'right' }}>Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {clientKeyPeople.map((kp) => (
-                                  <tr key={kp.id}>
-                                    <td style={{ fontWeight: '600', color: '#F5F5F5' }}>{kp.name}</td>
-                                    <td style={{ color: '#00D9FF' }}>{kp.role || '—'}</td>
-                                    <td style={{ color: '#CBD5E1' }}>{kp.department || '—'}</td>
-                                    <td>
-                                      {kp.contact ? (
-                                        <a href={`mailto:${kp.contact}`} style={{ color: '#00D9FF', textDecoration: 'none', fontSize: '0.8rem' }}>
-                                          {kp.contact}
-                                        </a>
-                                      ) : (
-                                        <span style={{ color: '#64748B' }}>—</span>
-                                      )}
-                                    </td>
-                                    <td>
-                                      {kp.socialProfile ? (
-                                        <a href={kp.socialProfile} target="_blank" rel="noreferrer" style={{ color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', fontSize: '0.78rem' }}>
-                                          Profile <ExternalLink size={10} />
-                                        </a>
-                                      ) : (
-                                        <span style={{ color: '#64748B' }}>—</span>
-                                      )}
-                                    </td>
-                                    <td style={{ textAlign: 'right' }}>
-                                      <button
-                                        type="button"
-                                        className="portal-btn-secondary"
-                                        style={{ padding: '4px 8px', fontSize: '0.75rem', color: '#ef4444' }}
-                                        onClick={() => handleDeleteKeyPerson(kp.id)}
-                                        title="Delete Stakeholder"
-                                      >
-                                        <Trash2 size={12} />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </>
               )}
             </div>
@@ -3208,7 +2972,6 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
               <div style={{ display: 'flex', gap: '14px', fontSize: '0.78rem', color: '#94A3B8' }}>
                 <span>Research: <strong style={{ color: clientResearch?.trim() ? '#34d399' : '#fbbf24' }}>{clientResearch?.trim() ? '✓ Saved' : 'Pending'}</strong></span>
                 <span>Sample Leads: <strong style={{ color: clientLeads.length >= 5 ? '#34d399' : '#fbbf24' }}>{clientLeads.length}/5</strong></span>
-                <span>Stakeholders: <strong style={{ color: clientKeyPeople.length > 0 ? '#34d399' : '#fbbf24' }}>{clientKeyPeople.length}</strong></span>
               </div>
               <button
                 type="button"

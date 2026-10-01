@@ -856,8 +856,8 @@ export const getOnboardingClients = async (req, res) => {
       const keyPeopleCount = row.keyPeopleCount || 0;
       const linkedInCount = row.linkedInCount || 0;
       const sampleLeadsCompleted = leadCount >= 5;
-      const keyPeopleCompleted = keyPeopleCount > 0;
-      const leadOnboardingAllPrepared = hasResearch && sampleLeadsCompleted && keyPeopleCompleted;
+      const keyPeopleCompleted = true; // Key Stakeholders are not required for sample work completion
+      const leadOnboardingAllPrepared = hasResearch && sampleLeadsCompleted;
 
       return {
         id: row.id,
@@ -1355,7 +1355,7 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
       leads: mappedLeads,
       count: mappedLeads.length,
       isKeyPeoplePaid: Boolean(isKeyPeoplePaid),
-      allPrepared: mappedLeads.length >= 5 && mappedLeads.slice(0, 5).every(l => l.leadStudy)
+      allPrepared: mappedLeads.length >= 5
     });
   } catch (error) {
     console.error('[Get Lead Onboarding Assets Error]:', error);

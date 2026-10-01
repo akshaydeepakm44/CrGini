@@ -92,9 +92,18 @@ export default class ErrorBoundary extends React.Component {
                 textAlign: 'left',
                 marginBottom: '24px',
                 overflowX: 'auto',
-                maxHeight: '100px'
+                maxHeight: '260px'
               }}>
-                {import.meta.env.DEV ? this.state.error.message : 'An unexpected application error occurred. Please reload the view.'}
+                {import.meta.env.DEV ? (
+                  <div>
+                    <div style={{ fontWeight: 'bold', color: '#f87171', marginBottom: '8px' }}>
+                      {this.state.error.toString()}
+                    </div>
+                    <pre style={{ margin: 0, fontSize: '0.72rem', whiteSpace: 'pre-wrap', color: '#94a3b8' }}>
+                      {this.state.error?.stack || this.state.errorInfo?.componentStack}
+                    </pre>
+                  </div>
+                ) : 'An unexpected application error occurred. Please reload the view.'}
               </div>
             )}
 
