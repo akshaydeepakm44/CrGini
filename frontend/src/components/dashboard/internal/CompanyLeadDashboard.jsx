@@ -354,7 +354,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
         throw new Error(`${label} must be a valid PDF document.`);
       }
       if (file.size > maxSizeBytes) {
-        throw new Error(`${label} exceeds the maximum allowed file size of 25MB.`);
+        throw new Error(`${label}: File too large. Each file must be 25 MB or smaller.`);
       }
     };
 
@@ -519,7 +519,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
     }
     const maxSizeBytes = 25 * 1024 * 1024;
     if (file.size > maxSizeBytes) {
-      alert('PDF document exceeds the maximum allowed file size of 25MB.');
+      alert('File too large. Each file must be 25 MB or smaller.');
       return;
     }
 
@@ -2522,7 +2522,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                         return;
                                       }
                                       if (file.size > 25 * 1024 * 1024) {
-                                        alert('PDF file exceeds the maximum size limit of 25MB.');
+                                        alert('File too large. Each file must be 25 MB or smaller.');
                                         e.target.value = '';
                                         return;
                                       }
@@ -2583,7 +2583,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
                                         return;
                                       }
                                       if (file.size > 25 * 1024 * 1024) {
-                                        alert('PDF file exceeds the maximum size limit of 25MB.');
+                                        alert('File too large. Each file must be 25 MB or smaller.');
                                         e.target.value = '';
                                         return;
                                       }

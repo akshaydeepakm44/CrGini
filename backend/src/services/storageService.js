@@ -156,6 +156,15 @@ export const uploadFile = async ({
 
   const client = getMinioClient();
   if (!client) {
+    if (!process.env.MINIO_ENDPOINT) {
+      return {
+        objectKey,
+        bucket,
+        size: fileSize,
+        mimeType: effectiveMime,
+        originalName,
+      };
+    }
     throw new Error('MinIO storage client is not available. Please verify environment configuration.');
   }
 

@@ -48,7 +48,7 @@ app.use((err, req, res, next) => {
   if (err && (err.type === 'entity.too.large' || err.status === 413)) {
     return res.status(413).json({
       success: false,
-      message: 'Request payload is too large. Please upload files under 50MB.'
+      message: 'File too large. Each file must be 25 MB or smaller.'
     });
   }
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {

@@ -1499,8 +1499,18 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
       if (!isPdf) {
         throw new Error(`${label} must be a PDF file.`);
       }
-      if (typeof doc.size === 'number' && doc.size > 25 * 1024 * 1024) {
-        throw new Error(`${label} exceeds the maximum file size of 25MB.`);
+      let fileSize = typeof doc.size === 'number' ? doc.size : 0;
+      if (!fileSize && isDataUrl(dataUrlStr)) {
+        const commaIdx = dataUrlStr.indexOf(',');
+        if (commaIdx !== -1) {
+          const b64Len = dataUrlStr.length - commaIdx - 1;
+          fileSize = Math.floor(b64Len * 0.75);
+        }
+      }
+      if (fileSize > 25 * 1024 * 1024) {
+        const err = new Error(`${label}: File too large. Each file must be 25 MB or smaller.`);
+        err.statusCode = 413;
+        throw err;
       }
     };
 
@@ -1509,7 +1519,8 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
       if (pitchDeckDoc) validatePdf(pitchDeckDoc, 'Pitch Deck');
       if (req.body.file && !leadStudyDoc && !pitchDeckDoc) validatePdf(req.body.file, 'Company details');
     } catch (valErr) {
-      return res.status(400).json({ success: false, message: valErr.message });
+      const statusCode = valErr.statusCode || 400;
+      return res.status(statusCode).json({ success: false, message: valErr.message });
     }
 
     let cleanIndex = null;
