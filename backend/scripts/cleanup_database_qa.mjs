@@ -19,7 +19,7 @@ async function performFinalCleanup() {
   console.log(`[Backup]: Generating full PostgreSQL backup at ${backupPath}...`);
 
   try {
-    execSync(`sudo -u postgres pg_dump -d creativegini -F p -f "${backupPath}"`, { stdio: 'inherit' });
+    execSync(`sudo -u postgres pg_dump -d creativegini -F p > "${backupPath}"`, { stdio: 'inherit', shell: '/bin/bash' });
     const stats = fs.statSync(backupPath);
     console.log(`[Backup]: Backup completed successfully. File size: ${stats.size} bytes.\n`);
   } catch (err) {
