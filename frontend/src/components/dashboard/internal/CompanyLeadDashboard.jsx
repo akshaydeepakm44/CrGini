@@ -3267,6 +3267,7 @@ export default function CompanyLeadDashboard({ user, onLogout }) {
         title={viewingLeadPdf?.title}
         documentType={viewingLeadPdf?.documentType}
         companyName={viewingLeadPdf?.companyName}
+        assetId={viewingLeadPdf?.assetId}
         streamUrl={viewingLeadPdf?.streamUrl}
         downloadUrl={viewingLeadPdf?.downloadUrl}
         fileName={viewingLeadPdf?.fileName}

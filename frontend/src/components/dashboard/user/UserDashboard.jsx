@@ -2272,13 +2272,27 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
 
                       const studyDoc = lead.leadStudy || (lead.pdf?.streamUrl ? lead.pdf : null);
                       const pitchDoc = lead.pitchDeck;
-                      const isKpUnlocked = lead.keyPeopleUnlocked;
-
-                      const peopleList = Array.isArray(lead.keyPeople?.people) && lead.keyPeople.people.length > 0
-                        ? lead.keyPeople.people
-                        : ((Array.isArray(lead.keyPeople?.emails) && lead.keyPeople.emails.length > 0)
-                            ? lead.keyPeople.emails.map(e => ({ name: '', email: e }))
-                            : (lead.email ? [{ name: lead.name || '', email: lead.email }] : []));
+                      let peopleList = [];
+                      if (Array.isArray(lead.keyPeople?.people) && lead.keyPeople.people.length > 0) {
+                        peopleList = lead.keyPeople.people;
+                      } else if (Array.isArray(lead.keyPeople) && lead.keyPeople.length > 0) {
+                        peopleList = lead.keyPeople.map(p => (typeof p === 'string' ? { name: '', email: p } : { name: p?.name || '', email: p?.email || '' }));
+                      } else if (Array.isArray(lead.keyPeople?.emails) && lead.keyPeople.emails.length > 0) {
+                        peopleList = lead.keyPeople.emails.map(e => ({ name: '', email: e }));
+                      } else if (lead.notes) {
+                        const kpJsonMatch = lead.notes.match(/\[Key People JSON:\s*(\[.*?\])\]/);
+                        if (kpJsonMatch && kpJsonMatch[1]) {
+                          try {
+                            const parsed = JSON.parse(kpJsonMatch[1]);
+                            if (Array.isArray(parsed)) {
+                              peopleList = parsed.map(p => ({ name: p.name || '', email: p.email || '' }));
+                            }
+                          } catch (_) {}
+                        }
+                      }
+                      if (peopleList.length === 0 && lead.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email.trim())) {
+                        peopleList = [{ name: lead.name || '', email: lead.email.trim().toLowerCase() }];
+                      }
 
                       return (
                         <div
@@ -2399,27 +2413,27 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                               Key People
                             </div>
 
-                            {isKpUnlocked ? (
-                              peopleList.length > 0 ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  {peopleList.map((person, pIdx) => (
-                                    <div
-                                      key={pIdx}
-                                      style={{
-                                        background: 'rgba(255, 255, 255, 0.02)',
-                                        border: '1px solid rgba(255, 255, 255, 0.05)',
-                                        borderRadius: '6px',
-                                        padding: '6px 10px',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '2px'
-                                      }}
-                                    >
-                                      {person.name && (
-                                        <div style={{ fontSize: '0.86rem', fontWeight: '600', color: '#F5F5F5' }}>
-                                          {person.name}
-                                        </div>
-                                      )}
+                            {peopleList.length > 0 ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {peopleList.map((person, pIdx) => (
+                                  <div
+                                    key={pIdx}
+                                    style={{
+                                      background: 'rgba(255, 255, 255, 0.02)',
+                                      border: '1px solid rgba(255, 255, 255, 0.05)',
+                                      borderRadius: '6px',
+                                      padding: '6px 10px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '2px'
+                                    }}
+                                  >
+                                    {person.name && (
+                                      <div style={{ fontSize: '0.86rem', fontWeight: '600', color: '#F5F5F5' }}>
+                                        {person.name}
+                                      </div>
+                                    )}
+                                    {person.email ? (
                                       <a
                                         href={`mailto:${person.email}`}
                                         style={{
@@ -2437,52 +2451,15 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                                           {person.email}
                                         </span>
                                       </a>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div style={{ fontSize: '0.82rem', color: '#64748B' }}>
-                                  Key People not available
-                                </div>
-                              )
+                                    ) : (
+                                      <span style={{ fontSize: '0.78rem', color: '#64748B' }}>Email not available</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
                             ) : (
-                              <div
-                                style={{
-                                  background: 'rgba(245, 158, 11, 0.06)',
-                                  border: '1px solid rgba(245, 158, 11, 0.25)',
-                                  borderRadius: '8px',
-                                  padding: '10px 12px',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  gap: '8px'
-                                }}
-                              >
-                                <div style={{ fontSize: '0.78rem', color: '#fbbf24' }}>
-                                  Key People locked ({lead.keyPeople?.count || 1} available)
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={handleUnlockKeyPeople}
-                                  style={{
-                                    padding: '5px 10px',
-                                    fontSize: '0.76rem',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    fontWeight: '600',
-                                    background: 'rgba(245, 158, 11, 0.18)',
-                                    border: '1px solid rgba(245, 158, 11, 0.4)',
-                                    color: '#fbbf24',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    flexShrink: 0
-                                  }}
-                                  title="Unlock Key People Intelligence"
-                                >
-                                  <Lock size={12} />
-                                  <span>Unlock</span>
-                                </button>
+                              <div style={{ fontSize: '0.82rem', color: '#64748B' }}>
+                                Key People not available
                               </div>
                             )}
                           </div>
@@ -2721,6 +2698,7 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                   title={viewingLeadPdf.title || `${viewingLeadPdf.companyName} — Document`}
                   documentType={viewingLeadPdf.documentType || 'PDF Document'}
                   companyName={viewingLeadPdf.companyName}
+                  assetId={viewingLeadPdf.assetId}
                   streamUrl={viewingLeadPdf.streamUrl}
                   downloadUrl={viewingLeadPdf.downloadUrl}
                   fileName={viewingLeadPdf.fileName || `${(viewingLeadPdf.companyName || 'Lead').replace(/\s+/g, '_')}_Document.pdf`}

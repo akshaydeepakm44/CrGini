@@ -3,16 +3,17 @@ import { FileText, Download, X, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '../../services/api';
 
 /**
- * Reusable In-App Document Viewer Modal for CreativeGini
- * - Displays readable extracted document content directly inside the CreativeGini UI
- * - NO iframe, NO browser PDF viewer plugin, NO external redirects
- * - Supports PDF and DOC/DOCX processed text with headings and list formatting
- * - Provides download action for the original uploaded file
- * - Fully responsive on desktop, laptop, tablet, and mobile
+ * Polished CreativeGini Document Detail Modal
+ * - Displays readable extracted document content inside the CreativeGini UI
+ * - Compact, professional document reader proportions (desktop ~75vw/75vh, mobile responsive)
+ * - Clean header with document icon, title, company name, type badge, Download Original button, and close X
+ * - Compact centered state when preview is unavailable (no huge empty viewer)
+ * - Removed cramped long filename footer
+ * - Beautiful typography with Markdown heading & bullet list formatting
  */
 export default function PdfViewerModal({
   isOpen = true,
-  title = 'Document Viewer',
+  title = 'Document Details',
   documentType = 'Document',
   companyName = '',
   content: initialContent = '',
@@ -54,7 +55,7 @@ export default function PdfViewerModal({
     api.getAssetContent(resolvedAssetId)
       .then(res => {
         if (!isMounted) return;
-        if (res && res.success && res.content) {
+        if (res && res.success && res.content && res.content.trim()) {
           setExtractedContent(res.content);
         } else {
           setExtractedContent('');
@@ -88,28 +89,16 @@ export default function PdfViewerModal({
 
   const effectiveDownloadUrl = downloadUrl || actualStreamUrl;
   const safeFileName = fileName || 'document.pdf';
+  const fileExt = (safeFileName.split('.').pop() || '').toUpperCase();
+  const hasContent = Boolean(extractedContent && extractedContent.trim());
 
-  // Helper to render formatted text with headings and lists
+  // Render formatted markdown-like extracted text
   const renderFormattedContent = (rawText) => {
-    if (!rawText || !rawText.trim()) {
-      return (
-        <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#94A3B8' }}>
-          <FileText size={36} color="#64748B" style={{ margin: '0 auto 0.75rem', display: 'block' }} />
-          <div style={{ fontWeight: '600', color: '#E2E8F0', marginBottom: '0.35rem' }}>
-            Preview content is not available for this document.
-          </div>
-          <div style={{ fontSize: '0.85rem', color: '#64748B' }}>
-            You can still download the original uploaded file below.
-          </div>
-        </div>
-      );
-    }
-
     const lines = rawText.split('\n');
     return lines.map((line, idx) => {
       const trimmed = line.trim();
       if (!trimmed) {
-        return <div key={idx} style={{ height: '0.85rem' }} />;
+        return <div key={idx} style={{ height: '0.75rem' }} />;
       }
 
       if (trimmed.startsWith('### ')) {
@@ -117,11 +106,11 @@ export default function PdfViewerModal({
           <h4
             key={idx}
             style={{
-              fontSize: '1.05rem',
+              fontSize: '1rem',
               fontWeight: '700',
               color: '#00D9FF',
-              margin: '1.25rem 0 0.5rem 0',
-              letterSpacing: '0.3px'
+              margin: '1.1rem 0 0.4rem 0',
+              letterSpacing: '0.2px'
             }}
           >
             {trimmed.replace(/^###\s+/, '')}
@@ -134,12 +123,12 @@ export default function PdfViewerModal({
           <h3
             key={idx}
             style={{
-              fontSize: '1.2rem',
-              fontWeight: '800',
-              color: '#F5F5F5',
-              margin: '1.5rem 0 0.6rem 0',
+              fontSize: '1.15rem',
+              fontWeight: '700',
+              color: '#F8FAFC',
+              margin: '1.35rem 0 0.5rem 0',
               borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-              paddingBottom: '0.35rem'
+              paddingBottom: '0.3rem'
             }}
           >
             {trimmed.replace(/^##\s+/, '')}
@@ -152,12 +141,12 @@ export default function PdfViewerModal({
           <h2
             key={idx}
             style={{
-              fontSize: '1.35rem',
+              fontSize: '1.25rem',
               fontWeight: '800',
               color: '#FFFFFF',
-              margin: '1.75rem 0 0.75rem 0',
+              margin: '1.5rem 0 0.6rem 0',
               borderBottom: '1px solid rgba(0, 217, 255, 0.25)',
-              paddingBottom: '0.45rem'
+              paddingBottom: '0.35rem'
             }}
           >
             {trimmed.replace(/^#\s+/, '')}
@@ -173,11 +162,11 @@ export default function PdfViewerModal({
               display: 'flex',
               alignItems: 'flex-start',
               gap: '8px',
-              margin: '0.3rem 0',
+              margin: '0.25rem 0',
               paddingLeft: '0.5rem',
               lineHeight: '1.6',
               color: '#E2E8F0',
-              fontSize: '0.92rem'
+              fontSize: '0.9rem'
             }}
           >
             <span style={{ color: '#00D9FF', fontWeight: 'bold' }}>•</span>
@@ -190,10 +179,10 @@ export default function PdfViewerModal({
         <p
           key={idx}
           style={{
-            margin: '0.4rem 0',
+            margin: '0.35rem 0',
             lineHeight: '1.65',
             color: '#CBD5E1',
-            fontSize: '0.92rem'
+            fontSize: '0.9rem'
           }}
         >
           {line}
@@ -212,9 +201,9 @@ export default function PdfViewerModal({
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(5, 10, 20, 0.88)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: 'rgba(6, 11, 20, 0.85)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -231,16 +220,17 @@ export default function PdfViewerModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: '920px',
-          height: '88vh',
-          maxHeight: '850px',
+          maxWidth: hasContent ? '860px' : '560px',
+          height: hasContent ? '78vh' : 'auto',
+          maxHeight: '82vh',
           display: 'flex',
           flexDirection: 'column',
-          background: '#0d1117',
-          border: '1px solid rgba(0, 217, 255, 0.25)',
-          borderRadius: '14px',
-          boxShadow: '0 25px 70px rgba(0, 0, 0, 0.85), 0 0 30px rgba(0, 217, 255, 0.1)',
-          overflow: 'hidden'
+          background: '#0c121e',
+          border: '1px solid rgba(0, 217, 255, 0.2)',
+          borderRadius: '12px',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.75), 0 0 1px rgba(0, 217, 255, 0.3)',
+          overflow: 'hidden',
+          transition: 'max-width 0.2s ease'
         }}
       >
         {/* Header Bar */}
@@ -249,21 +239,22 @@ export default function PdfViewerModal({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '14px 20px',
+            padding: '12px 18px',
             borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.8) 100%)',
+            background: 'rgba(15, 23, 42, 0.9)',
             gap: '12px',
             flexWrap: 'wrap'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+          {/* Left: Document Icon + Title + Company Name */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
             <div
               style={{
-                width: '36px',
-                height: '36px',
+                width: '34px',
+                height: '34px',
                 borderRadius: '8px',
-                background: 'rgba(0, 217, 255, 0.12)',
-                border: '1px solid rgba(0, 217, 255, 0.25)',
+                background: 'rgba(0, 217, 255, 0.1)',
+                border: '1px solid rgba(0, 217, 255, 0.22)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -271,20 +262,20 @@ export default function PdfViewerModal({
                 flexShrink: 0
               }}
             >
-              <FileText size={18} />
+              <FileText size={17} />
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <h3
                   style={{
                     margin: 0,
-                    fontSize: '1.05rem',
+                    fontSize: '1rem',
                     fontWeight: '700',
-                    color: '#F5F5F5',
+                    color: '#F8FAFC',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    maxWidth: '460px'
+                    maxWidth: '380px'
                   }}
                   title={title}
                 >
@@ -293,31 +284,45 @@ export default function PdfViewerModal({
                 {documentType && (
                   <span
                     style={{
-                      fontSize: '0.72rem',
-                      padding: '2px 8px',
-                      borderRadius: '10px',
-                      background: 'rgba(0, 217, 255, 0.12)',
-                      border: '1px solid rgba(0, 217, 255, 0.3)',
+                      fontSize: '0.7rem',
+                      padding: '2px 7px',
+                      borderRadius: '6px',
+                      background: 'rgba(0, 217, 255, 0.1)',
+                      border: '1px solid rgba(0, 217, 255, 0.25)',
                       color: '#00D9FF',
                       fontWeight: '600',
                       textTransform: 'uppercase',
-                      letterSpacing: '0.4px'
+                      letterSpacing: '0.3px'
                     }}
                   >
                     {documentType}
                   </span>
                 )}
+                {fileExt && fileExt !== documentType.toUpperCase() && (
+                  <span
+                    style={{
+                      fontSize: '0.68rem',
+                      padding: '1px 6px',
+                      borderRadius: '4px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      color: '#94A3B8',
+                      fontWeight: '500'
+                    }}
+                  >
+                    {fileExt}
+                  </span>
+                )}
               </div>
               {companyName && (
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.78rem', color: '#94A3B8', marginTop: '2px', fontWeight: '500' }}>
                   {companyName}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+          {/* Right: Download Original button + Close X */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
             {effectiveDownloadUrl && (
               <a
                 href={effectiveDownloadUrl}
@@ -326,19 +331,19 @@ export default function PdfViewerModal({
                 rel="noopener noreferrer"
                 className="portal-btn-primary"
                 style={{
-                  padding: '7px 16px',
-                  fontSize: '0.84rem',
+                  padding: '6px 12px',
+                  fontSize: '0.8rem',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '5px',
                   textDecoration: 'none',
                   borderRadius: '6px',
                   fontWeight: '600'
                 }}
-                title="Download original file"
+                title="Download original document file"
               >
-                <Download size={14} />
-                <span>Download</span>
+                <Download size={13} />
+                <span>Download Original</span>
               </a>
             )}
             <button
@@ -347,38 +352,39 @@ export default function PdfViewerModal({
               style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#94a3b8',
+                color: '#94A3B8',
                 cursor: 'pointer',
-                padding: '7px',
+                padding: '6px',
                 borderRadius: '6px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'all 0.15s ease'
               }}
-              title="Close viewer (Esc)"
+              title="Close (Esc)"
+              aria-label="Close document modal"
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = '#F5F5F5';
-                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.18)';
+                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = '#94a3b8';
+                e.currentTarget.style.color = '#94A3B8';
                 e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
                 e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
               }}
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           </div>
         </div>
 
-        {/* Scrollable Document Content Area */}
+        {/* Content Area */}
         <div
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '24px 28px',
+            padding: hasContent ? '20px 24px' : '24px 20px',
             background: '#090d16',
             color: '#E2E8F0',
             fontFamily: 'inherit'
@@ -391,51 +397,50 @@ export default function PdfViewerModal({
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                height: '100%',
-                minHeight: '240px',
+                padding: '2.5rem 1rem',
                 color: '#94A3B8',
                 gap: '12px'
               }}
             >
-              <Loader2 size={32} color="#00D9FF" className="animate-spin" />
-              <div style={{ fontSize: '0.9rem', color: '#CBD5E1', fontWeight: '500' }}>
+              <Loader2 size={28} color="#00D9FF" className="animate-spin" />
+              <div style={{ fontSize: '0.86rem', color: '#CBD5E1', fontWeight: '500' }}>
                 Reading processed document content...
               </div>
             </div>
-          ) : loadError ? (
+          ) : (!hasContent || loadError) ? (
+            /* Compact Centered Unavailable State */
             <div
               style={{
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '3rem 1.5rem',
+                padding: '1.5rem 1rem',
                 textAlign: 'center',
-                maxWidth: '520px',
-                margin: '0 auto',
                 color: '#94A3B8',
-                gap: '14px'
+                gap: '10px'
               }}
             >
               <div
                 style={{
-                  width: '48px',
-                  height: '48px',
+                  width: '42px',
+                  height: '42px',
                   borderRadius: '50%',
-                  background: 'rgba(239, 68, 68, 0.1)',
+                  background: 'rgba(100, 116, 139, 0.12)',
+                  border: '1px solid rgba(100, 116, 139, 0.25)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#ef4444'
+                  color: '#94A3B8'
                 }}
               >
-                <AlertCircle size={24} />
+                <FileText size={20} />
               </div>
-              <h4 style={{ margin: 0, color: '#F8FAFC', fontSize: '1.05rem', fontWeight: '700' }}>
-                Preview content is unavailable
+              <h4 style={{ margin: 0, color: '#F1F5F9', fontSize: '1rem', fontWeight: '700' }}>
+                Preview unavailable
               </h4>
-              <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: '1.5' }}>
-                We were unable to extract readable text preview for this document. You can download the original file to view it directly on your device.
+              <p style={{ margin: 0, fontSize: '0.84rem', lineHeight: '1.5', maxWidth: '400px', color: '#94A3B8' }}>
+                This document cannot be previewed inside CreativeGini. You can download the original document to view it.
               </p>
               {effectiveDownloadUrl && (
                 <a
@@ -443,16 +448,18 @@ export default function PdfViewerModal({
                   download={safeFileName}
                   className="portal-btn-primary"
                   style={{
-                    padding: '8px 18px',
-                    fontSize: '0.86rem',
+                    padding: '8px 16px',
+                    fontSize: '0.84rem',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
                     textDecoration: 'none',
-                    marginTop: '6px'
+                    marginTop: '6px',
+                    borderRadius: '6px',
+                    fontWeight: '600'
                   }}
                 >
-                  <Download size={15} />
+                  <Download size={14} />
                   <span>Download Original Document</span>
                 </a>
               )}
@@ -460,49 +467,14 @@ export default function PdfViewerModal({
           ) : (
             <div
               style={{
-                maxWidth: '820px',
+                maxWidth: '780px',
                 margin: '0 auto',
                 lineHeight: '1.65',
-                fontSize: '0.92rem'
+                fontSize: '0.9rem'
               }}
             >
               {renderFormattedContent(extractedContent)}
             </div>
-          )}
-        </div>
-
-        {/* Footer info & download bar */}
-        <div
-          style={{
-            padding: '10px 20px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-            background: 'rgba(15, 23, 42, 0.7)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: '0.78rem',
-            color: '#64748B',
-            flexWrap: 'wrap',
-            gap: '8px'
-          }}
-        >
-          <span>CreativeGini Document Reader</span>
-          {effectiveDownloadUrl && (
-            <a
-              href={effectiveDownloadUrl}
-              download={safeFileName}
-              style={{
-                color: '#00D9FF',
-                textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontWeight: '600'
-              }}
-            >
-              <Download size={12} />
-              <span>Download Original ({safeFileName})</span>
-            </a>
           )}
         </div>
       </div>

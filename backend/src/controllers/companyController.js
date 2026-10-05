@@ -1256,10 +1256,10 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
       // Identify whether this is an additional lead (index > 5, or tagged ADDITIONAL)
       const isAdditionalLead = slotIndex > 5 || notes.includes('[Lead Type: ADDITIONAL]') || notes.includes('ADDITIONAL');
 
-      // Key People access rule:
-      // - Additional leads from paid sprints have Key People access INCLUDED (no extra payment).
-      // - Free/sample leads require Key People payment unless user is ADMIN or COMPANY_LEAD.
-      const keyPeopleUnlocked = isAdditionalLead || isKeyPeoplePaid || ['ADMIN', 'COMPANY_LEAD'].includes(req.user.role);
+      // Key People access rule for Sample Leads:
+      // Sample Leads Key People are directly visible to client without payment lock.
+      // Unrelated paid lead records in other endpoints continue to enforce existing entitlement rules.
+      const keyPeopleUnlocked = true;
 
       // Logo
       const logoFile = filesByTag.get(`${slotIndex}_logo`) || filesByTag.get(`${lead.id}_logo`);
