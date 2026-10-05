@@ -40,15 +40,15 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+app.use(express.json({ limit: '150mb' }));
+app.use(express.urlencoded({ extended: true, limit: '150mb' }));
 
 // Dedicated body-parser error handler to ensure JSON responses on large payloads / malformed JSON
 app.use((err, req, res, next) => {
   if (err && (err.type === 'entity.too.large' || err.status === 413)) {
     return res.status(413).json({
       success: false,
-      message: 'File too large. Each file must be 25 MB or smaller.'
+      message: 'Upload payload is too large. Please reduce the combined upload size and try again.'
     });
   }
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {

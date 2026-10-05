@@ -38,7 +38,7 @@ const parseApiResponse = async (res, defaultErrorMessage = 'Request failed') => 
   const data = await safeJson(res);
   if (!res.ok) {
     if (res.status === 413) {
-      const message = data?.message || 'File too large. Each file must be 25 MB or smaller.';
+      const message = data?.message || 'Upload payload is too large. Please reduce the combined upload size and try again.';
       throw new Error(message);
     }
     const message = data?.message || `${defaultErrorMessage} (Server returned HTTP ${res.status})`;

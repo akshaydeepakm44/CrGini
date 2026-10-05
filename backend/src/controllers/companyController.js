@@ -1641,7 +1641,7 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
 
     try {
       if (logoDoc) validateImage(logoDoc, 'Company Logo');
-      if (leadStudyDoc) validateDocument(leadStudyDoc, 'Lead Study');
+      if (leadStudyDoc) validateDocument(leadStudyDoc, 'Company Study');
       if (pitchDeckDoc) validateDocument(pitchDeckDoc, 'Pitch Deck');
       if (req.body.file && !leadStudyDoc && !pitchDeckDoc) validateDocument(req.body.file, 'Company details');
     } catch (valErr) {
