@@ -4,6 +4,7 @@ import {
   getAssetById,
   streamAsset,
   downloadAsset,
+  getAssetContent,
 } from '../controllers/assetController.js';
 import { protect } from '../middleware/auth.js';
 
@@ -20,5 +21,8 @@ router.get('/:id/stream', protect, streamAsset);
 
 // Authenticated asset download
 router.get('/:id/download', protect, downloadAsset);
+
+// Authenticated asset text extraction content
+router.get('/:id/content', protect, getAssetContent);
 
 export default router;

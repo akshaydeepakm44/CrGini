@@ -654,15 +654,12 @@ export default function UserDashboard({ user, onLogout }) {
     if (requirementSubService === 'STRATEGIC_PLAN') {
       if (!strategicPlanForm.mainGoal.trim()) errors.mainGoal = 'Main goal is required';
       if (!strategicPlanForm.targetMarket.trim()) errors.targetMarket = 'Target market / audience is required';
-      if (!strategicPlanForm.focusArea.trim()) errors.focusArea = 'Please specify focus areas';
       if (!strategicPlanForm.painPoints.trim()) errors.painPoints = 'Key challenges or pain points are required';
-      if (!strategicPlanForm.expectedOutcome.trim()) errors.expectedOutcome = 'Expected outcome is required';
     } else if (requirementSubService === 'CONTENT') {
       const hasType = Object.values(contentForm.contentTypes).some(Boolean);
       if (!hasType) errors.contentTypes = 'Select at least one content type';
       if (!contentForm.deliverablesCount.trim()) errors.deliverablesCount = 'Deliverables count / scope is required';
       if (!contentForm.mainPurpose.trim()) errors.mainPurpose = 'Main purpose of the content is required';
-      if (!contentForm.targetAudience.trim()) errors.targetAudience = 'Target audience is required';
       if (!contentForm.productHighlight.trim()) errors.productHighlight = 'Product or service to highlight is required';
     } else if (requirementSubService === 'DEVREL') {
       if (!devrelForm.mainDevrelGoal.trim()) errors.mainDevrelGoal = 'Main DevRel goal is required';
@@ -2235,317 +2232,380 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                 )}
               </div>
 
-              {/* Company Leads Table */}
+              {/* Sample Leads Cards Section */}
               <div className="portal-card" style={{ marginBottom: '1.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
                   <div>
                     <h4 style={{ fontSize: '1.1rem', fontWeight: '700', margin: '0 0 0.25rem 0', color: '#F5F5F5' }}>
-                      Company Leads ({leadsList.length})
+                      Sample Leads ({leadsList.length})
                     </h4>
                     <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>
-                      Pre-researched target accounts, custom pitch decks, and verified Key People intelligence dossiers.
+                      Verified target accounts, company studies, custom pitch decks, and Key People intelligence dossiers.
                     </p>
                   </div>
                 </div>
 
-                {/* Table of Company Leads */}
-                <div className="request-table-wrapper table-container" style={{ overflowX: 'auto' }}>
-                  <table className="request-table" style={{ width: '100%', minWidth: '780px', tableLayout: 'fixed' }}>
-                    <thead>
-                      <tr>
-                        <th style={{ width: '28%' }}>Company Name</th>
-                        <th style={{ width: '24%' }}>Company URL</th>
-                        <th style={{ width: '16%', textAlign: 'center' }}>Lead Study</th>
-                        <th style={{ width: '16%', textAlign: 'center' }}>Pitch Deck</th>
-                        <th style={{ width: '16%', textAlign: 'center' }}>Key People</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {leadsList.length === 0 ? (
-                        <tr>
-                          <td colSpan="5" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#94a3b8' }}>
-                            <Users size={32} color="#64748b" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
-                            <div style={{ fontWeight: '600', color: '#e2e8f0', marginBottom: '0.25rem' }}>Leads are being researched.</div>
-                            <div style={{ fontSize: '0.85rem' }}>
-                              Your company leads, lead studies, pitch decks, and key people dossiers will appear here once verified.
+                {leadsList.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#94a3b8' }}>
+                    <Users size={36} color="#64748b" style={{ margin: '0 auto 0.75rem', display: 'block' }} />
+                    <div style={{ fontWeight: '600', color: '#e2e8f0', marginBottom: '0.35rem' }}>
+                      Sample leads are being researched.
+                    </div>
+                    <div style={{ fontSize: '0.85rem' }}>
+                      Your 5 sample lead cards will appear here once verified by our lead team.
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                      gap: '1.25rem'
+                    }}
+                  >
+                    {leadsList.map((lead, idx) => {
+                      const companyName = lead.companyName || lead.lead_company || lead.company || lead.name || `Lead ${idx + 1}`;
+                      let rawWeb = (lead.website || lead.linkedin || (lead.notes?.match(/https?:\/\/[^\s\]]+/)?.[0]) || '').trim();
+                      const websiteUrl = rawWeb ? (/^https?:\/\//i.test(rawWeb) ? rawWeb : `https://${rawWeb}`) : '';
+                      const displayUrl = rawWeb.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '');
+                      const logoUrl = lead.logoUrl || (lead.notes?.match(/\[Logo:\s*([^\]]+)\]/)?.[1]) || null;
+
+                      const studyDoc = lead.leadStudy || (lead.pdf?.streamUrl ? lead.pdf : null);
+                      const pitchDoc = lead.pitchDeck;
+                      const isKpUnlocked = lead.keyPeopleUnlocked;
+
+                      const peopleList = Array.isArray(lead.keyPeople?.people) && lead.keyPeople.people.length > 0
+                        ? lead.keyPeople.people
+                        : ((Array.isArray(lead.keyPeople?.emails) && lead.keyPeople.emails.length > 0)
+                            ? lead.keyPeople.emails.map(e => ({ name: '', email: e }))
+                            : (lead.email ? [{ name: lead.name || '', email: lead.email }] : []));
+
+                      return (
+                        <div
+                          key={lead.id || idx}
+                          style={{
+                            background: 'rgba(15, 23, 42, 0.65)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '12px',
+                            padding: '1.25rem 1.4rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            minHeight: '260px',
+                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+                            transition: 'border-color 0.2s, box-shadow 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(0, 217, 255, 0.35)';
+                            e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.35)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.25)';
+                          }}
+                        >
+                          {/* Top Section: Company Name, URL & Company Logo */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '1.25rem' }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <h4
+                                style={{
+                                  margin: '0 0 4px 0',
+                                  fontSize: '1.15rem',
+                                  fontWeight: '700',
+                                  color: '#F5F5F5',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title={companyName}
+                              >
+                                {companyName}
+                              </h4>
+                              {websiteUrl ? (
+                                <a
+                                  href={websiteUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    color: '#00D9FF',
+                                    textDecoration: 'none',
+                                    fontSize: '0.84rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    maxWidth: '100%'
+                                  }}
+                                  title={websiteUrl}
+                                >
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayUrl || websiteUrl}</span>
+                                  <ExternalLink size={12} style={{ flexShrink: 0 }} />
+                                </a>
+                              ) : (
+                                <span style={{ color: '#64748B', fontSize: '0.82rem' }}>Website in preparation</span>
+                              )}
                             </div>
-                          </td>
-                        </tr>
-                      ) : (
-                        leadsList.map((lead, idx) => {
-                          const companyName = lead.companyName || lead.lead_company || lead.company || lead.name || `Lead ${idx + 1}`;
-                          let rawWeb = (lead.website || lead.linkedin || (lead.notes?.match(/https?:\/\/[^\s\]]+/)?.[0]) || '').trim();
-                          const websiteUrl = rawWeb ? (/^https?:\/\//i.test(rawWeb) ? rawWeb : `https://${rawWeb}`) : '';
-                          const displayUrl = rawWeb.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '');
 
-                          const studyPdf = lead.leadStudy || (lead.pdf?.streamUrl ? lead.pdf : null);
-                          const pitchPdf = lead.pitchDeck;
-                          const keyPeoplePdf = lead.keyPeople;
-                          const isKpUnlocked = lead.keyPeopleUnlocked;
+                            {/* Top-Right: Company Logo */}
+                            <div
+                              style={{
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '10px',
+                                background: 'rgba(255, 255, 255, 0.04)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                overflow: 'hidden'
+                              }}
+                              title={`${companyName} Logo`}
+                            >
+                              {logoUrl ? (
+                                <img
+                                  src={logoUrl}
+                                  alt={companyName}
+                                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    fontSize: '1.1rem',
+                                    fontWeight: '800',
+                                    color: '#00D9FF'
+                                  }}
+                                >
+                                  {companyName.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                          </div>
 
-                          return (
-                            <tr key={lead.id || idx}>
-                              {/* 1. Company Name */}
-                              <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {websiteUrl ? (
-                                  <a
-                                    href={websiteUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{
-                                      fontWeight: '600',
-                                      color: '#F5F5F5',
-                                      textDecoration: 'none',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '6px'
-                                    }}
-                                    title={`Visit ${companyName} website in new tab`}
-                                  >
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{companyName}</span>
-                                    <ExternalLink size={12} color="#00D9FF" style={{ flexShrink: 0 }} />
-                                  </a>
-                                ) : (
-                                  <span style={{ fontWeight: '600', color: '#F5F5F5' }}>{companyName}</span>
-                                )}
-                              </td>
+                          {/* Middle Section: Key People */}
+                          <div style={{ marginBottom: '1.25rem', flex: 1 }}>
+                            <div
+                              style={{
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                color: '#94A3B8',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '0.5rem'
+                              }}
+                            >
+                              Key People
+                            </div>
 
-                              {/* 2. Company URL */}
-                              <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {websiteUrl ? (
-                                  <a
-                                    href={websiteUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{
-                                      color: '#00D9FF',
-                                      textDecoration: 'none',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      fontSize: '0.86rem'
-                                    }}
-                                    title={websiteUrl}
-                                  >
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
-                                      {displayUrl || websiteUrl}
-                                    </span>
-                                    <ExternalLink size={11} style={{ flexShrink: 0 }} />
-                                  </a>
-                                ) : (
-                                  <span style={{ color: '#64748B', fontSize: '0.84rem' }}>In preparation</span>
-                                )}
-                              </td>
-
-                              {/* 3. Lead Study */}
-                              <td style={{ textAlign: 'center' }}>
-                                {studyPdf && (studyPdf.streamUrl || studyPdf.id) ? (
-                                  <button
-                                    type="button"
-                                    className="portal-btn-primary"
-                                    style={{
-                                      padding: '5px 12px',
-                                      fontSize: '0.8rem',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      fontWeight: '600',
-                                      margin: '0 auto'
-                                    }}
-                                    onClick={() => setViewingLeadPdf({
-                                      title: `${companyName} — Lead Study`,
-                                      documentType: 'Lead Study',
-                                      companyName,
-                                      streamUrl: getAuthenticatedAssetUrl(studyPdf),
-                                      downloadUrl: getAuthenticatedAssetUrl(studyPdf, 'download'),
-                                      fileName: `${companyName.replace(/\s+/g, '_')}_Lead_Study.pdf`
-                                    })}
-                                    title={`View Lead Study PDF for ${companyName}`}
-                                  >
-                                    <FileText size={13} />
-                                    <span>View</span>
-                                  </button>
-                                ) : (
-                                  <span style={{ fontSize: '0.76rem', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                    <Clock size={11} /> Pending
-                                  </span>
-                                )}
-                              </td>
-
-                              {/* 4. Pitch Deck */}
-                              <td style={{ textAlign: 'center' }}>
-                                {pitchPdf && (pitchPdf.streamUrl || pitchPdf.id) ? (
-                                  <button
-                                    type="button"
-                                    className="portal-btn-primary"
-                                    style={{
-                                      padding: '5px 12px',
-                                      fontSize: '0.8rem',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      fontWeight: '600',
-                                      margin: '0 auto'
-                                    }}
-                                    onClick={() => setViewingLeadPdf({
-                                      title: `${companyName} — Pitch Deck`,
-                                      documentType: 'Pitch Deck',
-                                      companyName,
-                                      streamUrl: getAuthenticatedAssetUrl(pitchPdf),
-                                      downloadUrl: getAuthenticatedAssetUrl(pitchPdf, 'download'),
-                                      fileName: `${companyName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`
-                                    })}
-                                    title={`View Pitch Deck PDF for ${companyName}`}
-                                  >
-                                    <FileText size={13} />
-                                    <span>View</span>
-                                  </button>
-                                ) : (
-                                  <span style={{ fontSize: '0.76rem', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                    <Clock size={11} /> Pending
-                                  </span>
-                                )}
-                              </td>
-
-                              {/* 5. Key People */}
-                              <td style={{ textAlign: 'center' }}>
-                                {isKpUnlocked ? (
-                                  (() => {
-                                    const emails = Array.isArray(lead.keyPeople?.emails) && lead.keyPeople.emails.length > 0
-                                      ? lead.keyPeople.emails
-                                      : (lead.email ? [lead.email] : []);
-                                    if (emails.length > 0) {
-                                      return (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                          {emails.map((em, eIdx) => (
-                                            <a
-                                              key={eIdx}
-                                              href={`mailto:${em}`}
-                                              style={{
-                                                fontSize: '0.78rem',
-                                                color: '#34d399',
-                                                fontWeight: '600',
-                                                textDecoration: 'none',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '4px',
-                                                background: 'rgba(16, 185, 129, 0.1)',
-                                                border: '1px solid rgba(16, 185, 129, 0.25)',
-                                                padding: '2px 8px',
-                                                borderRadius: '4px'
-                                              }}
-                                              title={`Email ${em}`}
-                                            >
-                                              <Mail size={11} />
-                                              <span>{em}</span>
-                                            </a>
-                                          ))}
+                            {isKpUnlocked ? (
+                              peopleList.length > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  {peopleList.map((person, pIdx) => (
+                                    <div
+                                      key={pIdx}
+                                      style={{
+                                        background: 'rgba(255, 255, 255, 0.02)',
+                                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                                        borderRadius: '6px',
+                                        padding: '6px 10px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '2px'
+                                      }}
+                                    >
+                                      {person.name && (
+                                        <div style={{ fontSize: '0.86rem', fontWeight: '600', color: '#F5F5F5' }}>
+                                          {person.name}
                                         </div>
-                                      );
-                                    }
-                                    return (
-                                      <span style={{ fontSize: '0.76rem', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                        <Clock size={11} /> Pending
-                                      </span>
-                                    );
-                                  })()
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={handleUnlockKeyPeople}
-                                    style={{
-                                      padding: '5px 11px',
-                                      fontSize: '0.78rem',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      fontWeight: '600',
-                                      margin: '0 auto',
-                                      background: 'rgba(245, 158, 11, 0.12)',
-                                      border: '1px solid rgba(245, 158, 11, 0.35)',
-                                      color: '#fbbf24',
-                                      borderRadius: '6px',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                    title="Key People is locked. Click to unlock access."
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.background = 'rgba(245, 158, 11, 0.22)';
-                                      e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.6)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.background = 'rgba(245, 158, 11, 0.12)';
-                                      e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.35)';
-                                    }}
-                                  >
-                                    <Lock size={12} />
-                                    <span>Locked</span>
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                                      )}
+                                      <a
+                                        href={`mailto:${person.email}`}
+                                        style={{
+                                          fontSize: '0.8rem',
+                                          color: '#34d399',
+                                          textDecoration: 'none',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '5px'
+                                        }}
+                                        title={`Email ${person.email}`}
+                                      >
+                                        <Mail size={12} style={{ flexShrink: 0 }} />
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {person.email}
+                                        </span>
+                                      </a>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div style={{ fontSize: '0.82rem', color: '#64748B' }}>
+                                  Key People not available
+                                </div>
+                              )
+                            ) : (
+                              <div
+                                style={{
+                                  background: 'rgba(245, 158, 11, 0.06)',
+                                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                                  borderRadius: '8px',
+                                  padding: '10px 12px',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  gap: '8px'
+                                }}
+                              >
+                                <div style={{ fontSize: '0.78rem', color: '#fbbf24' }}>
+                                  Key People locked ({lead.keyPeople?.count || 1} available)
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={handleUnlockKeyPeople}
+                                  style={{
+                                    padding: '5px 10px',
+                                    fontSize: '0.76rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontWeight: '600',
+                                    background: 'rgba(245, 158, 11, 0.18)',
+                                    border: '1px solid rgba(245, 158, 11, 0.4)',
+                                    color: '#fbbf24',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    flexShrink: 0
+                                  }}
+                                  title="Unlock Key People Intelligence"
+                                >
+                                  <Lock size={12} />
+                                  <span>Unlock</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Bottom Section: Company Study & Pitch Deck Buttons */}
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: '10px',
+                              marginTop: 'auto',
+                              paddingTop: '12px',
+                              borderTop: '1px solid rgba(255, 255, 255, 0.07)'
+                            }}
+                          >
+                            {/* Company Study */}
+                            {studyDoc && (studyDoc.streamUrl || studyDoc.id) ? (
+                              <button
+                                type="button"
+                                className="portal-btn-primary"
+                                style={{
+                                  padding: '8px 12px',
+                                  fontSize: '0.82rem',
+                                  fontWeight: '600',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  width: '100%'
+                                }}
+                                onClick={() => setViewingLeadPdf({
+                                  title: `${companyName} — Company Study`,
+                                  documentType: 'Company Study',
+                                  companyName,
+                                  assetId: studyDoc.assetId || studyDoc.id || null,
+                                  streamUrl: getAuthenticatedAssetUrl(studyDoc),
+                                  downloadUrl: getAuthenticatedAssetUrl(studyDoc, 'download'),
+                                  fileName: studyDoc.name || `${companyName.replace(/\s+/g, '_')}_Company_Study.pdf`
+                                })}
+                                title={`Open Company Study for ${companyName}`}
+                              >
+                                <FileText size={14} />
+                                <span>Company Study</span>
+                              </button>
+                            ) : (
+                              <div
+                                style={{
+                                  padding: '8px 10px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(255, 255, 255, 0.02)',
+                                  border: '1px dashed rgba(255, 255, 255, 0.1)',
+                                  color: '#64748B',
+                                  fontSize: '0.76rem',
+                                  textAlign: 'center',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '5px'
+                                }}
+                              >
+                                <Clock size={12} />
+                                <span>Company Study not available</span>
+                              </div>
+                            )}
+
+                            {/* Pitch Deck */}
+                            {pitchDoc && (pitchDoc.streamUrl || pitchDoc.id) ? (
+                              <button
+                                type="button"
+                                className="portal-btn-primary"
+                                style={{
+                                  padding: '8px 12px',
+                                  fontSize: '0.82rem',
+                                  fontWeight: '600',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  width: '100%'
+                                }}
+                                onClick={() => setViewingLeadPdf({
+                                  title: `${companyName} — Pitch Deck`,
+                                  documentType: 'Pitch Deck',
+                                  companyName,
+                                  assetId: pitchDoc.assetId || pitchDoc.id || null,
+                                  streamUrl: getAuthenticatedAssetUrl(pitchDoc),
+                                  downloadUrl: getAuthenticatedAssetUrl(pitchDoc, 'download'),
+                                  fileName: pitchDoc.name || `${companyName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`
+                                })}
+                                title={`Open Pitch Deck for ${companyName}`}
+                              >
+                                <FileText size={14} />
+                                <span>Pitch Deck</span>
+                              </button>
+                            ) : (
+                              <div
+                                style={{
+                                  padding: '8px 10px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(255, 255, 255, 0.02)',
+                                  border: '1px dashed rgba(255, 255, 255, 0.1)',
+                                  color: '#64748B',
+                                  fontSize: '0.76rem',
+                                  textAlign: 'center',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '5px'
+                                }}
+                              >
+                                <Clock size={12} />
+                                <span>Pitch Deck not available</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              {/* Identified Key Stakeholders Table */}
-              <div className="portal-card" style={{ marginBottom: '1.75rem' }}>
-                <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '1rem', color: '#F5F5F5', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Briefcase size={18} color="#a855f7" /> Identified Key Stakeholders ({keyPeopleCount})
-                </h4>
-                <div className="request-table-wrapper">
-                  <table className="request-table">
-                    <thead>
-                      <tr>
-                        <th>Stakeholder</th>
-                        <th>Executive Role</th>
-                        <th>Department</th>
-                        <th>Contact Email</th>
-                        <th>Social Profile</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {keyPeopleCount > 0 ? (
-                        company.initialKeyPeople.map((kp, idx) => (
-                          <tr key={kp.id || idx}>
-                            <td style={{ fontWeight: '600', color: '#F5F5F5' }}>{kp.name}</td>
-                            <td style={{ color: '#94a3b8' }}>{kp.role || 'Not available'}</td>
-                            <td style={{ color: '#94a3b8' }}>{kp.department || 'Not available'}</td>
-                            <td>
-                              {kp.contact ? (
-                                <a href={`mailto:${kp.contact}`} style={{ color: '#00D9FF', textDecoration: 'none' }}>
-                                  {kp.contact}
-                                </a>
-                              ) : (
-                                <span style={{ color: '#64748b' }}>Not available</span>
-                              )}
-                            </td>
-                            <td>
-                              {kp.socialProfile ? (
-                                <a href={kp.socialProfile} target="_blank" rel="noreferrer" style={{ color: '#00D9FF', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
-                                  Profile <ExternalLink size={11} />
-                                </a>
-                              ) : (
-                                <span style={{ color: '#64748b' }}>Not available</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="5" style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8' }}>
-                            No stakeholders specified on file.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+
 
               {/* Dedicated "Request More Leads" Card & CTA (Above Sprint History) */}
               <div
@@ -3522,69 +3582,7 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                 </div>
               </div>
 
-              {/* Previous Boost Sprints History Table */}
-              <div className="portal-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h4 style={{ fontSize: '1.05rem', fontWeight: '700', margin: 0 }}>
-                    Company Boost Sprint History
-                  </h4>
-                  <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
-                    {requests.filter(r => r.serviceType === 'COMPANY_BOOST').length} Total Sprints
-                  </span>
-                </div>
-                <div className="request-table-wrapper">
-                  <table className="request-table">
-                    <thead>
-                      <tr>
-                        <th>Ticket ID</th>
-                        <th>Sprint Title</th>
-                        <th>Priority</th>
-                        <th>Status</th>
-                        <th>Assigned Team</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {requests.filter(r => r.serviceType === 'COMPANY_BOOST').length === 0 ? (
-                        <tr>
-                          <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-                            No Company Boost requests created yet. Select a service above to begin!
-                          </td>
-                        </tr>
-                      ) : (
-                        requests.filter(r => r.serviceType === 'COMPANY_BOOST').map((req) => (
-                          <tr key={req._id}>
-                            <td>
-                              <span className="ticket-key" onClick={() => handleOpenTicket(req)}>
-                                {req.ticketId}
-                              </span>
-                            </td>
-                            <td style={{ fontWeight: '600' }}>{req.title}</td>
-                            <td>
-                              <span className={`priority-pill ${req.priority}`}>{req.priority}</span>
-                            </td>
-                            <td>
-                              <span className={`status-pill ${req.status}`}>
-                                {req.status.replace(/_/g, ' ')}
-                              </span>
-                            </td>
-                            <td>{req.assignedTeam}</td>
-                            <td>
-                              <button
-                                className="portal-btn-secondary"
-                                style={{ padding: '4px 8px', fontSize: '0.78rem' }}
-                                onClick={() => handleOpenTicket(req)}
-                              >
-                                View Ticket
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+
             </div>
           )}
 
@@ -3935,21 +3933,34 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                       <th>Assigned Team</th>
                       <th>Payment</th>
                       <th>Created Date</th>
-                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredUserRequests.length === 0 ? (
                       <tr>
-                        <td colSpan="9" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
                           No tickets match your filter criteria.
                         </td>
                       </tr>
                     ) : (
                       filteredUserRequests.map((req) => (
-                        <tr key={req._id}>
+                        <tr
+                          key={req._id}
+                          className="clickable-row"
+                          onClick={() => handleOpenTicket(req)}
+                          tabIndex={0}
+                          role="button"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleOpenTicket(req);
+                            }
+                          }}
+                          style={{ cursor: 'pointer' }}
+                          title={`Click to view ticket details for ${req.ticketId}`}
+                        >
                           <td>
-                            <span className="ticket-key" onClick={() => handleOpenTicket(req)}>
+                            <span className="ticket-key">
                               {req.ticketId}
                             </span>
                           </td>
@@ -3971,16 +3982,6 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                           </td>
                           <td style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
                             {new Date(req.createdAt).toLocaleDateString()}
-                          </td>
-                          <td>
-                            <button
-                              type="button"
-                              className="portal-btn-secondary"
-                              style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                              onClick={() => handleOpenTicket(req)}
-                            >
-                              Open
-                            </button>
                           </td>
                         </tr>
                       ))
@@ -4017,19 +4018,32 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                       <th>Payment Method</th>
                       <th>Status</th>
                       <th>Date</th>
-                      <th style={{ textAlign: 'right' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {requests.filter(r => r.paymentStatus === 'PAID').length === 0 ? (
                       <tr>
-                        <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
                           No paid invoices recorded yet.
                         </td>
                       </tr>
                     ) : (
                       requests.filter(r => r.paymentStatus === 'PAID').map((req, idx) => (
-                        <tr key={req._id}>
+                        <tr
+                          key={req._id}
+                          className="clickable-row"
+                          onClick={() => setViewingInvoice({ ...req, invoiceId: `INV-2026-00${idx + 1}` })}
+                          tabIndex={0}
+                          role="button"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setViewingInvoice({ ...req, invoiceId: `INV-2026-00${idx + 1}` });
+                            }
+                          }}
+                          style={{ cursor: 'pointer' }}
+                          title={`Click to view invoice details for INV-2026-00${idx + 1}`}
+                        >
                           <td style={{ fontFamily: 'monospace', fontWeight: '700', color: '#2563EB' }}>
                             INV-2026-00{idx + 1}
                           </td>
@@ -4043,16 +4057,6 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                           </td>
                           <td style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
                             {new Date(req.updatedAt || req.createdAt).toLocaleDateString()}
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <button
-                              type="button"
-                              className="portal-btn-secondary"
-                              style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                              onClick={() => setViewingInvoice({ ...req, invoiceId: `INV-2026-00${idx + 1}` })}
-                            >
-                              <Receipt size={13} /> View Invoice
-                            </button>
                           </td>
                         </tr>
                       ))
@@ -4390,7 +4394,7 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
 
                         <div>
                           <label className="portal-form-label">
-                            What Should CreativeGini Focus On? <span style={{ color: '#EF4444' }}>*</span>
+                            What Should CreativeGini Focus On?
                           </label>
                           <input
                             className="portal-form-input"
@@ -4428,7 +4432,7 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
 
                       <div>
                         <label className="portal-form-label">
-                          Expected Outcome <span style={{ color: '#EF4444' }}>*</span>
+                          Expected Outcome
                         </label>
                         <textarea
                           className="portal-form-input"
@@ -4595,7 +4599,7 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
 
                         <div>
                           <label className="portal-form-label">
-                            Target Audience <span style={{ color: '#EF4444' }}>*</span>
+                            Target Audience
                           </label>
                           <textarea
                             className="portal-form-input"
@@ -5007,7 +5011,7 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                         </div>
                         <div>
                           <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Focus Area</div>
-                          <div style={{ color: '#F8FAFC', marginTop: '2px' }}>{strategicPlanForm.focusArea}</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px' }}>{strategicPlanForm.focusArea || <span style={{ color: '#64748B' }}>Not specified</span>}</div>
                         </div>
                         <div>
                           <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Current Challenges / Pain Points</div>
@@ -5015,7 +5019,7 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                         </div>
                         <div>
                           <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Expected Outcome</div>
-                          <div style={{ color: '#F8FAFC', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{strategicPlanForm.expectedOutcome}</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{strategicPlanForm.expectedOutcome || <span style={{ color: '#64748B' }}>Not specified</span>}</div>
                         </div>
                         {strategicPlanForm.competitors && (
                           <div>
@@ -5063,7 +5067,7 @@ ${customForm.expectedOutcome ? `• Expected Outcome: ${customForm.expectedOutco
                         </div>
                         <div>
                           <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Target Audience</div>
-                          <div style={{ color: '#F8FAFC', marginTop: '2px' }}>{contentForm.targetAudience}</div>
+                          <div style={{ color: '#F8FAFC', marginTop: '2px' }}>{contentForm.targetAudience || <span style={{ color: '#64748B' }}>Not specified</span>}</div>
                         </div>
                         {contentForm.preferredPlatforms && (
                           <div>

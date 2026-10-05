@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, X, AlertCircle, Loader2 } from 'lucide-react';
+import { api } from '../../services/api';
 
 /**
- * Reusable Internal PDF Viewer Modal for CreativeGini
- * - Opens PDFs inside the application without redirecting externally
- * - Responsive on desktop, laptop, tablet, and mobile
- * - Includes document title, visible PDF content, loading state, error state,
- *   download action returning original valid PDF, and close actions.
+ * Reusable In-App Document Viewer Modal for CreativeGini
+ * - Displays readable extracted document content directly inside the CreativeGini UI
+ * - NO iframe, NO browser PDF viewer plugin, NO external redirects
+ * - Supports PDF and DOC/DOCX processed text with headings and list formatting
+ * - Provides download action for the original uploaded file
+ * - Fully responsive on desktop, laptop, tablet, and mobile
  */
 export default function PdfViewerModal({
   isOpen = true,
   title = 'Document Viewer',
-  documentType = 'PDF Document',
+  documentType = 'Document',
   companyName = '',
+  content: initialContent = '',
+  assetId = null,
   streamUrl = '',
   pdfUrl = '',
   downloadUrl = '',
@@ -20,13 +24,55 @@ export default function PdfViewerModal({
   onClose
 }) {
   const actualStreamUrl = streamUrl || pdfUrl || '';
-  const [isLoading, setIsLoading] = useState(true);
+  const [extractedContent, setExtractedContent] = useState(initialContent || '');
+  const [isLoading, setIsLoading] = useState(!initialContent && Boolean(assetId || actualStreamUrl));
   const [loadError, setLoadError] = useState(false);
 
+  // Extract asset ID from stream/download URL if not directly passed
+  const resolvedAssetId = assetId || (() => {
+    const match = (actualStreamUrl || downloadUrl || '').match(/\/api\/assets\/([a-f0-9-]+)\/(stream|download|content)/i);
+    return match ? match[1] : null;
+  })();
+
   useEffect(() => {
+    if (initialContent) {
+      setExtractedContent(initialContent);
+      setIsLoading(false);
+      setLoadError(false);
+      return;
+    }
+
+    if (!resolvedAssetId) {
+      setIsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
     setIsLoading(true);
     setLoadError(false);
-  }, [actualStreamUrl]);
+
+    api.getAssetContent(resolvedAssetId)
+      .then(res => {
+        if (!isMounted) return;
+        if (res && res.success && res.content) {
+          setExtractedContent(res.content);
+        } else {
+          setExtractedContent('');
+        }
+      })
+      .catch(err => {
+        if (!isMounted) return;
+        console.warn('[PdfViewerModal] Could not extract document text:', err?.message);
+        setLoadError(true);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialContent, resolvedAssetId, actualStreamUrl]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -41,13 +87,119 @@ export default function PdfViewerModal({
   if (!isOpen) return null;
 
   const effectiveDownloadUrl = downloadUrl || actualStreamUrl;
-  const safeFileName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
+  const safeFileName = fileName || 'document.pdf';
 
-  const handleDownload = (e) => {
-    if (!effectiveDownloadUrl) {
-      e.preventDefault();
-      alert('Document download link is currently unavailable.');
+  // Helper to render formatted text with headings and lists
+  const renderFormattedContent = (rawText) => {
+    if (!rawText || !rawText.trim()) {
+      return (
+        <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#94A3B8' }}>
+          <FileText size={36} color="#64748B" style={{ margin: '0 auto 0.75rem', display: 'block' }} />
+          <div style={{ fontWeight: '600', color: '#E2E8F0', marginBottom: '0.35rem' }}>
+            Preview content is not available for this document.
+          </div>
+          <div style={{ fontSize: '0.85rem', color: '#64748B' }}>
+            You can still download the original uploaded file below.
+          </div>
+        </div>
+      );
     }
+
+    const lines = rawText.split('\n');
+    return lines.map((line, idx) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return <div key={idx} style={{ height: '0.85rem' }} />;
+      }
+
+      if (trimmed.startsWith('### ')) {
+        return (
+          <h4
+            key={idx}
+            style={{
+              fontSize: '1.05rem',
+              fontWeight: '700',
+              color: '#00D9FF',
+              margin: '1.25rem 0 0.5rem 0',
+              letterSpacing: '0.3px'
+            }}
+          >
+            {trimmed.replace(/^###\s+/, '')}
+          </h4>
+        );
+      }
+
+      if (trimmed.startsWith('## ')) {
+        return (
+          <h3
+            key={idx}
+            style={{
+              fontSize: '1.2rem',
+              fontWeight: '800',
+              color: '#F5F5F5',
+              margin: '1.5rem 0 0.6rem 0',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              paddingBottom: '0.35rem'
+            }}
+          >
+            {trimmed.replace(/^##\s+/, '')}
+          </h3>
+        );
+      }
+
+      if (trimmed.startsWith('# ')) {
+        return (
+          <h2
+            key={idx}
+            style={{
+              fontSize: '1.35rem',
+              fontWeight: '800',
+              color: '#FFFFFF',
+              margin: '1.75rem 0 0.75rem 0',
+              borderBottom: '1px solid rgba(0, 217, 255, 0.25)',
+              paddingBottom: '0.45rem'
+            }}
+          >
+            {trimmed.replace(/^#\s+/, '')}
+          </h2>
+        );
+      }
+
+      if (/^[-*•]\s+/.test(trimmed)) {
+        return (
+          <div
+            key={idx}
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              margin: '0.3rem 0',
+              paddingLeft: '0.5rem',
+              lineHeight: '1.6',
+              color: '#E2E8F0',
+              fontSize: '0.92rem'
+            }}
+          >
+            <span style={{ color: '#00D9FF', fontWeight: 'bold' }}>•</span>
+            <span>{trimmed.replace(/^[-*•]\s+/, '')}</span>
+          </div>
+        );
+      }
+
+      return (
+        <p
+          key={idx}
+          style={{
+            margin: '0.4rem 0',
+            lineHeight: '1.65',
+            color: '#CBD5E1',
+            fontSize: '0.92rem'
+          }}
+        >
+          {line}
+        </p>
+      );
+    });
   };
 
   return (
@@ -79,15 +231,15 @@ export default function PdfViewerModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: '1020px',
-          height: '90vh',
-          maxHeight: '900px',
+          maxWidth: '920px',
+          height: '88vh',
+          maxHeight: '850px',
           display: 'flex',
           flexDirection: 'column',
           background: '#0d1117',
           border: '1px solid rgba(0, 217, 255, 0.25)',
           borderRadius: '14px',
-          boxShadow: '0 25px 70px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 217, 255, 0.1)',
+          boxShadow: '0 25px 70px rgba(0, 0, 0, 0.85), 0 0 30px rgba(0, 217, 255, 0.1)',
           overflow: 'hidden'
         }}
       >
@@ -172,7 +324,6 @@ export default function PdfViewerModal({
                 download={safeFileName}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={handleDownload}
                 className="portal-btn-primary"
                 style={{
                   padding: '7px 16px',
@@ -184,10 +335,10 @@ export default function PdfViewerModal({
                   borderRadius: '6px',
                   fontWeight: '600'
                 }}
-                title="Download original PDF file"
+                title="Download original file"
               >
                 <Download size={14} />
-                <span>Download PDF</span>
+                <span>Download</span>
               </a>
             )}
             <button
@@ -222,57 +373,47 @@ export default function PdfViewerModal({
           </div>
         </div>
 
-        {/* Viewer Content Frame */}
+        {/* Scrollable Document Content Area */}
         <div
           style={{
             flex: 1,
-            height: '100%',
-            position: 'relative',
+            overflowY: 'auto',
+            padding: '24px 28px',
             background: '#090d16',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden'
+            color: '#E2E8F0',
+            fontFamily: 'inherit'
           }}
         >
-          {/* Loading State Spinner */}
-          {isLoading && !loadError && (
+          {isLoading ? (
             <div
               style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: '#0d1117',
-                zIndex: 2,
-                color: '#94a3b8',
+                height: '100%',
+                minHeight: '240px',
+                color: '#94A3B8',
                 gap: '12px'
               }}
             >
               <Loader2 size={32} color="#00D9FF" className="animate-spin" />
-              <div style={{ fontSize: '0.9rem', color: '#cbd5e1', fontWeight: '500' }}>
-                Loading internal PDF dossier...
+              <div style={{ fontSize: '0.9rem', color: '#CBD5E1', fontWeight: '500' }}>
+                Reading processed document content...
               </div>
             </div>
-          )}
-
-          {/* Error State Fallback */}
-          {loadError ? (
+          ) : loadError ? (
             <div
               style={{
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '2rem',
+                padding: '3rem 1.5rem',
                 textAlign: 'center',
-                maxWidth: '460px',
-                color: '#94a3b8',
+                maxWidth: '520px',
+                margin: '0 auto',
+                color: '#94A3B8',
                 gap: '14px'
               }}
             >
@@ -290,11 +431,11 @@ export default function PdfViewerModal({
               >
                 <AlertCircle size={24} />
               </div>
-              <h4 style={{ margin: 0, color: '#f8fafc', fontSize: '1.05rem', fontWeight: '700' }}>
-                Unable to preview PDF document
+              <h4 style={{ margin: 0, color: '#F8FAFC', fontSize: '1.05rem', fontWeight: '700' }}>
+                Preview content is unavailable
               </h4>
               <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: '1.5' }}>
-                Your browser could not render the internal PDF stream directly. You can download the original PDF file to view it on your device.
+                We were unable to extract readable text preview for this document. You can download the original file to view it directly on your device.
               </p>
               {effectiveDownloadUrl && (
                 <a
@@ -312,30 +453,56 @@ export default function PdfViewerModal({
                   }}
                 >
                   <Download size={15} />
-                  <span>Download Original PDF</span>
+                  <span>Download Original Document</span>
                 </a>
               )}
             </div>
-          ) : actualStreamUrl ? (
-            <iframe
-              src={actualStreamUrl}
-              title={title}
-              style={{
-                width: '100%',
-                height: '100%',
-                border: 'none',
-                background: '#161b22'
-              }}
-              onLoad={() => setIsLoading(false)}
-              onError={() => {
-                setIsLoading(false);
-                setLoadError(true);
-              }}
-            />
           ) : (
-            <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-              No document stream available.
+            <div
+              style={{
+                maxWidth: '820px',
+                margin: '0 auto',
+                lineHeight: '1.65',
+                fontSize: '0.92rem'
+              }}
+            >
+              {renderFormattedContent(extractedContent)}
             </div>
+          )}
+        </div>
+
+        {/* Footer info & download bar */}
+        <div
+          style={{
+            padding: '10px 20px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+            background: 'rgba(15, 23, 42, 0.7)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '0.78rem',
+            color: '#64748B',
+            flexWrap: 'wrap',
+            gap: '8px'
+          }}
+        >
+          <span>CreativeGini Document Reader</span>
+          {effectiveDownloadUrl && (
+            <a
+              href={effectiveDownloadUrl}
+              download={safeFileName}
+              style={{
+                color: '#00D9FF',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontWeight: '600'
+              }}
+            >
+              <Download size={12} />
+              <span>Download Original ({safeFileName})</span>
+            </a>
           )}
         </div>
       </div>

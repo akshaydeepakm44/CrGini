@@ -1233,14 +1233,16 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
       const leadKey = leadMatch ? (isNaN(parseInt(leadMatch[1], 10)) ? leadMatch[1] : parseInt(leadMatch[1], 10)) : null;
 
       // Detect doc type
-      const isStudy = /\[(Lead\s*Study|Study)\]/i.test(file.name) || (/^\[Lead\s*\d+\]/i.test(file.name) && !/\[(Pitch|Key)/i.test(file.name));
+      const isStudy = /\[(Lead\s*Study|Study)\]/i.test(file.name) || (/^\[Lead\s*\d+\]/i.test(file.name) && !/\[(Pitch|Key|Logo)/i.test(file.name));
       const isPitch = /\[(Pitch\s*Deck|Pitch)\]/i.test(file.name);
       const isKeyPeople = /\[(Key\s*People|KeyPeople)\]/i.test(file.name);
+      const isLogo = /\[Logo\]/i.test(file.name);
 
       if (leadKey) {
         if (isStudy) filesByTag.set(`${leadKey}_study`, cleanFile);
         if (isPitch) filesByTag.set(`${leadKey}_pitch`, cleanFile);
         if (isKeyPeople) filesByTag.set(`${leadKey}_keypeople`, cleanFile);
+        if (isLogo) filesByTag.set(`${leadKey}_logo`, cleanFile);
       }
     }
 
@@ -1259,11 +1261,17 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
       // - Free/sample leads require Key People payment unless user is ADMIN or COMPANY_LEAD.
       const keyPeopleUnlocked = isAdditionalLead || isKeyPeoplePaid || ['ADMIN', 'COMPANY_LEAD'].includes(req.user.role);
 
+      // Logo
+      const logoFile = filesByTag.get(`${slotIndex}_logo`) || filesByTag.get(`${lead.id}_logo`);
+      const logoFromNotes = notes.match(/\[Logo:\s*([^\]]+)\]/);
+      const logoUrl = logoFile ? logoFile.streamUrl : (logoFromNotes ? logoFromNotes[1] : null);
+
       // 1. Lead Study
       const studyFile = filesByTag.get(`${slotIndex}_study`) || filesByTag.get(`${lead.id}_study`);
       const studyFromNotes = notes.match(/\[Lead Study:\s*([^\]]+)\]/) || notes.match(/\[Lead PDF:\s*([^\]]+)\]/);
       const leadStudy = studyFile ? {
         id: studyFile.id,
+        assetId: studyFile.id,
         name: studyFile.name,
         streamUrl: studyFile.streamUrl,
         downloadUrl: studyFile.downloadUrl,
@@ -1271,6 +1279,7 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
         type: studyFile.type
       } : (studyFromNotes ? {
         id: null,
+        assetId: null,
         name: `${companyName} - Lead Study.pdf`,
         streamUrl: studyFromNotes[1],
         downloadUrl: studyFromNotes[1]
@@ -1281,6 +1290,7 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
       const pitchFromNotes = notes.match(/\[Pitch Deck:\s*([^\]]+)\]/);
       const pitchDeck = pitchFile ? {
         id: pitchFile.id,
+        assetId: pitchFile.id,
         name: pitchFile.name,
         streamUrl: pitchFile.streamUrl,
         downloadUrl: pitchFile.downloadUrl,
@@ -1288,41 +1298,74 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
         type: pitchFile.type
       } : (pitchFromNotes ? {
         id: null,
+        assetId: null,
         name: `${companyName} - Pitch Deck.pdf`,
         streamUrl: pitchFromNotes[1],
         downloadUrl: pitchFromNotes[1]
       } : null);
 
-      // 3. Key People (Email addresses, no PDF)
-      let kpEmails = [];
-      const kpNotesMatch = notes.match(/\[Key People:\s*([^\]]+)\]/i);
-      if (kpNotesMatch && kpNotesMatch[1]) {
-        const rawParts = kpNotesMatch[1].split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-        kpEmails = rawParts.filter(part => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(part));
+      // 3. Key People (Name + Email addresses)
+      let peopleList = [];
+      const kpJsonMatch = notes.match(/\[Key People JSON:\s*(\[.*?\])\]/);
+      if (kpJsonMatch && kpJsonMatch[1]) {
+        try {
+          const parsed = JSON.parse(kpJsonMatch[1]);
+          if (Array.isArray(parsed)) {
+            peopleList = parsed.map(p => ({
+              name: (p.name || '').trim(),
+              email: (p.email || '').trim().toLowerCase()
+            })).filter(p => p.name || p.email);
+          }
+        } catch (_) {}
       }
-      if (kpEmails.length === 0 && lead.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email.trim())) {
-        kpEmails = [lead.email.trim().toLowerCase()];
+      if (peopleList.length === 0) {
+        const kpNotesMatch = notes.match(/\[Key People:\s*([^\]]+)\]/i);
+        if (kpNotesMatch && kpNotesMatch[1] && !kpNotesMatch[1].toLowerCase().includes('locked')) {
+          const rawParts = kpNotesMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          peopleList = rawParts.map(part => {
+            const namedMatch = part.match(/^([^<]+)<([^>]+)>$/);
+            if (namedMatch) {
+              return {
+                name: namedMatch[1].trim(),
+                email: namedMatch[2].trim().toLowerCase()
+              };
+            }
+            if (emailRegex.test(part)) {
+              return { name: '', email: part.toLowerCase() };
+            }
+            return null;
+          }).filter(Boolean);
+        }
       }
+      if (peopleList.length === 0 && lead.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email.trim())) {
+        peopleList = [{ name: lead.name || '', email: lead.email.trim().toLowerCase() }];
+      }
+
+      const kpEmails = peopleList.map(p => p.email).filter(Boolean);
 
       let keyPeople = null;
       if (keyPeopleUnlocked) {
         keyPeople = {
           isLocked: false,
-          count: kpEmails.length,
+          count: peopleList.length,
+          people: peopleList,
           emails: kpEmails
         };
       } else {
         keyPeople = {
           isLocked: true,
-          count: kpEmails.length
-          // emails array is strictly omitted when locked
+          count: peopleList.length
+          // people and emails array strictly omitted when locked
         };
       }
 
-      // Security: Strip email addresses from notes if locked
+      // Security: Strip email addresses and names from notes if locked
       const sanitizedNotes = keyPeopleUnlocked
         ? notes
-        : notes.replace(/\[Key People:\s*[^\]]+\]/gi, '[Key People: Locked]');
+        : notes
+            .replace(/\[Key People:\s*[^\]]+\]/gi, '[Key People: Locked]')
+            .replace(/\[Key People JSON:\s*[^\]]+\]/gi, '[Key People: Locked]');
 
       return {
         ...lead,
@@ -1331,6 +1374,7 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
         companyName,
         company: companyName,
         website: websiteUrl,
+        logoUrl,
         slotIndex,
         isAdditionalLead: Boolean(isAdditionalLead),
         keyPeopleUnlocked: Boolean(keyPeopleUnlocked),
@@ -1415,89 +1459,170 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
       return res.status(400).json({ success: false, message: 'A valid HTTP or HTTPS company website URL is required.' });
     }
 
-    // 3. Process Key People Emails (no PDF, no MinIO)
-    let rawKpEmails = req.body.keyPeopleEmails ?? req.body.keyPeopleEmail;
-    if (rawKpEmails === undefined && (typeof req.body.keyPeople === 'string' || Array.isArray(req.body.keyPeople))) {
-      rawKpEmails = req.body.keyPeople;
-    }
-    if (rawKpEmails === undefined && leadData?.keyPeopleEmails) {
-      rawKpEmails = leadData.keyPeopleEmails;
+    // 3. Process Key People (Name + Email, no PDF, no MinIO)
+    let rawKpInput = req.body.keyPeople ?? req.body.keyPeopleEmails ?? req.body.keyPeopleEmail;
+    if (rawKpInput === undefined && leadData) {
+      rawKpInput = leadData.keyPeople ?? leadData.keyPeopleEmails;
     }
 
-    let inputKpEmails = [];
-    if (Array.isArray(rawKpEmails)) {
-      inputKpEmails = rawKpEmails.map(e => typeof e === 'string' ? e.trim() : (e?.email ? String(e.email).trim() : '')).filter(Boolean);
-    } else if (typeof rawKpEmails === 'string') {
-      inputKpEmails = rawKpEmails.split(',').map(e => e.trim()).filter(Boolean);
+    let inputKeyPeople = [];
+    if (Array.isArray(rawKpInput)) {
+      inputKeyPeople = rawKpInput.map(item => {
+        if (typeof item === 'string') {
+          const named = item.match(/^([^<]+)<([^>]+)>$/);
+          if (named) {
+            return { name: named[1].trim(), email: named[2].trim().toLowerCase() };
+          }
+          return { name: '', email: item.trim().toLowerCase() };
+        }
+        return {
+          name: (item?.name || '').trim(),
+          email: (item?.email || '').trim().toLowerCase()
+        };
+      }).filter(p => p.email || p.name);
+    } else if (typeof rawKpInput === 'string') {
+      inputKeyPeople = rawKpInput.split(',').map(s => {
+        const item = s.trim();
+        const named = item.match(/^([^<]+)<([^>]+)>$/);
+        if (named) {
+          return { name: named[1].trim(), email: named[2].trim().toLowerCase() };
+        }
+        return { name: '', email: item.toLowerCase() };
+      }).filter(p => p.email || p.name);
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    for (const email of inputKpEmails) {
-      if (!emailRegex.test(email)) {
+    for (const p of inputKeyPeople) {
+      if (p.email && !emailRegex.test(p.email)) {
         return res.status(400).json({
           success: false,
-          message: `Invalid email address format: "${email}".`
+          message: `Invalid email address format: "${p.email}".`
         });
       }
     }
 
-    const uniqueKpEmails = [];
-    for (const email of inputKpEmails) {
-      const lower = email.toLowerCase();
-      if (uniqueKpEmails.includes(lower)) {
-        return res.status(400).json({
-          success: false,
-          message: `Duplicate email address found: "${lower}". Each key person email must be unique.`
-        });
+    const uniqueKpPeople = [];
+    const seenEmails = new Set();
+    for (const p of inputKeyPeople) {
+      if (p.email) {
+        if (seenEmails.has(p.email)) {
+          return res.status(400).json({
+            success: false,
+            message: `Duplicate email address found: "${p.email}". Each key person email must be unique.`
+          });
+        }
+        seenEmails.add(p.email);
       }
-      uniqueKpEmails.push(lower);
+      uniqueKpPeople.push(p);
     }
 
-    // Retain existing key people emails if updating existing lead and none were explicitly provided
-    if (rawKpEmails === undefined && existingLead?.notes) {
-      const existingKpMatch = existingLead.notes.match(/\[Key People:\s*([^\]]+)\]/i);
-      if (existingKpMatch && existingKpMatch[1]) {
-        const parts = existingKpMatch[1].split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-        for (const p of parts) {
-          if (emailRegex.test(p) && !uniqueKpEmails.includes(p)) {
-            uniqueKpEmails.push(p);
+    // Retain existing key people if updating existing lead and none were explicitly provided
+    if (rawKpInput === undefined && existingLead?.notes) {
+      const existingKpJson = existingLead.notes.match(/\[Key People JSON:\s*(\[.*?\])\]/);
+      if (existingKpJson && existingKpJson[1]) {
+        try {
+          const parsed = JSON.parse(existingKpJson[1]);
+          if (Array.isArray(parsed)) {
+            for (const p of parsed) {
+              const em = (p.email || '').trim().toLowerCase();
+              if (!em || !seenEmails.has(em)) {
+                if (em) seenEmails.add(em);
+                uniqueKpPeople.push({ name: (p.name || '').trim(), email: em });
+              }
+            }
+          }
+        } catch (_) {}
+      }
+      if (uniqueKpPeople.length === 0) {
+        const existingKpMatch = existingLead.notes.match(/\[Key People:\s*([^\]]+)\]/i);
+        if (existingKpMatch && existingKpMatch[1] && !existingKpMatch[1].toLowerCase().includes('locked')) {
+          const parts = existingKpMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+          for (const part of parts) {
+            const named = part.match(/^([^<]+)<([^>]+)>$/);
+            const name = named ? named[1].trim() : '';
+            const email = (named ? named[2] : part).trim().toLowerCase();
+            if (emailRegex.test(email) && !seenEmails.has(email)) {
+              seenEmails.add(email);
+              uniqueKpPeople.push({ name, email });
+            }
           }
         }
       }
-      if (uniqueKpEmails.length === 0 && existingLead.email && emailRegex.test(existingLead.email.trim())) {
-        uniqueKpEmails.push(existingLead.email.trim().toLowerCase());
+      if (uniqueKpPeople.length === 0 && existingLead.email && emailRegex.test(existingLead.email.trim())) {
+        const em = existingLead.email.trim().toLowerCase();
+        if (!seenEmails.has(em)) {
+          seenEmails.add(em);
+          uniqueKpPeople.push({ name: existingLead.name || '', email: em });
+        }
       }
     }
 
+    const uniqueKpEmails = uniqueKpPeople.map(p => p.email).filter(Boolean);
+
     // Identify provided files:
-    // Lead Study PDF, Pitch Deck PDF (No Key People PDF)
-    // Also support single `file` property for backwards compatibility
+    // Company Logo, Lead Study (PDF/DOC/DOCX), Pitch Deck (PDF/DOC/DOCX)
+    const logoDoc = req.body.logo || req.body.logoFile;
     const leadStudyDoc = req.body.leadStudy || req.body.leadStudyFile || (!req.body.pitchDeck ? req.body.file : null);
     const pitchDeckDoc = req.body.pitchDeck || req.body.pitchDeckFile || (req.body.file?.docType === 'pitch' ? req.body.file : null);
 
     const existingHasAssets = existingLead && (
-      (existingLead.notes && (existingLead.notes.includes('[Lead Study:') || existingLead.notes.includes('[Pitch Deck:') || existingLead.notes.includes('[Key People:'))) ||
+      (existingLead.notes && (
+        existingLead.notes.includes('[Lead Study:') ||
+        existingLead.notes.includes('[Pitch Deck:') ||
+        existingLead.notes.includes('[Key People:') ||
+        existingLead.notes.includes('[Logo:')
+      )) ||
       existingLead.email
     );
 
-    if (!leadStudyDoc && !pitchDeckDoc && uniqueKpEmails.length === 0 && !req.body.file && !existingHasAssets) {
+    if (!logoDoc && !leadStudyDoc && !pitchDeckDoc && uniqueKpPeople.length === 0 && !req.body.file && !existingHasAssets) {
       return res.status(400).json({
         success: false,
-        message: 'At least one lead document (Lead Study or Pitch Deck) or Key People email is required.'
+        message: 'At least one lead asset (Logo, Lead Study, Pitch Deck) or Key Person is required.'
       });
     }
 
-    const validatePdf = (doc, label) => {
+    const validateImage = (doc, label) => {
       if (!doc) return;
       if (!doc.dataUrl && !doc.url) {
-        throw new Error(`${label} PDF document is required.`);
+        throw new Error(`${label} file is required.`);
       }
       const fileNameLower = (doc.name || '').toLowerCase();
       const mimeLower = (doc.type || doc.mimeType || '').toLowerCase();
       const dataUrlStr = typeof doc.dataUrl === 'string' ? doc.dataUrl : (typeof doc.url === 'string' ? doc.url : '');
-      const isPdf = fileNameLower.endsWith('.pdf') || mimeLower.includes('pdf') || dataUrlStr.startsWith('data:application/pdf');
-      if (!isPdf) {
-        throw new Error(`${label} must be a PDF file.`);
+      const isImg = fileNameLower.endsWith('.png') || fileNameLower.endsWith('.jpg') || fileNameLower.endsWith('.jpeg') || fileNameLower.endsWith('.webp') || fileNameLower.endsWith('.svg')
+        || mimeLower.startsWith('image/') || dataUrlStr.startsWith('data:image/');
+      if (!isImg) {
+        throw new Error(`${label} must be a valid image file (PNG, JPG, WEBP, or SVG).`);
+      }
+      let fileSize = typeof doc.size === 'number' ? doc.size : 0;
+      if (!fileSize && isDataUrl(dataUrlStr)) {
+        const commaIdx = dataUrlStr.indexOf(',');
+        if (commaIdx !== -1) {
+          const b64Len = dataUrlStr.length - commaIdx - 1;
+          fileSize = Math.floor(b64Len * 0.75);
+        }
+      }
+      if (fileSize > 25 * 1024 * 1024) {
+        const err = new Error(`${label}: File too large. Each file must be 25 MB or smaller.`);
+        err.statusCode = 413;
+        throw err;
+      }
+    };
+
+    const validateDocument = (doc, label) => {
+      if (!doc) return;
+      if (!doc.dataUrl && !doc.url) {
+        throw new Error(`${label} document is required.`);
+      }
+      const fileNameLower = (doc.name || '').toLowerCase();
+      const mimeLower = (doc.type || doc.mimeType || '').toLowerCase();
+      const dataUrlStr = typeof doc.dataUrl === 'string' ? doc.dataUrl : (typeof doc.url === 'string' ? doc.url : '');
+      const isDoc = fileNameLower.endsWith('.pdf') || fileNameLower.endsWith('.doc') || fileNameLower.endsWith('.docx')
+        || mimeLower.includes('pdf') || mimeLower.includes('msword') || mimeLower.includes('wordprocessingml')
+        || dataUrlStr.startsWith('data:application/pdf') || dataUrlStr.startsWith('data:application/msword') || dataUrlStr.startsWith('data:application/vnd');
+      if (!isDoc) {
+        throw new Error(`${label} must be a PDF or DOC/DOCX file.`);
       }
       let fileSize = typeof doc.size === 'number' ? doc.size : 0;
       if (!fileSize && isDataUrl(dataUrlStr)) {
@@ -1515,9 +1640,10 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
     };
 
     try {
-      if (leadStudyDoc) validatePdf(leadStudyDoc, 'Lead Study');
-      if (pitchDeckDoc) validatePdf(pitchDeckDoc, 'Pitch Deck');
-      if (req.body.file && !leadStudyDoc && !pitchDeckDoc) validatePdf(req.body.file, 'Company details');
+      if (logoDoc) validateImage(logoDoc, 'Company Logo');
+      if (leadStudyDoc) validateDocument(leadStudyDoc, 'Lead Study');
+      if (pitchDeckDoc) validateDocument(pitchDeckDoc, 'Pitch Deck');
+      if (req.body.file && !leadStudyDoc && !pitchDeckDoc) validateDocument(req.body.file, 'Company details');
     } catch (valErr) {
       const statusCode = valErr.statusCode || 400;
       return res.status(statusCode).json({ success: false, message: valErr.message });
@@ -1601,6 +1727,11 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
     const storeFile = async (doc, docTypeLabel, nameSuffix) => {
       if (!doc) return null;
 
+      // Extract file extension
+      const origName = doc.name || '';
+      const extMatch = origName.match(/\.([a-zA-Z0-9]+)$/);
+      let ext = extMatch ? extMatch[1].toLowerCase() : (docTypeLabel === 'Logo' ? 'png' : 'pdf');
+
       // Find old file url to clean up MinIO AFTER new upload and DB update
       const oldFilesRes = await query(`
         SELECT id, url FROM submission_files
@@ -1612,8 +1743,19 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
         .map(r => r.url)
         .filter(u => isMinioObjectKey(u));
 
-      const fileName = `[${tag}][${docTypeLabel}] ${companyName} - ${nameSuffix}.pdf`;
-      const mime = doc.type || doc.mimeType || 'application/pdf';
+      const fileName = `[${tag}][${docTypeLabel}] ${companyName} - ${nameSuffix}.${ext}`;
+      let mime = doc.type || doc.mimeType;
+      if (!mime) {
+        if (docTypeLabel === 'Logo') {
+          mime = ext === 'svg' ? 'image/svg+xml' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+        } else if (ext === 'docx') {
+          mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        } else if (ext === 'doc') {
+          mime = 'application/msword';
+        } else {
+          mime = 'application/pdf';
+        }
+      }
       const size = doc.size ? (typeof doc.size === 'number' ? `${(doc.size / 1024).toFixed(1)} KB` : String(doc.size)) : 'Unknown';
       let url = doc.dataUrl || doc.url || '';
 
@@ -1622,7 +1764,7 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
         try {
           const uploadRes = await uploadFile({
             dataUrl: url,
-            originalName: `${companyName} - ${nameSuffix}.pdf`,
+            originalName: `${companyName} - ${nameSuffix}.${ext}`,
             mimeType: mime,
             prefix: `leads/${targetCompanyId}`,
           });
@@ -1656,6 +1798,7 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
       const fileRecord = ins.rows[0];
       return {
         id: fileRecord.id,
+        assetId: fileRecord.id,
         name: fileRecord.name,
         size: fileRecord.size,
         type: fileRecord.type,
@@ -1664,9 +1807,13 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
       };
     };
 
+    let logoRecord = null;
     let studyRecord = null;
     let pitchRecord = null;
 
+    if (logoDoc) {
+      logoRecord = await storeFile(logoDoc, 'Logo', 'Logo');
+    }
     if (leadStudyDoc) {
       studyRecord = await storeFile(leadStudyDoc, 'Lead Study', 'Lead Study');
     }
@@ -1674,10 +1821,18 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
       pitchRecord = await storeFile(pitchDeckDoc, 'Pitch Deck', 'Pitch Deck');
     }
 
-    const primaryRecord = studyRecord || pitchRecord;
+    const primaryRecord = studyRecord || pitchRecord || logoRecord;
 
     const leadTypeStr = (isAdditional || cleanIndex > 5) ? 'ADDITIONAL' : 'SAMPLE';
     let notesWithMeta = `[Website: ${website}]\n[Lead Type: ${leadTypeStr}]`;
+
+    if (logoRecord) {
+      notesWithMeta += `\n[Logo: ${logoRecord.streamUrl}]`;
+    } else if (existingLead?.notes) {
+      const existingLogo = existingLead.notes.match(/\[Logo:\s*([^\]]+)\]/);
+      if (existingLogo) notesWithMeta += `\n[Logo: ${existingLogo[1]}]`;
+    }
+
     if (studyRecord) {
       notesWithMeta += `\n[Lead Study: ${studyRecord.streamUrl}]\n[Lead PDF: ${studyRecord.streamUrl}]`;
     } else if (existingLead?.notes) {
@@ -1692,8 +1847,9 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
       if (existingPitch) notesWithMeta += `\n[Pitch Deck: ${existingPitch[1]}]`;
     }
 
-    if (uniqueKpEmails.length > 0) {
-      notesWithMeta += `\n[Key People: ${uniqueKpEmails.join(', ')}]`;
+    if (uniqueKpPeople.length > 0) {
+      notesWithMeta += `\n[Key People: ${uniqueKpPeople.map(p => p.name ? `${p.name} <${p.email}>` : p.email).join(', ')}]`;
+      notesWithMeta += `\n[Key People JSON: ${JSON.stringify(uniqueKpPeople)}]`;
     }
     if (req.body.ticketId) notesWithMeta += `\n[Ticket: ${req.body.ticketId}]`;
 
@@ -1733,9 +1889,12 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
 
     const keyPeopleObj = {
       isLocked: false,
-      count: uniqueKpEmails.length,
+      count: uniqueKpPeople.length,
+      people: uniqueKpPeople,
       emails: uniqueKpEmails
     };
+
+    const resolvedLogoUrl = logoRecord?.streamUrl || (existingLead?.notes?.match(/\[Logo:\s*([^\]]+)\]/)?.[1]) || null;
 
     return res.json({
       success: true,
@@ -1745,6 +1904,7 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
         ...savedLead,
         companyName: savedLead.lead_company || savedLead.name,
         website: savedLead.linkedin,
+        logoUrl: resolvedLogoUrl,
         slotIndex: cleanIndex,
         leadStudy: studyRecord,
         pitchDeck: pitchRecord,

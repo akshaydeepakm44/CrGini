@@ -1,6 +1,7 @@
 import { findAssets, findAssetById } from '../repositories/assetRepository.js';
 import { query } from '../config/postgres.js';
-import { getFileStream, getObjectStat, isMinioObjectKey } from '../services/storageService.js';
+import { getFileStream, getObjectStat, isMinioObjectKey, isDataUrl, parseDataUrl } from '../services/storageService.js';
+import { extractDocumentText } from '../services/documentExtractor.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -523,3 +524,71 @@ export const downloadAsset = async (req, res) => {
     });
   }
 };
+
+// @desc    Extract and return readable text content for a document asset (PDF, DOC, DOCX)
+// @route   GET /api/assets/:id/content
+// @access  Private
+export const getAssetContent = async (req, res) => {
+  try {
+    const asset = await findAssetById(req.params.id);
+
+    if (!asset) {
+      return res.status(404).json({
+        success: false,
+        message: 'Asset not found',
+      });
+    }
+
+    if (!canUserAccessAsset(req.user, asset)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You do not have permission to access this asset.',
+      });
+    }
+
+    const hasKpAccess = await checkKeyPeopleEntitlement(req.user, asset);
+    if (!hasKpAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Key People intelligence document is locked. Payment required.',
+        isLocked: true,
+      });
+    }
+
+    const storageUrl = asset.storageUrl;
+    let buffer = null;
+
+    if (isDataUrl(storageUrl)) {
+      const parsed = parseDataUrl(storageUrl);
+      buffer = parsed.buffer;
+    } else if (isMinioObjectKey(storageUrl)) {
+      const stream = await getFileStream(storageUrl);
+      const chunks = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+      buffer = Buffer.concat(chunks);
+    }
+
+    let content = null;
+    if (buffer) {
+      content = extractDocumentText(buffer, asset.mimeType, asset.fileName);
+    }
+
+    return res.json({
+      success: true,
+      assetId: asset.id,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      content,
+      hasContent: Boolean(content && content.trim().length > 0),
+    });
+  } catch (error) {
+    console.error('[AssetController.getAssetContent] Error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to extract asset content.',
+    });
+  }
+};
+

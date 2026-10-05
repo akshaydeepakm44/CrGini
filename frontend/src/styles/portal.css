@@ -1464,6 +1464,20 @@ body:has(.portal-root) {
   background: rgba(0, 217, 255, 0.04);
 }
 
+.request-table tr.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.request-table tr.clickable-row:hover td {
+  background: rgba(0, 217, 255, 0.08) !important;
+}
+
+.request-table tr.clickable-row:focus-visible {
+  outline: 2px solid var(--portal-primary, #00D9FF);
+  outline-offset: -2px;
+}
+
 .ticket-key {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 700;

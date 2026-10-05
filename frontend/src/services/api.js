@@ -877,5 +877,19 @@ export const api = {
     }
     return data;
   },
+
+  async getAssetContent(assetId) {
+    const res = await fetch(`${API_BASE}/assets/${assetId}/content`, {
+      headers: getHeaders(true)
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to load document content');
+    }
+    return data;
+  },
 };
+
+export default api;
+
 

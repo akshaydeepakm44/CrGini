@@ -7,12 +7,16 @@ const mapCompany = (row) => {
     const pdfMatch = (l.notes || '').match(/\[Lead PDF:\s*([^\]]+)\]/) || (l.notes || '').match(/\[Lead Study:\s*([^\]]+)\]/);
     const pitchMatch = (l.notes || '').match(/\[Pitch Deck:\s*([^\]]+)\]/);
     const kpMatch = (l.notes || '').match(/\[Key People:\s*([^\]]+)\]/);
+    const kpJsonMatch = (l.notes || '').match(/\[Key People JSON:\s*(\[.*?\])\]/);
+    const logoMatch = (l.notes || '').match(/\[Logo:\s*([^\]]+)\]/);
     const source_reference = pdfMatch ? pdfMatch[1] : null;
     const cleanNotes = (l.notes || '')
       .replace(/\[Lead PDF:\s*[^\]]+\]/g, '')
       .replace(/\[Lead Study:\s*[^\]]+\]/g, '')
       .replace(/\[Pitch Deck:\s*[^\]]+\]/g, '')
       .replace(/\[Key People:\s*[^\]]+\]/g, '')
+      .replace(/\[Key People JSON:\s*[^\]]+\]/g, '')
+      .replace(/\[Logo:\s*[^\]]+\]/g, '')
       .replace(/\[Lead Type:\s*[^\]]+\]/g, '')
       .replace(/\[Ticket:\s*[^\]]+\]/g, '')
       .replace(/\[Website:\s*[^\]]+\]/g, '')
@@ -31,6 +35,8 @@ const mapCompany = (row) => {
     const kpRef = kpMatch ? kpMatch[1] : null;
     const kpAssetMatch = kpRef ? kpRef.match(/\/api\/assets\/([a-f0-9\-]+)\/stream/i) : null;
     const kpAssetId = kpAssetMatch ? kpAssetMatch[1] : null;
+
+    const logoUrl = logoMatch ? logoMatch[1] : null;
 
     const leadStudy = source_reference ? {
       id: assetId,
@@ -57,12 +63,44 @@ const mapCompany = (row) => {
         downloadUrl: kpAssetId ? `/api/assets/${kpAssetId}/download` : kpRef,
         fileName: `${companyName} - Key People.pdf`
       };
-    } else if (kpRef) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const emails = kpRef.split(',').map(s => s.trim().toLowerCase()).filter(s => emailRegex.test(s));
+    } else {
+      let people = [];
+      if (kpJsonMatch && kpJsonMatch[1]) {
+        try {
+          const parsed = JSON.parse(kpJsonMatch[1]);
+          if (Array.isArray(parsed)) {
+            people = parsed.map(p => ({
+              name: (p.name || '').trim(),
+              email: (p.email || '').trim().toLowerCase()
+            })).filter(p => p.name || p.email);
+          }
+        } catch (_) {}
+      }
+      if (people.length === 0 && kpRef) {
+        const parts = kpRef.split(',').map(s => s.trim()).filter(Boolean);
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        people = parts.map(part => {
+          const namedMatch = part.match(/^([^<]+)<([^>]+)>$/);
+          if (namedMatch) {
+            return {
+              name: namedMatch[1].trim(),
+              email: namedMatch[2].trim().toLowerCase()
+            };
+          }
+          if (emailRegex.test(part)) {
+            return { name: '', email: part.toLowerCase() };
+          }
+          return null;
+        }).filter(Boolean);
+      }
+      if (people.length === 0 && l.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email.trim())) {
+        people = [{ name: l.name || '', email: l.email.trim().toLowerCase() }];
+      }
+
       keyPeople = {
-        count: emails.length,
-        emails
+        count: people.length,
+        people,
+        emails: people.map(p => p.email).filter(Boolean)
       };
     }
 
@@ -70,6 +108,7 @@ const mapCompany = (row) => {
       ...l,
       companyName,
       website,
+      logoUrl,
       notes: cleanNotes,
       source_reference,
       sourceReference: source_reference,
