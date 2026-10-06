@@ -1,7 +1,7 @@
 import { findAssets, findAssetById } from '../repositories/assetRepository.js';
 import { query } from '../config/postgres.js';
 import { getFileStream, getObjectStat, isMinioObjectKey, isDataUrl, parseDataUrl } from '../services/storageService.js';
-import { extractDocumentText } from '../services/documentExtractor.js';
+import { extractDocumentText, analyzeDocument } from '../services/documentExtractor.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -573,8 +573,12 @@ export const getAssetContent = async (req, res) => {
     }
 
     let content = null;
+    let analysis = null;
     if (buffer) {
       content = extractDocumentText(buffer, asset.mimeType, asset.fileName);
+      if (content && content.trim()) {
+        analysis = analyzeDocument(content, asset.fileName, asset.mimeType);
+      }
     }
 
     return res.json({
@@ -584,6 +588,7 @@ export const getAssetContent = async (req, res) => {
       mimeType: asset.mimeType,
       content,
       hasContent: Boolean(content && content.trim().length > 0),
+      analysis,
     });
   } catch (error) {
     console.error('[AssetController.getAssetContent] Error:', error.message);

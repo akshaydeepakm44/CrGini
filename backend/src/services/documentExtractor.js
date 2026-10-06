@@ -190,7 +190,7 @@ export function extractTextFromPdf(buffer) {
           }
 
           if (lines.length > 0) {
-            const joined = lines.join(' ').replace(/\s+/g, ' ').trim();
+            const joined = lines.join('\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
             if (joined && joined.length > 1) {
               extractedParagraphs.push(joined);
             }
@@ -273,4 +273,167 @@ export function extractDocumentText(buffer, mimeType = '', filename = '') {
   }
 
   return null;
+}
+
+/**
+ * Analyze and structure extracted document text into sections, bullet items, and metadata
+ */
+export function analyzeDocument(rawText, filename = '', mimeType = '') {
+  if (!rawText || typeof rawText !== 'string' || !rawText.trim()) {
+    return null;
+  }
+
+  // Normalize text: handle escaped newlines and inline section/bullet headers
+  const text = rawText
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\n')
+    .replace(/\s+(#{1,4}\s+)/g, '\n$1')
+    .replace(/\s+([•\*\-▪▫✓✔]\s+)/g, '\n$1')
+    .trim();
+
+  const fnLower = (filename || '').toLowerCase();
+
+  // 1. Determine Document Type
+  let documentType = 'document';
+  let documentTypeLabel = 'Document';
+  if (/pitch|deck|presentation/i.test(fnLower) || /pitch\s*deck/i.test(text.slice(0, 500))) {
+    documentType = 'pitch_deck';
+    documentTypeLabel = 'Pitch Deck';
+  } else if (/study|research|dossier|analysis|profile/i.test(fnLower) || /company\s*study/i.test(text.slice(0, 500))) {
+    documentType = 'company_study';
+    documentTypeLabel = 'Company Study';
+  }
+
+  // 2. Extract Company Name & Title
+  let companyName = '';
+  let documentTitle = '';
+
+  // Check filename e.g. "[Lead 01][Lead Study] LimitlessAI - Lead Study.pdf"
+  const bracketMatch = filename.match(/\]\s*([^-\]]+?)\s*-\s*/);
+  if (bracketMatch && bracketMatch[1].trim()) {
+    companyName = bracketMatch[1].trim();
+  }
+
+  // Break text into lines/paragraphs
+  const lines = text
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  let startIndex = 0;
+  if (lines.length > 0) {
+    const firstLine = lines[0];
+    if (/^#+\s+/.test(firstLine) || (firstLine.length < 80 && !firstLine.includes('•') && !firstLine.endsWith('.'))) {
+      const cleanFirst = firstLine.replace(/^#+\s*/, '').trim();
+      documentTitle = cleanFirst;
+
+      if (!companyName) {
+        if (cleanFirst.includes('—')) {
+          companyName = cleanFirst.split('—')[0].trim();
+        } else if (cleanFirst.includes('-')) {
+          companyName = cleanFirst.split('-')[0].trim();
+        }
+      }
+      startIndex = 1;
+    }
+  }
+
+  if (!documentTitle) {
+    documentTitle = companyName ? `${companyName} — ${documentTypeLabel}` : documentTypeLabel;
+  }
+
+  // 3. Section Parsing
+  const isHeading = (line) => {
+    if (/^[•\*\-▪▫✓✔]/.test(line)) return false;
+    if (/^#{1,4}\s+\S+/.test(line)) return true;
+    if (/^[A-Z0-9\s&,/-]{3,50}:$/.test(line)) return true;
+    if (/^[A-Z\s&/]{4,40}$/.test(line) && !line.includes('.') && !line.startsWith('•')) return true;
+    if (/^\d+\.\s+[A-Z][A-Za-z0-9\s&,/-]{2,40}$/.test(line)) return true;
+    return false;
+  };
+
+  const cleanHeading = (line) => {
+    return line
+      .replace(/^#{1,4}\s+/, '')
+      .replace(/:$/, '')
+      .replace(/^\d+\.\s+/, '')
+      .trim();
+  };
+
+  const isBullet = (line) => {
+    return /^[•\*\-▪▫✓✔]\s+/.test(line) || /^\d+[\.)]\s+/.test(line);
+  };
+
+  const cleanBullet = (line) => {
+    return line.replace(/^[•\*\-▪▫✓✔]\s+/, '').replace(/^\d+[\.)]\s+/, '').trim();
+  };
+
+  const rawSections = [];
+  let currentSec = null;
+
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (isHeading(line)) {
+      if (currentSec) {
+        rawSections.push(currentSec);
+      }
+      currentSec = {
+        title: cleanHeading(line),
+        content: '',
+        items: []
+      };
+      continue;
+    }
+
+    if (!currentSec) {
+      currentSec = {
+        title: 'Executive Summary',
+        content: '',
+        items: []
+      };
+    }
+
+    if (isBullet(line)) {
+      currentSec.items.push(cleanBullet(line));
+    } else {
+      if (currentSec.content) {
+        currentSec.content += ' ' + line;
+      } else {
+        currentSec.content = line;
+      }
+    }
+  }
+
+  if (currentSec) {
+    rawSections.push(currentSec);
+  }
+
+  // Sanitize and filter sections
+  const sections = rawSections
+    .map(s => {
+      const sec = { title: s.title };
+      if (s.content && s.content.trim()) {
+        sec.content = s.content.trim();
+      }
+      if (s.items && s.items.length > 0) {
+        sec.items = s.items.filter(Boolean);
+      }
+      return sec;
+    })
+    .filter(s => Boolean(s.content || (s.items && s.items.length > 0)));
+
+  return {
+    documentType,
+    documentTypeLabel,
+    companyName: companyName || 'Company',
+    documentTitle,
+    sections: sections.length > 0 ? sections : [
+      {
+        title: 'Overview',
+        content: text
+      }
+    ]
+  };
 }

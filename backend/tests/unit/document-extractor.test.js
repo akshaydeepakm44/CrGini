@@ -1,6 +1,6 @@
 import zlib from 'node:zlib';
 import assert from 'node:assert';
-import { extractDocumentText, extractTextFromPdf, extractTextFromDocx } from '../../src/services/documentExtractor.js';
+import { extractDocumentText, extractTextFromPdf, extractTextFromDocx, analyzeDocument } from '../../src/services/documentExtractor.js';
 
 console.log('====================================================');
 console.log('CREATIVEGINI DOCUMENT EXTRACTOR TEST SUITE');
@@ -90,7 +90,58 @@ const t6 = extractDocumentText(emptyBuf, 'application/pdf', 'Scanned_Doc.pdf');
 assert(t6 === null, 'Test 6 failed: non-text doc must return null for preview-unavailable state');
 console.log('  [PASS] Returned null gracefully for non-text document');
 
+// TEST 7: analyzeDocument parses sections, bullets, and metadata
+console.log('\nTEST 7: analyzeDocument structures sections, bullets, and metadata');
+
+const sampleStudyText = `### LimitlessAI — Comprehensive Company Study
+### Executive Summary
+LimitlessAI is an enterprise generative AI orchestration platform providing secure LLM gateway solutions.
+### Market Position
+• 120% net retention rate
+• Serving Fortune 500 financial and healthcare institutions
+• Primary competitors: Legacy orchestration tools
+### Financial Overview
+• Projected ARR: $18.5M
+• Raised $12M Series A led by Tier-1 VCs
+• Operating cash flow positive`;
+
+const a1 = analyzeDocument(sampleStudyText, '[Lead 01][Lead Study] LimitlessAI - Lead Study.pdf');
+assert(a1, 'Test 7 failed: analysis returned null');
+assert.strictEqual(a1.documentType, 'company_study', 'Document type should be company_study');
+assert.strictEqual(a1.companyName, 'LimitlessAI', 'Company name should be LimitlessAI');
+assert.strictEqual(a1.sections.length, 3, 'Should have 3 sections');
+assert.strictEqual(a1.sections[0].title, 'Executive Summary');
+assert(a1.sections[0].content.includes('orchestration platform'));
+assert.strictEqual(a1.sections[1].title, 'Market Position');
+assert.strictEqual(a1.sections[1].items.length, 3);
+assert.strictEqual(a1.sections[2].title, 'Financial Overview');
+assert.strictEqual(a1.sections[2].items.length, 3);
+console.log('  [PASS] Structured ' + a1.sections.length + ' sections for ' + a1.companyName);
+
+// TEST 8: analyzeDocument handles colon/uppercase headings and Pitch Decks
+console.log('\nTEST 8: analyzeDocument handles colon/uppercase headings and Pitch Decks');
+const samplePitchText = `LimitlessAI — Pitch Deck 2026
+THE PROBLEM:
+Enterprises cannot safely deploy open models without governance, audit trails, and data isolation.
+OUR SOLUTION:
+A unified enterprise AI gateway with real-time prompt filtering, DLP, and token optimization.
+TRACTION & MILESTONES:
+• 45 enterprise customers
+• $4.2M current ARR
+• Zero data security incidents`;
+
+const a2 = analyzeDocument(samplePitchText, 'LimitlessAI_Pitch_Deck.pdf');
+assert(a2, 'Test 8 failed: analysis returned null');
+assert.strictEqual(a2.documentType, 'pitch_deck', 'Document type should be pitch_deck');
+assert.strictEqual(a2.sections.length, 3, 'Should have 3 sections');
+assert.strictEqual(a2.sections[0].title, 'THE PROBLEM');
+assert.strictEqual(a2.sections[1].title, 'OUR SOLUTION');
+assert.strictEqual(a2.sections[2].title, 'TRACTION & MILESTONES');
+assert.strictEqual(a2.sections[2].items.length, 3);
+console.log('  [PASS] Structured ' + a2.sections.length + ' sections for ' + a2.documentTypeLabel);
+
 console.log('\n====================================================');
-console.log('TEST SUMMARY: 6 PASSED, 0 FAILED');
+console.log('TEST SUMMARY: 8 PASSED, 0 FAILED');
 console.log('====================================================\n');
 process.exit(0);
+
