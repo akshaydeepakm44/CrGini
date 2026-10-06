@@ -158,7 +158,9 @@ export const uploadFile = async ({
   if (!client) {
     if (!process.env.MINIO_ENDPOINT) {
       return {
-        objectKey,
+        objectKey: null,
+        dataUrl,
+        storedInMinio: false,
         bucket,
         size: fileSize,
         mimeType: effectiveMime,

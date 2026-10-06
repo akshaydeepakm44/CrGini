@@ -555,13 +555,15 @@ export const getAssetContent = async (req, res) => {
       });
     }
 
-    const storageUrl = asset.storageUrl;
+    const storageUrl = asset.url || asset.storageUrl;
     let buffer = null;
 
     if (isDataUrl(storageUrl)) {
       const parsed = parseDataUrl(storageUrl);
       buffer = parsed.buffer;
-    } else if (isMinioObjectKey(storageUrl)) {
+    } else if (storageUrl && fs.existsSync(storageUrl)) {
+      buffer = fs.readFileSync(storageUrl);
+    } else if (storageUrl && (isMinioObjectKey(storageUrl) || (!storageUrl.startsWith('data:') && !storageUrl.startsWith('http')))) {
       const stream = await getFileStream(storageUrl);
       const chunks = [];
       for await (const chunk of stream) {

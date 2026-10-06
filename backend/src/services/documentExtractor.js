@@ -63,17 +63,83 @@ function unescapePdfStr(str) {
 }
 
 /**
+ * Decode PDF hex string <48656C6C6F> or <00480065006C006C006F>
+ */
+function decodePdfHex(hexRaw) {
+  let clean = hexRaw.replace(/[^0-9a-fA-F]/g, '');
+  if (!clean) return '';
+  if (clean.length % 2 !== 0) clean += '0';
+
+  try {
+    const buf = Buffer.from(clean, 'hex');
+    if (buf.length === 0) return '';
+
+    // Check for UTF-16BE BOM (0xFE 0xFF) or alternating zero bytes
+    let isUtf16 = false;
+    if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
+      isUtf16 = true;
+    } else if (buf.length >= 4 && (buf[0] === 0 || buf[2] === 0)) {
+      isUtf16 = true;
+    }
+
+    if (isUtf16) {
+      const leBuf = Buffer.alloc(buf.length);
+      for (let i = 0; i < buf.length - 1; i += 2) {
+        leBuf[i] = buf[i + 1];
+        leBuf[i + 1] = buf[i];
+      }
+      return leBuf.toString('utf16le').replace(/^\uFEFF/, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+    }
+
+    // ASCII / UTF-8
+    return buf.toString('utf8').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Extract readable text from a PDF buffer
  */
 export function extractTextFromPdf(buffer) {
   try {
     const raw = buffer.toString('binary');
-    const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
-    let match;
     const extractedParagraphs = [];
 
-    while ((match = streamRegex.exec(raw)) !== null) {
-      const streamData = Buffer.from(match[1], 'binary');
+    // 1. Locate all streams in the PDF (using /Length if available, or endstream)
+    const streamStarts = [];
+    const streamStartRegex = /stream(?:\r\n|\n|\r)/g;
+    let sMatch;
+    while ((sMatch = streamStartRegex.exec(raw)) !== null) {
+      const dataStart = streamStartRegex.lastIndex;
+      const preSlice = raw.slice(Math.max(0, sMatch.index - 300), sMatch.index);
+      const lenMatch = preSlice.match(/\/Length\s+(\d+)\b/);
+      let streamData = null;
+
+      if (lenMatch && lenMatch[1]) {
+        const declaredLen = parseInt(lenMatch[1], 10);
+        if (declaredLen > 0 && dataStart + declaredLen <= raw.length) {
+          streamData = Buffer.from(raw.slice(dataStart, dataStart + declaredLen), 'binary');
+        }
+      }
+
+      if (!streamData) {
+        const endIdx = raw.indexOf('endstream', dataStart);
+        if (endIdx !== -1) {
+          let sliceEnd = endIdx;
+          if (raw[sliceEnd - 1] === '\n') sliceEnd--;
+          if (raw[sliceEnd - 1] === '\r') sliceEnd--;
+          streamData = Buffer.from(raw.slice(dataStart, sliceEnd), 'binary');
+        }
+      }
+
+      if (streamData && streamData.length > 0) {
+        streamStarts.push(streamData);
+      }
+    }
+
+    // 2. Process each stream data chunk
+    for (const streamData of streamStarts) {
       let textContent = '';
 
       try {
@@ -95,21 +161,31 @@ export function extractTextFromPdf(buffer) {
           const block = btMatch[1];
           const lines = [];
 
-          // Match (Text) Tj
-          const tjRegex = /\(([^)]*)\)\s*Tj/g;
+          // Match (text) Tj or <hex> Tj or (text) ' or <hex> '
+          const tjRegex = /(?:\(([^)]*)\)|<([0-9a-fA-F\s]+)>)\s*(?:Tj|'|")/g;
           let tjMatch;
           while ((tjMatch = tjRegex.exec(block)) !== null) {
-            lines.push(unescapePdfStr(tjMatch[1]));
+            if (tjMatch[1] !== undefined) {
+              lines.push(unescapePdfStr(tjMatch[1]));
+            } else if (tjMatch[2] !== undefined) {
+              lines.push(decodePdfHex(tjMatch[2]));
+            }
           }
 
-          // Match [(Part 1) 10 (Part 2)] TJ
-          const arrayTjRegex = /\[(.*?)\]\s*TJ/g;
+          // Match [(Part 1) 10 <Part 2>] TJ
+          const arrayTjRegex = /\[([\s\S]*?)\]\s*TJ/g;
           let atjMatch;
           while ((atjMatch = arrayTjRegex.exec(block)) !== null) {
             const inner = atjMatch[1];
-            const parts = [...inner.matchAll(/\(([^)]*)\)/g)].map(m => unescapePdfStr(m[1]));
+            const tokens = [...inner.matchAll(/(?:\(([^)]*)\)|<([0-9a-fA-F\s]+)>)/g)];
+            const parts = tokens.map(m => {
+              if (m[1] !== undefined) return unescapePdfStr(m[1]);
+              if (m[2] !== undefined) return decodePdfHex(m[2]);
+              return '';
+            }).filter(Boolean);
+
             if (parts.length > 0) {
-              lines.push(parts.join(''));
+              lines.push(parts.join(' '));
             }
           }
 
@@ -127,10 +203,14 @@ export function extractTextFromPdf(buffer) {
       return extractedParagraphs.filter((p, i, a) => i === 0 || p !== a[i - 1]).join('\n\n');
     }
 
-    // Fallback: search for strings in raw PDF
-    const textFallback = [...raw.matchAll(/\(([\w\s.,!?:;@/#%&'"()\-]{3,})\)\s*Tj/g)]
-      .map(m => unescapePdfStr(m[1]))
-      .filter(Boolean);
+    // 3. Fallback: Search for strings or hex in raw PDF text
+    const textFallback = [
+      ...raw.matchAll(/(?:\(([\w\s.,!?:;@/#%&'"()\-]{3,})\)|<([0-9a-fA-F\s]{6,})>)\s*(?:Tj|'|")/g)
+    ].map(m => {
+      if (m[1]) return unescapePdfStr(m[1]);
+      if (m[2]) return decodePdfHex(m[2]);
+      return '';
+    }).filter(s => s && s.trim().length > 2);
 
     if (textFallback.length > 0) {
       return textFallback.join('\n\n');

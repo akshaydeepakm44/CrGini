@@ -27,6 +27,7 @@ const mapAssetRow = (row) => {
     mimeType: row.mime_type || 'application/octet-stream',
     fileSize: row.file_size || 'Unknown',
     url: row.storage_url || null,
+    storageUrl: row.storage_url || null,
     storageReference: row.storage_url ? (row.storage_url.startsWith('data:') ? 'Inline data' : row.storage_url) : null,
     createdAt: row.created_at,
     submissionId: row.submission_id,

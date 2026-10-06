@@ -1111,7 +1111,9 @@ export const saveCompanyUiOnboardingAssets = async (req, res) => {
             mimeType: mime,
             prefix: `onboarding/ui/${targetCompanyId}`,
           });
-          url = uploadRes.objectKey;
+          if (uploadRes && uploadRes.objectKey) {
+            url = uploadRes.objectKey;
+          }
         } catch (uploadErr) {
           console.error('[Save UI Onboarding Assets] MinIO upload error, falling back:', uploadErr.message);
         }
@@ -1269,6 +1271,7 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
       // 1. Lead Study
       const studyFile = filesByTag.get(`${slotIndex}_study`) || filesByTag.get(`${lead.id}_study`);
       const studyFromNotes = notes.match(/\[Lead Study:\s*([^\]]+)\]/) || notes.match(/\[Lead PDF:\s*([^\]]+)\]/);
+      const studyAssetIdFromUrl = studyFromNotes ? studyFromNotes[1].match(/\/api\/assets\/([a-f0-9-]+)/i)?.[1] : null;
       const leadStudy = studyFile ? {
         id: studyFile.id,
         assetId: studyFile.id,
@@ -1278,16 +1281,17 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
         size: studyFile.size,
         type: studyFile.type
       } : (studyFromNotes ? {
-        id: null,
-        assetId: null,
+        id: studyAssetIdFromUrl || null,
+        assetId: studyAssetIdFromUrl || null,
         name: `${companyName} - Lead Study.pdf`,
         streamUrl: studyFromNotes[1],
-        downloadUrl: studyFromNotes[1]
+        downloadUrl: studyAssetIdFromUrl ? `/api/assets/${studyAssetIdFromUrl}/download` : studyFromNotes[1]
       } : null);
 
       // 2. Pitch Deck
       const pitchFile = filesByTag.get(`${slotIndex}_pitch`) || filesByTag.get(`${lead.id}_pitch`);
       const pitchFromNotes = notes.match(/\[Pitch Deck:\s*([^\]]+)\]/);
+      const pitchAssetIdFromUrl = pitchFromNotes ? pitchFromNotes[1].match(/\/api\/assets\/([a-f0-9-]+)/i)?.[1] : null;
       const pitchDeck = pitchFile ? {
         id: pitchFile.id,
         assetId: pitchFile.id,
@@ -1297,11 +1301,11 @@ export const getCompanyLeadOnboardingAssets = async (req, res) => {
         size: pitchFile.size,
         type: pitchFile.type
       } : (pitchFromNotes ? {
-        id: null,
-        assetId: null,
+        id: pitchAssetIdFromUrl || null,
+        assetId: pitchAssetIdFromUrl || null,
         name: `${companyName} - Pitch Deck.pdf`,
         streamUrl: pitchFromNotes[1],
-        downloadUrl: pitchFromNotes[1]
+        downloadUrl: pitchAssetIdFromUrl ? `/api/assets/${pitchAssetIdFromUrl}/download` : pitchFromNotes[1]
       } : null);
 
       // 3. Key People (Name + Email addresses)
@@ -1768,7 +1772,9 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
             mimeType: mime,
             prefix: `leads/${targetCompanyId}`,
           });
-          url = uploadRes.objectKey;
+          if (uploadRes && uploadRes.objectKey && uploadRes.storedInMinio !== false) {
+            url = uploadRes.objectKey;
+          }
         } catch (uploadErr) {
           console.error('[saveCompanyLeadOnboardingAssets] MinIO upload error, falling back:', uploadErr.message);
         }
@@ -1857,13 +1863,23 @@ export const saveCompanyLeadOnboardingAssets = async (req, res) => {
     let savedLead = null;
     const primaryEmail = uniqueKpEmails[0] || req.body.email || leadData?.email || existingLead?.email || null;
 
-    if (leadId) {
+    let targetLeadId = leadId;
+    if (!targetLeadId && cleanIndex) {
+      const existingLeadsRes = await query(`
+        SELECT id FROM company_leads WHERE company_id = $1 ORDER BY created_at ASC
+      `, [targetCompanyId]);
+      if (existingLeadsRes.rows[cleanIndex - 1]) {
+        targetLeadId = existingLeadsRes.rows[cleanIndex - 1].id;
+      }
+    }
+
+    if (targetLeadId) {
       const resLead = await query(`
         UPDATE company_leads
         SET name = $1, lead_company = $1, email = $2, linkedin = $3, status = 'VERIFIED', notes = $4, updated_at = NOW()
         WHERE id = $5
         RETURNING *
-      `, [companyName, primaryEmail, website, notesWithMeta, leadId]);
+      `, [companyName, primaryEmail, website, notesWithMeta, targetLeadId]);
       savedLead = resLead.rows[0];
     } else {
       const insLead = await query(`
