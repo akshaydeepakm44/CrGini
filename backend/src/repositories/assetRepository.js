@@ -151,6 +151,7 @@ export const findAssets = async ({
     SELECT
       sf.id,
       sf.name AS file_name,
+      sf.url AS storage_url,
       sf.size AS file_size,
       sf.type AS mime_type,
       sf.created_at,
@@ -165,6 +166,7 @@ export const findAssets = async ({
       r.service_type,
       r.user_id,
       r.company_id,
+      r.payment_status,
       c.name AS company_name,
       u.name AS client_name,
       u.email AS client_email
