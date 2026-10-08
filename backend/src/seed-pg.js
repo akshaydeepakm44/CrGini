@@ -74,18 +74,42 @@ const seedStaffAccounts = async () => {
       },
     ];
 
+    // Attempt to drop legacy role check constraint if present
+    try {
+      await query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`);
+    } catch (_) {}
+
     for (const staff of staffAccounts) {
-      await query(`
-        INSERT INTO users (name, email, password, role, company_lead, company_boost, company_ui, phone, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'ACTIVE')
-        ON CONFLICT (email) DO UPDATE SET
-          name = EXCLUDED.name,
-          role = EXCLUDED.role,
-          company_lead = EXCLUDED.company_lead,
-          company_boost = EXCLUDED.company_boost,
-          company_ui = EXCLUDED.company_ui,
-          status = 'ACTIVE'
-      `, [staff.name, staff.email, staff.password, staff.role, staff.lead, staff.boost, staff.ui, staff.phone]);
+      try {
+        await query(`
+          INSERT INTO users (name, email, password, role, company_lead, company_boost, company_ui, phone, status)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'ACTIVE')
+          ON CONFLICT (email) DO UPDATE SET
+            name = EXCLUDED.name,
+            role = EXCLUDED.role,
+            company_lead = EXCLUDED.company_lead,
+            company_boost = EXCLUDED.company_boost,
+            company_ui = EXCLUDED.company_ui,
+            status = 'ACTIVE'
+        `, [staff.name, staff.email, staff.password, staff.role, staff.lead, staff.boost, staff.ui, staff.phone]);
+      } catch (err) {
+        if (err.constraint === 'users_role_check' && staff.role === 'SUPER_ADMIN') {
+          console.warn('[Seed-PG] Legacy users_role_check detected on database; provisioning Super Admin with role ADMIN...');
+          await query(`
+            INSERT INTO users (name, email, password, role, company_lead, company_boost, company_ui, phone, status)
+            VALUES ($1, $2, $3, 'ADMIN', $4, $5, $6, $7, 'ACTIVE')
+            ON CONFLICT (email) DO UPDATE SET
+              name = EXCLUDED.name,
+              role = 'ADMIN',
+              company_lead = EXCLUDED.company_lead,
+              company_boost = EXCLUDED.company_boost,
+              company_ui = EXCLUDED.company_ui,
+              status = 'ACTIVE'
+          `, [staff.name, staff.email, staff.password, staff.lead, staff.boost, staff.ui, staff.phone]);
+        } else {
+          throw err;
+        }
+      }
     }
 
     // Provision an official clean demo client account with company profile
