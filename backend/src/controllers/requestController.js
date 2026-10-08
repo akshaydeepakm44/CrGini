@@ -269,7 +269,7 @@ export const createRequest = async (req, res) => {
       assignedTeam: teamMap[serviceType] || 'CreativeGini Core Team',
       notes: finalNotes,
       status: 'REQUEST_CREATED',
-      paymentStatus: 'CONFIRMED'
+      paymentStatus: 'PAID'
     });
 
     // Create activity log
