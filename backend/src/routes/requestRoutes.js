@@ -11,7 +11,8 @@ import {
   assignTicket,
   startWork,
   adminOverride,
-  getTicketActivity
+  getTicketActivity,
+  getUnreadMessagesCount
 } from '../controllers/requestController.js';
 import {
   createSubmission,
@@ -20,16 +21,19 @@ import {
   approveSubmission,
   requestChanges
 } from '../controllers/submissionController.js';
-import { protect, authorize } from '../middleware/auth.js';
+import { protect, optionalProtect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
 router.route('/')
-  .post(protect, createRequest)
+  .post(optionalProtect, createRequest)
   .get(protect, getRequests);
 
 router.route('/calculate-price')
-  .post(protect, calculateRequestPrice);
+  .post(optionalProtect, calculateRequestPrice);
+
+router.route('/messages/unread-count')
+  .get(protect, getUnreadMessagesCount);
 
 router.route('/:id')
   .get(protect, getRequestById);

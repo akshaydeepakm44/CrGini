@@ -1,0 +1,143 @@
+@import './design-tokens.css';
+
+/* ==========================================================================
+   LIGHT PREMIUM THEME STYLESHEET & UTILITIES
+   ========================================================================== */
+
+/* Font face definitions (Google Fonts fallback) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+/* Outer Window & Body Containment for Light Theme Portal */
+html:has(.cg-light-theme),
+body:has(.cg-light-theme) {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background-color: #F8F9FC !important;
+}
+
+#root:has(.cg-light-theme),
+.app-root:has(.cg-light-theme) {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background-color: #F8F9FC !important;
+}
+
+/* Base Container & Root Scoping */
+.cg-light-theme {
+  font-family: var(--cg-font-family);
+  background-color: var(--cg-bg-page);
+  color: var(--cg-text-primary);
+  height: 100vh;
+  max-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  box-sizing: border-box;
+}
+
+.cg-light-theme *,
+.cg-light-theme *::before,
+.cg-light-theme *::after {
+  box-sizing: border-box;
+}
+
+/* Typography Classes */
+.cg-heading-display {
+  font-family: var(--cg-font-heading);
+  font-size: var(--cg-font-size-3xl);
+  font-weight: 800;
+  line-height: var(--cg-line-height-tight);
+  color: var(--cg-text-primary);
+  letter-spacing: -0.025em;
+}
+
+.cg-heading-1 {
+  font-family: var(--cg-font-heading);
+  font-size: var(--cg-font-size-2xl);
+  font-weight: 700;
+  line-height: var(--cg-line-height-tight);
+  color: var(--cg-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.cg-heading-2 {
+  font-family: var(--cg-font-heading);
+  font-size: var(--cg-font-size-xl);
+  font-weight: 700;
+  line-height: var(--cg-line-height-tight);
+  color: var(--cg-text-primary);
+  letter-spacing: -0.015em;
+}
+
+.cg-heading-3 {
+  font-family: var(--cg-font-heading);
+  font-size: var(--cg-font-size-md);
+  font-weight: 600;
+  line-height: var(--cg-line-height-normal);
+  color: var(--cg-text-primary);
+}
+
+.cg-body {
+  font-family: var(--cg-font-family);
+  font-size: var(--cg-font-size-base);
+  font-weight: 400;
+  line-height: var(--cg-line-height-normal);
+  color: var(--cg-text-secondary);
+}
+
+.cg-body-sm {
+  font-family: var(--cg-font-family);
+  font-size: var(--cg-font-size-sm);
+  font-weight: 400;
+  line-height: var(--cg-line-height-normal);
+  color: var(--cg-text-secondary);
+}
+
+.cg-caption {
+  font-family: var(--cg-font-family);
+  font-size: var(--cg-font-size-xs);
+  font-weight: 500;
+  color: var(--cg-text-muted);
+}
+
+/* Custom Scrollbars for light surfaces */
+.cg-light-theme main::-webkit-scrollbar,
+.cg-light-theme nav::-webkit-scrollbar,
+.cg-light-theme ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.cg-light-theme main::-webkit-scrollbar-track,
+.cg-light-theme nav::-webkit-scrollbar-track,
+.cg-light-theme ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cg-light-theme main::-webkit-scrollbar-thumb,
+.cg-light-theme nav::-webkit-scrollbar-thumb,
+.cg-light-theme ::-webkit-scrollbar-thumb {
+  background: rgba(142, 135, 170, 0.28);
+  border-radius: var(--cg-radius-pill);
+}
+
+.cg-light-theme main::-webkit-scrollbar-thumb:hover,
+.cg-light-theme nav::-webkit-scrollbar-thumb:hover,
+.cg-light-theme ::-webkit-scrollbar-thumb:hover {
+  background: rgba(142, 135, 170, 0.5);
+}
+
+/* Focus Ring Accessibility */
+.cg-light-theme *:focus-visible {
+  outline: 2px solid var(--cg-purple-500);
+  outline-offset: 2px;
+}

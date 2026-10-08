@@ -1,27 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
-import Lenis from 'lenis';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import Navbar from './components/landing/Navbar';
-import IntroExperience from './components/landing/IntroExperience';
-import MarketingChannelsSection from './components/landing/MarketingChannelsSection';
-import MarketingJourney from './components/landing/MarketingJourney';
-import CreativeGiniEndExperience from './components/landing/CreativeGiniEndExperience';
-import Footer from './components/landing/Footer';
+import LandingPage from './components/LandingPage/LandingPage';
 import Toast from './components/common/Toast';
-import CosmicSpaceCanvas from './components/common/CosmicSpaceCanvas';
 import SignInPage from './components/auth/SignInPage';
 import ResetPasswordPage from './components/auth/ResetPasswordPage';
+import MagicLoginPage from './features/auth/pages/MagicLoginPage';
 import ProtectedRoute, { getRoleHome } from './components/common/ProtectedRoute';
-import UserDashboard from './components/dashboard/user/UserDashboard';
-import AdminDashboard from './components/dashboard/admin/AdminDashboard';
-import CompanyLeadDashboard from './components/dashboard/internal/CompanyLeadDashboard';
-import CompanyBoostDashboard from './components/dashboard/internal/CompanyBoostDashboard';
-import LandingPageDashboard from './components/dashboard/internal/LandingPageDashboard';
+import ClientPortal from './features/client/ClientPortal';
+import LeadPortal from './features/lead/LeadPortal';
+import BoostPortal from './features/boost/BoostPortal';
+import DesignPortal from './features/design/DesignPortal';
+import SuperAdminPortal from './features/admin/SuperAdminPortal';
+import PublicSampleDashboard from './features/samples/PublicSampleDashboard';
 import { api } from './services/api';
-
-gsap.registerPlugin(ScrollTrigger);
 
 // Helper component to route /ticket/:ticketId directly to the appropriate dashboard
 function TicketRedirect({ user, isAuthChecking }) {
@@ -32,7 +23,7 @@ function TicketRedirect({ user, isAuthChecking }) {
 
   if (isAuthChecking) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#060B13', color: '#00E5FF' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC', color: '#0284C7' }}>
         <div className="portal-spinner" />
       </div>
     );
@@ -44,6 +35,22 @@ function TicketRedirect({ user, isAuthChecking }) {
   }
 
   const roleHome = getRoleHome(user);
+  if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+    return <Navigate to={`/admin/requests/${encodeURIComponent(ticketId)}`} replace />;
+  }
+  if (user.role === 'USER') {
+    return <Navigate to={`/portal/requests/${encodeURIComponent(ticketId)}`} replace />;
+  }
+  if (user.role === 'COMPANY_LEAD' || user.dashboardAccess?.companyLead) {
+    return <Navigate to={`/lead/requests/${encodeURIComponent(ticketId)}`} replace />;
+  }
+  if (user.role === 'COMPANY_BOOST' || user.dashboardAccess?.companyBoost) {
+    return <Navigate to={`/boost/requests/${encodeURIComponent(ticketId)}`} replace />;
+  }
+  if (user.role === 'LANDING_PAGE' || user.dashboardAccess?.companyUI) {
+    return <Navigate to={`/design/requests/${encodeURIComponent(ticketId)}`} replace />;
+  }
+
   const targetUrl = `${roleHome}?ticket=${encodeURIComponent(ticketId)}${tab ? `&tab=${encodeURIComponent(tab)}` : ''}`;
   return <Navigate to={targetUrl} replace />;
 }
@@ -52,12 +59,9 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
-  const [isIntroComplete, setIsIntroComplete] = useState(false);
-  const spotlightRef = useRef(null);
 
   const navigate = useNavigate();
   const location = useLocation();
-  const isLandingPage = location.pathname === '/';
 
   // Check existing session on initial load
   useEffect(() => {
@@ -81,48 +85,6 @@ export default function App() {
     }
   }, []);
 
-  // Global Inertial Scroll Engine (Lenis + GSAP ScrollTrigger) exclusively on landing page
-  useEffect(() => {
-    if (!isLandingPage) return;
-
-    const lenis = new Lenis({
-      duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      orientation: 'vertical',
-      gestureOrientation: 'vertical',
-      smoothWheel: true,
-      wheelMultiplier: 0.95,
-      touchMultiplier: 1.5,
-      infinite: false
-    });
-
-    lenis.on('scroll', ScrollTrigger.update);
-
-    const updateTicker = (time) => {
-      lenis.raf(time * 1000);
-    };
-
-    gsap.ticker.add(updateTicker);
-    gsap.ticker.lagSmoothing(0);
-
-    return () => {
-      gsap.ticker.remove(updateTicker);
-      lenis.destroy();
-    };
-  }, [isLandingPage]);
-
-  // Spotlight tracking on landing page
-  useEffect(() => {
-    if (!isLandingPage) return;
-    const handleMouseMove = (e) => {
-      if (spotlightRef.current) {
-        spotlightRef.current.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
-      }
-    };
-    window.addEventListener('mousemove', handleMouseMove, { passive: true });
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [isLandingPage]);
-
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -133,7 +95,7 @@ export default function App() {
   const handleLogin = (userData) => {
     setUser(userData);
     const searchParams = new URLSearchParams(location.search);
-    const redirectParam = searchParams.get('redirect');
+    const redirectParam = searchParams.get('redirect') || searchParams.get('returnTo');
     const targetRoute = redirectParam || getRoleHome(userData);
     navigate(targetRoute, { replace: true });
     showToast(`Welcome to CreativeGini, ${userData.name}!`);
@@ -143,61 +105,53 @@ export default function App() {
     api.logout();
     setUser(null);
     navigate('/', { replace: true });
-    setIsIntroComplete(false);
     showToast('Signed out successfully');
   };
 
   return (
-    <div className={`app-root ${isLandingPage ? 'cosmic-editorial-root' : ''}`}>
-      {/* 3D Cosmic Space Canvas rendered strictly on landing page */}
-      {isLandingPage && <CosmicSpaceCanvas />}
-      
-      {isLandingPage && (
-        <div
-          ref={spotlightRef}
-          className="cursor-cosmic-spotlight"
-          style={{ left: 0, top: 0, transform: 'translate3d(-500px, -500px, 0)' }}
-        />
-      )}
-
+    <div className="app-root">
       <Routes>
-        {/* 1. Landing Page (100% Preserved) */}
+        {/* 1. Redesigned Public Landing Page */}
         <Route
           path="/"
           element={
-            <>
-              <Navbar
-                onOpenSignIn={() => navigate('/signin')}
-                onOpenGoogleModal={() => navigate('/signin')}
-                user={user}
-                onLogout={handleLogout}
-                onGoToDashboard={() => navigate(getRoleHome(user))}
-              />
-
-              <div id="landing-main-scroll-wrapper">
-                <IntroExperience
-                  isComplete={isIntroComplete}
-                  setIsComplete={setIsIntroComplete}
-                />
-
-                <div id="next-landing-container" className="next-sections-flow">
-                  <MarketingChannelsSection
-                    onExploreChannel={user ? () => navigate(getRoleHome(user)) : () => navigate('/signin')}
-                  />
-
-                  <MarketingJourney
-                    onExploreSolution={user ? () => navigate(getRoleHome(user)) : () => navigate('/signin')}
-                  />
-
-                  <CreativeGiniEndExperience />
-
-                  <Footer
-                    onOpenAuth={user ? () => navigate(getRoleHome(user)) : () => navigate('/signin')}
-                  />
-                </div>
-              </div>
-            </>
+            <LandingPage
+              user={user}
+              onSignIn={() => navigate('/signin')}
+              onGetStarted={() => navigate('/signin?view=signup')}
+              onGoToDashboard={() => navigate(getRoleHome(user))}
+            />
           }
+        />
+
+        {/* Public Sample Intelligence Showcases */}
+        <Route
+          path="/samples/:slug"
+          element={<PublicSampleDashboard />}
+        />
+        <Route
+          path="/samples"
+          element={<Navigate to="/samples/data-i2i" replace />}
+        />
+        <Route
+          path="/showcase/:slug"
+          element={<PublicSampleDashboard />}
+        />
+
+        {/* Dedicated Sign Up redirect */}
+        <Route
+          path="/signup"
+          element={<Navigate to="/signin?view=signup" replace />}
+        />
+        <Route
+          path="/register"
+          element={<Navigate to="/signin?view=signup" replace />}
+        />
+
+        {/* Legacy landing page route (cleanly redirected to modern landing page) */}
+        <Route
+          path="/legacy"
+          element={<Navigate to="/" replace />}
         />
 
         {/* 2. Sign In Route */}
@@ -245,57 +199,146 @@ export default function App() {
           }
         />
 
-        {/* 3. User Dashboard Route */}
+        {/* 2c. Passwordless Magic Link Login Route */}
         <Route
-          path="/dashboard"
+          path="/magic-login"
           element={
-            <ProtectedRoute user={user} allowedRoles={['USER']} isAuthChecking={isAuthChecking} onLogout={handleLogout}>
-              <UserDashboard user={user} onLogout={handleLogout} />
+            <MagicLoginPage
+              onLogin={handleLogin}
+              showToast={showToast}
+            />
+          }
+        />
+
+        {/* 3. New Modern Client Portal Routes */}
+        <Route
+          path="/portal/*"
+          element={
+            <ProtectedRoute user={user} allowedRoles={['USER', 'ADMIN']} isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <ClientPortal user={user} onLogout={handleLogout} />
             </ProtectedRoute>
           }
         />
 
-        {/* 4. Admin Dashboard Route */}
+        {/* 3a. Client Dashboard Redirect */}
+        <Route
+          path="/dashboard"
+          element={<Navigate to="/portal" replace />}
+        />
+
+        {/* 3b. Legacy User Dashboard Redirect */}
+        <Route
+          path="/legacy-dashboard"
+          element={<Navigate to="/portal" replace />}
+        />
+
+        {/* 4. Super Admin Control Center Routes */}
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedRoute user={user} allowedRoles={['ADMIN', 'SUPER_ADMIN']} isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <SuperAdminPortal user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin"
           element={
-            <ProtectedRoute user={user} allowedRoles={['ADMIN']} isAuthChecking={isAuthChecking} onLogout={handleLogout}>
-              <AdminDashboard user={user} onLogout={handleLogout} />
+            <ProtectedRoute user={user} allowedRoles={['ADMIN', 'SUPER_ADMIN']} isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <SuperAdminPortal user={user} onLogout={handleLogout} />
             </ProtectedRoute>
           }
         />
+        {/* 4b. Legacy Admin Dashboard Route (Redirected to modern Super Admin) */}
+        <Route
+          path="/admin/legacy"
+          element={<Navigate to="/admin" replace />}
+        />
 
-        {/* 5. Company Lead Dashboard Route */}
+        {/* 5. Modern Lead Service Portal Routes */}
+        <Route
+          path="/lead/*"
+          element={
+            <ProtectedRoute user={user} allowedRoles={['COMPANY_LEAD', 'ADMIN', 'SUPER_ADMIN']} requiredPermission="companyLead" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <LeadPortal user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/company-lead/*"
+          element={
+            <ProtectedRoute user={user} allowedRoles={['COMPANY_LEAD', 'ADMIN', 'SUPER_ADMIN']} requiredPermission="companyLead" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <LeadPortal user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/company-lead"
           element={
-            <ProtectedRoute user={user} requiredPermission="companyLead" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
-              <CompanyLeadDashboard user={user} onLogout={handleLogout} />
+            <ProtectedRoute user={user} allowedRoles={['COMPANY_LEAD', 'ADMIN', 'SUPER_ADMIN']} requiredPermission="companyLead" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <LeadPortal user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+        {/* Legacy Lead route redirect */}
+        <Route
+          path="/company-lead-legacy"
+          element={<Navigate to="/lead" replace />}
+        />
+
+        {/* 6. Modern Boost Service Portal Routes */}
+        <Route
+          path="/boost/*"
+          element={
+            <ProtectedRoute user={user} allowedRoles={['COMPANY_BOOST', 'ADMIN', 'SUPER_ADMIN']} requiredPermission="companyBoost" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <BoostPortal user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/boost"
+          element={
+            <ProtectedRoute user={user} allowedRoles={['COMPANY_BOOST', 'ADMIN', 'SUPER_ADMIN']} requiredPermission="companyBoost" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <BoostPortal user={user} onLogout={handleLogout} />
             </ProtectedRoute>
           }
         />
 
-        {/* 6. Company Boost Dashboard Route */}
+        {/* Legacy Boost route redirects */}
+        <Route
+          path="/company-boost/*"
+          element={<Navigate to="/boost" replace />}
+        />
         <Route
           path="/company-boost"
+          element={<Navigate to="/boost" replace />}
+        />
+
+        {/* 7. Modern UI/Design Service Portal Routes */}
+        <Route
+          path="/design/*"
           element={
-            <ProtectedRoute user={user} requiredPermission="companyBoost" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
-              <CompanyBoostDashboard user={user} onLogout={handleLogout} />
+            <ProtectedRoute user={user} allowedRoles={['LANDING_PAGE', 'ADMIN', 'SUPER_ADMIN']} requiredPermission="companyUI" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <DesignPortal user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/design"
+          element={
+            <ProtectedRoute user={user} allowedRoles={['LANDING_PAGE', 'ADMIN', 'SUPER_ADMIN']} requiredPermission="companyUI" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
+              <DesignPortal user={user} onLogout={handleLogout} />
             </ProtectedRoute>
           }
         />
 
-        {/* 7. Landing Page Enhancement Dashboard Route */}
+        {/* 8. Legacy Landing Page Enhancement Dashboard Route (Redirected to modern Design portal) */}
         <Route
           path="/landing-page-enhancement"
-          element={
-            <ProtectedRoute user={user} requiredPermission="companyUI" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
-              <LandingPageDashboard user={user} onLogout={handleLogout} />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/design" replace />}
         />
 
-        {/* 8. Direct Ticket Deep Link Helper Route */}
+        {/* 9. Direct Ticket Deep Link Helper Route */}
         <Route
           path="/ticket/:ticketId"
           element={<TicketRedirect user={user} isAuthChecking={isAuthChecking} />}

@@ -773,6 +773,13 @@ export const updateUserPermissions = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    if (targetUser.role === 'USER') {
+      return res.status(400).json({
+        success: false,
+        message: 'Permissions cannot be granted to client accounts. Permissions are reserved exclusively for internal staff and administrators.'
+      });
+    }
+
     const prevAccess = getEffectiveDashboardAccess(targetUser);
 
     const formatPerms = (p) => {
@@ -793,11 +800,20 @@ export const updateUserPermissions = async (req, res) => {
 
     const newStr = formatPerms(newAccess);
 
-    // Determine updated role based on new access
-    let newRole = targetUser.role;
-    if (newAccess.companyLead) newRole = 'COMPANY_LEAD';
-    else if (newAccess.companyBoost) newRole = 'COMPANY_BOOST';
-    else if (newAccess.companyUI) newRole = 'LANDING_PAGE';
+    // Determine updated role based on explicit role or new access flags (only staff roles)
+    const validRoles = ['COMPANY_LEAD', 'COMPANY_BOOST', 'LANDING_PAGE', 'ADMIN', 'SUPER_ADMIN'];
+    let newRole = (req.body.role && validRoles.includes(req.body.role)) ? req.body.role : targetUser.role;
+
+    if (!req.body.role) {
+      if (newAccess.companyLead) newRole = 'COMPANY_LEAD';
+      else if (newAccess.companyBoost) newRole = 'COMPANY_BOOST';
+      else if (newAccess.companyUI) newRole = 'LANDING_PAGE';
+    }
+
+    // Protect primary root administrator
+    if (targetUser.email === 'admin@creativegini.com' || targetUser.role === 'SUPER_ADMIN') {
+      newRole = targetUser.role;
+    }
 
     await query(`
       UPDATE users
@@ -807,7 +823,7 @@ export const updateUserPermissions = async (req, res) => {
       newAccess.companyBoost,
       newAccess.companyLead,
       newAccess.companyUI,
-      targetUser.role === 'ADMIN' ? 'ADMIN' : newRole,
+      (targetUser.role === 'ADMIN' || targetUser.role === 'SUPER_ADMIN') && !req.body.role ? targetUser.role : newRole,
       targetUser.id
     ]);
 

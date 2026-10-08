@@ -444,7 +444,9 @@ export const addCompanyLead = async (
       lead.linkedin || null,
       lead.location || null,
       lead.status || 'PENDING',
-      lead.notes || null,
+      lead.logo || lead.logoUrl
+        ? `${lead.notes || ''}\n[Logo: ${lead.logo || lead.logoUrl}]`.trim()
+        : (lead.notes || null),
     ]
   );
 
@@ -521,7 +523,13 @@ export const getCompanyLeads = async (companyId) => {
   return result.rows.map(r => {
     const pdfMatch = (r.notes || '').match(/\[Lead PDF:\s*([^\]]+)\]/);
     const source_reference = pdfMatch ? pdfMatch[1] : null;
-    const cleanNotes = (r.notes || '').replace(/\[Lead PDF:\s*[^\]]+\]/g, '').replace(/\[Website:\s*[^\]]+\]/g, '').trim();
+    const logoMatch = (r.notes || '').match(/\[(Lead )?Logo:\s*([^\]]+)\]/i);
+    const logo = logoMatch ? logoMatch[2].trim() : null;
+    const cleanNotes = (r.notes || '')
+      .replace(/\[Lead PDF:\s*[^\]]+\]/g, '')
+      .replace(/\[Website:\s*[^\]]+\]/g, '')
+      .replace(/\[(Lead )?Logo:\s*[^\]]+\]/gi, '')
+      .trim();
     const websiteMatch = (r.notes || '').match(/\[Website:\s*([^\]]+)\]/);
     const website = (r.linkedin && /^https?:\/\//i.test(r.linkedin)) ? r.linkedin : (websiteMatch ? websiteMatch[1] : (r.linkedin || ''));
     const companyName = r.lead_company || r.name;
@@ -533,6 +541,8 @@ export const getCompanyLeads = async (companyId) => {
       ...r,
       companyName,
       website,
+      logo,
+      logoUrl: logo,
       notes: cleanNotes,
       source_reference,
       sourceReference: source_reference,
@@ -647,7 +657,21 @@ export const findLeadById = async (leadId) => {
     `,
     [leadId]
   );
-  return result.rows[0] || null;
+  if (!result.rows[0]) return null;
+  const row = result.rows[0];
+  const logoMatch = (row.notes || '').match(/\[(Lead )?Logo:\s*([^\]]+)\]/i);
+  const logo = logoMatch ? logoMatch[2].trim() : null;
+  const cleanNotes = (row.notes || '')
+    .replace(/\[Lead PDF:\s*[^\]]+\]/g, '')
+    .replace(/\[Website:\s*[^\]]+\]/g, '')
+    .replace(/\[(Lead )?Logo:\s*[^\]]+\]/gi, '')
+    .trim();
+  return {
+    ...row,
+    logo,
+    logoUrl: logo,
+    notes: cleanNotes,
+  };
 };
 
 export const updateCompanyLead = async (leadId, updates = {}) => {

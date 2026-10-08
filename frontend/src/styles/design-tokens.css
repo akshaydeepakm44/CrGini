@@ -1,0 +1,135 @@
+/* ==========================================================================
+   CREATIVEGINI DESIGN SYSTEM — DESIGN TOKENS (LIGHT PREMIUM AESTHETIC)
+   Inspired by modern digital marketing SaaS platforms:
+   Airy white surfaces, soft pastel accents (lavender, mint, sky blue, coral),
+   Plus Jakarta Sans & Inter typography, rounded cards (16px), subtle shadows.
+   ========================================================================== */
+
+:root {
+  /* --- Primary Brand Colors (Lavender & Purple) --- */
+  --cg-purple-50:  #F8F6FF;
+  --cg-purple-100: #EFEAFC;
+  --cg-purple-200: #DDD4FA;
+  --cg-purple-300: #C4B5FD;
+  --cg-purple-400: #A78BFA;
+  --cg-purple-500: #8B5CF6;
+  --cg-purple-600: #7C3AED;
+  --cg-purple-700: #6D28D9;
+  --cg-purple-800: #5B21B6;
+  --cg-purple-900: #4C1D95;
+
+  /* --- Accent Colors (Mint / Success) --- */
+  --cg-mint-50:   #ECFDF5;
+  --cg-mint-100:  #D1FAE5;
+  --cg-mint-200:  #A7F3D0;
+  --cg-mint-500:  #10B981;
+  --cg-mint-600:  #059669;
+  --cg-mint-700:  #047857;
+
+  /* --- Accent Colors (Sky Blue / Info) --- */
+  --cg-blue-50:   #EFF6FF;
+  --cg-blue-100:  #DBEAFE;
+  --cg-blue-200:  #BFDBFE;
+  --cg-blue-500:  #3B82F6;
+  --cg-blue-600:  #2563EB;
+  --cg-blue-700:  #1D4ED8;
+
+  /* --- Accent Colors (Coral & Rose / Warning & Highlight) --- */
+  --cg-coral-50:  #FFF1F2;
+  --cg-coral-100: #FFE4E6;
+  --cg-coral-200: #FECDD3;
+  --cg-coral-500: #F43F5E;
+  --cg-coral-600: #E11D48;
+  --cg-coral-700: #BE123C;
+
+  /* --- Accent Colors (Amber / Alert) --- */
+  --cg-amber-50:  #FFFBEB;
+  --cg-amber-100: #FEF3C7;
+  --cg-amber-200: #FDE68A;
+  --cg-amber-500: #F59E0B;
+  --cg-amber-600: #D97706;
+
+  /* --- Neutral Grayscale --- */
+  --cg-neutral-0:   #FFFFFF;
+  --cg-neutral-50:  #FAFAFD;
+  --cg-neutral-100: #F3F4F8;
+  --cg-neutral-200: #E5E7EB;
+  --cg-neutral-300: #D1D5DB;
+  --cg-neutral-400: #9CA3AF;
+  --cg-neutral-500: #6B7280;
+  --cg-neutral-600: #4B5563;
+  --cg-neutral-700: #374151;
+  --cg-neutral-800: #1F2937;
+  --cg-neutral-900: #111827;
+
+  /* --- Surfaces & Canvas --- */
+  --cg-bg-page:           #F8F9FD;
+  --cg-bg-sidebar:        #FFFFFF;
+  --cg-bg-header:         rgba(255, 255, 255, 0.94);
+  --cg-bg-card:           #FFFFFF;
+  --cg-bg-card-subtle:    #F8F9FC;
+  --cg-bg-input:          #FFFFFF;
+  --cg-bg-hover:          #F5F4FA;
+
+  /* --- Borders --- */
+  --cg-border-light:      #F0EEF8;
+  --cg-border:            #E5E7EB;
+  --cg-border-focus:      #8B5CF6;
+  --cg-border-active:     #7C3AED;
+
+  /* --- Typography Colors --- */
+  --cg-text-primary:      #1A1040;
+  --cg-text-secondary:    #5B527E;
+  --cg-text-muted:        #8E87AA;
+  --cg-text-disabled:     #B5AFC7;
+  --cg-text-inverse:      #FFFFFF;
+
+  /* --- Typography Families & Scales --- */
+  --cg-font-family:       'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --cg-font-heading:      'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --cg-font-size-xs:      0.75rem;    /* 12px */
+  --cg-font-size-sm:      0.84375rem; /* 13.5px */
+  --cg-font-size-base:    0.9375rem;  /* 15px */
+  --cg-font-size-md:      1.0625rem;  /* 17px */
+  --cg-font-size-lg:      1.1875rem;  /* 19px */
+  --cg-font-size-xl:      1.375rem;   /* 22px */
+  --cg-font-size-2xl:     1.75rem;    /* 28px */
+  --cg-font-size-3xl:     2.25rem;    /* 36px */
+
+  --cg-line-height-tight: 1.25;
+  --cg-line-height-normal:1.5;
+  --cg-line-height-loose: 1.75;
+
+  /* --- Elevation & Shadows --- */
+  --cg-shadow-xs:         0 1px 2px rgba(124, 58, 237, 0.04);
+  --cg-shadow-sm:         0 1px 3px rgba(124, 58, 237, 0.05), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --cg-shadow-card:       0 2px 8px rgba(124, 58, 237, 0.05), 0 1px 3px rgba(0, 0, 0, 0.02);
+  --cg-shadow-hover:      0 8px 24px rgba(124, 58, 237, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03);
+  --cg-shadow-modal:      0 20px 48px rgba(26, 16, 64, 0.14), 0 8px 16px rgba(0, 0, 0, 0.05);
+
+  /* --- Border Radii --- */
+  --cg-radius-xs:         4px;
+  --cg-radius-sm:         8px;
+  --cg-radius-md:         12px;
+  --cg-radius-lg:         16px;
+  --cg-radius-xl:         22px;
+  --cg-radius-pill:       9999px;
+
+  /* --- Layout Dimensions --- */
+  --cg-sidebar-width:     250px;
+  --cg-sidebar-collapsed: 76px;
+  --cg-header-height:     70px;
+  --cg-max-content-width: 1400px;
+
+  /* --- Transitions --- */
+  --cg-transition-fast:   150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --cg-transition-normal: 240ms cubic-bezier(0.4, 0, 0.2, 1);
+  --cg-transition-slow:   350ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* --- Gradients --- */
+  --cg-gradient-purple:   linear-gradient(135deg, #7C3AED 0%, #A855F7 100%);
+  --cg-gradient-banner:   linear-gradient(135deg, #F3E8FF 0%, #EFF6FF 50%, #ECFDF5 100%);
+  --cg-gradient-button:   linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%);
+  --cg-gradient-accent:   linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+}

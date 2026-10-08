@@ -6,8 +6,11 @@ import {
   findUserByEmail,
   findUserById,
   updateUser,
+  createUser,
   getEffectiveDashboardAccess,
 } from '../repositories/userRepository.js';
+
+import { createCompany } from '../repositories/companyRepository.js';
 
 import { createActivityLog } from '../repositories/activityLogRepository.js';
 import {
@@ -16,7 +19,12 @@ import {
   markTokenAsUsed,
   invalidateUserTokens,
 } from '../repositories/passwordResetRepository.js';
-import { sendPasswordResetEmail } from '../services/emailService.js';
+import {
+  createMagicToken,
+  findActiveMagicTokenByHash,
+  markMagicTokenAsUsed,
+} from '../repositories/magicTokenRepository.js';
+import { sendPasswordResetEmail, sendMagicLinkEmail } from '../services/emailService.js';
 
 const generateToken = (id) => {
   return jwt.sign(
@@ -38,6 +46,102 @@ const buildUserResponse = (user) => ({
   company: user.company || null,
   dashboardAccess: getEffectiveDashboardAccess(user),
 });
+
+// @desc    Register new client user & company
+// @route   POST /api/auth/register
+// @access  Public
+export const registerUser = async (req, res) => {
+  try {
+    const { name, email, password, companyName, phone } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Full name is required.',
+      });
+    }
+
+    if (!email || !email.trim() || !email.includes('@')) {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid email address is required.',
+      });
+    }
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long.',
+      });
+    }
+
+    if (!companyName || !companyName.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Company name is required.',
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if user already exists
+    const existingUser = await findUserByEmail(normalizedEmail);
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        code: 'USER_EXISTS',
+        message: 'An account with this email address already exists. Please sign in.',
+      });
+    }
+
+    // Create Company for this new client tenant
+    const newCompany = await createCompany({
+      name: companyName.trim(),
+      contactPerson: name.trim(),
+      email: normalizedEmail,
+      phone: phone ? phone.trim() : null,
+    });
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create new User with role USER
+    const newUser = await createUser({
+      name: name.trim(),
+      email: normalizedEmail,
+      password: hashedPassword,
+      role: 'USER',
+      companyId: newCompany.id,
+      phone: phone ? phone.trim() : null,
+      status: 'ACTIVE',
+      dashboardAccess: {
+        companyBoost: true,
+        companyLead: true,
+        companyUI: true,
+      },
+    });
+
+    // Attach company to user response
+    newUser.company = newCompany;
+
+    // Issue JWT token
+    const token = generateToken(newUser.id || newUser._id);
+
+    return res.status(201).json({
+      success: true,
+      token,
+      user: buildUserResponse(newUser),
+      message: 'Account registered successfully. Welcome to CreativeGini!',
+    });
+  } catch (error) {
+    console.error('[AuthController.registerUser] Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Registration failed. Please try again.',
+    });
+  }
+};
 
 // @desc    Authenticate user & get token
 // @route   POST /api/auth/login
@@ -685,5 +789,184 @@ export const changePassword = async (req, res) => {
     });
   }
 };
+
+/**
+ * @desc    Request a passwordless magic access link
+ * @route   POST /api/auth/magic-link
+ * @access  Public (or Admin on behalf of a user)
+ */
+export const requestMagicLink = async (req, res) => {
+  try {
+    const { email, userId: targetUserId } = req.body;
+
+    let user = null;
+    if (email && email.trim()) {
+      user = await findUserByEmail(email.toLowerCase().trim());
+    } else if (targetUserId) {
+      user = await findUserById(targetUserId);
+    }
+
+    if (!user || user.isDeleted || user.status !== 'ACTIVE') {
+      return res.status(404).json({
+        success: false,
+        message: 'No active account found with that email address.',
+      });
+    }
+
+    const userId = user._id || user.id;
+
+    // 1. Generate 256-bit cryptographically secure token
+    const rawToken = crypto.randomBytes(32).toString('hex');
+
+    // 2. Compute SHA-256 hash for database storage
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
+
+    // 3. Token expiration: 24 hours (1440 minutes) for demo & testing flexibility
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    // 4. Persist in database
+    await createMagicToken({
+      userId,
+      tokenHash,
+      expiresAt,
+    });
+
+    // 5. Build magic link URL dynamically matching origin or tunnel
+    let portalBase = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim().replace(/\/$/, '');
+    const forwardedHost = req.headers['x-forwarded-host'];
+    const forwardedProto = req.headers['x-forwarded-proto'] || 'https';
+    const originHeader = req.headers.origin || req.headers.referer;
+    if (forwardedHost) {
+      portalBase = `${forwardedProto}://${forwardedHost}`;
+    } else if (originHeader) {
+      try {
+        const parsed = new URL(originHeader);
+        portalBase = `${parsed.protocol}//${parsed.host}`;
+      } catch (_) {}
+    }
+
+    const magicUrl = `${portalBase}/magic-login?token=${encodeURIComponent(rawToken)}`;
+
+    // 6. Send email asynchronously (with test simulation fallback)
+    sendMagicLinkEmail({
+      to: user.email,
+      name: user.name,
+      magicUrl,
+      expiresMinutes: 1440,
+    }).catch((err) => console.error('[Magic Link Email Error]:', err.message));
+
+    // 7. Audit log
+    try {
+      await createActivityLog({
+        userId,
+        userName: user.name,
+        companyId: user.companyId || null,
+        action: 'MAGIC_LINK_GENERATED',
+        details: `Magic link generated for ${user.email}.`,
+      });
+    } catch (_) {}
+
+    return res.json({
+      success: true,
+      message: `Magic access link generated successfully for ${user.name}.`,
+      magicUrl,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      expiresAt,
+    });
+  } catch (error) {
+    console.error('Request magic link error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate magic access link. Please try again.',
+    });
+  }
+};
+
+/**
+ * @desc    Verify magic access link & authenticate session
+ * @route   POST /api/auth/verify-magic-link
+ * @access  Public
+ */
+export const verifyMagicLink = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token || !token.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Magic access token is missing or malformed.',
+      });
+    }
+
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(token.trim())
+      .digest('hex');
+
+    const tokenRecord = await findActiveMagicTokenByHash(tokenHash);
+
+    if (!tokenRecord) {
+      return res.status(400).json({
+        success: false,
+        message: 'This magic link is invalid, expired, or has already been used. Please request a new link.',
+      });
+    }
+
+    // Mark single-use token as used
+    await markMagicTokenAsUsed(tokenRecord.id);
+
+    const user = tokenRecord.user;
+    const userId = user.id || user._id;
+
+    // Issue standard JWT session token
+    const jwtToken = generateToken(userId);
+
+    // Update last login timestamp
+    await updateUser(userId, { lastLogin: new Date() }).catch(() => {});
+
+    // Determine target redirect based on role
+    let redirectUrl = '/portal';
+    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+      redirectUrl = '/admin';
+    } else if (user.role === 'COMPANY_LEAD') {
+      redirectUrl = '/lead';
+    } else if (user.role === 'COMPANY_BOOST') {
+      redirectUrl = '/boost';
+    } else if (user.role === 'LANDING_PAGE') {
+      redirectUrl = '/design';
+    }
+
+    // Audit log
+    try {
+      await createActivityLog({
+        userId,
+        userName: user.name,
+        companyId: user.companyId || null,
+        action: 'MAGIC_LINK_LOGIN',
+        details: `User ${user.email} authenticated via one-click magic link.`,
+      });
+    } catch (_) {}
+
+    return res.json({
+      success: true,
+      message: `Welcome back, ${user.name}!`,
+      token: jwtToken,
+      user: buildUserResponse(user),
+      redirectUrl,
+    });
+  } catch (error) {
+    console.error('Verify magic link error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify magic access link. Please try again.',
+    });
+  }
+};
+
 
 

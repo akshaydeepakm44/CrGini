@@ -62,9 +62,56 @@ export const protect = async (req, res, next) => {
   }
 };
 
+export const optionalProtect = async (req, res, next) => {
+  let token;
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.query && req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || 'creativegini_secret_2026'
+    );
+    const user = await findUserById(decoded.id);
+    if (user && user.status !== 'DISABLED' && user.status !== 'SUSPENDED' && !user.isDeleted) {
+      req.user = user;
+    }
+  } catch (_) {
+    // optional, continue
+  }
+  next();
+};
+
 export const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Access denied. No authenticated user.',
+      });
+    }
+
+    // SUPER_ADMIN has platform-wide authority
+    if (req.user.role === 'SUPER_ADMIN') {
+      return next();
+    }
+
+    // If ADMIN is authorized, both ADMIN and SUPER_ADMIN have access
+    if (roles.includes('ADMIN') && (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN')) {
+      return next();
+    }
+
+    if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: `Forbidden: Role '${req.user?.role}' does not have permission to access this resource.`,
@@ -84,7 +131,7 @@ export const authorizeDashboard = (dashboardKey) => {
       });
     }
 
-    if (req.user.role === 'ADMIN') {
+    if (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN') {
       return next();
     }
 

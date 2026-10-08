@@ -433,6 +433,9 @@ body:has(.portal-root) {
   gap: 16px;
   z-index: 110;
   box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .portal-topbar-title-group {

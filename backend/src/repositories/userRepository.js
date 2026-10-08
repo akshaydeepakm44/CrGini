@@ -288,7 +288,7 @@ export const getEffectiveDashboardAccess = (user) => {
     };
   }
 
-  if (user.role === 'ADMIN') {
+  if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
     return {
       companyBoost: true,
       companyLead: true,
@@ -321,7 +321,7 @@ export const findActiveSpecialists = async (serviceType) => {
   } else if (serviceType === 'LANDING_PAGE' || serviceType === 'COMPANY_UI') {
     condition = "(role = 'LANDING_PAGE' OR company_ui = true)";
   } else {
-    condition = "role = 'ADMIN'";
+    condition = "(role = 'ADMIN' OR role = 'SUPER_ADMIN')";
   }
 
   const result = await query(

@@ -8,6 +8,7 @@ import requestRoutes from './routes/requestRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import assetRoutes from './routes/assetRoutes.js';
+import sampleRoutes from './routes/sampleRoutes.js';
 
 dotenv.config();
 
@@ -67,8 +68,11 @@ app.use('/api/requests', requestRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/assets', assetRoutes);
+app.use('/api/samples', sampleRoutes);
 
-// Health Check with PostgreSQL Connectivity Diagnostics
+import { checkStorageHealth } from './services/storageService.js';
+
+// Health Check with PostgreSQL & Object Storage Diagnostics
 app.get('/api/health', async (req, res) => {
   try {
     const pool = getPool();
@@ -83,6 +87,8 @@ app.get('/api/health', async (req, res) => {
       client.release();
     }
 
+    const storageHealth = await checkStorageHealth();
+
     res.status(200).json({
       status: 'online',
       service: 'CreativeGini Portal API',
@@ -91,7 +97,8 @@ app.get('/api/health', async (req, res) => {
         type: 'PostgreSQL',
         status: dbStatus,
         ...dbInfo
-      }
+      },
+      storage: storageHealth
     });
   } catch (err) {
     res.status(503).json({
@@ -124,3 +131,4 @@ app.use((err, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[CreativeGini API] Server running on port ${PORT}`);
 });
+

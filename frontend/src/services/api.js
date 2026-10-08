@@ -4,13 +4,7 @@ const getApiBase = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL.replace(/\/+$/, '');
   }
-  if (typeof window !== 'undefined' && window.location && window.location.origin) {
-    const hostname = window.location.hostname;
-    if (hostname && !hostname.includes('localhost') && !hostname.includes('127.0.0.1')) {
-      return `${window.location.origin}/api`;
-    }
-  }
-  return 'http://localhost:5000/api';
+  return '/api';
 };
 
 const API_BASE = getApiBase();
@@ -52,7 +46,8 @@ const parseApiResponse = async (res, defaultErrorMessage = 'Request failed') => 
 
 const getHeaders = (includeAuth = true) => {
   const headers = {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true'
   };
   if (includeAuth) {
     const token = localStorage.getItem('cg_auth_token');
@@ -79,6 +74,22 @@ export const api = {
     return data;
   },
 
+  async register({ name, email, password, companyName, phone }) {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: getHeaders(false),
+      body: JSON.stringify({ name, email, password, companyName, phone })
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Registration failed. Please try again.');
+    }
+    if (data.token) {
+      localStorage.setItem('cg_auth_token', data.token);
+    }
+    return data;
+  },
+
   async getMe() {
     const res = await fetch(`${API_BASE}/auth/me`, {
       headers: getHeaders(true)
@@ -92,6 +103,33 @@ export const api = {
 
   logout() {
     localStorage.removeItem('cg_auth_token');
+  },
+
+  // Passwordless Magic Link Flow
+  async requestMagicLink(email, userId = null) {
+    const res = await fetch(`${API_BASE}/auth/magic-link`, {
+      method: 'POST',
+      headers: getHeaders(false),
+      body: JSON.stringify({ email: email?.trim(), userId })
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to generate magic access link.');
+    }
+    return data;
+  },
+
+  async verifyMagicLink(token) {
+    const res = await fetch(`${API_BASE}/auth/verify-magic-link`, {
+      method: 'POST',
+      headers: getHeaders(false),
+      body: JSON.stringify({ token: token?.trim() })
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Invalid or expired magic access link.');
+    }
+    return data;
   },
 
   // Password Recovery Flow
@@ -253,11 +291,31 @@ export const api = {
     return data.messages || [];
   },
 
-  async sendMessage(requestId, text, isProgressUpdate = false) {
+  async getTicketMessages(requestId) {
+    return this.getMessages(requestId);
+  },
+
+  async getUnreadMessagesCount() {
+    try {
+      const res = await fetch(`${API_BASE}/requests/messages/unread-count`, {
+        headers: getHeaders(true)
+      });
+      const data = await safeJson(res);
+      return data?.unreadCount || 0;
+    } catch {
+      return 0;
+    }
+  },
+
+  async sendMessage(requestId, textOrPayload, isProgressUpdate = false) {
+    const body = typeof textOrPayload === 'object' && textOrPayload !== null
+      ? { text: textOrPayload.text || textOrPayload.message, isProgressUpdate: textOrPayload.isProgressUpdate ?? isProgressUpdate }
+      : { text: textOrPayload, isProgressUpdate };
+
     const res = await fetch(`${API_BASE}/requests/${requestId}/messages`, {
       method: 'POST',
       headers: getHeaders(true),
-      body: JSON.stringify({ text, isProgressUpdate })
+      body: JSON.stringify(body)
     });
     const data = await safeJson(res);
     if (!res.ok || !data.success) {
@@ -887,6 +945,82 @@ export const api = {
       throw new Error(data.message || 'Failed to load document content');
     }
     return data;
+  },
+
+  // Public Sample Showcase
+  async getPublicSample(slug) {
+    const res = await fetch(`${API_BASE}/samples/${encodeURIComponent(slug)}`, {
+      headers: getHeaders(false)
+    });
+    return parseApiResponse(res, 'Failed to load public sample showcase');
+  },
+
+  // Prospect Sample Showcase Management (Lead Specialists & Admin)
+  async getAdminSamples() {
+    const res = await fetch(`${API_BASE}/samples/manage`, {
+      headers: getHeaders(true)
+    });
+    return parseApiResponse(res, 'Failed to load sample showcases');
+  },
+
+  async getAdminSampleById(id) {
+    const res = await fetch(`${API_BASE}/samples/manage/${id}`, {
+      headers: getHeaders(true)
+    });
+    return parseApiResponse(res, 'Failed to load sample showcase');
+  },
+
+  async createAdminSample(sampleData) {
+    const res = await fetch(`${API_BASE}/samples/manage`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(sampleData)
+    });
+    return parseApiResponse(res, 'Failed to create sample showcase');
+  },
+
+  async updateAdminSample(id, sampleData) {
+    const res = await fetch(`${API_BASE}/samples/manage/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(true),
+      body: JSON.stringify(sampleData)
+    });
+    return parseApiResponse(res, 'Failed to update sample showcase');
+  },
+
+  async deleteAdminSample(id) {
+    const res = await fetch(`${API_BASE}/samples/manage/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(true)
+    });
+    return parseApiResponse(res, 'Failed to delete sample showcase');
+  },
+
+  async uploadCompanyStudyPdf(id, payload) {
+    const res = await fetch(`${API_BASE}/samples/manage/${id}/upload-company-study-pdf`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    return parseApiResponse(res, 'Failed to upload company study PDF');
+  },
+
+  async uploadAdminPitchDeck(id, payload) {
+    const res = await fetch(`${API_BASE}/samples/manage/${id}/upload-pitch-deck`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    return parseApiResponse(res, 'Failed to upload sample pitch deck');
+  },
+
+  async uploadLeadPitchDeck(id, leadId, payload) {
+    const res = await fetch(`${API_BASE}/samples/manage/${id}/leads/${leadId}/pitch-deck`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    return parseApiResponse(res, 'Failed to upload lead pitch deck');
   },
 };
 

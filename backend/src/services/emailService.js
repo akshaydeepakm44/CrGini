@@ -1612,6 +1612,84 @@ export const sendPasswordResetEmail = async ({
   }
 };
 
+export const sendMagicLinkEmail = async ({
+  to,
+  name,
+  magicUrl,
+  expiresMinutes = 1440
+}) => {
+  try {
+    if (!to || !to.trim()) {
+      return { success: false, reason: 'missing_recipient_email' };
+    }
+
+    const recipientName = name || 'Valued Client';
+    const subject = `Your CreativeGini Magic Access Link (One-Click Sign In)`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${subject}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #1e293b; }
+          .wrapper { max-width: 580px; margin: 30px auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+          .header { background: #0f172a; padding: 28px 32px; text-align: center; }
+          .header h1 { color: #ffffff; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+          .header p { color: #94a3b8; margin: 6px 0 0 0; font-size: 13px; }
+          .content { padding: 32px; }
+          .btn-box { text-align: center; margin: 28px 0; }
+          .btn { display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; font-weight: 600; font-size: 15px; padding: 14px 32px; border-radius: 8px; box-shadow: 0 2px 8px rgba(37,99,235,0.3); }
+          .alt-link { background: #f1f5f9; border-radius: 6px; padding: 12px; font-size: 12px; color: #475569; word-break: break-all; margin-top: 20px; }
+          .footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 32px; font-size: 12px; color: #64748b; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="wrapper">
+          <div class="header">
+            <h1>CreativeGini</h1>
+            <p>Instant Secure Passwordless Access</p>
+          </div>
+          <div class="content">
+            <p style="font-size: 15px; margin-top: 0;">Hello <strong>${recipientName}</strong>,</p>
+            <p style="font-size: 14px; line-height: 1.6; color: #334155;">
+              Click the button below to instantly sign in to your CreativeGini Portal without entering your password:
+            </p>
+            <div class="btn-box">
+              <a href="${magicUrl}" class="btn" target="_blank">Sign In to Dashboard &rarr;</a>
+            </div>
+            <p style="font-size: 13px; color: #64748b; line-height: 1.5;">
+              This magic link expires in ${Math.round(expiresMinutes / 60)} hours and can be used once. If you did not request this link, you can safely ignore this email.
+            </p>
+            <div class="alt-link">
+              <strong>Or copy this direct URL:</strong><br/>
+              ${magicUrl}
+            </div>
+          </div>
+          <div class="footer">
+            &copy; ${new Date().getFullYear()} CreativeGini Platform. All rights reserved.
+          </div>
+        </div>
+      </body>
+      </html>
+    `.trim();
+
+    const text = `Sign in to CreativeGini: ${magicUrl}\n\nThis magic link expires in ${Math.round(expiresMinutes / 60)} hours.`;
+
+    return await sendEmail({
+      to,
+      subject,
+      html,
+      text,
+      event: 'MAGIC_LINK_REQUESTED'
+    });
+  } catch (err) {
+    console.error('[EMAIL ERROR] sendMagicLinkEmail:', err.message);
+    return { success: false, error: err.message };
+  }
+};
+
 /**
  * Dispatch internal notification email to internal team members (Company Boost, Company Lead, UI team)
  * when Admin creates a new client.

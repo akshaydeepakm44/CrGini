@@ -42,13 +42,10 @@
   --ease-matter: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Base Pure Black Environment */
-html,
-body,
-#root,
+/* Base Pure Black Environment strictly for legacy cosmic mode */
+.cosmic-editorial-root,
 .app-root.cosmic-editorial-root,
-.app-root.maximalist-root,
-.app-root {
+.app-root.maximalist-root {
   background-color: #000000 !important;
   color: var(--matter-ice) !important;
   font-family: var(--font-editorial);

@@ -10,9 +10,29 @@ build/
 
 # Environment variables
 .env
-.env.local
-.env.*.local
+.env.*
 *.env
+!.env.example
+!*/.env.example
+
+# Temporary test browser profiles and runtime storage
+.chrome-temp*/
+storage/
+backend/storage/
+qa-artifacts/
+qa-reports/qa_screenshots/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Certificates and credentials
+*.pem
+*.key
+*.crt
+*.cert
+*.pfx
+*.p12
 
 # Logs
 logs/

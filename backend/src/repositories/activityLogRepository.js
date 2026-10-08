@@ -31,20 +31,18 @@ export const createActivityLog = async ({
         user_id,
         user_name,
         company_id,
-        request_id,
         action,
         details
       )
-      VALUES ($1, $2, $3, $4, $5, $6)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING *
     `,
     [
       userId,
       userName || 'System',
       companyId,
-      requestId,
       action,
-      details || '',
+      details ? (requestId ? `${details} (Request #${requestId})` : details) : (requestId ? `Request #${requestId}` : ''),
     ]
   );
 

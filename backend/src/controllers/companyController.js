@@ -235,7 +235,7 @@ export const getCompanyById = async (req, res) => {
 export const addLead = async (req, res) => {
   try {
     const { companyId } = req.params;
-    const { name, title, company, lead_company, email, linkedin, location, status, notes } = req.body;
+    const { name, title, company, lead_company, email, linkedin, location, status, notes, logo, logoUrl } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({
@@ -253,6 +253,12 @@ export const addLead = async (req, res) => {
       });
     }
 
+    let finalNotes = notes?.trim() || '';
+    const actualLogo = (logo || logoUrl || '').trim();
+    if (actualLogo) {
+      finalNotes = `${finalNotes}\n[Logo: ${actualLogo}]`.trim();
+    }
+
     const newLead = await addCompanyLead(companyId, {
       name: name.trim(),
       title: title?.trim() || null,
@@ -261,7 +267,8 @@ export const addLead = async (req, res) => {
       linkedin: linkedin?.trim() || null,
       location: location?.trim() || null,
       status: finalStatus,
-      notes: notes?.trim() || null,
+      notes: finalNotes || null,
+      logo: actualLogo || null,
     });
 
     return res.status(201).json({
@@ -292,7 +299,7 @@ export const updateLead = async (req, res) => {
       });
     }
 
-    const { name, title, company, email, linkedin, location, status, notes } = req.body;
+    const { name, title, company, email, linkedin, location, status, notes, logo, logoUrl } = req.body;
 
     // If changing to VERIFIED, verify notes exist
     if (status && status.toUpperCase() === 'VERIFIED') {
@@ -305,6 +312,15 @@ export const updateLead = async (req, res) => {
       }
     }
 
+    let finalNotes = notes !== undefined ? notes : existing.notes;
+    const actualLogo = logo !== undefined ? logo : logoUrl;
+    if (actualLogo !== undefined) {
+      finalNotes = (finalNotes || '').replace(/\[(Lead )?Logo:\s*[^\]]+\]/gi, '').trim();
+      if (actualLogo && actualLogo.trim()) {
+        finalNotes = `${finalNotes}\n[Logo: ${actualLogo.trim()}]`.trim();
+      }
+    }
+
     const updated = await updateCompanyLead(leadId, {
       name,
       title,
@@ -313,7 +329,7 @@ export const updateLead = async (req, res) => {
       linkedin,
       location,
       status,
-      notes,
+      notes: finalNotes,
     });
 
     return res.json({

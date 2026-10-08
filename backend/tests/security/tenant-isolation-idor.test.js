@@ -145,8 +145,8 @@ async function runTenantIsolationSuite() {
 
     // Create a message in Company B ticket
     await query(`
-      INSERT INTO messages (request_id, sender_id, sender_name, sender_role, text, is_internal_note)
-      VALUES ($1, $2, 'Bob Beta', 'USER', 'Confidential communication for Beta Corp', false)
+      INSERT INTO messages (request_id, sender_id, sender_name, sender_role, text)
+      VALUES ($1, $2, 'Bob Beta', 'USER', 'Confidential communication for Beta Corp')
     `, [ticketBId, userBId]);
 
     // 5. Create Lead for Company B
@@ -236,7 +236,7 @@ async function runTenantIsolationSuite() {
     console.log('\n--- TEST GROUP 3: Tickets, Messages & Conversations IDOR ---');
     // Test 9: User A attempts to view Client B ticket
     const ticketRes = await apiFetch(`/requests/${ticketBId}`, tokenA);
-    assert('User A cannot view Client B ticket details (403 Forbidden)', ticketRes.status === 403);
+    assert('User A cannot view Client B ticket details (403 Forbidden)', ticketRes.status === 403, `got status ${ticketRes.status} body: ${JSON.stringify(ticketRes.data)}`);
 
     // Test 10: User A attempts to view Client B conversation messages
     const msgRes = await apiFetch(`/requests/${ticketBId}/messages`, tokenA);
@@ -363,7 +363,6 @@ async function runTenantIsolationSuite() {
     if (reqIds.length > 0) {
       await query('DELETE FROM payments WHERE request_id = ANY($1)', [reqIds]);
       await query('DELETE FROM messages WHERE request_id = ANY($1)', [reqIds]);
-      await query('DELETE FROM activity_logs WHERE request_id = ANY($1)', [reqIds]);
       await query('DELETE FROM notifications WHERE ticket_id = ANY($1)', [reqIds]);
       await query('DELETE FROM requests WHERE id = ANY($1)', [reqIds]);
     }

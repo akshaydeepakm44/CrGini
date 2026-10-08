@@ -151,7 +151,7 @@ export default function ResetPasswordPage({ onBackHome, showToast }) {
                 <h1 className="signin-title" style={{ fontSize: '1.65rem', marginBottom: '0.4rem' }}>
                   {isSuccess ? 'Password Updated' : 'Create New Password'}
                 </h1>
-                <p className="signin-subtitle" style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.6)' }}>
+                <p className="signin-subtitle" style={{ fontSize: '0.9rem', color: '#5B527E' }}>
                   {isSuccess
                     ? 'Your account security credentials have been updated.'
                     : 'Set a strong, secure password for your CreativeGini account.'}
@@ -162,7 +162,7 @@ export default function ResetPasswordPage({ onBackHome, showToast }) {
               {isVerifying && (
                 <div style={{ textAlign: 'center', padding: '2.5rem 0' }}>
                   <div className="portal-spinner" style={{ margin: '0 auto 1.25rem' }} />
-                  <p style={{ fontSize: '0.9rem', color: '#94A3B8' }}>
+                  <p style={{ fontSize: '0.9rem', color: '#64748B' }}>
                     Verifying security recovery link...
                   </p>
                 </div>
@@ -171,13 +171,13 @@ export default function ResetPasswordPage({ onBackHome, showToast }) {
               {/* ================= STATE 2: INVALID OR EXPIRED TOKEN ================= */}
               {!isVerifying && !tokenValid && !isSuccess && (
                 <div className="forgot-invalid-box" style={{ textAlign: 'center', padding: '1rem 0' }}>
-                  <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', marginBottom: '1rem', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
+                  <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '50%', background: '#FEF2F2', color: '#DC2626', marginBottom: '1rem', border: '1px solid #FECACA' }}>
                     <AlertCircle size={36} />
                   </div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#FFFFFF', marginBottom: '0.6rem' }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#1A1040', marginBottom: '0.6rem' }}>
                     Link Expired or Invalid
                   </h3>
-                  <p style={{ fontSize: '0.88rem', color: '#CBD5E1', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+                  <p style={{ fontSize: '0.88rem', color: '#5B527E', lineHeight: '1.6', marginBottom: '1.5rem' }}>
                     {verificationError || 'This password reset link is invalid or has expired. Please request a new one.'}
                   </p>
                   <button
@@ -194,13 +194,13 @@ export default function ResetPasswordPage({ onBackHome, showToast }) {
               {/* ================= STATE 3: SUCCESSFUL RESET ================= */}
               {!isVerifying && isSuccess && (
                 <div className="forgot-success-box" style={{ textAlign: 'center', padding: '1rem 0' }}>
-                  <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '50%', background: 'rgba(0, 229, 255, 0.1)', color: '#00E5FF', marginBottom: '1rem', border: '1px solid rgba(0, 229, 255, 0.25)' }}>
+                  <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '50%', background: '#ECFDF5', color: '#059669', marginBottom: '1rem', border: '1px solid #A7F3D0' }}>
                     <CheckCircle2 size={36} />
                   </div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#FFFFFF', marginBottom: '0.6rem' }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#1A1040', marginBottom: '0.6rem' }}>
                     Password Updated Successfully
                   </h3>
-                  <p style={{ fontSize: '0.88rem', color: '#CBD5E1', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+                  <p style={{ fontSize: '0.88rem', color: '#5B527E', lineHeight: '1.6', marginBottom: '1.5rem' }}>
                     Your password has been updated successfully. You can now sign in using your new password.
                   </p>
                   <button
@@ -351,7 +351,7 @@ export default function ResetPasswordPage({ onBackHome, showToast }) {
               )}
 
               {/* Trust Footer inside card */}
-              <div className="signin-card-footer" style={{ marginTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1.25rem' }}>
+              <div className="signin-card-footer" style={{ marginTop: '2rem', borderTop: '1px solid #E5E7EB', paddingTop: '1.25rem' }}>
                 <div className="trust-badge-row" style={{ justifyContent: 'center' }}>
                   <ShieldCheck size={14} className="shield-icon" />
                   <span>256-bit SSL · Single-Use Token · Enterprise Privacy</span>

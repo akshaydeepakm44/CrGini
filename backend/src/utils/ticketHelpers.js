@@ -12,7 +12,7 @@ import {
 export const hasServiceTypeAccess = (user, serviceType) => {
   if (!user) return false;
 
-  if (user.role === 'ADMIN') {
+  if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
     return true;
   }
 
@@ -47,6 +47,12 @@ export const resolveRequest = async (idOrTicketId) => {
 
   const value = String(idOrTicketId).trim();
 
+  // Numeric database primary key
+  if (/^\d+$/.test(value)) {
+    const request = await findRequestById(Number(value));
+    if (request) return request;
+  }
+
   // PostgreSQL UUID format
   const uuidRegex =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -70,7 +76,7 @@ export const canAccessTicket = (user, request) => {
     return false;
   }
 
-  if (user.role === 'ADMIN') {
+  if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
     return true;
   }
 

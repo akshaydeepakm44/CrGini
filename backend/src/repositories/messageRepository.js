@@ -46,7 +46,7 @@ const messageSelect = `
     m.sender_name,
     m.sender_role,
     m.text,
-    m.is_internal_note,
+    false AS is_internal_note,
     m.created_at,
     m.updated_at,
 
@@ -175,16 +175,14 @@ export const createMessage = async ({
       sender_id,
       sender_name,
       sender_role,
-      text,
-      is_internal_note
+      text
     )
     VALUES (
       $1,
       $2,
       $3,
       $4,
-      $5,
-      $6
+      $5
     )
     RETURNING id
     `,
@@ -194,7 +192,6 @@ export const createMessage = async ({
       senderName,
       senderRole,
       String(text).trim(),
-      Boolean(isInternalNote),
     ]
   );
 

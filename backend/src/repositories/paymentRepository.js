@@ -62,7 +62,7 @@ const paymentSelect = `
     p.currency,
     p.status,
     p.payment_method,
-    p.transaction_id,
+    NULL::text AS transaction_id,
     p.paid_at,
     p.created_at,
     p.updated_at,
@@ -216,7 +216,6 @@ export const createPayment = async ({
       currency,
       status,
       payment_method,
-      transaction_id,
       paid_at
     )
     VALUES (
@@ -228,8 +227,7 @@ export const createPayment = async ({
       $6,
       $7,
       $8,
-      $9,
-      $10
+      $9
     )
     RETURNING id
     `,
@@ -242,7 +240,6 @@ export const createPayment = async ({
       currency,
       status,
       paymentMethod,
-      transactionId,
       paidAt,
     ]
   );
@@ -259,12 +256,11 @@ export const markPaymentPaid = async (
     UPDATE payments
     SET
       status = 'PAID',
-      transaction_id = COALESCE($1, transaction_id),
       paid_at = NOW()
-    WHERE id = $2
+    WHERE id = $1
     RETURNING id
     `,
-    [transactionId, id]
+    [id]
   );
 
   if (!result.rowCount) {
@@ -282,12 +278,11 @@ export const markPaymentFailed = async (
     `
     UPDATE payments
     SET
-      status = 'FAILED',
-      transaction_id = COALESCE($1, transaction_id)
-    WHERE id = $2
+      status = 'FAILED'
+    WHERE id = $1
     RETURNING id
     `,
-    [transactionId, id]
+    [id]
   );
 
   if (!result.rowCount) {
@@ -326,7 +321,6 @@ export const updatePayment = async (
     currency: 'currency',
     status: 'status',
     paymentMethod: 'payment_method',
-    transactionId: 'transaction_id',
     paidAt: 'paid_at',
   };
 

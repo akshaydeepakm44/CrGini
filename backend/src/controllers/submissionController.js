@@ -55,13 +55,17 @@ const resolveSubmission = async (requestId, submissionIdOrVersion) => {
 
   const value = String(submissionIdOrVersion).trim();
 
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (/^\d+$/.test(value)) {
+    const subById = await findSubmissionById(Number(value));
+    if (subById && (String(subById.ticketId || subById.requestId || subById.request_id) === String(requestId))) {
+      return subById;
+    }
+  }
 
   if (uuidRegex.test(value)) {
     const submission = await findSubmissionById(value);
 
-    if (submission && String(submission.ticketId) === String(requestId)) {
+    if (submission && String(submission.ticketId || submission.requestId || submission.request_id) === String(requestId)) {
       return submission;
     }
   }
@@ -78,12 +82,14 @@ const resolveSubmission = async (requestId, submissionIdOrVersion) => {
 /**
  * Verify that a user can access the ticket.
  */
+const isAdmin = (u) => Boolean(u && (u.role === 'ADMIN' || u.role === 'SUPER_ADMIN'));
+
 const canAccessTicket = (user, request) => {
   if (!user || !request) {
     return false;
   }
 
-  if (user.role === 'ADMIN') {
+  if (isAdmin(user)) {
     return true;
   }
 
@@ -133,7 +139,7 @@ export const createSubmission = async (req, res) => {
     }
 
     if (
-      req.user.role !== 'ADMIN' &&
+      !isAdmin(req.user) &&
       !hasServiceTypeAccess(req.user, request.serviceType)
     ) {
       return res.status(403).json({
@@ -169,27 +175,51 @@ export const createSubmission = async (req, res) => {
     // Store submission files through the repository.
     if (Array.isArray(files) && files.length > 0) {
       const { addSubmissionFile } = await import('../repositories/submissionRepository.js');
-      for (const file of files) {
-        if (!file) continue;
+      const rawCompanyId = request.companyId?.id || request.companyId?._id || request.companyId || 'general';
+      const uploadedObjectKeys = [];
 
-        let fileUrl = file.url || file.dataUrl || file.path || `/uploads/${encodeURIComponent(file.name || 'deliverable')}`;
-        if (isDataUrl(fileUrl)) {
-          try {
+      try {
+        for (const file of files) {
+          if (!file) continue;
+
+          let fileUrl = file.url || file.dataUrl || file.path || `/uploads/${encodeURIComponent(file.name || 'deliverable')}`;
+          let fileSize = file.size || null;
+          let fileType = file.type || file.mimeType || 'application/octet-stream';
+
+          if (isDataUrl(fileUrl)) {
             const uploadResult = await uploadFile({
               dataUrl: fileUrl,
               originalName: file.name || 'deliverable',
-              mimeType: file.type || file.mimeType,
-              prefix: `submissions/${submission._id}`,
+              mimeType: fileType,
+              companyId: rawCompanyId,
+              requestId: request._id || request.ticketId,
+              submissionId: submission._id,
+              version: versionNumber,
             });
             fileUrl = uploadResult.objectKey;
-          } catch (uploadErr) {
-            console.error('[SubmissionController] MinIO upload error, falling back:', uploadErr.message);
+            fileSize = uploadResult.size;
+            fileType = uploadResult.mimeType;
+            uploadedObjectKeys.push(fileUrl);
           }
-        }
 
-        await addSubmissionFile(submission._id, {
-          ...file,
-          url: fileUrl,
+          await addSubmissionFile(submission._id, {
+            ...file,
+            name: file.name || 'deliverable',
+            url: fileUrl,
+            size: fileSize,
+            type: fileType,
+          });
+        }
+      } catch (uploadErr) {
+        // Rollback uploaded objects if database insertion fails
+        const { deleteFile } = await import('../services/storageService.js');
+        for (const key of uploadedObjectKeys) {
+          await deleteFile(key).catch(() => {});
+        }
+        console.error('[SubmissionController] Deliverable storage upload error:', uploadErr.message);
+        return res.status(500).json({
+          success: false,
+          message: `Storage upload failed: ${uploadErr.message}`,
         });
       }
     }
@@ -399,7 +429,7 @@ export const approveSubmission = async (req, res) => {
           message: 'Not authorized to approve this ticket',
         });
       }
-    } else if (req.user.role !== 'ADMIN') {
+    } else if (!isAdmin(req.user)) {
       return res.status(403).json({
         success: false,
         message: 'Only client or admin can approve work',
@@ -570,7 +600,7 @@ export const requestChanges = async (req, res) => {
             'Not authorized to request changes on this ticket',
         });
       }
-    } else if (req.user.role !== 'ADMIN') {
+    } else if (!isAdmin(req.user)) {
       return res.status(403).json({
         success: false,
         message:

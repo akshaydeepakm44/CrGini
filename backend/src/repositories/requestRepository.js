@@ -95,6 +95,9 @@ const mapRequest = (row) => {
           role: row.assigned_user_role,
         }
       : undefined,
+
+    messageCount: Number(row.message_count || 0),
+    latestMessage: row.latest_message || null,
   };
 };
 
@@ -119,10 +122,10 @@ const requestSelect = `
     r.approved_by,
     r.completed_at,
 
-    r.admin_override,
-    r.admin_override_reason,
-    r.admin_overridden_by,
-    r.admin_overridden_at,
+    FALSE AS admin_override,
+    NULL::text AS admin_override_reason,
+    NULL::integer AS admin_overridden_by,
+    NULL::timestamptz AS admin_overridden_at,
 
     r.notes,
     r.created_at,
@@ -163,15 +166,39 @@ const requestSelect = `
             'title', rd.title,
             'url', rd.url,
             'description', rd.description,
-            'deliveredAt', rd.delivered_at
+            'deliveredAt', rd.created_at
           )
-          ORDER BY rd.delivered_at
+          ORDER BY rd.created_at
         )
         FROM request_deliverables rd
         WHERE rd.request_id = r.id
       ),
       '[]'::jsonb
-    ) AS deliverables
+    ) AS deliverables,
+
+    COALESCE(
+      (
+        SELECT COUNT(*)::integer
+        FROM messages m
+        WHERE m.request_id = r.id
+      ),
+      0
+    ) AS message_count,
+
+    (
+      SELECT jsonb_build_object(
+        'id', lm.id,
+        'senderId', lm.sender_id,
+        'senderName', lm.sender_name,
+        'senderRole', lm.sender_role,
+        'text', lm.text,
+        'createdAt', lm.created_at
+      )
+      FROM messages lm
+      WHERE lm.request_id = r.id
+      ORDER BY lm.created_at DESC
+      LIMIT 1
+    ) AS latest_message
 
   FROM requests r
   LEFT JOIN users u
@@ -832,22 +859,20 @@ export const addDeliverable = async (
       request_id,
       title,
       url,
-      description,
-      delivered_at
+      description
     )
     VALUES (
       $1,
       $2,
       $3,
-      $4,
-      NOW()
+      $4
     )
     RETURNING
       id,
       title,
       url,
       description,
-      delivered_at
+      created_at AS delivered_at
     `,
     [
       requestId,
@@ -892,10 +917,10 @@ export const getDeliverables = async (
       title,
       url,
       description,
-      delivered_at
+      created_at AS delivered_at
     FROM request_deliverables
     WHERE request_id = $1
-    ORDER BY delivered_at ASC
+    ORDER BY created_at ASC
     `,
     [requestId]
   );

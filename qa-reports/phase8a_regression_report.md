@@ -1,0 +1,19 @@
+# Phase 8A Regression Report
+
+| # | Subsystem / Area | Status | Observations & Evidence |
+|---|---|---|---|
+| 1 | **Build** | **PASS** | `npm run build` in `frontend` completed cleanly with exit code 0. 1,732 modules transformed into production assets in 19.88s with zero syntax or bundling errors. |
+| 2 | **Automated tests** | **PASS** | `npm run test:lifecycle` executed in `backend`: 31 test scenarios covering multi-service lifecycles passed with 0 failures. |
+| 3 | **Security tests** | **PASS** | `npm run test:security` executed in `backend`: 31 test scenarios across 7 test groups (Tenant isolation, IDOR, asset streaming, role permissions) passed with 0 failures. |
+| 4 | **Client Portal** | **PASS** | Tested `/portal/dashboard`, `/portal/boosting`, `/portal/digitalising`, `/portal/design`, and `/portal/requests`. No crashes or layout breakages. Screenshots: `phase8a_regression_boosting.png`, `phase8a_regression_digitalising.png`, `phase8a_def003_channel_nav.png`. |
+| 5 | **Lead Portal** | **PASS** | Tested `/lead` and `/lead/requests`. Lead specialist queue, workflows, and navigation remained functional. Screenshot: `phase8a_regression_lead_portal.png`. |
+| 6 | **Boost Portal** | **PASS** | Tested `/boost` and `/boost/requests`. DevRel ticket `CG-1010` successfully displayed alongside all existing Boost sprint requests without regression. Screenshot: `phase8a_regression_boost_portal.png`. |
+| 7 | **Design Portal** | **PASS** | Tested `/design`, `/design/dashboard`, and `/design/requests`. The 3 client-created Design tickets (`CG-1011`, `CG-1012`, `CG-1013`) routed correctly, loaded into specialist views, and supported deliverables. Screenshot: `phase8a_regression_design_portal.png`. |
+| 8 | **Admin** | **PASS** | Admin dashboard and permissions remain intact. Non-admin roles strictly blocked from `/admin/*`. Screenshot: `phase8a_def001_user_admin.png`. |
+| 9 | **Super Admin** | **PASS** | Super Admin authenticated and accessed `/admin/operations` cleanly. All tickets observable in global operations view. Screenshot: `phase8a_regression_admin_ops.png`. |
+| 10 | **Messaging** | **PASS** | Two-way message exchange tested for DevRel (`CG-1010`) and UI/UX Audit (`CG-1011`). Client sent notes; specialist read and replied in real-time. Screenshots: `phase8a_def002_specialist_response.png`, `phase8a_def003_uiux_specialist_reply.png`. |
+| 11 | **Notifications** | **PASS** | Activity logs and assignment notifications generated upon ticket creation and specialist assignment across all four tested tickets. |
+| 12 | **Deliverables** | **PASS** | Versioned deliverable submission flow verified for DevRel V1 (`CG-1010`), UI/UX Audit V1 (`CG-1011`), Figma V1 (`CG-1012`), and Redesign V1 (`CG-1013`). Synthetic artifacts attached and rendered. Screenshots: `phase8a_def002_v1_submitted.png`, `phase8a_def003_uiux_v1_submitted.png`, `phase8a_def003_figma_v1_submitted.png`, `phase8a_def003_redesign_v1_submitted.png`. |
+| 13 | **Ticket lifecycle** | **PASS** | Complete state machine verified: `REQUEST_CREATED` -> `IN_PROGRESS` -> `CLIENT_REVIEW` -> `COMPLETED`. Client review and approval executed to final completion for all 4 tickets. Screenshots: `phase8a_def002_final_completed.png`, `phase8a_def003_uiux_completed.png`, `phase8a_def003_figma_completed.png`, `phase8a_def003_redesign_completed.png`. |
+| 14 | **RBAC** | **PASS** | Live route guard validation verified across 5 distinct roles. Direct URL navigation to unpermitted portals blocked with instant redirection. Screenshots: `phase8a_def001_*.png` (11 screenshots). |
+| 15 | **Tenant isolation** | **PASS** | Verified through automated tenant isolation test suite (31 tests) and Data I2I live portal sessions: tickets, deliverables, and messages remain completely isolated to the authenticated company. |

@@ -1,22 +1,35 @@
 /* ==========================================================================
    CREATIVEGINI — SIGN IN / AUTHENTICATION PAGE STYLING
-   Cosmic Dark Aesthetic, Glassmorphism, Editorial Splendor
+   Current Light Theme Design System (Airy, Modern, Premium Lavender & Purple)
    ========================================================================== */
+
+@import './design-tokens.css';
+
+html:has(.signin-page-root),
+body:has(.signin-page-root) {
+  background-color: #F8F9FD !important;
+  color: #1A1040 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  min-height: 100vh !important;
+  height: auto !important;
+}
 
 .signin-page-root {
   min-height: 100vh;
   width: 100%;
   position: relative;
-  background-color: #030303;
-  color: #F5F5F5;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--cg-bg-page, #F8F9FD);
+  color: var(--cg-text-primary, #1A1040);
+  font-family: var(--cg-font-family, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
+  overflow-y: auto;
   z-index: 10;
 }
 
-/* Ambient Radial Glows */
+/* Ambient Radial Glows (Light Theme Pastel Accents) */
 .signin-ambient-glow {
   position: fixed;
   border-radius: 50%;
@@ -30,7 +43,7 @@
   left: 10%;
   width: 580px;
   height: 580px;
-  background: radial-gradient(circle, rgba(0, 217, 255, 0.12) 0%, rgba(0, 174, 239, 0.04) 50%, transparent 70%);
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.08) 0%, rgba(139, 92, 246, 0.02) 60%, transparent 80%);
 }
 
 .signin-ambient-glow.glow-violet {
@@ -38,7 +51,7 @@
   right: 12%;
   width: 650px;
   height: 650px;
-  background: radial-gradient(circle, rgba(255, 176, 0, 0.05) 0%, rgba(0, 217, 255, 0.03) 50%, transparent 70%);
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.08) 0%, rgba(99, 102, 241, 0.02) 60%, transparent 80%);
 }
 
 .signin-grid-overlay {
@@ -48,9 +61,9 @@
   width: 100%;
   height: 100%;
   background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 48px 48px;
+    linear-gradient(to right, rgba(124, 58, 237, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(124, 58, 237, 0.04) 1px, transparent 1px);
+  background-size: 36px 36px;
   pointer-events: none;
   z-index: 1;
 }
@@ -72,21 +85,23 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 18px;
-  background: #0A1826;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 8px 18px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
   border-radius: 9999px;
-  color: #E2E8F0;
+  color: #475569;
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.25s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
 }
 
 .signin-back-btn:hover {
-  background: #0E2032;
-  border-color: rgba(0, 217, 255, 0.4);
-  color: #00D9FF;
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  color: #1A1040;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
   transform: translateX(-3px);
 }
 
@@ -99,14 +114,7 @@
   height: 34px;
   width: auto;
   object-fit: contain;
-  filter: drop-shadow(0 0 12px rgba(0, 217, 255, 0.3));
-}
-
-
-
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.6; transform: scale(0.95); }
-  50% { opacity: 1; transform: scale(1.1); }
+  filter: drop-shadow(0 1px 4px rgba(124, 58, 237, 0.12));
 }
 
 /* Layout Container */
@@ -117,7 +125,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px 24px 60px 24px;
+  padding: 12px 24px 48px 24px;
   max-width: 1320px;
   width: 100%;
   margin: 0 auto;
@@ -130,7 +138,7 @@
   width: 100%;
 }
 
-/* Card Wrapper & Glass Panel */
+/* Card Wrapper & Glass Panel (Current Light Theme Card) */
 .signin-card-wrapper {
   width: 100%;
   max-width: 480px;
@@ -138,18 +146,21 @@
 }
 
 .signin-card.glass-panel {
-  background: #0A1826;
-  border: 1px solid rgba(0, 217, 255, 0.2);
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
   box-shadow: 
-    0 20px 48px rgba(0, 0, 0, 0.65),
-    0 0 1px rgba(0, 217, 255, 0.2);
+    0 20px 48px rgba(26, 16, 64, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.02);
   border-radius: 16px;
-  padding: 38px 40px;
-  transition: border-color 0.3s ease;
+  padding: 36px 36px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .signin-card.glass-panel:hover {
-  border-color: rgba(0, 217, 255, 0.35);
+  border-color: rgba(124, 58, 237, 0.25);
+  box-shadow: 
+    0 24px 54px rgba(26, 16, 64, 0.11),
+    0 2px 6px rgba(0, 0, 0, 0.03);
 }
 
 /* Card Header */
@@ -162,75 +173,74 @@
   align-items: center;
   gap: 8px;
   padding: 4px 12px;
-  background: rgba(0, 217, 255, 0.08);
-  border: 1px solid rgba(0, 217, 255, 0.25);
+  background: #F5F3FF;
+  border: 1px solid rgba(124, 58, 237, 0.2);
   border-radius: 9999px;
   font-size: 0.72rem;
-  font-family: 'JetBrains Mono', monospace;
-  color: #00D9FF;
+  font-family: var(--cg-font-mono, monospace);
+  color: #7C3AED;
   margin-bottom: 14px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  font-weight: 600;
 }
 
 .live-pulse-dot {
   width: 6px;
   height: 6px;
-  background-color: #00D9FF;
+  background-color: #7C3AED;
   border-radius: 50%;
-  box-shadow: 0 0 8px #00D9FF;
-  animation: pulse-glow 1.5s infinite;
+  box-shadow: 0 0 6px #7C3AED;
 }
 
 .signin-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 2rem;
+  font-family: var(--cg-font-heading, 'Plus Jakarta Sans', sans-serif);
+  font-size: 1.65rem;
   font-weight: 700;
-  color: #FFFFFF;
+  color: #1A1040;
   letter-spacing: -0.02em;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .signin-subtitle {
   font-size: 0.88rem;
-  color: #94A3B8;
+  color: #5B527E;
   line-height: 1.5;
 }
 
 /* Mode Switcher Tabs */
 .signin-mode-tabs {
   display: flex;
-  background: #06111A;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
   padding: 4px;
   margin-bottom: 22px;
 }
 
 .mode-tab-btn {
   flex: 1;
-  padding: 9px 16px;
+  padding: 8px 16px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 8px;
-  color: #94A3B8;
-  font-size: 0.85rem;
+  border-radius: 6px;
+  color: #64748B;
+  font-size: 0.84rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .mode-tab-btn.active {
-  background: rgba(0, 217, 255, 0.14);
-  color: #FFFFFF;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  border-color: rgba(0, 217, 255, 0.3);
+  background: #FFFFFF;
+  color: #1A1040;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border-color: #E2E8F0;
 }
 
 .mode-tab-btn:hover:not(.active) {
-  color: #E2E8F0;
+  color: #1E293B;
 }
-
 
 /* Form Styles */
 .auth-credentials-form {
@@ -252,21 +262,22 @@
 }
 
 .field-label {
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  color: #CBD5E1;
+  color: #1A1040;
   letter-spacing: 0.01em;
 }
 
 .forgot-password-link {
-  font-size: 0.78rem;
-  color: #00D9FF;
+  font-size: 0.8rem;
+  color: #7C3AED;
+  font-weight: 600;
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color 0.2s ease;
 }
 
 .forgot-password-link:hover {
-  color: #38BDF8;
+  color: #6D28D9;
   text-decoration: underline;
 }
 
@@ -279,18 +290,18 @@
 .field-icon {
   position: absolute;
   left: 14px;
-  color: #64748B;
+  color: #94A3B8;
   pointer-events: none;
   transition: color 0.2s ease;
 }
 
 .auth-text-input {
   width: 100%;
-  padding: 12px 14px 12px 42px;
-  background: #040C12;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  color: #FFFFFF;
+  padding: 11px 14px 11px 42px;
+  background: #FFFFFF;
+  border: 1px solid #D1D5DB;
+  border-radius: 8px;
+  color: #1A1040;
   font-size: 0.9rem;
   font-family: inherit;
   outline: none;
@@ -298,18 +309,18 @@
 }
 
 .auth-text-input::placeholder {
-  color: #475569;
+  color: #9CA3AF;
 }
 
 .auth-text-input:focus {
-  border-color: #00D9FF;
-  background: #06111A;
-  box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.15);
+  border-color: #7C3AED;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.14);
 }
 
 .auth-text-input:focus + .field-icon,
 .input-with-icon:focus-within .field-icon {
-  color: #00D9FF;
+  color: #7C3AED;
 }
 
 .password-toggle-btn {
@@ -317,7 +328,7 @@
   right: 12px;
   background: transparent;
   border: none;
-  color: #64748B;
+  color: #94A3B8;
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -326,7 +337,7 @@
 }
 
 .password-toggle-btn:hover {
-  color: #E2E8F0;
+  color: #1A1040;
 }
 
 .form-options-row {
@@ -340,17 +351,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.8rem;
-  color: #94A3B8;
+  font-size: 0.8125rem;
+  color: #475569;
   cursor: pointer;
   user-select: none;
 }
 
 .custom-checkbox {
-  accent-color: #00D9FF;
+  accent-color: #7C3AED;
   width: 15px;
   height: 15px;
   cursor: pointer;
+  border-radius: 4px;
 }
 
 /* Primary Submit Button */
@@ -360,22 +372,23 @@
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 13px 20px;
-  background: linear-gradient(135deg, #00D9FF 0%, #00AEEF 100%);
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%);
   border: none;
-  border-radius: 10px;
-  color: #030303;
-  font-size: 0.95rem;
-  font-weight: 700;
+  border-radius: 8px;
+  color: #FFFFFF;
+  font-size: 0.9375rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.28);
   margin-top: 4px;
 }
 
 .auth-primary-submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #6D28D9 0%, #5B21B6 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0, 217, 255, 0.35);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.38);
 }
 
 .auth-primary-submit-btn:active:not(:disabled) {
@@ -385,25 +398,28 @@
 .auth-primary-submit-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  box-shadow: none;
 }
-
 
 /* Error Banner */
 .auth-error-banner {
   padding: 10px 14px;
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  border-radius: 10px;
-  color: #FCA5A5;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  color: #B91C1C;
   font-size: 0.82rem;
   margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Trust footer */
 .signin-card-footer {
-  margin-top: 22px;
+  margin-top: 20px;
   padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid #E5E7EB;
 }
 
 .trust-badge-row {
@@ -411,7 +427,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 0.72rem;
+  font-size: 0.73rem;
   color: #64748B;
   text-align: center;
 }
@@ -435,11 +451,11 @@
 
   .signin-card.glass-panel {
     padding: 26px 20px;
-    border-radius: 20px;
+    border-radius: 16px;
   }
 
   .signin-title {
-    font-size: 1.6rem;
+    font-size: 1.45rem;
   }
 }
 
@@ -454,11 +470,11 @@
 
   .signin-card.glass-panel {
     padding: 20px 14px;
-    border-radius: 16px;
+    border-radius: 14px;
   }
 
   .signin-title {
-    font-size: 1.35rem;
+    font-size: 1.3rem;
   }
 
   .signin-back-btn {
@@ -469,21 +485,6 @@
   .signin-nav-logo {
     height: 26px;
   }
-
-  .auth-toggle-pill {
-    font-size: 0.76rem;
-    padding: 6px 10px;
-  }
-}
-
-@media (max-width: 330px) {
-  .signin-card.glass-panel {
-    padding: 16px 10px;
-  }
-
-  .signin-layout-container {
-    padding: 6px 6px 24px 6px;
-  }
 }
 
 /* ==========================================================================
@@ -493,7 +494,7 @@
 .forgot-back-to-signin-btn {
   background: transparent;
   border: none;
-  color: #94A3B8;
+  color: #64748B;
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
@@ -506,8 +507,8 @@
 }
 
 .forgot-back-to-signin-btn:hover {
-  color: #00E5FF;
-  background: rgba(0, 229, 255, 0.08);
+  color: #7C3AED;
+  background: rgba(124, 58, 237, 0.08);
 }
 
 .forgot-back-to-signin-btn:disabled {
@@ -517,8 +518,8 @@
 
 /* Password Requirements Checklist Box */
 .password-checklist-box {
-  background: #040C12;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
   border-radius: 8px;
   padding: 12px 14px;
   margin: 10px 0 16px 0;
@@ -527,7 +528,7 @@
 .checklist-title {
   font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.6px;
   font-weight: 700;
   color: #64748B;
   margin-bottom: 8px;
@@ -550,13 +551,13 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #475569;
+  background: #CBD5E1;
   flex-shrink: 0;
   margin: 0 4px;
 }
 
 .check-icon.success {
-  color: #00E5FF;
+  color: #10B981;
   flex-shrink: 0;
 }
 
@@ -566,7 +567,7 @@
 }
 
 .text-success {
-  color: #E2E8F0;
+  color: #047857;
   font-weight: 500;
   transition: color 0.2s ease;
 }
@@ -577,7 +578,7 @@
 }
 
 .text-error {
-  color: #F87171;
+  color: #B91C1C;
   font-weight: 500;
   transition: color 0.2s ease;
 }
@@ -598,5 +599,3 @@
     transform: translateY(0);
   }
 }
-
-
