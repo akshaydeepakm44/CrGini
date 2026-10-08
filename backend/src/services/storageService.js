@@ -3,6 +3,9 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { Readable } from 'stream';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 /**
  * MinIO Storage Service
