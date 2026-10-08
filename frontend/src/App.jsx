@@ -1,5 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import Lenis from 'lenis';
+
+// Original 3D Animated Landing Page components
+import Navbar from './components/landing/Navbar';
+import IntroExperience from './components/landing/IntroExperience';
+import MarketingChannelsSection from './components/landing/MarketingChannelsSection';
+import MarketingJourney from './components/landing/MarketingJourney';
+import CreativeGiniEndExperience from './components/landing/CreativeGiniEndExperience';
+import Footer from './components/landing/Footer';
+import CosmicSpaceCanvas from './components/common/CosmicSpaceCanvas';
+
 import LandingPage from './components/LandingPage/LandingPage';
 import Toast from './components/common/Toast';
 import SignInPage from './components/auth/SignInPage';
@@ -13,6 +26,8 @@ import DesignPortal from './features/design/DesignPortal';
 import SuperAdminPortal from './features/admin/SuperAdminPortal';
 import PublicSampleDashboard from './features/samples/PublicSampleDashboard';
 import { api } from './services/api';
+
+gsap.registerPlugin(ScrollTrigger);
 
 // Helper component to route /ticket/:ticketId directly to the appropriate dashboard
 function TicketRedirect({ user, isAuthChecking }) {
@@ -59,9 +74,12 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
+  const [isIntroComplete, setIsIntroComplete] = useState(false);
+  const spotlightRef = useRef(null);
 
   const navigate = useNavigate();
   const location = useLocation();
+  const isLandingPage = location.pathname === '/';
 
   // Check existing session on initial load
   useEffect(() => {
@@ -85,6 +103,48 @@ export default function App() {
     }
   }, []);
 
+  // Global Inertial Scroll Engine (Lenis + GSAP ScrollTrigger) exclusively on landing page
+  useEffect(() => {
+    if (!isLandingPage) return;
+
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      orientation: 'vertical',
+      gestureOrientation: 'vertical',
+      smoothWheel: true,
+      wheelMultiplier: 0.95,
+      touchMultiplier: 1.5,
+      infinite: false
+    });
+
+    lenis.on('scroll', ScrollTrigger.update);
+
+    const updateTicker = (time) => {
+      lenis.raf(time * 1000);
+    };
+
+    gsap.ticker.add(updateTicker);
+    gsap.ticker.lagSmoothing(0);
+
+    return () => {
+      gsap.ticker.remove(updateTicker);
+      lenis.destroy();
+    };
+  }, [isLandingPage]);
+
+  // Spotlight tracking on landing page
+  useEffect(() => {
+    if (!isLandingPage) return;
+    const handleMouseMove = (e) => {
+      if (spotlightRef.current) {
+        spotlightRef.current.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [isLandingPage]);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -105,15 +165,66 @@ export default function App() {
     api.logout();
     setUser(null);
     navigate('/', { replace: true });
+    setIsIntroComplete(false);
     showToast('Signed out successfully');
   };
 
   return (
-    <div className="app-root">
+    <div className={`app-root ${isLandingPage ? 'cosmic-editorial-root' : ''}`}>
+      {/* 3D Cosmic Space Canvas rendered strictly on landing page */}
+      {isLandingPage && <CosmicSpaceCanvas />}
+
+      {isLandingPage && (
+        <div
+          ref={spotlightRef}
+          className="cursor-cosmic-spotlight"
+          style={{ left: 0, top: 0, transform: 'translate3d(-500px, -500px, 0)' }}
+        />
+      )}
+
       <Routes>
-        {/* 1. Redesigned Public Landing Page */}
+        {/* 1. Original 3D Animated Cosmic Landing Page */}
         <Route
           path="/"
+          element={
+            <>
+              <Navbar
+                onOpenSignIn={() => navigate('/signin')}
+                onOpenGoogleModal={() => navigate('/signin')}
+                user={user}
+                onLogout={handleLogout}
+                onGoToDashboard={() => navigate(getRoleHome(user))}
+              />
+
+              <div id="landing-main-scroll-wrapper">
+                <IntroExperience
+                  isComplete={isIntroComplete}
+                  setIsComplete={setIsIntroComplete}
+                />
+
+                <div id="next-landing-container" className="next-sections-flow">
+                  <MarketingChannelsSection
+                    onExploreChannel={user ? () => navigate(getRoleHome(user)) : () => navigate('/signin')}
+                  />
+
+                  <MarketingJourney
+                    onExploreSolution={user ? () => navigate(getRoleHome(user)) : () => navigate('/signin')}
+                  />
+
+                  <CreativeGiniEndExperience />
+
+                  <Footer
+                    onOpenAuth={user ? () => navigate(getRoleHome(user)) : () => navigate('/signin')}
+                  />
+                </div>
+              </div>
+            </>
+          }
+        />
+
+        {/* Minimal alternate landing page */}
+        <Route
+          path="/minimal"
           element={
             <LandingPage
               user={user}
