@@ -166,9 +166,9 @@ const requestSelect = `
             'title', rd.title,
             'url', rd.url,
             'description', rd.description,
-            'deliveredAt', rd.created_at
+            'deliveredAt', rd.delivered_at
           )
-          ORDER BY rd.created_at
+          ORDER BY rd.delivered_at
         )
         FROM request_deliverables rd
         WHERE rd.request_id = r.id
