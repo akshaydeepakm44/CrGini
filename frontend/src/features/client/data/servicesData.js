@@ -179,6 +179,36 @@ export const SERVICES_CATALOG = [
     ],
     idealFor: 'Growth marketers and founders running paid campaigns on Meta, LinkedIn, Google, or X.'
   },
+  {
+    id: 'brand-identity',
+    slug: 'brand-identity',
+    channel: 'boosting',
+    channelLabel: 'Boosting',
+    name: 'Brand Identity & Positioning',
+    shortTitle: 'Brand Identity',
+    headline: 'Establish a distinctive brand voice, visual guidelines, and market differentiation.',
+    shortDesc: 'Brand architecture, core narrative, visual design language, typography guidelines, and differentiation strategy.',
+    description: 'Elevate your brand with cohesive positioning and modern visual identity. Our senior brand strategists deliver comprehensive identity guidelines, executive tone-of-voice playbooks, and market differentiation assets.',
+    icon: ShieldCheck,
+    iconColor: '#3B82F6',
+    iconBg: '#EFF6FF',
+    turnaround: '48–72 Hours',
+    startingPrice: 799,
+    backendServiceType: 'COMPANY_BOOST',
+    backendSubService: 'STRATEGIC_PLAN',
+    whatYouGet: [
+      'Comprehensive Brand Identity & Style Guidelines (PDF)',
+      'Core Narrative Architecture & Positioning Matrix',
+      'Typography, Color Palette & Vector Logo Lockups',
+      'Executive Elevator Pitch & Tone-of-Voice Playbook'
+    ],
+    deliverablesSpec: [
+      { title: 'Brand Identity Guidelines', format: 'Interactive PDF & Figma Kit', icon: FileText },
+      { title: 'Positioning & Tone Playbook', format: 'Structured Playbook Document', icon: Compass },
+      { title: 'Vector Asset Pack', format: 'High-Res SVG & PNG Files', icon: Sparkles }
+    ],
+    idealFor: 'Founders and marketing leaders launching or refreshing their corporate brand identity.'
+  },
 
   // ==========================================
   // DIGITALISING SERVICES
@@ -306,8 +336,8 @@ export const SERVICES_CATALOG = [
   {
     id: 'custom',
     slug: 'custom',
-    channel: 'digitalising',
-    channelLabel: 'Digitalising',
+    channel: 'custom',
+    channelLabel: 'Custom Scope',
     name: 'Custom Request',
     shortTitle: 'Custom',
     headline: 'Build a customized growth sprint across multiple services and deliverables.',

@@ -222,12 +222,29 @@ export default function ClientDashboardPage({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+        <style>{`
+          .cg-service-channels-grid {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+          }
+          @media (max-width: 1180px) {
+            .cg-service-channels-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+          }
+          @media (max-width: 640px) {
+            .cg-service-channels-grid {
+              grid-template-columns: 1fr;
+            }
+          }
+        `}</style>
+        <div className="cg-service-channels-grid">
           <ServiceChannelCard
             channel="boosting"
             title="BOOSTING"
             description="Grow your brand, content and market presence with specialist campaigns."
-            servicesList={['Strategic Planner', 'Content Creator', 'DevRel & Technical Advocacy', 'GTM Strategy']}
+            servicesList={['Strategic Planner', 'Content Creator', 'DevRel', 'GTM Strategy', 'Ad Creatives']}
             onExplore={() => onNavigate && onNavigate('/portal/boosting')}
           />
 

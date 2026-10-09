@@ -111,6 +111,21 @@ const SERVICE_CONFIGS = {
       { item: 'Ad Copy Angles & Creative Testing Matrix', amount: 300 },
     ],
   },
+  'brand-identity': {
+    serviceType: 'COMPANY_BOOST',
+    subService: 'STRATEGIC_PLAN',
+    channel: 'boosting',
+    badge: 'BRAND IDENTITY SPRINT',
+    categoryLabel: 'Company Boost Service',
+    serviceLabel: 'Company Boost: Brand Identity Sprint',
+    accentColor: '#3B82F6',
+    accentBg: '#EFF6FF',
+    price: 799,
+    breakdown: [
+      { item: 'Brand Architecture & Identity Guidelines', amount: 499 },
+      { item: 'Tone of Voice Playbook & Narrative Matrix', amount: 300 },
+    ],
+  },
   'custom-boosting': {
     serviceType: 'COMPANY_BOOST',
     subService: 'CUSTOM',

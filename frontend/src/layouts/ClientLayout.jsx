@@ -71,6 +71,7 @@ export default function ClientLayout({
         { id: 'devrel', label: 'DevRel', path: '/portal/boosting/devrel' },
         { id: 'gtm', label: 'GTM Strategy', path: '/portal/boosting/gtm' },
         { id: 'ad-creatives', label: 'Ad Creatives', path: '/portal/boosting/ad-creatives' },
+        { id: 'brand-identity', label: 'Brand & Identity', path: '/portal/boosting/brand-identity' },
       ],
     },
     {
@@ -83,7 +84,6 @@ export default function ClientLayout({
         { id: 'company-study', label: 'Company Study', path: '/portal/digitalising/company-study' },
         { id: 'key-people', label: 'Key People Research', path: '/portal/digitalising/key-people' },
         { id: 'pitch-support', label: 'Pitch Support', path: '/portal/digitalising/pitch-support' },
-        { id: 'custom', label: 'Custom', path: '/portal/digitalising/custom' },
       ],
     },
     {

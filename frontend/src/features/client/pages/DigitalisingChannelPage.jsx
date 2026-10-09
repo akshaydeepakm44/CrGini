@@ -1,29 +1,12 @@
-import React, { useState } from 'react';
-import { Search, Sparkles, ArrowRight, CheckCircle2, ShieldCheck, Square, CheckSquare } from 'lucide-react';
+import React from 'react';
+import { Search, CheckCircle2, ArrowRight } from 'lucide-react';
 import { getServicesByChannel } from '../data/servicesData';
 
 export default function DigitalisingChannelPage({
   onSelectService,
   onRequestService,
 }) {
-  const digitalisingServices = getServicesByChannel('digitalising');
-
-  const [customServices, setCustomServices] = useState({
-    leadResearch: false,
-    companyStudy: false,
-    keyPeople: false,
-    pitchSupport: false,
-  });
-  const [customRequirements, setCustomRequirements] = useState('');
-
-  const handleConfigureCustom = () => {
-    if (onRequestService) {
-      onRequestService('custom-digitalising', {
-        selectedServices: customServices,
-        requirements: customRequirements,
-      });
-    }
-  };
+  const digitalisingServices = getServicesByChannel('digitalising').filter((s) => s.id !== 'custom');
 
   return (
     <div style={{ padding: '32px 36px 60px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -66,15 +49,26 @@ export default function DigitalisingChannelPage({
         </p>
       </div>
 
-      {/* Services Grid (4 modules) */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '24px',
-          marginBottom: '40px',
-        }}
-      >
+      {/* Services Grid (Balanced 4 cards: 4 across on wide, 2x2 grid on medium) */}
+      <style>{`
+        .cg-digitalising-services-grid {
+          display: grid;
+          gap: 24px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          margin-bottom: 40px;
+        }
+        @media (min-width: 1360px) {
+          .cg-digitalising-services-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+          }
+        }
+        @media (max-width: 640px) {
+          .cg-digitalising-services-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+      <div className="cg-digitalising-services-grid">
         {digitalisingServices.map((svc) => (
           <div
             key={svc.id}
@@ -214,201 +208,6 @@ export default function DigitalisingChannelPage({
             </div>
           </div>
         ))}
-      </div>
-
-      {/* ============================================================
-          CUSTOM REQUEST SECTION (Application Light Theme)
-          ============================================================ */}
-      <div
-        style={{
-          background: '#FFFFFF',
-          border: '1px solid var(--cg-border-light, #E5E7EB)',
-          borderRadius: 'var(--cg-radius-xl, 20px)',
-          padding: '28px 32px',
-          boxShadow: 'var(--cg-shadow-card, 0 4px 20px rgba(0, 0, 0, 0.04))',
-        }}
-      >
-        {/* Header Row */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '12px',
-            marginBottom: '6px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                backgroundColor: '#E0F2FE',
-                color: '#0284C7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Sparkles size={20} />
-            </div>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#111827' }}>
-                Custom Request
-              </h3>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.875rem', color: '#6B7280' }}>
-                Select a combination of services or define customized deliverables for your growth sprint.
-              </p>
-            </div>
-          </div>
-
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '0.72rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
-              Pricing Model
-            </div>
-            <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0284C7', marginTop: '2px' }}>
-              Pricing based on scope
-            </div>
-          </div>
-        </div>
-
-        {/* SELECT WHAT YOU NEED: */}
-        <div style={{ marginTop: '20px', marginBottom: '18px' }}>
-          <div
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              color: '#4B5563',
-              marginBottom: '10px',
-            }}
-          >
-            SELECT WHAT YOU NEED:
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-              gap: '14px',
-            }}
-          >
-            {[
-              { key: 'leadResearch', label: 'Lead Research', sub: 'Target Verified Lead Telemetry' },
-              { key: 'companyStudy', label: 'Company Study', sub: 'Comprehensive Account Dossier' },
-              { key: 'keyPeople', label: 'Key People Research', sub: 'Executive Hierarchy & Contacts' },
-              { key: 'pitchSupport', label: 'Pitch Support', sub: 'Narrative & Objection Handling' },
-            ].map((srv) => {
-              const isChecked = !!customServices[srv.key];
-              return (
-                <div
-                  key={srv.key}
-                  onClick={() =>
-                    setCustomServices((prev) => ({ ...prev, [srv.key]: !prev[srv.key] }))
-                  }
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '12px',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: isChecked ? '#F0F9FF' : '#F9FAFB',
-                    border: isChecked ? '1.5px solid #0EA5E9' : '1px solid #E5E7EB',
-                    cursor: 'pointer',
-                    userSelect: 'none',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <div style={{ marginTop: '2px' }}>
-                    {isChecked ? <CheckSquare size={18} color="#0284C7" /> : <Square size={18} color="#9CA3AF" />}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 700, color: isChecked ? '#0284C7' : '#111827' }}>
-                      {srv.label}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '2px' }}>
-                      {srv.sub}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Textarea */}
-        <div style={{ marginBottom: '20px' }}>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              color: '#374151',
-              marginBottom: '8px',
-            }}
-          >
-            What would you like CreativeGini to prepare for you?
-          </label>
-          <textarea
-            rows={4}
-            value={customRequirements}
-            onChange={(e) => setCustomRequirements(e.target.value)}
-            placeholder="Describe your specific requirements, key goals, target market, or customized deliverables..."
-            style={{
-              width: '100%',
-              padding: '12px 14px',
-              borderRadius: '10px',
-              border: '1px solid #D1D5DB',
-              backgroundColor: '#FFFFFF',
-              color: '#111827',
-              fontSize: '0.875rem',
-              outline: 'none',
-              boxSizing: 'border-box',
-              resize: 'vertical',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-              transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#0EA5E9';
-              e.target.style.boxShadow = '0 0 0 3px rgba(14, 165, 233, 0.15)';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = '#D1D5DB';
-              e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.04)';
-            }}
-          />
-        </div>
-
-        {/* Action Button */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button
-            type="button"
-            onClick={handleConfigureCustom}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '10px',
-              padding: '11px 24px',
-              fontSize: '0.875rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(14, 165, 233, 0.25)',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-1px)')}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = 'none')}
-          >
-            <span>Configure Custom Request</span>
-            <ArrowRight size={16} />
-          </button>
-        </div>
       </div>
     </div>
   );
