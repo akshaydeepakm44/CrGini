@@ -134,7 +134,7 @@ export default function DesignRequestDetailPage({ user, onNavigate }) {
     if (!ticket) return;
     try {
       setIsSubmittingWork(true);
-      await api.submitWork(ticket.id || ticket._id, payload);
+      await api.submitWork(ticket.ticketId || ticket.id || ticket._id, payload);
       setIsUploadModalOpen(false);
       await loadTicketData();
       setActiveTab('deliverables');

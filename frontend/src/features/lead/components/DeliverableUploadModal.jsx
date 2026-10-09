@@ -41,6 +41,8 @@ export default function DeliverableUploadModal({
   const [currentStep, setCurrentStep] = useState(1); // 1 = Upload Requirements, 2 = AI Analysis
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState('');
+  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
   const [error, setError] = useState('');
 
   // Detect which components are requested by the client for this unique ticket
@@ -71,6 +73,8 @@ export default function DeliverableUploadModal({
     setActiveReqs(initialRequirements);
     setCurrentStep(1);
     setError('');
+    setIsSubmittedSuccess(false);
+    setSubmitProgress('');
   }, [isOpen, initialRequirements]);
 
   // Step 1 Form States
@@ -143,6 +147,22 @@ export default function DeliverableUploadModal({
     reader.readAsDataURL(file);
   };
 
+  // Helper to read File into base64 Data URL
+  const readFileAsDataUrl = (file) => {
+    return new Promise((resolve) => {
+      if (!file) return resolve(null);
+      const reader = new FileReader();
+      reader.onload = () => resolve({
+        name: file.name,
+        size: file.size,
+        type: file.type || 'application/octet-stream',
+        dataUrl: reader.result,
+      });
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Step 1 Validation & Proceed to Step 2
   const handleProceedToStep2 = () => {
     setError('');
@@ -196,6 +216,21 @@ export default function DeliverableUploadModal({
         logo: p.logo || batchCompanyLogoUrl || '',
       }));
 
+      setSubmitProgress('Packaging deliverables and preparing cloud uploads...');
+      const uploadedFiles = [];
+      if (activeReqs.companyStudy && companyStudyFile) {
+        const f = await readFileAsDataUrl(companyStudyFile);
+        if (f) uploadedFiles.push({ ...f, category: 'Company Study' });
+      }
+      if (activeReqs.leadList && leadListFile) {
+        const f = await readFileAsDataUrl(leadListFile);
+        if (f) uploadedFiles.push({ ...f, category: 'Lead List' });
+      }
+      if (activeReqs.pitchDeck && pitchDeckFile) {
+        const f = await readFileAsDataUrl(pitchDeckFile);
+        if (f) uploadedFiles.push({ ...f, category: 'Tailored Pitch Deck' });
+      }
+
       const payload = {
         title: `Deliverable Package V${versionNumber} for ${ticketId}`,
         description: `Delivered components: ${[
@@ -217,20 +252,38 @@ export default function DeliverableUploadModal({
             evaluatedAt: new Date().toISOString(),
           }
         }),
+        files: uploadedFiles,
       };
 
+      setSubmitProgress('Saving deliverable package and notifying client...');
+      const targetId = activeTicket.ticketId || ticketId || activeTicket.id || activeTicket._id;
+
       if (api.submitWork) {
-        await api.submitWork(ticketId, payload).catch(() => {});
+        await api.submitWork(targetId, payload);
       }
       if (api.updateRequestStatus) {
-        await api.updateRequestStatus(ticketId, 'CLIENT_REVIEW', 'Deliverables submitted via Specialist Pod. Ready for client review.').catch(() => {});
+        await api.updateRequestStatus(targetId, 'CLIENT_REVIEW', 'Deliverables submitted via Specialist Pod. Ready for client review.').catch(() => {});
       }
 
-      if (onSuccess) onSuccess();
-      onClose();
+      setSubmitProgress('Deliverables submitted successfully!');
+      setIsSubmittedSuccess(true);
+      setIsSubmitting(false);
+
+      if (onSuccess) {
+        try {
+          onSuccess();
+        } catch (cbErr) {
+          console.warn('[Lead DeliverableUploadModal] onSuccess callback caught:', cbErr);
+        }
+      }
+
+      // Auto close card after 2 seconds
+      setTimeout(() => {
+        onClose();
+      }, 2000);
     } catch (err) {
-      setError(err.message || 'Failed to submit deliverable');
-    } finally {
+      console.error('Failed to submit deliverable:', err);
+      setError(err.message || 'Failed to submit deliverable. Please try again.');
       setIsSubmitting(false);
     }
   };
@@ -307,6 +360,7 @@ export default function DeliverableUploadModal({
           <button
             type="button"
             onClick={onClose}
+            disabled={isSubmitting}
             style={{
               background: 'none',
               border: 'none',
@@ -320,14 +374,110 @@ export default function DeliverableUploadModal({
           </button>
         </div>
 
-        {/* Two-Step Progress Indicator Header (Audio 2) */}
-        <div
-          style={{
-            display: 'flex',
-            borderBottom: '1px solid #E5E7EB',
-            backgroundColor: '#FFFFFF',
-          }}
-        >
+        {/* Body: Heads-Up Success Card or Step Flow */}
+        {isSubmittedSuccess ? (
+          <div
+            style={{
+              padding: '52px 32px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '16px',
+              backgroundColor: '#FFFFFF',
+            }}
+          >
+            <div
+              style={{
+                width: '68px',
+                height: '68px',
+                borderRadius: '50%',
+                backgroundColor: '#DCFCE7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 8px 16px rgba(16, 185, 129, 0.2)',
+              }}
+            >
+              <CheckCircle2 size={38} color="#059669" />
+            </div>
+
+            <h3
+              style={{
+                fontSize: '1.25rem',
+                fontWeight: 800,
+                color: '#111827',
+                margin: 0,
+              }}
+            >
+              Deliverable Package V{versionNumber} Submitted!
+            </h3>
+
+            <p
+              style={{
+                fontSize: '0.875rem',
+                color: '#4B5563',
+                margin: 0,
+                maxWidth: '460px',
+                lineHeight: 1.5,
+              }}
+            >
+              All deliverables have been uploaded and registered. Ticket{' '}
+              <strong style={{ color: '#7C3AED' }}>{ticketId}</strong> is now
+              under <strong>Client Review</strong>. The client has been notified via portal alert and email.
+            </p>
+
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 14px',
+                borderRadius: '9999px',
+                backgroundColor: '#F3F4F6',
+                color: '#6B7280',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+              }}
+            >
+              <span>Closing this card automatically in 2 seconds...</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (onSuccess) {
+                  try { onSuccess(); } catch (e) {}
+                }
+                onClose();
+              }}
+              style={{
+                marginTop: '8px',
+                padding: '9px 26px',
+                borderRadius: '8px',
+                backgroundColor: '#7C3AED',
+                color: '#FFFFFF',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)',
+              }}
+            >
+              Close Now
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Two-Step Progress Indicator Header (Audio 2) */}
+            <div
+              style={{
+                display: 'flex',
+                borderBottom: '1px solid #E5E7EB',
+                backgroundColor: '#FFFFFF',
+              }}
+            >
           <div
             style={{
               flex: 1,
@@ -1226,102 +1376,161 @@ export default function DeliverableUploadModal({
             padding: '18px 28px',
             borderTop: '1px solid #F1F5F9',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            flexDirection: 'column',
+            gap: '12px',
             backgroundColor: '#FAFAFC',
           }}
         >
-          {currentStep === 1 ? (
-            <>
-              <button
-                type="button"
-                onClick={onClose}
-                style={{
-                  padding: '9px 18px',
-                  borderRadius: '9px',
-                  border: '1px solid #E5E7EB',
-                  backgroundColor: '#FFFFFF',
-                  color: '#4B5563',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={handleProceedToStep2}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '9px 20px',
-                  borderRadius: '9px',
-                  border: 'none',
-                  backgroundColor: '#7C3AED',
-                  color: '#FFFFFF',
-                  fontSize: '0.84rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
-                }}
-              >
-                <span>Next: AI Verification & Analysis</span>
-                <ArrowRight size={15} />
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => setCurrentStep(1)}
-                disabled={isSubmitting}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '9px 18px',
-                  borderRadius: '9px',
-                  border: '1px solid #E5E7EB',
-                  backgroundColor: '#FFFFFF',
-                  color: '#4B5563',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                <ArrowLeft size={15} />
-                <span>Back & Iterate</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleFinalSubmit}
-                disabled={isSubmitting || isAnalyzing}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '10px 24px',
-                  borderRadius: '9px',
-                  border: 'none',
-                  backgroundColor: '#059669',
-                  color: '#FFFFFF',
-                  fontSize: '0.875rem',
-                  fontWeight: 700,
-                  cursor: isSubmitting || isAnalyzing ? 'not-allowed' : 'pointer',
-                  opacity: isSubmitting || isAnalyzing ? 0.7 : 1,
-                  boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
-                }}
-              >
-                <CheckCircle2 size={16} />
-                <span>{isSubmitting ? 'Submitting Deliverable...' : 'Final Submit to Client Review'}</span>
-              </button>
-            </>
+          {error && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                backgroundColor: '#FEE2E2',
+                border: '1px solid #FECACA',
+                color: '#B91C1C',
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+              }}
+            >
+              <AlertCircle size={16} />
+              <span>{error}</span>
+            </div>
           )}
+
+          {isSubmitting && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                backgroundColor: '#F5F3FF',
+                border: '1px solid #DDD6FE',
+                color: '#6D28D9',
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+              }}
+            >
+              <div
+                style={{
+                  width: '14px',
+                  height: '14px',
+                  border: '2px solid #6D28D9',
+                  borderTopColor: 'transparent',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }}
+              />
+              <span>{submitProgress || 'Uploading deliverables to cloud storage... Please wait.'}</span>
+            </div>
+          )}
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            {currentStep === 1 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  style={{
+                    padding: '9px 18px',
+                    borderRadius: '9px',
+                    border: '1px solid #E5E7EB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#4B5563',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleProceedToStep2}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '9px 20px',
+                    borderRadius: '9px',
+                    border: 'none',
+                    backgroundColor: '#7C3AED',
+                    color: '#FFFFFF',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
+                  }}
+                >
+                  <span>Next: AI Verification & Analysis</span>
+                  <ArrowRight size={15} />
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  disabled={isSubmitting}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '9px 18px',
+                    borderRadius: '9px',
+                    border: '1px solid #E5E7EB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#4B5563',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <ArrowLeft size={15} />
+                  <span>Back & Iterate</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleFinalSubmit}
+                  disabled={isSubmitting || isAnalyzing}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '10px 24px',
+                    borderRadius: '9px',
+                    border: 'none',
+                    backgroundColor: '#059669',
+                    color: '#FFFFFF',
+                    fontSize: '0.875rem',
+                    fontWeight: 700,
+                    cursor: isSubmitting || isAnalyzing ? 'not-allowed' : 'pointer',
+                    opacity: isSubmitting || isAnalyzing ? 0.7 : 1,
+                    boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
+                  }}
+                >
+                  <CheckCircle2 size={16} />
+                  <span>{isSubmitting ? 'Submitting Deliverable...' : 'Final Submit to Client Review'}</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
+      </>
+    )}
       </div>
     </div>
   );

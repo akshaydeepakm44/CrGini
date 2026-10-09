@@ -359,11 +359,7 @@ export const api = {
       headers: getHeaders(true),
       body: JSON.stringify(payload)
     });
-    const data = await safeJson(res);
-    if (!res.ok || !data.success) {
-      throw new Error(data.message || 'Failed to submit deliverables');
-    }
-    return data;
+    return parseApiResponse(res, 'Failed to submit deliverables');
   },
 
   async approveSubmission(ticketId, submissionId, feedback = '') {

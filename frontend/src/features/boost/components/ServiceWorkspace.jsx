@@ -896,9 +896,12 @@ export default function ServiceWorkspace({
           onSuccess={() => {
             if (onRefreshData) onRefreshData();
             // Re-fetch submissions
-            api.getSubmissions(selectedTicket.id || selectedTicket._id).then((subs) => {
-              setTicketSubmissions(Array.isArray(subs) ? subs : []);
-            });
+            const targetId = selectedTicket.ticketId || selectedTicket.id || selectedTicket._id;
+            if (targetId) {
+              api.getSubmissions(targetId).then((subs) => {
+                setTicketSubmissions(Array.isArray(subs) ? subs : []);
+              }).catch(() => {});
+            }
           }}
         />
       )}

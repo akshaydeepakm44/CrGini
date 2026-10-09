@@ -284,6 +284,8 @@ export default function DeliverableUploadModal({
 }) {
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState('');
+  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
   const [error, setError] = useState('');
 
   // Required Deliverables extracted dynamically from ticket requirements
@@ -433,8 +435,15 @@ export default function DeliverableUploadModal({
       return;
     }
 
+    const targetTicketId = ticket.ticketId || ticket.id || ticket._id;
+    if (!targetTicketId) {
+      setError('Ticket identifier is missing. Please reload the page and try again.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
+      setSubmitProgress('Packaging deliverables and uploading files to cloud storage...');
 
       // Collect all files from slots
       const allFiles = [];
@@ -494,15 +503,29 @@ export default function DeliverableUploadModal({
         files: allFiles,
       };
 
-      await api.submitWork(ticket.id || ticket._id, payload);
+      setSubmitProgress('Saving deliverable package and notifying client...');
+      await api.submitWork(targetTicketId, payload);
+
+      setSubmitProgress('Deliverable package submitted successfully!');
+      setIsSubmittedSuccess(true);
+      setIsSubmitting(false);
+
+      // Safeguarded callback to parent
       if (onSuccess) {
-        onSuccess();
+        try {
+          onSuccess();
+        } catch (callbackErr) {
+          console.warn('[DeliverableUploadModal] onSuccess callback caught:', callbackErr);
+        }
       }
-      onClose();
+
+      // Auto close card after 2 seconds so the specialist sees the clear confirmation heads-up
+      setTimeout(() => {
+        onClose();
+      }, 2000);
     } catch (err) {
       console.error('Failed to submit deliverable package:', err);
       setError(err.message || 'Submission failed. Please check network or file size.');
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -618,17 +641,95 @@ export default function DeliverableUploadModal({
           </button>
         </div>
 
-        {/* Form Body */}
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            padding: '24px',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-          }}
-        >
+        {/* Body: Success Heads Up or Form */}
+        {isSubmittedSuccess ? (
+          <div
+            style={{
+              padding: '48px 32px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '16px',
+              backgroundColor: '#FFFFFF',
+            }}
+          >
+            <div
+              style={{
+                width: '68px',
+                height: '68px',
+                borderRadius: '50%',
+                backgroundColor: '#ECFDF5',
+                border: '2px solid #10B981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#059669',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+              }}
+            >
+              <CheckCircle2 size={38} />
+            </div>
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#111827', margin: 0 }}>
+              Deliverable Package V{currentVersion} Submitted!
+            </h3>
+
+            <p style={{ fontSize: '0.9rem', color: '#4B5563', maxWidth: '460px', margin: 0, lineHeight: 1.5 }}>
+              All deliverables have been uploaded and registered. Ticket <strong style={{ color: '#7C3AED' }}>{ticket.ticketId}</strong> is now under <strong>Client Review</strong>. The client has been notified via portal alert and email.
+            </p>
+
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                backgroundColor: '#F3F4F6',
+                color: '#6B7280',
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                marginTop: '4px',
+              }}
+            >
+              <span>Closing this card automatically in 2 seconds...</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (onSuccess) { try { onSuccess(); } catch (e) {} }
+                onClose();
+              }}
+              style={{
+                marginTop: '8px',
+                padding: '9px 26px',
+                borderRadius: '8px',
+                backgroundColor: '#7C3AED',
+                color: '#FFFFFF',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)',
+              }}
+            >
+              Close Now
+            </button>
+          </div>
+        ) : (
+          <form
+            onSubmit={handleSubmit}
+            style={{
+              padding: '24px',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+            }}
+          >
           {error && (
             <div
               style={{
@@ -1218,71 +1319,143 @@ export default function DeliverableUploadModal({
           <div
             style={{
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
+              flexDirection: 'column',
+              gap: '12px',
               paddingTop: '16px',
               borderTop: '1px solid #E5E7EB',
             }}
           >
-            <div style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
-              {allFulfilled ? (
-                <span style={{ color: '#059669', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <CheckCircle2 size={16} /> All {totalCount} client-requested deliverables ready
-                </span>
-              ) : (
-                <span style={{ color: '#D97706', fontWeight: 600 }}>
-                  {fulfilledCount} of {totalCount} deliverables prepared
-                </span>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={isSubmitting}
+            {error && (
+              <div
                 style={{
-                  padding: '9px 16px',
-                  borderRadius: '8px',
-                  border: '1px solid #D1D5DB',
-                  backgroundColor: '#FFFFFF',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: '#374151',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                style={{
-                  padding: '9px 22px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  backgroundColor: '#7C3AED',
-                  color: '#FFFFFF',
-                  fontSize: '0.875rem',
-                  fontWeight: 700,
-                  cursor: isSubmitting ? 'default' : 'pointer',
-                  opacity: isSubmitting ? 0.7 : 1,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(124, 58, 237, 0.2)',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: '#FEE2E2',
+                  border: '1px solid #FECACA',
+                  color: '#B91C1C',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
                 }}
               >
-                <Upload size={16} />
-                <span>
-                  {isSubmitting
-                    ? 'Submitting Work...'
-                    : `Submit Version ${currentVersion} Package`}
-                </span>
-              </button>
+                <AlertCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {isSubmitting && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: '#F5F3FF',
+                  border: '1px solid #DDD6FE',
+                  color: '#6D28D9',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                }}
+              >
+                <div
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    border: '2px solid #6D28D9',
+                    borderTopColor: 'transparent',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                  }}
+                />
+                <span>{submitProgress || 'Uploading deliverables to cloud storage... Please wait.'}</span>
+              </div>
+            )}
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
+                {allFulfilled ? (
+                  <span style={{ color: '#059669', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <CheckCircle2 size={16} /> All {totalCount} client-requested deliverables ready
+                  </span>
+                ) : (
+                  <span style={{ color: '#D97706', fontWeight: 600 }}>
+                    {fulfilledCount} of {totalCount} deliverables prepared
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                  style={{
+                    padding: '9px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  style={{
+                    padding: '9px 22px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: '#7C3AED',
+                    color: '#FFFFFF',
+                    fontSize: '0.875rem',
+                    fontWeight: 700,
+                    cursor: isSubmitting ? 'default' : 'pointer',
+                    opacity: isSubmitting ? 0.7 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(124, 58, 237, 0.2)',
+                  }}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          border: '2px solid #FFFFFF',
+                          borderTopColor: 'transparent',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite',
+                        }}
+                      />
+                      <span>Submitting Work...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={16} />
+                      <span>Submit Version {currentVersion} Package</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </form>
+      )}
       </div>
     </div>
   );

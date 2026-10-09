@@ -16,6 +16,23 @@ export const hasServiceTypeAccess = (user, serviceType) => {
     return true;
   }
 
+  // Direct role matching
+  if (user.role === serviceType) {
+    return true;
+  }
+  if (user.role === 'COMPANY_BOOST' && serviceType === 'COMPANY_BOOST') {
+    return true;
+  }
+  if (user.role === 'COMPANY_LEAD' && serviceType === 'COMPANY_LEAD') {
+    return true;
+  }
+  if (
+    ['LANDING_PAGE', 'COMPANY_UI'].includes(user.role) &&
+    ['LANDING_PAGE', 'COMPANY_UI', 'LANDING_PAGE_ENHANCEMENT'].includes(serviceType)
+  ) {
+    return true;
+  }
+
   const access = user.dashboardAccess || {};
 
   switch (serviceType) {
