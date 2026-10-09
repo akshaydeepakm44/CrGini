@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { query } from '../config/postgres.js';
 
 import {
   findUserByEmail,
@@ -36,16 +37,81 @@ const generateToken = (id) => {
   );
 };
 
-const buildUserResponse = (user) => ({
-  id: user._id || user.id,
-  name: user.name,
-  email: user.email,
-  role: user.role,
-  phone: user.phone,
-  status: user.status,
-  company: user.company || null,
-  dashboardAccess: getEffectiveDashboardAccess(user),
-});
+export const ensureDataI2IAccount = async () => {
+  try {
+    let compRes = await query(`SELECT id FROM companies WHERE name = 'Data I2I' OR email = 'testclient@datai2i.com' LIMIT 1`);
+    let dataI2ICompanyId = compRes.rows[0]?.id;
+    if (!dataI2ICompanyId) {
+      const newComp = await query(`
+        INSERT INTO companies (name, email, website, contact_person, industry)
+        VALUES ('Data I2I', 'testclient@datai2i.com', 'https://datai2i.com', 'Data I2I Client', 'AI & Data Intelligence')
+        RETURNING id
+      `);
+      dataI2ICompanyId = newComp.rows[0].id;
+    } else {
+      await query(`
+        UPDATE companies
+        SET name = 'Data I2I', website = 'https://datai2i.com', contact_person = 'Data I2I Client', industry = 'AI & Data Intelligence'
+        WHERE id = $1
+      `, [dataI2ICompanyId]);
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const clientHash = await bcrypt.hash('Client@123', salt);
+
+    // Upsert testclient@datai2i.com with Client@123
+    await query(`
+      INSERT INTO users (name, email, password, role, company_id, phone, status)
+      VALUES ('Data I2I Client', 'testclient@datai2i.com', $1, 'USER', $2, '+1 (555) 019-2834', 'ACTIVE')
+      ON CONFLICT (email) DO UPDATE SET
+        name = 'Data I2I Client',
+        password = $1,
+        role = 'USER',
+        company_id = $2,
+        status = 'ACTIVE'
+    `, [clientHash, dataI2ICompanyId]);
+
+    // Also update any legacy client@creativegini.com or Alex Mercer accounts to Data I2I with same password
+    await query(`
+      UPDATE users
+      SET name = 'Data I2I Client', company_id = $1, password = $2, status = 'ACTIVE'
+      WHERE email = 'client@creativegini.com' OR name ILIKE '%Alex Mercer%'
+    `, [dataI2ICompanyId, clientHash]);
+
+    await query(`
+      UPDATE companies
+      SET name = 'Data I2I', contact_person = 'Data I2I Client'
+      WHERE email = 'client@creativegini.com' OR name ILIKE '%Apex Enterprise%'
+    `);
+
+    console.log('[Auth] Ensured Data I2I account is provisioned (Company ID:', dataI2ICompanyId, ')');
+    return dataI2ICompanyId;
+  } catch (err) {
+    console.error('[Auth] Failed to ensure Data I2I account:', err.message);
+    return null;
+  }
+};
+
+const buildUserResponse = (user) => {
+  let name = user.name;
+  let company = user.company || null;
+  if (name?.includes('Alex Mercer') || name?.includes('almex')) {
+    name = 'Data I2I Client';
+  }
+  if (company?.name?.includes('Apex Enterprise') || company?.name?.includes('Acme')) {
+    company = { ...company, name: 'Data I2I' };
+  }
+  return {
+    id: user._id || user.id,
+    name,
+    email: user.email,
+    role: user.role,
+    phone: user.phone,
+    status: user.status,
+    company,
+    dashboardAccess: getEffectiveDashboardAccess(user),
+  };
+};
 
 // @desc    Register new client user & company
 // @route   POST /api/auth/register
@@ -157,11 +223,22 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-
-    const user = await findUserByEmail(normalizedEmail, {
+    let user = await findUserByEmail(normalizedEmail, {
       includePassword: true,
     });
+
+    // Auto-provision Data I2I account on the fly if needed
+    if (!user && (normalizedEmail === 'testclient@datai2i.com' || normalizedEmail === 'client@creativegini.com')) {
+      await ensureDataI2IAccount();
+      user = await findUserByEmail(normalizedEmail, {
+        includePassword: true,
+      });
+      if (!user) {
+        user = await findUserByEmail('testclient@datai2i.com', {
+          includePassword: true,
+        });
+      }
+    }
 
     if (!user) {
       console.warn(

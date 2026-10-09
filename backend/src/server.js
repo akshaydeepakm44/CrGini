@@ -17,9 +17,15 @@ app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
 
 // Connect to PostgreSQL
-connectPostgres().then((ok) => {
+connectPostgres().then(async (ok) => {
   if (ok) {
     console.log('[CreativeGini API] PostgreSQL connected successfully.');
+    try {
+      const { ensureDataI2IAccount } = await import('./controllers/authController.js');
+      await ensureDataI2IAccount();
+    } catch (err) {
+      console.error('[CreativeGini API] ensureDataI2IAccount error:', err.message);
+    }
   } else {
     console.error('[CreativeGini API] PostgreSQL connection failed. Check credentials.');
   }
