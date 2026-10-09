@@ -11,7 +11,8 @@ import {
   Package,
   Layers,
   Sparkles,
-  MessageSquare
+  MessageSquare,
+  Boxes,
 } from 'lucide-react';
 import MetricCard from '../../../components/cards/MetricCard';
 import ServiceChannelCard from '../../../components/cards/ServiceChannelCard';
@@ -271,6 +272,103 @@ export default function ClientDashboardPage({
             servicesList={['Web Application MVP', 'Mobile App Development', 'API & Backend Systems']}
             onExplore={() => onNavigate && onNavigate('/portal/development')}
           />
+        </div>
+
+        {/* Turnkey Bundles Discovery Banner */}
+        <div
+          style={{
+            marginTop: '20px',
+            background: 'linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 50%, #EDE9FE 100%)',
+            borderRadius: '16px',
+            border: '1px solid #DDD4FA',
+            padding: '18px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '14px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                backgroundColor: '#7C3AED',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(124, 58, 237, 0.25)',
+                flexShrink: 0,
+              }}
+            >
+              <Boxes size={22} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#111827' }}>
+                  Looking for Multi-Capability Bundles?
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    color: '#059669',
+                    backgroundColor: '#ECFDF5',
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                  }}
+                >
+                  SAVE UP TO 25%
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.8125rem', color: '#6B7280' }}>
+                Explore curated Offer Bundles or build your own Custom Bundle across growth, intelligence & engineering.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => onNavigate && onNavigate('/portal/bundles/offer')}
+              style={{
+                padding: '9px 18px',
+                borderRadius: '10px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                color: '#FFFFFF',
+                fontSize: '0.84375rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
+              }}
+            >
+              <span>Explore Offer Bundles</span>
+              <ArrowRight size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate && onNavigate('/portal/bundles/custom')}
+              style={{
+                padding: '9px 16px',
+                borderRadius: '10px',
+                border: '1px solid #DDD4FA',
+                backgroundColor: '#FFFFFF',
+                color: '#6D28D9',
+                fontSize: '0.84375rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Custom Bundle
+            </button>
+          </div>
         </div>
       </div>
 

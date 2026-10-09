@@ -25,30 +25,64 @@ export const createActivityLog = async ({
   action,
   details = '',
 }) => {
-  const result = await query(
-    `
-      INSERT INTO activity_logs (
-        user_id,
-        user_name,
-        company_id,
-        request_id,
+  try {
+    const result = await query(
+      `
+        INSERT INTO activity_logs (
+          user_id,
+          user_name,
+          company_id,
+          request_id,
+          action,
+          details
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+      `,
+      [
+        userId,
+        userName || 'System',
+        companyId,
+        requestId,
         action,
-        details
-      )
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *
-    `,
-    [
-      userId,
-      userName || 'System',
-      companyId,
-      requestId,
-      action,
-      details,
-    ]
-  );
+        details,
+      ]
+    );
 
-  return mapActivityLog(result.rows[0]);
+    return mapActivityLog(result.rows[0]);
+  } catch (err) {
+    if (err.code === '42703') {
+      try {
+        const enrichedDetails = requestId ? `[Req #${requestId}] ${details}` : details;
+        const fallbackResult = await query(
+          `
+            INSERT INTO activity_logs (
+              user_id,
+              user_name,
+              company_id,
+              action,
+              details
+            )
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+          `,
+          [
+            userId,
+            userName || 'System',
+            companyId,
+            action,
+            enrichedDetails,
+          ]
+        );
+        return mapActivityLog(fallbackResult.rows[0]);
+      } catch (fallbackErr) {
+        console.warn('[ActivityLog] Fallback insert failed:', fallbackErr.message);
+        return null;
+      }
+    }
+    console.warn('[ActivityLog] Insert failed:', err.message);
+    return null;
+  }
 };
 
 export const findActivityLogsByUserId = async (userId) => {
@@ -80,17 +114,37 @@ export const findActivityLogsByCompanyId = async (companyId) => {
 };
 
 export const findActivityLogsByRequestId = async (requestId) => {
-  const result = await query(
-    `
-      SELECT *
-      FROM activity_logs
-      WHERE request_id = $1
-      ORDER BY created_at ASC
-    `,
-    [requestId]
-  );
+  try {
+    const result = await query(
+      `
+        SELECT *
+        FROM activity_logs
+        WHERE request_id = $1
+        ORDER BY created_at ASC
+      `,
+      [requestId]
+    );
 
-  return result.rows.map(mapActivityLog);
+    return result.rows.map(mapActivityLog);
+  } catch (err) {
+    if (err.code === '42703') {
+      try {
+        const result = await query(
+          `
+            SELECT *
+            FROM activity_logs
+            WHERE details LIKE $1
+            ORDER BY created_at ASC
+          `,
+          [`%[Req #${requestId}]%`]
+        );
+        return result.rows.map(mapActivityLog);
+      } catch (fallbackErr) {
+        return [];
+      }
+    }
+    return [];
+  }
 };
 
 export const listActivityLogs = async ({

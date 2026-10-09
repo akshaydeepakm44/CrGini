@@ -167,6 +167,32 @@ export const calculateServicePrice = ({ serviceType, subService, requirements = 
       serviceLabel = 'Company Boost Growth Sprint';
       breakdown.push({ item: 'Standard Growth Operations Sprint', amount: 799 });
     }
+  } else if (serviceType === 'APP_DEVELOPMENT' || serviceType === 'DEVELOPMENT') {
+    if (subService === 'WEB_APP') {
+      basePrice = 1499;
+      serviceLabel = 'App Development: Web Application MVP Sprint';
+      breakdown.push({ item: 'Full-Stack Architecture & Application Core', amount: 999 });
+      breakdown.push({ item: 'Responsive Frontend, State & API Integration', amount: 500 });
+    } else if (subService === 'MOBILE_APP') {
+      basePrice = 1699;
+      serviceLabel = 'App Development: Mobile App Sprint';
+      breakdown.push({ item: 'Cross-Platform React Native Architecture', amount: 1199 });
+      breakdown.push({ item: 'App Store / Play Store Build Pipeline', amount: 500 });
+    } else if (subService === 'API_BACKEND') {
+      basePrice = 1299;
+      serviceLabel = 'App Development: Scalable API & Backend Sprint';
+      breakdown.push({ item: 'Relational Schema, Indexing & Authentication Engine', amount: 799 });
+      breakdown.push({ item: 'RESTful API Endpoints & Telemetry Testing', amount: 500 });
+    } else {
+      basePrice = 1499;
+      serviceLabel = 'App Development Sprint';
+      breakdown.push({ item: 'Turnkey Software Engineering Sprint', amount: 1499 });
+    }
+  } else if (serviceType === 'BUNDLE' || serviceType === 'CUSTOM_BUNDLE') {
+    basePrice = 1299;
+    serviceLabel = 'Specialist Bundle Sprint';
+    const count = Array.isArray(selectedServices) && selectedServices.length > 0 ? selectedServices.length : 1;
+    breakdown.push({ item: `Selected Multi-Service Bundle (${count} Services Included)`, amount: 1299 });
   }
 
   return {
@@ -240,7 +266,11 @@ export const createRequest = async (req, res) => {
     const teamMap = {
       COMPANY_LEAD: 'Company Lead Team',
       COMPANY_BOOST: 'Company Boost Team',
-      LANDING_PAGE: 'Landing Page Enhancement Team'
+      LANDING_PAGE: 'Landing Page Enhancement Team',
+      APP_DEVELOPMENT: 'App Development Engineering Team',
+      DEVELOPMENT: 'App Development Engineering Team',
+      BUNDLE: 'Specialist Pod Coordination Team',
+      CUSTOM_BUNDLE: 'Specialist Pod Coordination Team'
     };
 
     // Authoritative backend price calculation:
@@ -282,25 +312,33 @@ export const createRequest = async (req, res) => {
       paymentStatus: 'PAID'
     });
 
-    // Create activity log
-    await createActivityLog({
-      userId,
-      userName: req.user?.name || 'Client User',
-      companyId,
-      requestId: request.id,
-      action: 'REQUEST_CREATED',
-      details: `Ticket ${ticketId} created for ${serviceType.replace(/_/g, ' ')}.`
-    });
+    // Create activity log (guarded)
+    try {
+      await createActivityLog({
+        userId,
+        userName: req.user?.name || 'Client User',
+        companyId,
+        requestId: request.id,
+        action: 'REQUEST_CREATED',
+        details: `Ticket ${ticketId} created for ${serviceType.replace(/_/g, ' ')}.`
+      });
+    } catch (logErr) {
+      console.warn('[CreateRequest] Activity log failed (non-fatal):', logErr.message);
+    }
 
-    // Notify user
-    await createNotification({
-      userId,
-      type: 'ASSIGNMENT',
-      title: 'Request Ticket Submitted',
-      message: `Your request ${ticketId} ("${title}") has been received and assigned to the specialist team.`,
-      ticketId: request.id,
-      ticketCode: ticketId
-    });
+    // Notify user (guarded)
+    try {
+      await createNotification({
+        userId,
+        type: 'ASSIGNMENT',
+        title: 'Request Ticket Submitted',
+        message: `Your request ${ticketId} ("${title}") has been received and assigned to the specialist team.`,
+        ticketId: request.id,
+        ticketCode: ticketId
+      });
+    } catch (notifErr) {
+      console.warn('[CreateRequest] Notification failed (non-fatal):', notifErr.message);
+    }
 
     // Safeguard: Trigger Request Created confirmation email to the user
     sendRequestCreatedEmail({

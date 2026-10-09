@@ -10,6 +10,7 @@ import {
   User,
   Palette,
   Code2,
+  Boxes,
 } from 'lucide-react';
 import Sidebar from '../components/navigation/Sidebar';
 import Header from '../components/navigation/Header';
@@ -106,6 +107,16 @@ export default function ClientLayout({
         { id: 'web-app', label: 'Web Application', path: '/portal/development/web-app' },
         { id: 'mobile-app', label: 'Mobile App', path: '/portal/development/mobile-app' },
         { id: 'api-backend', label: 'API & Backend', path: '/portal/development/api-backend' },
+      ],
+    },
+    {
+      id: 'bundles',
+      label: 'Bundles',
+      path: '/portal/bundles',
+      icon: Boxes,
+      children: [
+        { id: 'offer-bundle', label: 'Offer Bundle', path: '/portal/bundles/offer' },
+        { id: 'custom-bundle', label: 'Custom Bundle', path: '/portal/bundles/custom' },
       ],
     },
     {

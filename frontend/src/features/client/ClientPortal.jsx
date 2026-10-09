@@ -14,6 +14,8 @@ import MessagesPage from './pages/MessagesPage';
 import BillingPage from './pages/BillingPage';
 import ProfilePage from './pages/ProfilePage';
 import CustomPage from './pages/CustomPage';
+import OfferBundlePage from './pages/OfferBundlePage';
+import CustomBundlePage from './pages/CustomBundlePage';
 import NewRequestModal from './components/NewRequestModal';
 
 import { api } from '../../services/api';
@@ -146,7 +148,7 @@ export default function ClientPortal({ user, onLogout }) {
   }, []);
 
   const handleOpenNewRequest = (serviceId = null, customData = null) => {
-    setNewRequestInitialService(serviceId);
+    setNewRequestInitialService(serviceId || 'custom');
     setNewRequestCustomData(customData);
     setIsNewRequestOpen(true);
   };
@@ -312,6 +314,30 @@ export default function ClientPortal({ user, onLogout }) {
             <ServiceDetailWrapper
               onOpenNewRequest={handleOpenNewRequest}
               channel="development"
+            />
+          }
+        />
+
+        {/* 3d. Bundles Channel & Sub Pages */}
+        <Route
+          path="bundles"
+          element={<Navigate to="/portal/bundles/offer" replace />}
+        />
+        <Route
+          path="bundles/offer"
+          element={
+            <OfferBundlePage
+              onRequestBundle={handleOpenNewRequest}
+              onNavigate={handleNavigate}
+            />
+          }
+        />
+        <Route
+          path="bundles/custom"
+          element={
+            <CustomBundlePage
+              onRequestCustomBundle={handleOpenNewRequest}
+              onNavigate={handleNavigate}
             />
           }
         />

@@ -215,17 +215,17 @@ const SERVICE_CONFIGS = {
     ],
   },
   'custom': {
-    serviceType: 'COMPANY_LEAD',
+    serviceType: 'COMPANY_BOOST',
     subService: 'CUSTOM',
-    channel: 'digitalising',
-    badge: 'CUSTOM SPRINT',
-    categoryLabel: 'Multidisciplinary Service',
-    serviceLabel: 'Custom Scope Growth Sprint',
+    channel: 'custom',
+    badge: 'CUSTOM SERVICE SPRINT',
+    categoryLabel: 'Multi-Service Container',
+    serviceLabel: 'Custom Multi-Service Sprint',
     accentColor: '#7C3AED',
     accentBg: '#F5F3FF',
     price: 799,
     breakdown: [
-      { item: 'Custom Multidisciplinary Scope (Configured Service Areas)', amount: 799 },
+      { item: 'Custom Multi-Service Scope (Configured Service Modules)', amount: 799 },
     ],
   },
   'ui-ux-audit': {
@@ -342,15 +342,22 @@ export default function NewRequestModal({
   // --- 4. Custom Request Form State ---
   const [customForm, setCustomForm] = useState({
     selectedServices: {
-      strategicPlan: true,
+      strategicPlan: false,
       content: false,
       devrel: false,
       gtm: false,
       adCreatives: false,
+      brandIdentity: false,
       leadResearch: false,
       companyStudy: false,
       keyPeople: false,
       pitchSupport: false,
+      uiUxAudit: false,
+      figmaProject: false,
+      redesignRequest: false,
+      webApp: false,
+      mobileApp: false,
+      apiBackend: false,
     },
     requirements: '',
     expectedOutcome: '',
@@ -471,7 +478,7 @@ export default function NewRequestModal({
       setServerPriceData(null);
       setCustomModalTab('all');
 
-      let serviceToUse = initialServiceId || 'strategic-planner';
+      let serviceToUse = initialServiceId || 'custom';
       if (
         initialServiceId === 'custom' ||
         initialServiceId === 'custom-boosting' ||
@@ -492,10 +499,19 @@ export default function NewRequestModal({
               strategicPlan: false,
               content: false,
               devrel: false,
+              gtm: false,
+              adCreatives: false,
+              brandIdentity: false,
               leadResearch: false,
               companyStudy: false,
               keyPeople: false,
               pitchSupport: false,
+              uiUxAudit: false,
+              figmaProject: false,
+              redesignRequest: false,
+              webApp: false,
+              mobileApp: false,
+              apiBackend: false,
               ...initialCustomData.selectedServices,
             },
           }));
@@ -1421,11 +1437,13 @@ export default function NewRequestModal({
                     </div>
 
                     {/* Filter Tabs */}
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
                       {[
-                        { id: 'all', label: 'All Services (7)' },
-                        { id: 'boosting', label: 'Boosting Sprints (3)' },
-                        { id: 'digitalising', label: 'Digitalising Intelligence (4)' },
+                        { id: 'all', label: 'All Services (16)' },
+                        { id: 'boosting', label: 'Boosting (6)' },
+                        { id: 'digitalising', label: 'Digitalising (4)' },
+                        { id: 'design', label: 'UI / Design (3)' },
+                        { id: 'development', label: 'App Development (3)' },
                       ].map((tab) => {
                         const isActive = customModalTab === tab.id;
                         return (
@@ -1451,7 +1469,7 @@ export default function NewRequestModal({
                       })}
                     </div>
 
-                    {/* All 7 Services Grid */}
+                    {/* All 16 Services Grid */}
                     <div
                       style={{
                         display: 'grid',
@@ -1460,13 +1478,26 @@ export default function NewRequestModal({
                       }}
                     >
                       {[
+                        // Boosting
                         { key: 'strategicPlan', category: 'boosting', label: 'Strategic Plan', sub: 'Positioning & ICP Roadmap', color: '#EC4899', bg: '#FDF2F8' },
-                        { key: 'content', category: 'boosting', label: 'Content for Your Company', sub: 'Branded Posters & Demo Videos', color: '#F43F5E', bg: '#FFF1F2' },
-                        { key: 'devrel', category: 'boosting', label: 'DevRel Plan', sub: 'Developer Relations Strategy', color: '#8B5CF6', bg: '#F5F3FF' },
+                        { key: 'content', category: 'boosting', label: 'Content Creator', sub: 'Branded Collateral & Videos', color: '#F43F5E', bg: '#FFF1F2' },
+                        { key: 'devrel', category: 'boosting', label: 'DevRel & Tech Advocacy', sub: 'Developer Relations Strategy', color: '#8B5CF6', bg: '#F5F3FF' },
+                        { key: 'gtm', category: 'boosting', label: 'GTM Strategy', sub: 'Go-To-Market & Launch Blueprints', color: '#10B981', bg: '#ECFDF5' },
+                        { key: 'adCreatives', category: 'boosting', label: 'Ad Creatives', sub: 'Multi-Format Visual Ads & Copy', color: '#EF4444', bg: '#FEF2F2' },
+                        { key: 'brandIdentity', category: 'boosting', label: 'Brand Identity', sub: 'Visual Language & Guidelines', color: '#3B82F6', bg: '#EFF6FF' },
+                        // Digitalising
                         { key: 'leadResearch', category: 'digitalising', label: 'Lead Research', sub: 'Target Verified Lead Telemetry', color: '#7C3AED', bg: '#EDE9FE' },
                         { key: 'companyStudy', category: 'digitalising', label: 'Company Study', sub: 'Comprehensive Account Dossier', color: '#6366F1', bg: '#EEF2FF' },
                         { key: 'keyPeople', category: 'digitalising', label: 'Key People Research', sub: 'Executive Hierarchy & Contacts', color: '#0EA5E9', bg: '#F0F9FF' },
                         { key: 'pitchSupport', category: 'digitalising', label: 'Pitch Support', sub: 'Narrative & Objection Handling', color: '#10B981', bg: '#ECFDF5' },
+                        // UI / Design
+                        { key: 'uiUxAudit', category: 'design', label: 'UI/UX Audit', sub: 'Heuristic Review & Usability', color: '#0284C7', bg: '#F0F9FF' },
+                        { key: 'figmaProject', category: 'design', label: 'Figma Project', sub: 'Component Library & UI Kit', color: '#7C3AED', bg: '#FAF5FF' },
+                        { key: 'redesignRequest', category: 'design', label: 'Redesign Request', sub: 'Full Page Layout Redesign', color: '#EC4899', bg: '#FDF2F8' },
+                        // App Development
+                        { key: 'webApp', category: 'development', label: 'Web Application MVP', sub: 'Turnkey Full-Stack Application', color: '#10B981', bg: '#ECFDF5' },
+                        { key: 'mobileApp', category: 'development', label: 'Mobile App', sub: 'Cross-Platform React Native App', color: '#6366F1', bg: '#EEF2FF' },
+                        { key: 'apiBackend', category: 'development', label: 'API & Backend Systems', sub: 'Scalable Architecture & APIs', color: '#0EA5E9', bg: '#F0F9FF' },
                       ]
                         .filter((s) => customModalTab === 'all' || s.category === customModalTab)
                         .map((srv) => {
@@ -1487,7 +1518,7 @@ export default function NewRequestModal({
                                 padding: '12px 14px',
                                 borderRadius: '12px',
                                 background: isChecked ? '#F5F3FF' : '#FFFFFF',
-                                border: isChecked ? '1px solid #7C3AED' : '1px solid #E5E7EB',
+                                border: isChecked ? '1.5px solid #7C3AED' : '1px solid #E5E7EB',
                                 cursor: 'pointer',
                                 userSelect: 'none',
                                 boxShadow: isChecked ? '0 2px 6px rgba(124, 58, 237, 0.12)' : '0 1px 2px rgba(0, 0, 0, 0.03)',
@@ -2980,21 +3011,27 @@ export default function NewRequestModal({
                       value={
                         Object.entries(customForm.selectedServices)
                           .filter(([_, v]) => v)
-                          .map(([k]) =>
-                            k === 'strategicPlan'
-                              ? 'Strategic Plan'
-                              : k === 'content'
-                              ? 'Content for Your Company'
-                              : k === 'devrel'
-                              ? 'DevRel Plan'
-                              : k === 'leadResearch'
-                              ? 'Lead Research'
-                              : k === 'companyStudy'
-                              ? 'Company Study'
-                              : k === 'keyPeople'
-                              ? 'Key People Research'
-                              : 'Pitch Support'
-                          )
+                          .map(([k]) => {
+                            const nameMap = {
+                              strategicPlan: 'Strategic Plan',
+                              content: 'Content Creator',
+                              devrel: 'DevRel',
+                              gtm: 'GTM Strategy',
+                              adCreatives: 'Ad Creatives',
+                              brandIdentity: 'Brand Identity',
+                              leadResearch: 'Lead Research',
+                              companyStudy: 'Company Study',
+                              keyPeople: 'Key People Research',
+                              pitchSupport: 'Pitch Support',
+                              uiUxAudit: 'UI/UX Audit',
+                              figmaProject: 'Figma Project',
+                              redesignRequest: 'Redesign Request',
+                              webApp: 'Web Application MVP',
+                              mobileApp: 'Mobile App',
+                              apiBackend: 'API & Backend',
+                            };
+                            return nameMap[k] || k;
+                          })
                           .join(', ') || 'Custom Scope'
                       }
                       highlight
