@@ -377,7 +377,6 @@ export const streamAsset = async (req, res) => {
         });
         return fs.createReadStream(filePath).pipe(res);
       }
-    }
 
     // Handle MinIO Object Key
     if (storageUrl && (isMinioObjectKey(storageUrl) || (!storageUrl.startsWith('data:') && !storageUrl.startsWith('http') && !fs.existsSync(storageUrl)))) {
