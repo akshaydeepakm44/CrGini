@@ -92,12 +92,18 @@ export const getPublicSampleBySlug = async (req, res) => {
       const matchedStudy = l.leadStudy || (sample.leadStudies || []).find((s) => s.leadName === leadName || s.id === leadId) || {};
 
       // Match lead-specific pitch deck or fall back to general pitch deck
-      const leadPitch = l.pitchDeck || (sample.pitchDeck?.assetKey ? {
+      const leadPitch = l.pitchDeck || (l.pitchDeckPdf ? {
+        title: l.pitchDeckTitle || `${leadName} Proposal Pitch Deck`,
+        summary: `Strategic value pitch tailored for ${l.title || 'executive decision makers'}.`,
+        fileName: l.pitchDeckPdfName || `${leadName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
+        streamUrl: l.pitchDeckPdf,
+        downloadUrl: l.pitchDeckPdf,
+      } : (sample.pitchDeck?.assetKey ? {
         title: `${sample.companyName} Proposal for ${l.company || sample.companyName}`,
         summary: `Strategic value pitch tailored for ${l.title || 'executive decision makers'}.`,
         fileName: sample.pitchDeck.fileName,
         streamUrl: `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck`,
-      } : null);
+      } : null));
 
       return {
         id: leadId,
@@ -108,6 +114,10 @@ export const getPublicSampleBySlug = async (req, res) => {
         industry: l.industry || '',
         location: l.location || '',
         linkedin: l.linkedin || '',
+        leadStudyPdf: l.leadStudyPdf || null,
+        leadStudyPdfName: l.leadStudyPdfName || null,
+        pitchDeckPdf: l.pitchDeckPdf || null,
+        pitchDeckPdfName: l.pitchDeckPdfName || null,
         aboutCompany: l.aboutCompany || l.company_summary || `Leading innovator in ${l.industry || 'the enterprise sector'}.`,
         whySuitsBest: l.whySuitsBest || l.why_suits_best || `Strategic decision maker evaluating modern solutions in ${l.industry || 'their market'}.`,
         maskedEmail: l.maskedEmail || maskEmail(l.email),
@@ -122,9 +132,16 @@ export const getPublicSampleBySlug = async (req, res) => {
         pitchDeck: leadPitch ? {
           title: leadPitch.title || `Tailored Pitch for ${leadName}`,
           summary: leadPitch.summary || 'Strategic presentation proposal designed to convert this stakeholder.',
-          streamUrl: `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck`,
-          fileName: leadPitch.fileName || `${leadName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
-        } : null,
+          streamUrl: leadPitch.streamUrl || (leadPitch.assetKey ? `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck` : (l.pitchDeckPdf || `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck`)),
+          downloadUrl: leadPitch.downloadUrl || leadPitch.streamUrl || (leadPitch.assetKey ? `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck?download=true` : (l.pitchDeckPdf || `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck?download=true`)),
+          fileName: leadPitch.fileName || l.pitchDeckPdfName || `${leadName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
+        } : (l.pitchDeckPdf ? {
+          title: `${leadName} Proposal Pitch Deck`,
+          summary: 'Tailored strategic pitch deck proposal prepared for this executive.',
+          streamUrl: l.pitchDeckPdf,
+          downloadUrl: l.pitchDeckPdf,
+          fileName: l.pitchDeckPdfName || `${leadName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
+        } : null),
       };
     });
 
@@ -294,6 +311,22 @@ export const streamLeadPitchDeck = async (req, res) => {
     }
 
     const lead = (sample.leads || []).find((l) => l.id === leadId);
+
+    // If PDF was saved directly as base64 data URL
+    if (lead?.pitchDeckPdf && lead.pitchDeckPdf.startsWith('data:application/pdf;base64,')) {
+      const base64Data = lead.pitchDeckPdf.replace(/^data:application\/pdf;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      const fname = (lead.pitchDeckPdfName || lead.pitchDeck?.fileName || `${lead.name || 'Lead'}_Pitch_Deck.pdf`).replace(/["\r\n]/g, '_');
+      const disposition = download === 'true' ? `attachment; filename="${fname}"` : `inline; filename="${fname}"`;
+      res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': disposition,
+        'Content-Length': buffer.length,
+        'Cache-Control': 'public, max-age=3600',
+      });
+      return res.end(buffer);
+    }
+
     let assetKey = lead?.pitchDeck?.assetKey || sample.pitchDeck?.assetKey;
     let fileName = lead?.pitchDeck?.fileName || sample.pitchDeck?.fileName || 'Proposal_Pitch_Deck.pdf';
 
@@ -349,6 +382,22 @@ export const streamLeadStudyPdf = async (req, res) => {
     }
 
     const lead = (sample.leads || []).find((l) => l.id === leadId);
+
+    // If PDF was saved directly as base64 data URL
+    if (lead?.leadStudyPdf && lead.leadStudyPdf.startsWith('data:application/pdf;base64,')) {
+      const base64Data = lead.leadStudyPdf.replace(/^data:application\/pdf;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      const fname = (lead.leadStudyPdfName || `${lead.name || 'Lead'}_Study.pdf`).replace(/["\r\n]/g, '_');
+      const disposition = download === 'true' ? `attachment; filename="${fname}"` : `inline; filename="${fname}"`;
+      res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': disposition,
+        'Content-Length': buffer.length,
+        'Cache-Control': 'public, max-age=3600',
+      });
+      return res.end(buffer);
+    }
+
     let assetKey = lead?.leadStudyPdfAssetKey || lead?.leadStudy?.assetKey;
     let fileName = lead?.leadStudyPdfName || `${lead?.name || 'Lead'}_Study.pdf`;
 

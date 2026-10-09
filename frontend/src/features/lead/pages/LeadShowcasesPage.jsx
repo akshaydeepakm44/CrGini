@@ -41,7 +41,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingShowcase, setEditingShowcase] = useState(null);
-  const [activeTab, setActiveTab] = useState('company'); // 'company' | 'study' | 'leads' | 'pitch'
+  const [activeTab, setActiveTab] = useState('company'); // 'company' | 'study' | 'leads'
 
   // Form State
   const [formData, setFormData] = useState({
@@ -74,6 +74,8 @@ export default function LeadShowcasesPage({ onNavigate }) {
     linkedin: '',
     leadStudyPdf: '',
     leadStudyPdfName: '',
+    pitchDeckPdf: '',
+    pitchDeckPdfName: '',
     logo: '',
     title: '',
     company: '',
@@ -140,6 +142,8 @@ export default function LeadShowcasesPage({ onNavigate }) {
           logo: '/logo.png',
           leadStudyPdf: '',
           leadStudyPdfName: '',
+          pitchDeckPdf: '',
+          pitchDeckPdfName: '',
           whySuitsBest: 'Leading multi-region platform migration with open Q3 procurement budget.',
           leadStudy: {
             whyRelevant: 'Direct budget authority for integration and architecture overhaul.',
@@ -360,6 +364,8 @@ support@creativegini.com`;
       linkedin: leadForm.linkedin?.trim() || '',
       leadStudyPdf: leadForm.leadStudyPdf || '',
       leadStudyPdfName: leadForm.leadStudyPdfName || '',
+      pitchDeckPdf: leadForm.pitchDeckPdf || '',
+      pitchDeckPdfName: leadForm.pitchDeckPdfName || '',
       logo: leadForm.logo || '',
       title: leadForm.title?.trim() || 'Key Executive',
       company: companyName,
@@ -370,6 +376,13 @@ support@creativegini.com`;
         observedContext: leadForm.observedContext?.trim() || 'Observed growth and strategic expansion.',
         suggestedApproach: leadForm.suggestedApproach?.trim() || 'Lead with verifiable outcomes and SLA guarantees.',
       },
+      pitchDeck: leadForm.pitchDeckPdf ? {
+        title: `${leadForm.name.trim()} Proposal Pitch Deck`,
+        summary: 'Targeted strategic pitch deck prepared for client leadership.',
+        streamUrl: leadForm.pitchDeckPdf,
+        downloadUrl: leadForm.pitchDeckPdf,
+        fileName: leadForm.pitchDeckPdfName || `${leadForm.name.trim().replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
+      } : null,
     };
 
     const updatedLeads = [...formData.leads];
@@ -387,6 +400,8 @@ support@creativegini.com`;
       linkedin: '',
       leadStudyPdf: '',
       leadStudyPdfName: '',
+      pitchDeckPdf: '',
+      pitchDeckPdfName: '',
       logo: '',
       title: '',
       company: '',
@@ -428,6 +443,8 @@ support@creativegini.com`;
             aboutCompany: `Leading corporate enterprise operating in ${formData.companyStudy.industry}.`,
             leadStudyPdf: '',
             leadStudyPdfName: '',
+            pitchDeckPdf: '',
+            pitchDeckPdfName: '',
             logo: '',
             whySuitsBest,
             leadStudy: {
@@ -913,21 +930,6 @@ support@creativegini.com`;
                 }}
               >
                 3. Curated Leads ({formData.leads.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('pitch')}
-                style={{
-                  padding: '12px 18px',
-                  border: 'none',
-                  background: 'none',
-                  fontSize: '0.875rem',
-                  fontWeight: activeTab === 'pitch' ? 700 : 500,
-                  color: activeTab === 'pitch' ? '#7C3AED' : '#6B7280',
-                  borderBottom: activeTab === 'pitch' ? '2px solid #7C3AED' : '2px solid transparent',
-                  cursor: 'pointer',
-                }}
-              >
-                4. Proposal Pitch Deck
               </button>
             </div>
 
@@ -1451,6 +1453,67 @@ support@creativegini.com`;
                           </label>
                         )}
                       </div>
+
+                      {/* 7. Pitch Deck PDF Upload */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                          7. Pitch Deck / Proposal PDF (Document)
+                        </label>
+                        {leadForm.pitchDeckPdf ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#FFFFFF', padding: '6px 12px', borderRadius: '7px', border: '1px solid #D1D5DB' }}>
+                            <Presentation size={18} color="#7C3AED" />
+                            <span style={{ fontSize: '0.8rem', color: '#6D28D9', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {leadForm.pitchDeckPdfName || 'Pitch Deck PDF Attached'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setLeadForm((prev) => ({ ...prev, pitchDeckPdf: '', pitchDeckPdfName: '' }))}
+                              style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                              title="Remove Pitch Deck"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              padding: '9px 12px',
+                              borderRadius: '7px',
+                              border: '1px dashed #7C3AED',
+                              background: '#FFFFFF',
+                              color: '#7C3AED',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Presentation size={15} color="#7C3AED" />
+                            <span>Upload Pitch Deck PDF</span>
+                            <input
+                              type="file"
+                              accept=".pdf,application/pdf"
+                              style={{ display: 'none' }}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                  setLeadForm((prev) => ({
+                                    ...prev,
+                                    pitchDeckPdf: ev.target.result,
+                                    pitchDeckPdfName: file.name,
+                                  }));
+                                };
+                                reader.readAsDataURL(file);
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
                     </div>
 
                     {/* Secondary Context Fields */}
@@ -1495,6 +1558,8 @@ support@creativegini.com`;
                               linkedin: '',
                               leadStudyPdf: '',
                               leadStudyPdfName: '',
+                              pitchDeckPdf: '',
+                              pitchDeckPdfName: '',
                               logo: '',
                               title: '',
                               company: '',
@@ -1618,7 +1683,12 @@ support@creativegini.com`;
                               )}
                               {l.leadStudyPdf && (
                                 <span style={{ fontSize: '0.72rem', color: '#1D4ED8', background: '#DBEAFE', padding: '2px 8px', borderRadius: '6px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                  <FileText size={10} /> PDF Attached
+                                  <FileText size={10} /> Lead Study Attached
+                                </span>
+                              )}
+                              {(l.pitchDeckPdf || l.pitchDeck?.streamUrl) && (
+                                <span style={{ fontSize: '0.72rem', color: '#7C3AED', background: '#F3E8FF', padding: '2px 8px', borderRadius: '6px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  <Presentation size={10} /> Pitch Deck Attached
                                 </span>
                               )}
                             </div>
@@ -1637,6 +1707,8 @@ support@creativegini.com`;
                                 linkedin: l.linkedin || '',
                                 leadStudyPdf: l.leadStudyPdf || '',
                                 leadStudyPdfName: l.leadStudyPdfName || '',
+                                pitchDeckPdf: l.pitchDeckPdf || l.pitchDeck?.streamUrl || '',
+                                pitchDeckPdfName: l.pitchDeckPdfName || l.pitchDeck?.fileName || '',
                                 logo: l.logo || '',
                                 title: l.title || '',
                                 company: l.company || '',
@@ -1687,81 +1759,9 @@ support@creativegini.com`;
                 </div>
               )}
 
-              {/* TAB 4: Proposal Pitch Deck */}
-              {activeTab === 'pitch' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div
-                    style={{
-                      background: '#F8FAFC',
-                      border: '2px dashed #CBD5E1',
-                      borderRadius: '12px',
-                      padding: '24px',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <Presentation size={36} color="#7C3AED" style={{ margin: '0 auto 8px auto' }} />
-                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1E293B' }}>
-                      Pitch Deck Proposal Document
-                    </div>
-                    <p style={{ fontSize: '0.8125rem', color: '#64748B', margin: '4px 0 14px 0' }}>
-                      Attach the pitch deck tailored for this prospect account that the client can propose.
-                    </p>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px', textAlign: 'left' }}>
-                        Pitch Deck Title
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. CreativeGini Strategic Growth Playbook"
-                        value={formData.pitchDeck.title}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            pitchDeck: { ...formData.pitchDeck, title: e.target.value },
-                          })
-                        }
-                        style={{
-                          width: '100%',
-                          padding: '10px 14px',
-                          border: '1px solid #D1D5DB',
-                          borderRadius: '8px',
-                          fontSize: '0.875rem',
-                          marginBottom: '12px',
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px', textAlign: 'left' }}>
-                        Pitch Deck Summary
-                      </label>
-                      <textarea
-                        rows={2}
-                        placeholder="Summary of presentation deck and proposed engagement model..."
-                        value={formData.pitchDeck.summary}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            pitchDeck: { ...formData.pitchDeck, summary: e.target.value },
-                          })
-                        }
-                        style={{
-                          width: '100%',
-                          padding: '10px 14px',
-                          border: '1px solid #D1D5DB',
-                          borderRadius: '8px',
-                          fontSize: '0.875rem',
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
             </div>
 
-            {/* Modal Footer (4-Step Wizard Flow) */}
+            {/* Modal Footer (3-Step Wizard Flow) */}
             <div
               style={{
                 padding: '16px 24px',
@@ -1776,10 +1776,9 @@ support@creativegini.com`;
               }}
             >
               <div style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
-                {activeTab === 'company' && <span>Step <strong>1 of 4</strong>: Target Account & Slug</span>}
-                {activeTab === 'study' && <span>Step <strong>2 of 4</strong>: Company Study & PDF Upload</span>}
-                {activeTab === 'leads' && <span>Step <strong>3 of 4</strong>: Curated Decision Makers ({formData.leads.length} added)</span>}
-                {activeTab === 'pitch' && <span>Step <strong>4 of 4</strong>: Proposal Pitch Deck & Final Save</span>}
+                {activeTab === 'company' && <span>Step <strong>1 of 3</strong>: Target Account & Slug</span>}
+                {activeTab === 'study' && <span>Step <strong>2 of 3</strong>: Company Study & PDF Upload</span>}
+                {activeTab === 'leads' && <span>Step <strong>3 of 3</strong>: Curated Decision Makers ({formData.leads.length} added) & Pitch Decks</span>}
               </div>
 
               <div style={{ display: 'flex', gap: '10px' }}>
@@ -1807,7 +1806,6 @@ support@creativegini.com`;
                     onClick={() => {
                       if (activeTab === 'study') setActiveTab('company');
                       if (activeTab === 'leads') setActiveTab('study');
-                      if (activeTab === 'pitch') setActiveTab('leads');
                     }}
                     style={{
                       background: '#FFFFFF',
@@ -1872,29 +1870,8 @@ support@creativegini.com`;
                   </button>
                 )}
 
-                {/* Step 3 Next */}
+                {/* Step 3 Final Submission */}
                 {activeTab === 'leads' && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('pitch')}
-                    style={{
-                      background: '#7C3AED',
-                      border: 'none',
-                      color: '#FFFFFF',
-                      padding: '9px 22px',
-                      borderRadius: '8px',
-                      fontWeight: 700,
-                      fontSize: '0.875rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
-                    }}
-                  >
-                    Save & Next: Pitch Deck →
-                  </button>
-                )}
-
-                {/* Step 4 Final Submission */}
-                {activeTab === 'pitch' && (
                   <button
                     type="button"
                     onClick={handleSaveShowcase}

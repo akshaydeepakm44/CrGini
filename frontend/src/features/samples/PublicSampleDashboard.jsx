@@ -458,11 +458,21 @@ export default function PublicSampleDashboard() {
                   )}
 
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {lead.name}
                       </span>
                       <ShieldCheck size={14} color="#10B981" title="Verified Decision Maker" />
+                      {(lead.pitchDeck || lead.pitchDeckPdf) && (
+                        <span style={{ fontSize: '0.7rem', color: '#7C3AED', background: '#F3E8FF', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Presentation size={10} /> Pitch Deck
+                        </span>
+                      )}
+                      {(lead.leadStudyPdf || lead.leadStudyPdfUrl) && (
+                        <span style={{ fontSize: '0.7rem', color: '#2563EB', background: '#DBEAFE', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <FileText size={10} /> Study PDF
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: '0.8125rem', color: '#2563EB', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {lead.title}
@@ -1028,7 +1038,7 @@ export default function PublicSampleDashboard() {
               )}
 
               {/* 5. Pitch Deck Proposal For This Lead */}
-              {selectedLead.pitchDeck && (
+              {(selectedLead.pitchDeck || selectedLead.pitchDeckPdf) && (
                 <div
                   style={{
                     background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)',
@@ -1047,17 +1057,18 @@ export default function PublicSampleDashboard() {
                       Proposal Pitch Deck For This Lead
                     </div>
                     <div style={{ fontSize: '1rem', fontWeight: 800, color: '#FFFFFF', marginTop: '2px' }}>
-                      {selectedLead.pitchDeck.title || `Tailored Pitch Proposal for ${selectedLead.name}`}
+                      {selectedLead.pitchDeck?.title || `Tailored Pitch Proposal for ${selectedLead.name}`}
                     </div>
                     <p style={{ fontSize: '0.8125rem', color: '#C7D2FE', margin: '4px 0 0 0', lineHeight: '1.4' }}>
-                      {selectedLead.pitchDeck.summary || 'Turnkey presentation proposal crafted specifically to engage and convert this stakeholder.'}
+                      {selectedLead.pitchDeck?.summary || 'Turnkey presentation proposal crafted specifically to engage and convert this stakeholder.'}
                     </p>
                   </div>
 
                   <a
-                    href={selectedLead.pitchDeck.streamUrl || `/api/samples/${sample.slug}/leads/${selectedLead.id}/pitch-deck`}
+                    href={selectedLead.pitchDeckPdf || selectedLead.pitchDeck?.streamUrl || selectedLead.pitchDeck?.downloadUrl || `/api/samples/${sample.slug}/leads/${selectedLead.id}/pitch-deck`}
                     target="_blank"
                     rel="noreferrer"
+                    download={selectedLead.pitchDeckPdfName || selectedLead.pitchDeck?.fileName || `${selectedLead.name}_Pitch_Deck.pdf`}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
