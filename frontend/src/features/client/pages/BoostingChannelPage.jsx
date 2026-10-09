@@ -13,6 +13,8 @@ export default function BoostingChannelPage({
     strategicPlan: false,
     content: false,
     devrel: false,
+    gtm: false,
+    adCreatives: false,
   });
   const [customRequirements, setCustomRequirements] = useState('');
 
@@ -300,6 +302,8 @@ export default function BoostingChannelPage({
               { key: 'strategicPlan', label: 'Strategic Plan', sub: 'Positioning & ICP Roadmap' },
               { key: 'content', label: 'Content for Your Company', sub: 'Branded Posters & Demo Videos' },
               { key: 'devrel', label: 'DevRel Plan', sub: 'Developer Relations Strategy' },
+              { key: 'gtm', label: 'GTM Strategy', sub: 'Launch Blueprints & Distribution' },
+              { key: 'adCreatives', label: 'Ad Creatives', sub: 'High-Converting Visual Ads & Copy' },
             ].map((srv) => {
               const isChecked = !!customServices[srv.key];
               return (

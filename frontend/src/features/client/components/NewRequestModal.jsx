@@ -66,6 +66,51 @@ const SERVICE_CONFIGS = {
       { item: 'Technical Community & Outreach Roadmap', amount: 300 },
     ],
   },
+  'gtm': {
+    serviceType: 'COMPANY_BOOST',
+    subService: 'GTM_STRATEGY',
+    channel: 'boosting',
+    badge: 'GTM STRATEGY SPRINT',
+    categoryLabel: 'Company Boost Service',
+    serviceLabel: 'Company Boost: GTM Strategy Sprint',
+    accentColor: '#10B981',
+    accentBg: '#ECFDF5',
+    price: 799,
+    breakdown: [
+      { item: 'GTM Launch Playbook & Channel Distribution Roadmap', amount: 499 },
+      { item: 'GTM Strategy Brochure & Collateral Deck', amount: 300 },
+    ],
+  },
+  'gtm-strategy': {
+    serviceType: 'COMPANY_BOOST',
+    subService: 'GTM_STRATEGY',
+    channel: 'boosting',
+    badge: 'GTM STRATEGY SPRINT',
+    categoryLabel: 'Company Boost Service',
+    serviceLabel: 'Company Boost: GTM Strategy Sprint',
+    accentColor: '#10B981',
+    accentBg: '#ECFDF5',
+    price: 799,
+    breakdown: [
+      { item: 'GTM Launch Playbook & Channel Distribution Roadmap', amount: 499 },
+      { item: 'GTM Strategy Brochure & Collateral Deck', amount: 300 },
+    ],
+  },
+  'ad-creatives': {
+    serviceType: 'COMPANY_BOOST',
+    subService: 'AD_CREATIVES',
+    channel: 'boosting',
+    badge: 'AD CREATIVES SPRINT',
+    categoryLabel: 'Company Boost Service',
+    serviceLabel: 'Company Boost: Ad Creatives Sprint',
+    accentColor: '#EF4444',
+    accentBg: '#FEF2F2',
+    price: 799,
+    breakdown: [
+      { item: 'Multi-Format Visual Ad Creative Pack (1:1, 9:16, 16:9)', amount: 499 },
+      { item: 'Ad Copy Angles & Creative Testing Matrix', amount: 300 },
+    ],
+  },
   'custom-boosting': {
     serviceType: 'COMPANY_BOOST',
     subService: 'CUSTOM',
@@ -285,6 +330,8 @@ export default function NewRequestModal({
       strategicPlan: true,
       content: false,
       devrel: false,
+      gtm: false,
+      adCreatives: false,
       leadResearch: false,
       companyStudy: false,
       keyPeople: false,
@@ -368,6 +415,35 @@ export default function NewRequestModal({
     additionalRequirements: '',
   });
 
+  // --- 12. GTM Strategy Form State ---
+  const [gtmForm, setGtmForm] = useState({
+    launchGoal: '',
+    targetProduct: '',
+    targetMarket: '',
+    distributionChannels: '',
+    launchTimeline: '',
+    competitors: '',
+    referenceLinks: '',
+    additionalRequirements: '',
+  });
+
+  // --- 13. Ad Creatives Form State ---
+  const [adCreativesForm, setAdCreativesForm] = useState({
+    campaignObjective: '',
+    adFormats: {
+      square: true,
+      story: true,
+      landscape: false,
+      carousel: false,
+    },
+    targetPlatforms: 'Meta (Instagram & Facebook), LinkedIn',
+    targetAudience: '',
+    coreOffer: '',
+    brandGuidelines: '',
+    referenceExamples: '',
+    additionalRequirements: '',
+  });
+
   // Category filter tab inside Custom modal scope builder
   const [customModalTab, setCustomModalTab] = useState('all');
 
@@ -387,6 +463,8 @@ export default function NewRequestModal({
         initialServiceId === 'custom-digitalising'
       ) {
         serviceToUse = 'custom';
+      } else if (initialServiceId === 'gtm-strategy') {
+        serviceToUse = 'gtm';
       }
       setActiveServiceId(serviceToUse);
 
@@ -473,6 +551,14 @@ export default function NewRequestModal({
       if (!redesignForm.targetUrl.trim()) errs.targetUrl = 'Current Page URL is required';
       if (!redesignForm.redesignObjective.trim()) errs.redesignObjective = 'Primary Redesign Objective is required';
       if (!redesignForm.targetAudience.trim()) errs.targetAudience = 'Target Audience is required';
+    } else if (activeServiceId === 'gtm' || activeServiceId === 'gtm-strategy') {
+      if (!gtmForm.launchGoal.trim()) errs.launchGoal = 'Launch Goal / Objective is required';
+      if (!gtmForm.targetProduct.trim()) errs.targetProduct = 'Product / Feature Name is required';
+      if (!gtmForm.targetMarket.trim()) errs.targetMarket = 'Target Market / Audience is required';
+    } else if (activeServiceId === 'ad-creatives') {
+      if (!adCreativesForm.campaignObjective.trim()) errs.campaignObjective = 'Campaign Objective is required';
+      if (!adCreativesForm.targetAudience.trim()) errs.targetAudience = 'Target Audience is required';
+      if (!adCreativesForm.coreOffer.trim()) errs.coreOffer = 'Core Offer / Value Hook is required';
     }
 
     setErrors(errs);
@@ -532,12 +618,19 @@ export default function NewRequestModal({
           serviceId: activeServiceId,
           contentDetails: customForm.selectedServices.content ? contentForm : undefined,
           devrelDetails: customForm.selectedServices.devrel ? devrelForm : undefined,
+          gtmDetails: customForm.selectedServices.gtm ? gtmForm : undefined,
+          adCreativesDetails: customForm.selectedServices.adCreatives ? adCreativesForm : undefined,
           leadResearchDetails: customForm.selectedServices.leadResearch ? leadForm : undefined,
           companyStudyDetails: customForm.selectedServices.companyStudy ? companyStudyForm : undefined,
           keyPeopleDetails: customForm.selectedServices.keyPeople ? keyPeopleForm : undefined,
           pitchSupportDetails: customForm.selectedServices.pitchSupport ? pitchSupportForm : undefined,
           strategicPlanDetails: customForm.selectedServices.strategicPlan ? strategicForm : undefined,
         };
+      case 'gtm':
+      case 'gtm-strategy':
+        return { ...gtmForm, serviceId: activeServiceId };
+      case 'ad-creatives':
+        return { ...adCreativesForm, serviceId: activeServiceId };
       case 'lead-research':
         return { ...leadForm, serviceId: activeServiceId };
       case 'company-study':
@@ -574,6 +667,11 @@ export default function NewRequestModal({
         return contentForm.productHighlight ? `Content Sprint: ${contentForm.productHighlight}` : 'Content Production Sprint';
       case 'devrel':
         return devrelForm.productApiSdk ? `DevRel Sprint: ${devrelForm.productApiSdk}` : 'DevRel Strategy Sprint';
+      case 'gtm':
+      case 'gtm-strategy':
+        return gtmForm.launchGoal ? `GTM Strategy: ${gtmForm.launchGoal}` : 'GTM Strategy Sprint';
+      case 'ad-creatives':
+        return adCreativesForm.campaignObjective ? `Ad Creatives: ${adCreativesForm.campaignObjective}` : 'Ad Creatives Sprint';
       case 'lead-research':
         return `Lead Research: ${leadForm.leadsCount} Verified Contacts (${leadForm.targetMarket || 'Target Accounts'})`;
       case 'company-study':
@@ -609,6 +707,8 @@ export default function NewRequestModal({
         title: getComputedTitle(),
         description:
           strategicForm.mainGoal ||
+          gtmForm.launchGoal ||
+          adCreativesForm.campaignObjective ||
           contentForm.mainPurpose ||
           devrelForm.mainDevrelGoal ||
           customForm.requirements ||
@@ -2493,6 +2593,243 @@ export default function NewRequestModal({
                   </div>
                 </div>
               )}
+
+              {/* ------------------------------------------------------
+                  CASE L: GTM STRATEGY SPRINT
+                  ------------------------------------------------------ */}
+              {(activeServiceId === 'gtm' || activeServiceId === 'gtm-strategy') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                    <div>
+                      <label style={labelStyle}>
+                        Launch Goal / Objective <span style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <input
+                        style={inputStyle(errors.launchGoal)}
+                        placeholder="e.g. Q4 enterprise product launch, international market expansion"
+                        value={gtmForm.launchGoal}
+                        onChange={(e) => setGtmForm({ ...gtmForm, launchGoal: e.target.value })}
+                      />
+                      {errors.launchGoal && <div style={errorStyle}>{errors.launchGoal}</div>}
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>
+                        Product / Feature Name <span style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <input
+                        style={inputStyle(errors.targetProduct)}
+                        placeholder="e.g. DataSync Enterprise v2.0"
+                        value={gtmForm.targetProduct}
+                        onChange={(e) => setGtmForm({ ...gtmForm, targetProduct: e.target.value })}
+                      />
+                      {errors.targetProduct && <div style={errorStyle}>{errors.targetProduct}</div>}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                    <div>
+                      <label style={labelStyle}>
+                        Target Market / Audience <span style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <input
+                        style={inputStyle(errors.targetMarket)}
+                        placeholder="e.g. Series B+ FinTech CTOs, Data Engineering VPs"
+                        value={gtmForm.targetMarket}
+                        onChange={(e) => setGtmForm({ ...gtmForm, targetMarket: e.target.value })}
+                      />
+                      {errors.targetMarket && <div style={errorStyle}>{errors.targetMarket}</div>}
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Primary Distribution Vectors</label>
+                      <input
+                        style={inputStyle()}
+                        placeholder="e.g. Product Hunt, LinkedIn Outbound, Partner Co-Marketing"
+                        value={gtmForm.distributionChannels}
+                        onChange={(e) => setGtmForm({ ...gtmForm, distributionChannels: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                    <div>
+                      <label style={labelStyle}>Target Launch Timeline</label>
+                      <input
+                        style={inputStyle()}
+                        placeholder="e.g. Launching in 4 weeks, Beta next month"
+                        value={gtmForm.launchTimeline}
+                        onChange={(e) => setGtmForm({ ...gtmForm, launchTimeline: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Key Competitors / Reference Launches</label>
+                      <input
+                        style={inputStyle()}
+                        placeholder="e.g. Snowflake, Databricks, Fivetran"
+                        value={gtmForm.competitors}
+                        onChange={(e) => setGtmForm({ ...gtmForm, competitors: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                    <div>
+                      <label style={labelStyle}>Reference Links / Product Docs</label>
+                      <input
+                        style={inputStyle()}
+                        placeholder="e.g. Pitch deck URL, staging environment, Notion doc"
+                        value={gtmForm.referenceLinks}
+                        onChange={(e) => setGtmForm({ ...gtmForm, referenceLinks: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Additional Requirements</label>
+                      <input
+                        style={inputStyle()}
+                        placeholder="e.g. Focus on executive sales collateral and launch scorecard"
+                        value={gtmForm.additionalRequirements}
+                        onChange={(e) => setGtmForm({ ...gtmForm, additionalRequirements: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ------------------------------------------------------
+                  CASE M: AD CREATIVES SPRINT
+                  ------------------------------------------------------ */}
+              {activeServiceId === 'ad-creatives' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                    <div>
+                      <label style={labelStyle}>
+                        Campaign Objective <span style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <input
+                        style={inputStyle(errors.campaignObjective)}
+                        placeholder="e.g. B2B Lead Gen, Free Trial Signups, Retargeting Demo Views"
+                        value={adCreativesForm.campaignObjective}
+                        onChange={(e) => setAdCreativesForm({ ...adCreativesForm, campaignObjective: e.target.value })}
+                      />
+                      {errors.campaignObjective && <div style={errorStyle}>{errors.campaignObjective}</div>}
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Target Ad Platforms</label>
+                      <input
+                        style={inputStyle()}
+                        placeholder="e.g. LinkedIn Sponsored, Meta (FB/IG), Google Display, X"
+                        value={adCreativesForm.targetPlatforms}
+                        onChange={(e) => setAdCreativesForm({ ...adCreativesForm, targetPlatforms: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Ad Formats Checkboxes */}
+                  <div>
+                    <label style={labelStyle}>Deliverable Formats Needed</label>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '6px' }}>
+                      {[
+                        { key: 'square', label: '1:1 Square (Feed & LinkedIn)' },
+                        { key: 'story', label: '9:16 Vertical (Stories & Reels)' },
+                        { key: 'landscape', label: '16:9 Landscape (Display & Banners)' },
+                        { key: 'carousel', label: 'Multi-Card Carousel Pack' },
+                      ].map((fmt) => (
+                        <button
+                          type="button"
+                          key={fmt.key}
+                          onClick={() =>
+                            setAdCreativesForm((prev) => ({
+                              ...prev,
+                              adFormats: { ...prev.adFormats, [fmt.key]: !prev.adFormats[fmt.key] },
+                            }))
+                          }
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            backgroundColor: adCreativesForm.adFormats[fmt.key] ? '#FEF2F2' : '#FFFFFF',
+                            color: adCreativesForm.adFormats[fmt.key] ? '#EF4444' : '#4B5563',
+                            border: adCreativesForm.adFormats[fmt.key] ? '1.5px solid #EF4444' : '1px solid #E5E7EB',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {adCreativesForm.adFormats[fmt.key] ? <CheckSquare size={14} color="#EF4444" /> : <Square size={14} color="#9CA3AF" />}
+                          <span>{fmt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                    <div>
+                      <label style={labelStyle}>
+                        Target Audience <span style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <input
+                        style={inputStyle(errors.targetAudience)}
+                        placeholder="e.g. Growth Marketing Directors, Founders, Dev Leads"
+                        value={adCreativesForm.targetAudience}
+                        onChange={(e) => setAdCreativesForm({ ...adCreativesForm, targetAudience: e.target.value })}
+                      />
+                      {errors.targetAudience && <div style={errorStyle}>{errors.targetAudience}</div>}
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>
+                        Core Offer / Value Hook <span style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <input
+                        style={inputStyle(errors.coreOffer)}
+                        placeholder="e.g. Get 50% faster data onboarding + 14-day free trial"
+                        value={adCreativesForm.coreOffer}
+                        onChange={(e) => setAdCreativesForm({ ...adCreativesForm, coreOffer: e.target.value })}
+                      />
+                      {errors.coreOffer && <div style={errorStyle}>{errors.coreOffer}</div>}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                    <div>
+                      <label style={labelStyle}>Brand Guidelines / Visual Assets</label>
+                      <input
+                        style={inputStyle()}
+                        placeholder="e.g. Brand book link, hex colors, vector logos link"
+                        value={adCreativesForm.brandGuidelines}
+                        onChange={(e) => setAdCreativesForm({ ...adCreativesForm, brandGuidelines: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Reference Ad Examples</label>
+                      <input
+                        style={inputStyle()}
+                        placeholder="e.g. Links to ads you admire, competitor ad library links"
+                        value={adCreativesForm.referenceExamples}
+                        onChange={(e) => setAdCreativesForm({ ...adCreativesForm, referenceExamples: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Additional Requirements</label>
+                    <input
+                      style={inputStyle()}
+                      placeholder="e.g. Include 3 copy angle variations per visual asset, export ready for Meta Ads Manager"
+                      value={adCreativesForm.additionalRequirements}
+                      onChange={(e) => setAdCreativesForm({ ...adCreativesForm, additionalRequirements: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -2773,6 +3110,48 @@ export default function NewRequestModal({
                     <ReviewRow label="Target Audience" value={redesignForm.targetAudience} />
                     {redesignForm.referenceLinks && <ReviewRow label="Reference Links" value={redesignForm.referenceLinks} isLink />}
                     {redesignForm.additionalRequirements && <ReviewRow label="Additional Requirements" value={redesignForm.additionalRequirements} />}
+                  </>
+                )}
+
+                {(activeServiceId === 'gtm' || activeServiceId === 'gtm-strategy') && (
+                  <>
+                    <ReviewRow label="Launch Goal / Objective" value={gtmForm.launchGoal} highlight />
+                    <ReviewRow label="Product / Feature Name" value={gtmForm.targetProduct} />
+                    <ReviewRow label="Target Market / Audience" value={gtmForm.targetMarket} />
+                    {gtmForm.distributionChannels && <ReviewRow label="Primary Distribution Vectors" value={gtmForm.distributionChannels} />}
+                    {gtmForm.launchTimeline && <ReviewRow label="Target Launch Timeline" value={gtmForm.launchTimeline} />}
+                    {gtmForm.competitors && <ReviewRow label="Competitors / Reference Launches" value={gtmForm.competitors} />}
+                    {gtmForm.referenceLinks && <ReviewRow label="Reference Links" value={gtmForm.referenceLinks} isLink />}
+                    {gtmForm.additionalRequirements && <ReviewRow label="Additional Requirements" value={gtmForm.additionalRequirements} />}
+                  </>
+                )}
+
+                {activeServiceId === 'ad-creatives' && (
+                  <>
+                    <ReviewRow label="Campaign Objective" value={adCreativesForm.campaignObjective} highlight />
+                    <ReviewRow
+                      label="Ad Formats Selected"
+                      value={
+                        Object.entries(adCreativesForm.adFormats)
+                          .filter(([_, v]) => v)
+                          .map(([k]) =>
+                            k === 'square'
+                              ? '1:1 Square'
+                              : k === 'story'
+                              ? '9:16 Vertical Story'
+                              : k === 'landscape'
+                              ? '16:9 Landscape'
+                              : 'Carousel Pack'
+                          )
+                          .join(', ') || 'Standard Formats'
+                      }
+                    />
+                    <ReviewRow label="Target Platforms" value={adCreativesForm.targetPlatforms} />
+                    <ReviewRow label="Target Audience" value={adCreativesForm.targetAudience} />
+                    <ReviewRow label="Core Offer / Value Hook" value={adCreativesForm.coreOffer} />
+                    {adCreativesForm.brandGuidelines && <ReviewRow label="Brand Guidelines" value={adCreativesForm.brandGuidelines} />}
+                    {adCreativesForm.referenceExamples && <ReviewRow label="Reference Examples" value={adCreativesForm.referenceExamples} />}
+                    {adCreativesForm.additionalRequirements && <ReviewRow label="Additional Requirements" value={adCreativesForm.additionalRequirements} />}
                   </>
                 )}
               </div>

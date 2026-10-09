@@ -68,6 +68,8 @@ export default function ClientLayout({
         { id: 'strategic-planner', label: 'Strategic Planner', path: '/portal/boosting/strategic-planner' },
         { id: 'content-creator', label: 'Content Creator', path: '/portal/boosting/content-creator' },
         { id: 'devrel', label: 'DevRel', path: '/portal/boosting/devrel' },
+        { id: 'gtm', label: 'GTM Strategy', path: '/portal/boosting/gtm' },
+        { id: 'ad-creatives', label: 'Ad Creatives', path: '/portal/boosting/ad-creatives' },
       ],
     },
     {

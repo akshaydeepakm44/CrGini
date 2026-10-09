@@ -26,6 +26,10 @@ const SERVICE_TYPE_MAP = {
       CONTENT: 'Content Creator',
       DEVREL: 'DevRel',
       DEVREL_PLAN: 'DevRel',
+      GTM: 'GTM Strategy',
+      GTM_STRATEGY: 'GTM Strategy',
+      AD_CREATIVES: 'Ad Creatives',
+      ADS: 'Ad Creatives',
       CUSTOM: 'Custom Growth Sprint',
     }
   },

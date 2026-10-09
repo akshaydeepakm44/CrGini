@@ -147,6 +147,16 @@ export const calculateServicePrice = ({ serviceType, subService, requirements = 
       serviceLabel = 'Company Boost: DevRel Strategy Sprint';
       breakdown.push({ item: 'Developer Ecosystem & Documentation Audit', amount: 499 });
       breakdown.push({ item: 'Technical Community & Outreach Roadmap', amount: 300 });
+    } else if (subService === 'GTM_STRATEGY' || subService === 'GTM') {
+      basePrice = 799;
+      serviceLabel = 'Company Boost: GTM Strategy Sprint';
+      breakdown.push({ item: 'GTM Launch Playbook & Channel Distribution Roadmap', amount: 499 });
+      breakdown.push({ item: 'GTM Strategy Brochure & Collateral Deck', amount: 300 });
+    } else if (subService === 'AD_CREATIVES' || subService === 'ADS' || subService === 'AD_CREATIVE') {
+      basePrice = 799;
+      serviceLabel = 'Company Boost: Ad Creatives Sprint';
+      breakdown.push({ item: 'Multi-Format Visual Ad Creative Pack (1:1, 9:16, 16:9)', amount: 499 });
+      breakdown.push({ item: 'Ad Copy Angles & Creative Testing Matrix', amount: 300 });
     } else if (subService === 'CUSTOM') {
       basePrice = 799;
       serviceLabel = 'Company Boost: Custom Scope Sprint';

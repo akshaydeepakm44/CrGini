@@ -113,6 +113,68 @@ export const SERVICES_CATALOG = [
     ],
     idealFor: 'DevTool, SaaS API, and Web3 founders targeting engineering teams and developer decision-makers.'
   },
+  {
+    id: 'gtm',
+    slug: 'gtm',
+    altSlug: 'gtm-strategy',
+    channel: 'boosting',
+    channelLabel: 'Boosting',
+    name: 'GTM Strategy',
+    shortTitle: 'GTM Strategy',
+    headline: 'Launch execution blueprints, distribution channel mapping, and market traction models.',
+    shortDesc: 'Operational strategy for new product rollouts, geographic expansion, distribution vectors, and launch blueprints.',
+    description: 'Transform new product rollouts into high-traction events. Our senior growth operators build your launch blueprints, channel distribution architecture, and executive go-to-market collateral.',
+    icon: Target,
+    iconColor: '#10B981',
+    iconBg: '#ECFDF5',
+    turnaround: '48–72 Hours',
+    startingPrice: 799,
+    backendServiceType: 'COMPANY_BOOST',
+    backendSubService: 'GTM_STRATEGY',
+    whatYouGet: [
+      'GTM Launch Playbook & Channel Distribution Roadmap',
+      'GTM Product Brochure & Sales Collateral Deck (PDF)',
+      'Pre-Launch, Launch-Day & Post-Launch Sprint Timeline',
+      'Acquisition Metrics, CAC Projections & KPI Scorecard'
+    ],
+    deliverablesSpec: [
+      { title: 'GTM Launch Playbook', format: 'Interactive Notion & PDF', icon: FileText },
+      { title: 'Product Brochure Collateral', format: 'High-Res Presentation / PDF', icon: Presentation },
+      { title: 'Distribution Roadmap & KPI Matrix', format: 'Structured Roadmap Spreadsheet', icon: Target }
+    ],
+    idealFor: 'Founders and product leaders launching new products, features, or expanding into new target markets.'
+  },
+  {
+    id: 'ad-creatives',
+    slug: 'ad-creatives',
+    altSlug: 'ads',
+    channel: 'boosting',
+    channelLabel: 'Boosting',
+    name: 'Ad Creatives',
+    shortTitle: 'Ad Creatives',
+    headline: 'High-converting ad banners, social creatives, display assets, and variant copy angles.',
+    shortDesc: 'Conversion-focused creative production for Meta, LinkedIn, Google Display, and X advertising campaigns.',
+    description: 'Stop burning ad budget on low-CTR creatives. Our specialist designers and copywriters produce high-converting static banners, carousel packs, and multi-angle ad copy tailored to your target platform.',
+    icon: Sparkles,
+    iconColor: '#EF4444',
+    iconBg: '#FEF2F2',
+    turnaround: '48–72 Hours',
+    startingPrice: 799,
+    backendServiceType: 'COMPANY_BOOST',
+    backendSubService: 'AD_CREATIVES',
+    whatYouGet: [
+      'Multi-Format Visual Ad Creative Pack (1:1, 9:16, 16:9)',
+      'High-CTR Ad Copy Angles & Compelling Hook Variants',
+      'A/B Creative Testing Matrix & Audience Angle Guide',
+      'Production-Ready PNG / SVG Asset Source Files'
+    ],
+    deliverablesSpec: [
+      { title: 'Visual Ad Creative Pack', format: 'PNG, SVG & Figma Components', icon: Sparkles },
+      { title: 'Ad Copy Angles & Hooks', format: 'Structured Copy Sheet (Notion / Sheets)', icon: FileText },
+      { title: 'A/B Testing Matrix', format: 'Campaign Variant Guide', icon: Zap }
+    ],
+    idealFor: 'Growth marketers and founders running paid campaigns on Meta, LinkedIn, Google, or X.'
+  },
 
   // ==========================================
   // DIGITALISING SERVICES
@@ -366,7 +428,7 @@ export const SERVICES_CATALOG = [
 export const getServiceBySlug = (slug) => {
   if (!slug) return null;
   const cleanSlug = slug.toLowerCase().trim();
-  return SERVICES_CATALOG.find((s) => s.slug === cleanSlug || s.id === cleanSlug) || null;
+  return SERVICES_CATALOG.find((s) => s.slug === cleanSlug || s.id === cleanSlug || s.altSlug === cleanSlug) || null;
 };
 
 export const getServicesByChannel = (channel) => {
