@@ -382,7 +382,7 @@ export default function AdminSamplesPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Acme Corporation"
+                  placeholder="e.g. Data I2I"
                   value={newCompany}
                   onChange={(e) => setNewCompany(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.875rem' }}

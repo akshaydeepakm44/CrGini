@@ -9,7 +9,7 @@ import Dropdown from '../common/Dropdown';
  * Matches the reference mockup: Omnibox search, notification bell with badge (3), user organization badge
  */
 export default function Header({
-  user = { name: 'Acme Corporation', email: 'client@acmecorp.com' },
+  user = { name: 'Data I2I Client', email: 'testclient@datai2i.com', company: { name: 'Data I2I' } },
   searchValue = '',
   onSearchChange,
   unreadNotifications = 3,
@@ -20,7 +20,7 @@ export default function Header({
   className = '',
   style = {},
 }) {
-  const userDisplayName = user?.company?.name || user?.name || 'Acme Corporation';
+  const userDisplayName = user?.company?.name || user?.name || 'Data I2I';
 
   const userMenuItems = [
     {

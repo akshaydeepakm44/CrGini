@@ -540,7 +540,7 @@ export default function LeadRequestDetailPage({ onNavigate, user }) {
             <div style={{ padding: '14px 18px', borderBottom: '1px solid #F1F5F9', backgroundColor: '#FAFAFC' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
                 <h3 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 800, color: '#111827' }}>
-                  Chat with Client: {request.clientCompany || 'Acme Corporation'}
+                  Chat with Client: {request.clientCompany || 'Data I2I'}
                 </h3>
                 <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#EDE9FE', color: '#7C3AED', padding: '2px 7px', borderRadius: '4px' }}>
                   {request.ticketId}

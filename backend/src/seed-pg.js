@@ -112,32 +112,43 @@ const seedStaffAccounts = async () => {
       }
     }
 
-    // Provision an official clean demo client account with company profile
+    // Provision Data I2I official clean client account with company profile
     const clientHash = await bcrypt.hash('Client@123', salt);
-    let compRes = await query(`SELECT id FROM companies WHERE email = 'client@creativegini.com'`);
+    let compRes = await query(`SELECT id FROM companies WHERE name = 'Data I2I' OR email = 'testclient@datai2i.com' LIMIT 1`);
     let companyId = compRes.rows[0]?.id;
     if (!companyId) {
       const newComp = await query(`
         INSERT INTO companies (name, email, website, contact_person, industry)
-        VALUES ('Apex Enterprise Solutions', 'client@creativegini.com', 'https://apexenterprise.test', 'Alex Mercer', 'Enterprise B2B Technology')
+        VALUES ('Data I2I', 'testclient@datai2i.com', 'https://datai2i.com', 'Data I2I Client', 'AI & Data Intelligence')
         RETURNING id
       `);
       companyId = newComp.rows[0].id;
+    } else {
+      await query(`
+        UPDATE companies
+        SET name = 'Data I2I', website = 'https://datai2i.com', contact_person = 'Data I2I Client', industry = 'AI & Data Intelligence'
+        WHERE id = $1
+      `, [companyId]);
     }
 
     await query(`
       INSERT INTO users (name, email, password, role, company_id, phone, status)
-      VALUES ('Alex Mercer (Client)', 'client@creativegini.com', $1, 'USER', $2, '+1 (555) 019-2834', 'ACTIVE')
+      VALUES ('Data I2I Client', 'testclient@datai2i.com', $1, 'USER', $2, '+1 (555) 019-2834', 'ACTIVE')
       ON CONFLICT (email) DO UPDATE SET
-        name = EXCLUDED.name,
+        name = 'Data I2I Client',
         role = 'USER',
         company_id = EXCLUDED.company_id,
         status = 'ACTIVE'
     `, [clientHash, companyId]);
 
-    console.log('[Seed-PG] Genuine staff accounts and official client verified successfully.');
+    // Also update any legacy client@creativegini.com account to Data I2I
+    await query(`
+      UPDATE users
+      SET name = 'Data I2I Client', company_id = $1
+      WHERE email = 'client@creativegini.com'
+    `, [companyId]);
 
-    console.log('[Seed-PG] Genuine staff accounts verified successfully (Zero fake data seeded).');
+    console.log('[Seed-PG] Genuine staff accounts and Data I2I client verified successfully.');
     process.exit(0);
   } catch (error) {
     console.error('[Seed-PG] Error seeding staff accounts:', error);

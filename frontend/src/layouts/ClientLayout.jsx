@@ -23,7 +23,7 @@ export default function ClientLayout({
   children,
   currentPath = '/portal/dashboard',
   onNavigate,
-  user = { name: 'Acme Corporation', email: 'client@acmecorp.com' },
+  user = { name: 'Data I2I Client', email: 'testclient@datai2i.com', company: { name: 'Data I2I' } },
   unreadNotifications = 0,
   unreadMessagesCount = 0,
   notifications = [],

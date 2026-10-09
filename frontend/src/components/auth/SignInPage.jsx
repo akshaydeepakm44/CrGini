@@ -400,7 +400,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
                             <input
                               id="email-input"
                               type="email"
-                              placeholder="client@creativegini.com"
+                              placeholder="testclient@datai2i.com"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
                               className="auth-text-input"
@@ -489,7 +489,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
                               <input
                                 id="magic-email-input"
                                 type="email"
-                                placeholder="client@creativegini.com"
+                                placeholder="testclient@datai2i.com"
                                 value={magicEmail}
                                 onChange={(e) => setMagicEmail(e.target.value)}
                                 className="auth-text-input"
@@ -588,7 +588,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                       <button
                         type="button"
-                        onClick={() => handleQuickDemoLogin('client@creativegini.com', 'Client@123')}
+                        onClick={() => handleQuickDemoLogin('testclient@datai2i.com', 'Client@123')}
                         style={{
                           background: '#EFF6FF',
                           border: '1px solid #BFDBFE',
@@ -600,7 +600,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
                           cursor: 'pointer',
                         }}
                       >
-                        🚀 Client Portal
+                        🚀 Data I2I (Client Portal)
                       </button>
 
                       <button
@@ -876,7 +876,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
                             <input
                               id="forgot-email-input"
                               type="email"
-                              placeholder="client@creativegini.com"
+                              placeholder="testclient@datai2i.com"
                               value={forgotEmail}
                               onChange={(e) => setForgotEmail(e.target.value)}
                               className="auth-text-input"

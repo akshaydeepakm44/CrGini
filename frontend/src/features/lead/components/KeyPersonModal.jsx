@@ -126,7 +126,7 @@ export default function KeyPersonModal({
             </label>
             <input
               required
-              placeholder="e.g. Alex Mercer"
+              placeholder="e.g. Sarah Jenkins"
               value={name}
               onChange={(e) => setName(e.target.value)}
               style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #D1D5DB', fontSize: '0.84375rem', boxSizing: 'border-box' }}
