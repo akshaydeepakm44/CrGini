@@ -24,6 +24,7 @@ import {
   Mail,
   Phone,
   CheckCircle,
+  Globe,
   X
 } from 'lucide-react';
 import { api } from '../../services/api';
@@ -318,7 +319,7 @@ export default function PublicSampleDashboard() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
                 
                 <div>
                   <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -347,16 +348,6 @@ export default function PublicSampleDashboard() {
                   </h4>
                   <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: '1.6', margin: 0 }}>
                     {companyStudy.keyObservations || 'Observed operational bottlenecks, growth triggers, and leadership priorities.'}
-                  </p>
-                </div>
-
-                <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Target size={16} color="#7C3AED" />
-                    Potential Opportunity
-                  </h4>
-                  <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: '1.6', margin: 0 }}>
-                    {companyStudy.potentialOpportunity || 'High-probability engagement pathways tailored for commercial conversion.'}
                   </p>
                 </div>
 
@@ -483,11 +474,27 @@ export default function PublicSampleDashboard() {
                 <div>
                   <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Building2 size={14} color="#64748B" />
-                    <span>{lead.company}</span>
+                    <span>{lead.company || sample?.companyName}</span>
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
-                    {lead.location || lead.industry || 'B2B Enterprise'}
-                  </div>
+                  {lead.companyLink ? (
+                    <a
+                      href={lead.companyLink.startsWith('http') ? lead.companyLink : `https://${lead.companyLink}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ fontSize: '0.75rem', color: '#2563EB', marginTop: '2px', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', fontWeight: 500 }}
+                    >
+                      <Globe size={11} />
+                      <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {lead.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
+                      </span>
+                      <ExternalLink size={10} />
+                    </a>
+                  ) : (
+                    <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
+                      {lead.location || lead.industry || 'B2B Enterprise'}
+                    </div>
+                  )}
                 </div>
 
                 {/* Column 3: Why Suits Best (Snippet) */}
@@ -865,17 +872,92 @@ export default function PublicSampleDashboard() {
                   </div>
                 </div>
 
-                {/* Masked Direct Phone */}
+                {/* Company Link / Website */}
                 <div>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
-                    Direct Phone Number
+                    Company Link / Website
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>
-                    <Lock size={13} color="#D97706" />
-                    <span>{selectedLead.maskedPhone || '+1 (•••) •••-••••'}</span>
-                  </div>
+                  {selectedLead.companyLink ? (
+                    <a
+                      href={selectedLead.companyLink.startsWith('http') ? selectedLead.companyLink : `https://${selectedLead.companyLink}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        color: '#2563EB',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <Globe size={14} />
+                      <span style={{ maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {selectedLead.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
+                      </span>
+                      <ExternalLink size={12} />
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>{selectedLead.company || 'Website on file'}</span>
+                  )}
                 </div>
               </div>
+
+              {/* Lead Study PDF Attachment */}
+              {(selectedLead.leadStudyPdf || selectedLead.leadStudyPdfUrl) && (
+                <div
+                  style={{
+                    background: '#EFF6FF',
+                    border: '1px solid #BFDBFE',
+                    borderRadius: '12px',
+                    padding: '14px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#DBEAFE', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FileText size={18} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1E40AF' }}>
+                        Lead Study Research PDF
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#3B82F6' }}>
+                        {selectedLead.leadStudyPdfName || `${selectedLead.name} - Deep-Dive Research.pdf`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <a
+                    href={selectedLead.leadStudyPdf || selectedLead.leadStudyPdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={selectedLead.leadStudyPdfName || `${selectedLead.name}_Lead_Study.pdf`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#2563EB',
+                      color: '#FFFFFF',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      fontSize: '0.8125rem',
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+                    }}
+                  >
+                    <Download size={14} />
+                    <span>Download / View PDF</span>
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+              )}
 
               {/* 2. About the Lead Company */}
               <div>
@@ -930,15 +1012,6 @@ export default function PublicSampleDashboard() {
                       </div>
                       <p style={{ fontSize: '0.8125rem', color: '#475569', margin: 0, lineHeight: '1.4' }}>
                         {selectedLead.leadStudy.observedContext || 'Observed operational growth and procurement signals.'}
-                      </p>
-                    </div>
-
-                    <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>
-                        📈 Potential Opportunity
-                      </div>
-                      <p style={{ fontSize: '0.8125rem', color: '#475569', margin: 0, lineHeight: '1.4' }}>
-                        {selectedLead.leadStudy.potentialOpportunity || 'High conversion probability for tailored solution sprints.'}
                       </p>
                     </div>
 

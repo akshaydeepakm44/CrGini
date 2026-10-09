@@ -4,6 +4,7 @@ import {
   streamPublicPitchDeck,
   streamCompanyStudyPdf,
   streamLeadPitchDeck,
+  streamLeadStudyPdf,
   getAdminSamples,
   getAdminSampleById,
   createAdminSample,
@@ -42,6 +43,7 @@ router.get('/:slug', getPublicSampleBySlug);
 router.get('/:slug/pitch-deck', streamPublicPitchDeck);
 router.get('/:slug/company-study-pdf', streamCompanyStudyPdf);
 router.get('/:slug/leads/:leadId/pitch-deck', streamLeadPitchDeck);
+router.get('/:slug/leads/:leadId/lead-study-pdf', streamLeadStudyPdf);
 router.get('/:slug/assets/:assetId', streamPublicPitchDeck);
 
 export default router;

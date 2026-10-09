@@ -334,6 +334,61 @@ export const streamLeadPitchDeck = async (req, res) => {
 };
 
 /**
+ * @desc    Stream Lead Study PDF for an individual sample lead securely from Object Storage
+ * @route   GET /api/samples/:slug/leads/:leadId/lead-study-pdf
+ * @access  Public (No Auth Required)
+ */
+export const streamLeadStudyPdf = async (req, res) => {
+  try {
+    const { slug, leadId } = req.params;
+    const { download } = req.query;
+
+    const sample = await findSampleBySlug(slug, true);
+    if (!sample) {
+      return res.status(404).json({ success: false, message: 'Sample showcase not found.' });
+    }
+
+    const lead = (sample.leads || []).find((l) => l.id === leadId);
+    let assetKey = lead?.leadStudyPdfAssetKey || lead?.leadStudy?.assetKey;
+    let fileName = lead?.leadStudyPdfName || `${lead?.name || 'Lead'}_Study.pdf`;
+
+    if (!assetKey) {
+      return res.status(404).json({
+        success: false,
+        message: 'Lead study document for this lead is not currently available.',
+      });
+    }
+
+    fileName = fileName.replace(/["\r\n]/g, '_');
+    const stat = await getObjectStat(assetKey).catch(() => null);
+    const stream = await getFileStream(assetKey);
+
+    const disposition = download === 'true'
+      ? `attachment; filename="${fileName}"`
+      : `inline; filename="${fileName}"`;
+
+    const headers = {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': disposition,
+      'Cache-Control': 'public, max-age=3600',
+    };
+
+    if (stat?.size) {
+      headers['Content-Length'] = stat.size;
+    }
+
+    res.writeHead(200, headers);
+    return stream.pipe(res);
+  } catch (error) {
+    console.error('[SampleController.streamLeadStudyPdf] Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to stream lead study PDF.',
+    });
+  }
+};
+
+/**
  * =========================================================================
  * PROSPECT SHOWCASE MANAGEMENT CONTROLLERS (Lead Team & Super Admin)
  * =========================================================================
@@ -441,7 +496,6 @@ export const createAdminSample = async (req, res) => {
         businessOverview: `Overview for ${companyName.trim()}.`,
         marketPosition: 'Key player in vertical sector.',
         keyObservations: 'Opportunity for strategic acceleration.',
-        potentialOpportunity: 'Bespoke account execution.',
       },
       leads: Array.isArray(leads) ? leads : [],
       leadStudies: Array.isArray(leadStudies) ? leadStudies : [],

@@ -23,6 +23,9 @@ import {
   Share2,
   Layers,
   Image,
+  Globe,
+  UserPlus,
+  CheckCircle,
   X
 } from 'lucide-react';
 import { api } from '../../../services/api';
@@ -66,17 +69,18 @@ export default function LeadShowcasesPage({ onNavigate }) {
   // Lead under edit inside modal
   const [leadForm, setLeadForm] = useState({
     name: '',
+    companyLink: '',
+    email: '',
+    linkedin: '',
+    leadStudyPdf: '',
+    leadStudyPdfName: '',
+    logo: '',
     title: '',
     company: '',
     aboutCompany: '',
-    linkedin: '',
-    email: '',
-    phone: '',
-    logo: '',
     whySuitsBest: '',
     whyRelevant: '',
     observedContext: '',
-    potentialOpportunity: '',
     suggestedApproach: '',
   });
   const [editingLeadIndex, setEditingLeadIndex] = useState(null);
@@ -122,7 +126,6 @@ export default function LeadShowcasesPage({ onNavigate }) {
         businessOverview: '',
         marketPosition: '',
         keyObservations: '',
-        potentialOpportunity: '',
       },
       leads: [
         {
@@ -130,15 +133,17 @@ export default function LeadShowcasesPage({ onNavigate }) {
           name: 'Sarah Jenkins',
           title: 'VP of Global Enterprise Architecture',
           company: 'Acme Global Systems',
+          companyLink: 'https://acmeglobal.com',
           aboutCompany: 'Enterprise IT infrastructure provider serving Fortune 500 customers.',
           linkedin: 'https://linkedin.com/in/sarah-jenkins-sample',
           email: 's.jenkins@acmeglobal.com',
-          phone: '+1 (415) 890-2341',
+          logo: '/logo.png',
+          leadStudyPdf: '',
+          leadStudyPdfName: '',
           whySuitsBest: 'Leading multi-region platform migration with open Q3 procurement budget.',
           leadStudy: {
             whyRelevant: 'Direct budget authority for integration and architecture overhaul.',
             observedContext: 'Recently published whitepaper on cloud modernization initiatives.',
-            potentialOpportunity: 'Ideal match for CreativeGini specialist deliverable engine.',
             suggestedApproach: 'Highlight verifiable deliverable SLAs and technical speed.',
           },
         },
@@ -167,7 +172,6 @@ export default function LeadShowcasesPage({ onNavigate }) {
         businessOverview: '',
         marketPosition: '',
         keyObservations: '',
-        potentialOpportunity: '',
       },
       leads: showcase.leads || [],
       pitchDeck: showcase.pitchDeck || {
@@ -278,7 +282,28 @@ support@creativegini.com`;
     if (!file) return;
 
     if (!editingShowcase?.id) {
-      alert('Please save the showcase first before uploading documents.');
+      setIsUploadingPdf(true);
+      setUploadStatusMsg('Reading and attaching PDF...');
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFormData((prev) => ({
+          ...prev,
+          companyStudy: {
+            ...prev.companyStudy,
+            pdfFileDataUrl: reader.result,
+            pdfFileName: file.name,
+            pdfMimeType: file.type || 'application/pdf',
+          },
+        }));
+        setIsUploadingPdf(false);
+        setUploadStatusMsg(`Attached: ${file.name}`);
+        setTimeout(() => setUploadStatusMsg(''), 2500);
+      };
+      reader.onerror = () => {
+        setIsUploadingPdf(false);
+        alert('Failed to read PDF file.');
+      };
+      reader.readAsDataURL(file);
       return;
     }
 
@@ -320,27 +345,30 @@ support@creativegini.com`;
 
   // Add / Edit Lead in Form
   const handleSaveLead = () => {
-    if (!leadForm.name.trim() || !leadForm.company.trim()) {
-      alert('Lead Name and Company are required.');
+    if (!leadForm.name.trim()) {
+      alert('Lead Name is required.');
       return;
     }
+
+    const companyName = leadForm.company?.trim() || formData.companyName || 'Target Organization';
 
     const newLead = {
       id: editingLeadIndex !== null ? formData.leads[editingLeadIndex].id : `lead-${Date.now()}`,
       name: leadForm.name.trim(),
-      title: leadForm.title.trim() || 'Key Executive',
-      company: leadForm.company.trim(),
-      aboutCompany: leadForm.aboutCompany.trim() || `Enterprise organization in technology.`,
-      linkedin: leadForm.linkedin.trim(),
-      email: leadForm.email.trim(),
-      phone: leadForm.phone.trim(),
+      companyLink: leadForm.companyLink?.trim() || '',
+      email: leadForm.email?.trim() || '',
+      linkedin: leadForm.linkedin?.trim() || '',
+      leadStudyPdf: leadForm.leadStudyPdf || '',
+      leadStudyPdfName: leadForm.leadStudyPdfName || '',
       logo: leadForm.logo || '',
-      whySuitsBest: leadForm.whySuitsBest.trim() || 'Strategic decision maker aligned with key pain points.',
+      title: leadForm.title?.trim() || 'Key Executive',
+      company: companyName,
+      aboutCompany: leadForm.aboutCompany?.trim() || `Enterprise organization operating in ${formData.companyStudy?.industry || 'technology'}.`,
+      whySuitsBest: leadForm.whySuitsBest?.trim() || 'Strategic decision maker aligned with key pain points.',
       leadStudy: {
-        whyRelevant: leadForm.whyRelevant.trim() || 'Key stakeholder evaluating digital capabilities.',
-        observedContext: leadForm.observedContext.trim() || 'Observed growth and strategic expansion.',
-        potentialOpportunity: leadForm.potentialOpportunity.trim() || 'High potential for commercial engagement.',
-        suggestedApproach: leadForm.suggestedApproach.trim() || 'Lead with verifiable outcomes and SLA guarantees.',
+        whyRelevant: leadForm.whyRelevant?.trim() || 'Direct decision authority and strategic alignment.',
+        observedContext: leadForm.observedContext?.trim() || 'Observed growth and strategic expansion.',
+        suggestedApproach: leadForm.suggestedApproach?.trim() || 'Lead with verifiable outcomes and SLA guarantees.',
       },
     };
 
@@ -354,17 +382,18 @@ support@creativegini.com`;
     setFormData({ ...formData, leads: updatedLeads });
     setLeadForm({
       name: '',
+      companyLink: '',
+      email: '',
+      linkedin: '',
+      leadStudyPdf: '',
+      leadStudyPdfName: '',
+      logo: '',
       title: '',
       company: '',
       aboutCompany: '',
-      linkedin: '',
-      email: '',
-      phone: '',
-      logo: '',
       whySuitsBest: '',
       whyRelevant: '',
       observedContext: '',
-      potentialOpportunity: '',
       suggestedApproach: '',
     });
     setEditingLeadIndex(null);
@@ -381,28 +410,29 @@ support@creativegini.com`;
       const parts = line.includes('\t') ? line.split('\t') : line.split(',');
       if (parts.length >= 2) {
         const name = parts[0]?.trim();
-        const title = parts[1]?.trim() || 'Decision Maker';
-        const company = parts[2]?.trim() || formData.companyName || 'Target Enterprise';
+        const companyLink = parts[1]?.trim() || '';
+        const email = parts[2]?.trim() || '';
         const linkedin = parts[3]?.trim() || '';
-        const email = parts[4]?.trim() || '';
-        const phone = parts[5]?.trim() || '';
-        const whySuitsBest = parts[6]?.trim() || 'Vetted prospect with immediate relevance to strategic offering.';
+        const title = parts[4]?.trim() || 'Key Executive';
+        const whySuitsBest = parts[5]?.trim() || 'Vetted prospect with immediate relevance to strategic offering.';
 
         if (name && name.toLowerCase() !== 'name') {
           imported.push({
             id: `lead-${Date.now()}-${idx}`,
             name,
-            title,
-            company,
-            aboutCompany: `Leading corporate enterprise operating in ${formData.companyStudy.industry}.`,
-            linkedin,
+            companyLink,
             email,
-            phone,
+            linkedin,
+            title,
+            company: formData.companyName || 'Target Enterprise',
+            aboutCompany: `Leading corporate enterprise operating in ${formData.companyStudy.industry}.`,
+            leadStudyPdf: '',
+            leadStudyPdfName: '',
+            logo: '',
             whySuitsBest,
             leadStudy: {
               whyRelevant: 'Direct budget authority and strategic alignment.',
               observedContext: 'Expanding modern software and operational infrastructure.',
-              potentialOpportunity: 'Ideal match for bespoke specialist execution.',
               suggestedApproach: 'Direct outreach referencing custom intelligence showcase.',
             },
           });
@@ -416,7 +446,7 @@ support@creativegini.com`;
       setShowBulkImport(false);
       alert(`Successfully imported ${imported.length} leads!`);
     } else {
-      alert('Could not parse any leads. Format: Name, Title, Company, LinkedIn, Email, Phone, Why Suits Best');
+      alert('Could not parse any leads. Format: Name, Company Link, Email, LinkedIn, Title, Why Suits Best');
     }
   };
 
@@ -1053,43 +1083,37 @@ support@creativegini.com`;
                       )}
                     </p>
 
-                    {editingShowcase ? (
-                      <div>
-                        <label
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            background: '#7C3AED',
-                            color: '#FFFFFF',
-                            padding: '8px 18px',
-                            borderRadius: '8px',
-                            fontSize: '0.8125rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <Upload size={14} />
-                          {isUploadingPdf ? 'Uploading...' : 'Upload / Replace Company Study PDF'}
-                          <input
-                            type="file"
-                            accept=".pdf,application/pdf"
-                            onChange={handleUploadCompanyStudyPdf}
-                            disabled={isUploadingPdf}
-                            style={{ display: 'none' }}
-                          />
-                        </label>
-                        {uploadStatusMsg && (
-                          <div style={{ fontSize: '0.8125rem', color: '#7C3AED', marginTop: '8px', fontWeight: 500 }}>
-                            {uploadStatusMsg}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: '0.8125rem', color: '#D97706', fontWeight: 500 }}>
-                        💡 Please click "Save Showcase" first, then upload the PDF.
-                      </div>
-                    )}
+                    <div>
+                      <label
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          background: '#7C3AED',
+                          color: '#FFFFFF',
+                          padding: '8px 18px',
+                          borderRadius: '8px',
+                          fontSize: '0.8125rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Upload size={14} />
+                        {isUploadingPdf ? 'Processing...' : 'Upload / Replace Company Study PDF'}
+                        <input
+                          type="file"
+                          accept=".pdf,application/pdf"
+                          onChange={handleUploadCompanyStudyPdf}
+                          disabled={isUploadingPdf}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                      {uploadStatusMsg && (
+                        <div style={{ fontSize: '0.8125rem', color: '#7C3AED', marginTop: '8px', fontWeight: 500 }}>
+                          {uploadStatusMsg}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div>
@@ -1152,30 +1176,6 @@ support@creativegini.com`;
                         setFormData({
                           ...formData,
                           companyStudy: { ...formData.companyStudy, keyObservations: e.target.value },
-                        })
-                      }
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        border: '1px solid #D1D5DB',
-                        borderRadius: '8px',
-                        fontSize: '0.875rem',
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
-                      Potential Commercial Opportunity
-                    </label>
-                    <textarea
-                      rows={2}
-                      placeholder="How CreativeGini accelerates their pipeline with bespoke execution..."
-                      value={formData.companyStudy.potentialOpportunity}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          companyStudy: { ...formData.companyStudy, potentialOpportunity: e.target.value },
                         })
                       }
                       style={{
@@ -1267,67 +1267,91 @@ support@creativegini.com`;
 
                   {/* Add / Edit Single Lead Form */}
                   <div style={{ background: '#FAF5FF', border: '1px solid #DDD4FA', borderRadius: '12px', padding: '18px' }}>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#5B21B6', marginBottom: '12px' }}>
-                      {editingLeadIndex !== null ? 'Edit Selected Lead' : '+ Add Curated Lead'}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#5B21B6', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <UserPlus size={16} />
+                        {editingLeadIndex !== null ? `Edit Lead Details (#${editingLeadIndex + 1})` : '+ Add Curated Lead to Showcase'}
+                      </div>
+                      {editingLeadIndex !== null && (
+                        <span style={{ fontSize: '0.75rem', color: '#7C3AED', background: '#EDE9FE', padding: '3px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                          Editing lead #{editingLeadIndex + 1}
+                        </span>
+                      )}
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                      <input
-                        type="text"
-                        placeholder="Lead Full Name *"
-                        value={leadForm.name}
-                        onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
-                        style={{ padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8125rem' }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Job Title *"
-                        value={leadForm.title}
-                        onChange={(e) => setLeadForm({ ...leadForm, title: e.target.value })}
-                        style={{ padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8125rem' }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Company he belongs to *"
-                        value={leadForm.company}
-                        onChange={(e) => setLeadForm({ ...leadForm, company: e.target.value })}
-                        style={{ padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8125rem' }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="LinkedIn Profile URL"
-                        value={leadForm.linkedin}
-                        onChange={(e) => setLeadForm({ ...leadForm, linkedin: e.target.value })}
-                        style={{ padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8125rem' }}
-                      />
-                      <input
-                        type="email"
-                        placeholder="Work Email (will be masked in public view)"
-                        value={leadForm.email}
-                        onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
-                        style={{ padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8125rem' }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Direct Phone (will be masked in public view)"
-                        value={leadForm.phone}
-                        onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
-                        style={{ padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8125rem' }}
-                      />
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+                      {/* 1. Lead Name */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                          1. Lead Full Name *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Sarah Jenkins"
+                          value={leadForm.name}
+                          onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
+                          style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
+                        />
+                      </div>
 
-                      {/* Lead/Company Logo Upload */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {/* 2. Company Link */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                          2. Company Link / Website *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. https://acmeglobal.com"
+                          value={leadForm.companyLink}
+                          onChange={(e) => setLeadForm({ ...leadForm, companyLink: e.target.value })}
+                          style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
+                        />
+                      </div>
+
+                      {/* 3. Work Mail */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                          3. Work Mail (Masked on public view)
+                        </label>
+                        <input
+                          type="email"
+                          placeholder="e.g. s.jenkins@acmeglobal.com"
+                          value={leadForm.email}
+                          onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
+                          style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
+                        />
+                      </div>
+
+                      {/* 4. Person LinkedIn ID / Profile */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                          4. Person LinkedIn Profile URL
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. https://linkedin.com/in/sarah-jenkins"
+                          value={leadForm.linkedin}
+                          onChange={(e) => setLeadForm({ ...leadForm, linkedin: e.target.value })}
+                          style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
+                        />
+                      </div>
+
+                      {/* 5. Company Logo Upload */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                          5. Company Logo (Image)
+                        </label>
                         {leadForm.logo ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#FFFFFF', padding: '5px 10px', borderRadius: '6px', border: '1px solid #D1D5DB', width: '100%', boxSizing: 'border-box' }}>
-                            <img src={leadForm.logo} alt="Lead Logo" style={{ width: '26px', height: '26px', borderRadius: '4px', objectFit: 'contain', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF' }} />
-                            <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Logo Attached</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#FFFFFF', padding: '6px 12px', borderRadius: '7px', border: '1px solid #D1D5DB' }}>
+                            <img src={leadForm.logo} alt="Lead Logo" style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'contain', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF' }} />
+                            <span style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Logo Attached</span>
                             <button
                               type="button"
-                              onClick={() => setLeadForm(prev => ({ ...prev, logo: '' }))}
-                              style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                              onClick={() => setLeadForm((prev) => ({ ...prev, logo: '' }))}
+                              style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
                               title="Remove logo"
                             >
-                              <X size={13} />
+                              <X size={14} />
                             </button>
                           </div>
                         ) : (
@@ -1337,20 +1361,18 @@ support@creativegini.com`;
                               alignItems: 'center',
                               justifyContent: 'center',
                               gap: '6px',
-                              padding: '8px 12px',
-                              borderRadius: '6px',
+                              padding: '9px 12px',
+                              borderRadius: '7px',
                               border: '1px dashed #7C3AED',
                               background: '#FFFFFF',
                               color: '#7C3AED',
-                              fontSize: '0.78rem',
+                              fontSize: '0.8rem',
                               fontWeight: 600,
                               cursor: 'pointer',
-                              width: '100%',
-                              boxSizing: 'border-box',
                             }}
                           >
-                            <Image size={14} color="#7C3AED" />
-                            <span>Attach Lead Logo (PNG/JPG)</span>
+                            <Image size={15} color="#7C3AED" />
+                            <span>Upload Company Logo</span>
                             <input
                               type="file"
                               accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
@@ -1360,7 +1382,68 @@ support@creativegini.com`;
                                 if (!file) return;
                                 const reader = new FileReader();
                                 reader.onload = (ev) => {
-                                  setLeadForm(prev => ({ ...prev, logo: ev.target.result }));
+                                  setLeadForm((prev) => ({ ...prev, logo: ev.target.result }));
+                                };
+                                reader.readAsDataURL(file);
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+
+                      {/* 6. Lead Study PDF Upload */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                          6. Lead Study PDF (Document)
+                        </label>
+                        {leadForm.leadStudyPdf ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#FFFFFF', padding: '6px 12px', borderRadius: '7px', border: '1px solid #D1D5DB' }}>
+                            <FileText size={18} color="#2563EB" />
+                            <span style={{ fontSize: '0.8rem', color: '#1D4ED8', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {leadForm.leadStudyPdfName || 'Lead Study PDF Attached'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setLeadForm((prev) => ({ ...prev, leadStudyPdf: '', leadStudyPdfName: '' }))}
+                              style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                              title="Remove PDF"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              padding: '9px 12px',
+                              borderRadius: '7px',
+                              border: '1px dashed #2563EB',
+                              background: '#FFFFFF',
+                              color: '#2563EB',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <FileUp size={15} color="#2563EB" />
+                            <span>Upload Lead Study PDF</span>
+                            <input
+                              type="file"
+                              accept=".pdf,application/pdf"
+                              style={{ display: 'none' }}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                  setLeadForm((prev) => ({
+                                    ...prev,
+                                    leadStudyPdf: ev.target.result,
+                                    leadStudyPdfName: file.name,
+                                  }));
                                 };
                                 reader.readAsDataURL(file);
                               }}
@@ -1370,69 +1453,31 @@ support@creativegini.com`;
                       </div>
                     </div>
 
-                    <div style={{ marginBottom: '12px' }}>
-                      <input
-                        type="text"
-                        placeholder="About the lead company (Brief company description)"
-                        value={leadForm.aboutCompany}
-                        onChange={(e) => setLeadForm({ ...leadForm, aboutCompany: e.target.value })}
-                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8125rem' }}
-                      />
-                    </div>
+                    {/* Secondary Context Fields */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#4B5563', marginBottom: '4px' }}>
+                          Designation / Job Title
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. VP of Global Enterprise Architecture"
+                          value={leadForm.title}
+                          onChange={(e) => setLeadForm({ ...leadForm, title: e.target.value })}
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8rem' }}
+                        />
+                      </div>
 
-                    <div style={{ marginBottom: '12px' }}>
-                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#4C1D95', marginBottom: '4px' }}>
-                        Why this lead suits best for the client *
-                      </label>
-                      <textarea
-                        rows={2}
-                        placeholder="Strategic rationale: Why is this exact person the ideal commercial target?"
-                        value={leadForm.whySuitsBest}
-                        onChange={(e) => setLeadForm({ ...leadForm, whySuitsBest: e.target.value })}
-                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8125rem' }}
-                      />
-                    </div>
-
-                    {/* Lead Study Sub-fields */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                       <div>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4C1D95' }}>Lead Study: Why Relevant</label>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#4B5563', marginBottom: '4px' }}>
+                          Why This Lead Suits Best (Fit Rationale)
+                        </label>
                         <input
                           type="text"
-                          placeholder="e.g. Budget owner for enterprise growth"
-                          value={leadForm.whyRelevant}
-                          onChange={(e) => setLeadForm({ ...leadForm, whyRelevant: e.target.value })}
-                          style={{ width: '100%', padding: '6px 10px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.75rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4C1D95' }}>Lead Study: Observed Context</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Recently hired 15 account executives"
-                          value={leadForm.observedContext}
-                          onChange={(e) => setLeadForm({ ...leadForm, observedContext: e.target.value })}
-                          style={{ width: '100%', padding: '6px 10px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.75rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4C1D95' }}>Lead Study: Potential Opportunity</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. High synergy with automation sprint"
-                          value={leadForm.potentialOpportunity}
-                          onChange={(e) => setLeadForm({ ...leadForm, potentialOpportunity: e.target.value })}
-                          style={{ width: '100%', padding: '6px 10px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.75rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4C1D95' }}>Lead Study: Suggested Approach</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Lead with tailored pilot metrics"
-                          value={leadForm.suggestedApproach}
-                          onChange={(e) => setLeadForm({ ...leadForm, suggestedApproach: e.target.value })}
-                          style={{ width: '100%', padding: '6px 10px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.75rem' }}
+                          placeholder="e.g. Leading platform overhaul with active budget..."
+                          value={leadForm.whySuitsBest}
+                          onChange={(e) => setLeadForm({ ...leadForm, whySuitsBest: e.target.value })}
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8rem' }}
                         />
                       </div>
                     </div>
@@ -1440,21 +1485,23 @@ support@creativegini.com`;
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                       {editingLeadIndex !== null && (
                         <button
+                          type="button"
                           onClick={() => {
                             setEditingLeadIndex(null);
                             setLeadForm({
                               name: '',
+                              companyLink: '',
+                              email: '',
+                              linkedin: '',
+                              leadStudyPdf: '',
+                              leadStudyPdfName: '',
+                              logo: '',
                               title: '',
                               company: '',
                               aboutCompany: '',
-                              linkedin: '',
-                              email: '',
-                              phone: '',
-                              logo: '',
                               whySuitsBest: '',
                               whyRelevant: '',
                               observedContext: '',
-                              potentialOpportunity: '',
                               suggestedApproach: '',
                             });
                           }}
@@ -1462,26 +1509,29 @@ support@creativegini.com`;
                             background: '#F3F4F6',
                             color: '#4B5563',
                             border: '1px solid #D1D5DB',
-                            padding: '6px 12px',
+                            padding: '7px 14px',
                             borderRadius: '6px',
                             fontSize: '0.8125rem',
                             cursor: 'pointer',
+                            fontWeight: 600,
                           }}
                         >
                           Cancel
                         </button>
                       )}
                       <button
+                        type="button"
                         onClick={handleSaveLead}
                         style={{
                           background: '#7C3AED',
                           color: '#FFFFFF',
                           border: 'none',
-                          padding: '6px 14px',
+                          padding: '7px 18px',
                           borderRadius: '6px',
                           fontSize: '0.8125rem',
-                          fontWeight: 600,
+                          fontWeight: 700,
                           cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
                         }}
                       >
                         {editingLeadIndex !== null ? 'Update Lead' : '+ Add Lead to Showcase'}
@@ -1489,8 +1539,8 @@ support@creativegini.com`;
                     </div>
                   </div>
 
-                  {/* Existing Leads Table / Rows */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Existing Leads List (1, 2, 3...) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {formData.leads.map((l, index) => (
                       <div
                         key={l.id || index}
@@ -1500,42 +1550,100 @@ support@creativegini.com`;
                           justifyContent: 'space-between',
                           background: '#FFFFFF',
                           border: '1px solid #E5E7EB',
-                          padding: '12px 16px',
-                          borderRadius: '8px',
-                          gap: '12px',
+                          padding: '14px 18px',
+                          borderRadius: '10px',
+                          gap: '14px',
+                          flexWrap: 'wrap',
                         }}
                       >
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {l.logo ? (
-                              <img src={l.logo} alt={l.company} style={{ width: '24px', height: '24px', borderRadius: '4px', objectFit: 'contain', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF' }} />
-                            ) : null}
-                            <strong style={{ fontSize: '0.875rem', color: '#111827' }}>{l.name}</strong>
-                            <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>• {l.title}</span>
-                            <span style={{ fontSize: '0.75rem', color: '#2563EB', fontWeight: 600 }}>@{l.company}</span>
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: '#4B5563', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            🎯 <strong>Why suits best:</strong> {l.whySuitsBest}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '240px', flex: '1 1 280px' }}>
+                          <span
+                            style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '50%',
+                              background: '#F3F4F6',
+                              color: '#6B7280',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {index + 1}
+                          </span>
+
+                          {l.logo ? (
+                            <img src={l.logo} alt={l.company} style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'contain', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF', padding: '2px' }} />
+                          ) : (
+                            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#EDE9FE', color: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem', flexShrink: 0 }}>
+                              {l.name?.charAt(0) || 'L'}
+                            </div>
+                          )}
+
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <strong style={{ fontSize: '0.92rem', color: '#111827' }}>{l.name}</strong>
+                              <span style={{ fontSize: '0.78rem', color: '#6B7280' }}>• {l.title || 'Decision Maker'}</span>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '3px' }}>
+                              {l.companyLink && (
+                                <a
+                                  href={l.companyLink.startsWith('http') ? l.companyLink : `https://${l.companyLink}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{ fontSize: '0.75rem', color: '#2563EB', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}
+                                >
+                                  <Globe size={11} />
+                                  <span>{l.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}</span>
+                                </a>
+                              )}
+                              {l.email && (
+                                <span style={{ fontSize: '0.75rem', color: '#4B5563', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  <Mail size={11} /> {l.email}
+                                </span>
+                              )}
+                              {l.linkedin && (
+                                <a
+                                  href={l.linkedin}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{ fontSize: '0.75rem', color: '#0A66C2', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', fontWeight: 600 }}
+                                >
+                                  <Linkedin size={11} /> LinkedIn
+                                </a>
+                              )}
+                              {l.leadStudyPdf && (
+                                <span style={{ fontSize: '0.72rem', color: '#1D4ED8', background: '#DBEAFE', padding: '2px 8px', borderRadius: '6px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  <FileText size={10} /> PDF Attached
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button
+                            type="button"
                             onClick={() => {
                               setEditingLeadIndex(index);
                               setLeadForm({
                                 name: l.name || '',
+                                companyLink: l.companyLink || '',
+                                email: l.email || '',
+                                linkedin: l.linkedin || '',
+                                leadStudyPdf: l.leadStudyPdf || '',
+                                leadStudyPdfName: l.leadStudyPdfName || '',
+                                logo: l.logo || '',
                                 title: l.title || '',
                                 company: l.company || '',
                                 aboutCompany: l.aboutCompany || '',
-                                linkedin: l.linkedin || '',
-                                email: l.email || '',
-                                phone: l.phone || '',
-                                logo: l.logo || '',
                                 whySuitsBest: l.whySuitsBest || '',
                                 whyRelevant: l.leadStudy?.whyRelevant || '',
                                 observedContext: l.leadStudy?.observedContext || '',
-                                potentialOpportunity: l.leadStudy?.potentialOpportunity || '',
                                 suggestedApproach: l.leadStudy?.suggestedApproach || '',
                               });
                             }}
@@ -1543,15 +1651,17 @@ support@creativegini.com`;
                               background: '#F3F4F6',
                               border: '1px solid #D1D5DB',
                               color: '#374151',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
                               cursor: 'pointer',
                             }}
                           >
                             Edit
                           </button>
                           <button
+                            type="button"
                             onClick={() => {
                               const updated = formData.leads.filter((_, i) => i !== index);
                               setFormData({ ...formData, leads: updated });
@@ -1560,9 +1670,10 @@ support@creativegini.com`;
                               background: '#FEE2E2',
                               border: '1px solid #FECACA',
                               color: '#DC2626',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
                               cursor: 'pointer',
                             }}
                           >
@@ -1650,7 +1761,7 @@ support@creativegini.com`;
 
             </div>
 
-            {/* Modal Footer */}
+            {/* Modal Footer (4-Step Wizard Flow) */}
             <div
               style={{
                 padding: '16px 24px',
@@ -1660,44 +1771,152 @@ support@creativegini.com`;
                 justifyContent: 'space-between',
                 background: '#FAFAFC',
                 borderRadius: '0 0 16px 16px',
+                flexWrap: 'wrap',
+                gap: '12px',
               }}
             >
               <div style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
-                Showcase URL: <strong>/samples/{formData.slug || 'company-slug'}</strong>
+                {activeTab === 'company' && <span>Step <strong>1 of 4</strong>: Target Account & Slug</span>}
+                {activeTab === 'study' && <span>Step <strong>2 of 4</strong>: Company Study & PDF Upload</span>}
+                {activeTab === 'leads' && <span>Step <strong>3 of 4</strong>: Curated Decision Makers ({formData.leads.length} added)</span>}
+                {activeTab === 'pitch' && <span>Step <strong>4 of 4</strong>: Proposal Pitch Deck & Final Save</span>}
               </div>
 
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  style={{
-                    background: '#FFFFFF',
-                    border: '1px solid #D1D5DB',
-                    color: '#374151',
-                    padding: '9px 18px',
-                    borderRadius: '8px',
-                    fontWeight: 600,
-                    fontSize: '0.875rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveShowcase}
-                  style={{
-                    background: '#7C3AED',
-                    border: 'none',
-                    color: '#FFFFFF',
-                    padding: '9px 22px',
-                    borderRadius: '8px',
-                    fontWeight: 700,
-                    fontSize: '0.875rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
-                  }}
-                >
-                  Save Showcase
-                </button>
+                {/* Back or Cancel Button */}
+                {activeTab === 'company' ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    style={{
+                      background: '#FFFFFF',
+                      border: '1px solid #D1D5DB',
+                      color: '#374151',
+                      padding: '9px 18px',
+                      borderRadius: '8px',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeTab === 'study') setActiveTab('company');
+                      if (activeTab === 'leads') setActiveTab('study');
+                      if (activeTab === 'pitch') setActiveTab('leads');
+                    }}
+                    style={{
+                      background: '#FFFFFF',
+                      border: '1px solid #D1D5DB',
+                      color: '#374151',
+                      padding: '9px 18px',
+                      borderRadius: '8px',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ← Back
+                  </button>
+                )}
+
+                {/* Step 1 Next */}
+                {activeTab === 'company' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!formData.companyName.trim()) {
+                        alert('Please enter a Target Company Name to proceed.');
+                        return;
+                      }
+                      setActiveTab('study');
+                    }}
+                    style={{
+                      background: '#7C3AED',
+                      border: 'none',
+                      color: '#FFFFFF',
+                      padding: '9px 22px',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
+                    }}
+                  >
+                    Save & Next: Company Study →
+                  </button>
+                )}
+
+                {/* Step 2 Next */}
+                {activeTab === 'study' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('leads')}
+                    style={{
+                      background: '#7C3AED',
+                      border: 'none',
+                      color: '#FFFFFF',
+                      padding: '9px 22px',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
+                    }}
+                  >
+                    Save & Next: Curated Leads →
+                  </button>
+                )}
+
+                {/* Step 3 Next */}
+                {activeTab === 'leads' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('pitch')}
+                    style={{
+                      background: '#7C3AED',
+                      border: 'none',
+                      color: '#FFFFFF',
+                      padding: '9px 22px',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
+                    }}
+                  >
+                    Save & Next: Pitch Deck →
+                  </button>
+                )}
+
+                {/* Step 4 Final Submission */}
+                {activeTab === 'pitch' && (
+                  <button
+                    type="button"
+                    onClick={handleSaveShowcase}
+                    style={{
+                      background: '#059669',
+                      border: 'none',
+                      color: '#FFFFFF',
+                      padding: '9px 24px',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <CheckCircle size={16} />
+                    <span>Save Showcase</span>
+                  </button>
+                )}
               </div>
             </div>
 
