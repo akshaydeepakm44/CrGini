@@ -5,6 +5,7 @@ import ClientDashboardPage from './pages/ClientDashboardPage';
 import BoostingChannelPage from './pages/BoostingChannelPage';
 import DigitalisingChannelPage from './pages/DigitalisingChannelPage';
 import DesignChannelPage from './pages/DesignChannelPage';
+import DevelopmentChannelPage from './pages/DevelopmentChannelPage';
 import ServiceDetailPage from './pages/ServiceDetailPage';
 import MyRequestsPage from './pages/MyRequestsPage';
 import RequestDetailPage from './pages/RequestDetailPage';
@@ -102,8 +103,9 @@ export default function ClientPortal({ user, onLogout }) {
         setRawRequests(reqsRes.value);
         adaptedList = reqsRes.value.map(adaptRequest);
         setRequests(adaptedList);
-        setMetrics(computeDashboardMetrics(adaptedList));
-        setDeliverables(adaptDeliverables(adaptedList));
+        const adaptedDeliverables = adaptDeliverables(adaptedList);
+        setDeliverables(adaptedDeliverables);
+        setMetrics(computeDashboardMetrics(adaptedList, adaptedDeliverables));
       } else {
         setRequests([]);
         setMetrics(computeDashboardMetrics([]));
@@ -290,6 +292,26 @@ export default function ClientPortal({ user, onLogout }) {
             <ServiceDetailWrapper
               onOpenNewRequest={handleOpenNewRequest}
               channel="design"
+            />
+          }
+        />
+
+        {/* 3c. App Development Channel & Services */}
+        <Route
+          path="development"
+          element={
+            <DevelopmentChannelPage
+              onSelectService={(slug) => navigate(`/portal/development/${slug}`)}
+              onRequestService={(serviceId, customData) => handleOpenNewRequest(serviceId, customData)}
+            />
+          }
+        />
+        <Route
+          path="development/:serviceSlug"
+          element={
+            <ServiceDetailWrapper
+              onOpenNewRequest={handleOpenNewRequest}
+              channel="development"
             />
           }
         />

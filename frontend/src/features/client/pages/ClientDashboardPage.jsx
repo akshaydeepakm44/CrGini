@@ -39,25 +39,32 @@ export default function ClientDashboardPage({
   const companyName = company?.name || user?.companyName || 'Your Organization';
 
   // Live accurate metrics calculated directly from in-memory requests and deliverables
+  const activeRequestsList = requests.filter(
+    (r) => !['COMPLETED', 'APPROVED', 'CANCELLED'].includes(String(r.status).toUpperCase())
+  );
+  const completedList = requests.filter(
+    (r) => ['COMPLETED', 'APPROVED'].includes(String(r.status).toUpperCase())
+  );
+  const totalDeliverablesCount = deliverables.length > 0
+    ? deliverables.length
+    : requests.reduce((acc, r) => acc + (r.submissions?.length || 0), 0);
+  const pendingPaymentsCount = requests.filter(
+    (r) => String(r.paymentStatus || r.payment_status).toUpperCase() === 'PENDING'
+  ).length;
+
   const liveMetrics = {
-    activeRequests: requests.filter((r) => !['COMPLETED', 'APPROVED', 'CANCELLED'].includes(r.status)).length,
-    completed: requests.filter((r) => ['COMPLETED', 'APPROVED'].includes(r.status)).length,
-    verifiedDeliverables: deliverables.filter((d) => d.status === 'APPROVED' || d.status === 'VERIFIED' || d.verified).length,
-    pendingPayments: requests.filter((r) => r.paymentStatus === 'PENDING' || r.payment_status === 'PENDING').length,
+    activeRequests: activeRequestsList.length,
+    completed: completedList.length,
+    verifiedDeliverables: totalDeliverablesCount,
+    pendingPayments: pendingPaymentsCount,
   };
 
   // Greeting based on client local time
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  // Active requests (in progress / client review / submitted)
-  const activeRequestsList = requests.filter(
-    (r) => r.status !== 'COMPLETED' && r.status !== 'APPROVED'
-  );
   const displayRequests = activeRequestsList.length > 0 ? activeRequestsList.slice(0, 5) : requests.slice(0, 5);
-
-  // Recent deliverables (up to 3)
-  const recentDeliverablesList = deliverables.slice(0, 3);
+  const recentDeliverablesList = deliverables.slice(0, 4);
 
   // Recent ticket communications with latest messages
   const recentConversations = requests
@@ -155,7 +162,7 @@ export default function ClientDashboardPage({
           label="Active Requests"
           icon={Clock}
           variant="lavender"
-          trend="In specialist queues"
+          trend={liveMetrics.activeRequests > 0 ? `${liveMetrics.activeRequests} in queue` : 'In specialist queues'}
           trendDirection="neutral"
           onClick={() => onNavigate && onNavigate('/portal/requests')}
         />
@@ -172,10 +179,10 @@ export default function ClientDashboardPage({
 
         <MetricCard
           value={liveMetrics.verifiedDeliverables}
-          label="Verified Deliverables"
+          label="Recent Deliverables"
           icon={ShieldCheck}
           variant="blue"
-          trend="Human QA verified"
+          trend={liveMetrics.verifiedDeliverables > 0 ? `${liveMetrics.verifiedDeliverables} ready for review` : 'Human QA verified'}
           trendDirection="up"
           onClick={() => onNavigate && onNavigate('/portal/deliverables')}
         />
@@ -220,7 +227,7 @@ export default function ClientDashboardPage({
             channel="boosting"
             title="BOOSTING"
             description="Grow your brand, content and market presence with specialist campaigns."
-            servicesList={['Strategic Planner', 'Content Creator', 'DevRel & Technical Advocacy']}
+            servicesList={['Strategic Planner', 'Content Creator', 'DevRel & Technical Advocacy', 'GTM Strategy']}
             onExplore={() => onNavigate && onNavigate('/portal/boosting')}
           />
 
@@ -231,14 +238,37 @@ export default function ClientDashboardPage({
             servicesList={['Lead Research', 'Company Study', 'Key People Research', 'Pitch Support']}
             onExplore={() => onNavigate && onNavigate('/portal/digitalising')}
           />
+
+          <ServiceChannelCard
+            channel="design"
+            title="UI / DESIGN"
+            description="Professional interface design, heuristic audits, and design system engineering."
+            servicesList={['UI/UX Audit', 'Figma Project', 'Redesign Request', 'Design Systems']}
+            onExplore={() => onNavigate && onNavigate('/portal/design')}
+          />
+
+          <ServiceChannelCard
+            channel="development"
+            title="APP DEVELOPMENT"
+            description="Turnkey full-stack web applications, mobile apps, and scalable API systems."
+            servicesList={['Web Application MVP', 'Mobile App Development', 'API & Backend Systems']}
+            onExplore={() => onNavigate && onNavigate('/portal/development')}
+          />
         </div>
       </div>
 
       {/* ============================================================
-          SECTION C & D: ACTIVE REQUESTS & RECENT DELIVERABLES GRID
+          SECTION C, D & F: ACTIVE SPRINT ACTIVITY (3 BALANCED CARDS)
           ============================================================ */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '28px' }}>
-        {/* SECTION C: ACTIVE REQUESTS */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '20px',
+          alignItems: 'stretch',
+        }}
+      >
+        {/* CARD 1: ACTIVE REQUESTS */}
         <div
           style={{
             backgroundColor: '#FFFFFF',
@@ -249,6 +279,7 @@ export default function ClientDashboardPage({
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
+            minHeight: '380px',
           }}
         >
           <div>
@@ -266,7 +297,7 @@ export default function ClientDashboardPage({
                   Active Requests
                 </h3>
                 <span style={{ fontSize: '0.78125rem', color: '#6B7280' }}>
-                  {activeRequestsList.length} sprints currently in progress
+                  {activeRequestsList.length} sprint{activeRequestsList.length !== 1 ? 's' : ''} currently in progress
                 </span>
               </div>
 
@@ -313,12 +344,12 @@ export default function ClientDashboardPage({
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {displayRequests.map((req) => (
+                {displayRequests.slice(0, 4).map((req) => (
                   <div
                     key={req.id}
                     onClick={() => onViewRequest && onViewRequest(req)}
                     style={{
-                      padding: '14px 16px',
+                      padding: '12px 14px',
                       borderRadius: '12px',
                       border: '1px solid #F3F4F6',
                       backgroundColor: '#FAFAFC',
@@ -339,49 +370,84 @@ export default function ClientDashboardPage({
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                       <div
                         style={{
-                          fontSize: '0.75rem',
+                          fontSize: '0.72rem',
                           fontWeight: 700,
                           color: '#7C3AED',
                           backgroundColor: '#EDE9FE',
-                          padding: '4px 8px',
+                          padding: '3px 7px',
                           borderRadius: '6px',
                           whiteSpace: 'nowrap',
+                          flexShrink: 0,
                         }}
                       >
                         {req.ticketId}
                       </div>
 
-                      <div>
-                        <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#111827', lineHeight: 1.3 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: '0.84375rem',
+                            fontWeight: 700,
+                            color: '#111827',
+                            lineHeight: 1.3,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
                           {req.title}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                          <span>{req.service}</span>
-                          <span>•</span>
-                          <span style={{ color: req.channel === 'Boosting' ? '#BE185D' : '#0369A1', fontWeight: 600 }}>
+                        <div style={{ fontSize: '0.72rem', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
+                          <span style={{ color: req.channel === 'Boosting' ? '#BE185D' : req.channel === 'UI / Design' ? '#9333EA' : req.channel === 'App Development' ? '#059669' : '#0369A1', fontWeight: 600 }}>
                             {req.channel}
                           </span>
                           <span>•</span>
-                          <span>Updated {req.updatedDate}</span>
+                          <span>{req.updatedDate}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '8px' }}>
                       <StatusBadge status={req.status} size="sm" />
-                      <ArrowRight size={14} color="#9CA3AF" />
+                      <ArrowRight size={13} color="#9CA3AF" />
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {displayRequests.length > 0 && (
+            <div style={{ paddingTop: '14px', borderTop: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>
+                Showing top active tickets
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate('/portal/requests')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--cg-purple-600, #7C3AED)',
+                  fontSize: '0.78125rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <span>All Requests ({requests.length})</span>
+                <ArrowRight size={12} />
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* SECTION D: RECENT DELIVERABLES */}
+        {/* CARD 2: RECENT DELIVERABLES */}
         <div
           style={{
             backgroundColor: '#FFFFFF',
@@ -392,6 +458,7 @@ export default function ClientDashboardPage({
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
+            minHeight: '380px',
           }}
         >
           <div>
@@ -409,7 +476,7 @@ export default function ClientDashboardPage({
                   Recent Deliverables
                 </h3>
                 <span style={{ fontSize: '0.78125rem', color: '#6B7280' }}>
-                  Hand-verified research and assets ready for review
+                  {deliverables.length} verified asset{deliverables.length !== 1 ? 's' : ''} available
                 </span>
               </div>
 
@@ -452,8 +519,8 @@ export default function ClientDashboardPage({
                 </p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {recentDeliverablesList.map((del) => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {recentDeliverablesList.slice(0, 3).map((del) => (
                   <DeliverableCard
                     key={del.id}
                     title={del.title}
@@ -469,36 +536,201 @@ export default function ClientDashboardPage({
               </div>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* ============================================================
-          SECTION F: RECENT COMMUNICATIONS & SPECIALIST REPLIES
-          ============================================================ */}
-      {recentConversations.length > 0 && (
-        <div style={{ marginTop: '36px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MessageSquare size={18} color="#7C3AED" />
-                <h2
-                  style={{
-                    fontFamily: 'var(--cg-font-heading, "Plus Jakarta Sans", sans-serif)',
-                    fontSize: '1.25rem',
-                    fontWeight: 800,
-                    color: 'var(--cg-text-primary, #111827)',
-                    margin: 0,
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  Recent Communications & Specialist Updates
-                </h2>
+          {deliverables.length > 0 && (
+            <div style={{ paddingTop: '14px', borderTop: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>
+                QA-checked outputs
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate('/portal/deliverables')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#0284C7',
+                  fontSize: '0.78125rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <span>Browse Deliverables Hub</span>
+                <ArrowRight size={12} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* CARD 3: SPECIALIST UPDATES & SUPPORT */}
+        <div
+          style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 'var(--cg-radius-xl, 20px)',
+            border: '1px solid var(--cg-border-light, #E5E7EB)',
+            padding: '24px',
+            boxShadow: 'var(--cg-shadow-card, 0 4px 20px rgba(0, 0, 0, 0.04))',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            minHeight: '380px',
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <h3
+                    style={{
+                      fontFamily: 'var(--cg-font-heading, "Plus Jakarta Sans", sans-serif)',
+                      fontSize: '1.125rem',
+                      fontWeight: 800,
+                      color: 'var(--cg-text-primary, #111827)',
+                      margin: 0,
+                    }}
+                  >
+                    Specialist Updates
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: '0.6875rem',
+                      fontWeight: 700,
+                      color: '#059669',
+                      backgroundColor: '#ECFDF5',
+                      padding: '1px 7px',
+                      borderRadius: '9999px',
+                      border: '1px solid #A7F3D0',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#10B981' }}></span>
+                    Pod Active
+                  </span>
+                </div>
+                <span style={{ fontSize: '0.78125rem', color: '#6B7280' }}>
+                  Direct conversation threads &amp; sprint check-ins
+                </span>
               </div>
-              <p style={{ margin: '4px 0 0', fontSize: '0.84375rem', color: 'var(--cg-text-secondary, #6B7280)' }}>
-                Direct conversation threads and status check-ins with your assigned specialists
-              </p>
+
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate('/portal/messages')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--cg-purple-600, #7C3AED)',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <span>Open Chat</span>
+                <ArrowRight size={13} />
+              </button>
             </div>
 
+            {recentConversations.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {recentConversations.slice(0, 3).map((req) => {
+                  const isClientLast =
+                    req.latestMessage?.senderRole === 'USER' ||
+                    req.latestMessage?.sender_role === 'USER';
+                  return (
+                    <div
+                      key={req.id}
+                      onClick={() => onNavigate && onNavigate('/portal/messages')}
+                      style={{
+                        padding: '12px 14px',
+                        borderRadius: '12px',
+                        border: '1px solid #F3F4F6',
+                        backgroundColor: '#FAFAFC',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        e.currentTarget.style.borderColor = '#DDD4FA';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(124, 58, 237, 0.08)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#FAFAFC';
+                        e.currentTarget.style.borderColor = '#F3F4F6';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span
+                          style={{
+                            fontFamily: 'monospace',
+                            fontWeight: 700,
+                            fontSize: '0.72rem',
+                            color: '#7C3AED',
+                            backgroundColor: '#EDE9FE',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                          }}
+                        >
+                          {req.ticketId}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>
+                          {req.latestMessage?.createdAt ? new Date(req.latestMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: '0.78125rem',
+                          color: '#374151',
+                          lineHeight: 1.35,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, color: isClientLast ? '#6B7280' : '#7C3AED' }}>
+                          {isClientLast ? 'You: ' : 'Specialist: '}
+                        </span>
+                        "{req.latestMessage?.text || 'Review updated.'}"
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: '28px 18px',
+                  borderRadius: '12px',
+                  backgroundColor: '#FAF5FF',
+                  border: '1px dashed #DDD4FA',
+                  textAlign: 'center',
+                }}
+              >
+                <MessageSquare size={26} color="#7C3AED" style={{ margin: '0 auto 8px' }} />
+                <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#1F2937', marginBottom: '4px' }}>
+                  Direct Specialist Pod Access
+                </div>
+                <p style={{ fontSize: '0.78125rem', color: '#6B7280', margin: '0 0 14px', lineHeight: 1.4 }}>
+                  Have questions about your sprint requirements or scope adjustments? Connect directly with your assigned specialist team.
+                </p>
+                <Button variant="primary" size="sm" onClick={() => onNavigate && onNavigate('/portal/messages')}>
+                  Message Specialists
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div style={{ paddingTop: '14px', borderTop: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>
+              Average response: &lt;1 hour
+            </span>
             <button
               type="button"
               onClick={() => onNavigate && onNavigate('/portal/messages')}
@@ -506,110 +738,20 @@ export default function ClientDashboardPage({
                 background: 'none',
                 border: 'none',
                 color: 'var(--cg-purple-600, #7C3AED)',
-                fontSize: '0.8125rem',
-                fontWeight: 700,
+                fontSize: '0.78125rem',
+                fontWeight: 600,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
               }}
             >
-              <span>Open Chat Channels</span>
-              <ArrowRight size={13} />
+              <span>Chat Channels</span>
+              <ArrowRight size={12} />
             </button>
           </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-            {recentConversations.slice(0, 3).map((req) => {
-              const isClientLast =
-                req.latestMessage?.senderRole === 'USER' ||
-                req.latestMessage?.sender_role === 'USER';
-              return (
-                <div
-                  key={req.id}
-                  onClick={() => onNavigate && onNavigate('/portal/messages')}
-                  style={{
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '16px',
-                    border: '1px solid #E5E7EB',
-                    padding: '18px 20px',
-                    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.borderColor = '#7C3AED';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'none';
-                    e.currentTarget.style.borderColor = '#E5E7EB';
-                  }}
-                >
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span
-                        style={{
-                          fontFamily: 'monospace',
-                          fontWeight: 800,
-                          fontSize: '0.78125rem',
-                          color: '#7C3AED',
-                          backgroundColor: '#F5F3FF',
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid #DDD4FA',
-                        }}
-                      >
-                        {req.ticketId}
-                      </span>
-
-                      <span style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>
-                        {req.latestMessage?.createdAt ? new Date(req.latestMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                      </span>
-                    </div>
-
-                    <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827', marginBottom: '6px' }}>
-                      {req.title}
-                    </div>
-
-                    <div
-                      style={{
-                        backgroundColor: isClientLast ? '#F9FAFB' : '#FAF5FF',
-                        border: `1px solid ${isClientLast ? '#E5E7EB' : '#DDD4FA'}`,
-                        borderRadius: '8px',
-                        padding: '10px 12px',
-                        fontSize: '0.8125rem',
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: isClientLast ? '#6B7280' : '#7C3AED', marginBottom: '2px' }}>
-                        {isClientLast ? 'You sent:' : `${req.latestMessage?.senderName || 'Specialist'} replied:`}
-                      </div>
-                      <div style={{ color: '#374151', fontStyle: 'italic', wordBreak: 'break-word' }}>
-                        "{req.latestMessage?.text}"
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '4px' }}>
-                    <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 500 }}>
-                      {req.messageCount} message{req.messageCount > 1 ? 's' : ''} in thread
-                    </span>
-                    <span style={{ fontSize: '0.78125rem', color: '#7C3AED', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span>Reply</span>
-                      <ArrowRight size={12} />
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

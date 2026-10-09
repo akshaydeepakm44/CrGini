@@ -12,7 +12,11 @@ import {
   Zap,
   Sparkles,
   ShieldCheck,
-  FileText
+  FileText,
+  Smartphone,
+  Terminal,
+  Layers,
+  Globe
 } from 'lucide-react';
 
 /**
@@ -422,6 +426,100 @@ export const SERVICES_CATALOG = [
       { title: 'Layout Specifications', format: 'Component Redlines', icon: FileText }
     ],
     idealFor: 'Companies seeking a modern visual identity overhaul and higher landing page conversion rates.'
+  },
+
+  // ==========================================
+  // APP DEVELOPMENT SERVICES
+  // ==========================================
+  {
+    id: 'web-app',
+    slug: 'web-app',
+    channel: 'development',
+    channelLabel: 'App Development',
+    name: 'Web Application MVP',
+    shortTitle: 'Web App',
+    headline: 'Production-ready full-stack web applications with modern frontend and backend architecture.',
+    shortDesc: 'Responsive React / Next.js web applications, secure backend APIs, database schemas, and cloud deployment.',
+    description: 'Engineered for startups and scale-ups. Our senior full-stack developers deliver production-grade web applications, interactive dashboards, SaaS MVPs, and custom portals with clean, scalable code.',
+    icon: Globe,
+    iconColor: '#059669',
+    iconBg: '#ECFDF5',
+    turnaround: '3–5 Days',
+    startingPrice: 999,
+    backendServiceType: 'LANDING_PAGE',
+    backendSubService: 'WEB_APP',
+    whatYouGet: [
+      'Full-Stack React / Next.js Application Source Code',
+      'Production Database Schema & API Integration',
+      'Responsive UI & Mobile-First Optimization',
+      'Vercel / AWS Cloud Deployment & CI/CD Setup'
+    ],
+    deliverablesSpec: [
+      { title: 'Production GitHub Repository', format: 'Clean Source Code', icon: Code },
+      { title: 'Architecture & API Docs', format: 'Technical Markdown / PDF', icon: FileText },
+      { title: 'Live Deployment URL', format: 'Staging / Production Environment', icon: Zap }
+    ],
+    idealFor: 'Founders and companies launching new SaaS products, customer portals, or interactive web applications.'
+  },
+  {
+    id: 'mobile-app',
+    slug: 'mobile-app',
+    channel: 'development',
+    channelLabel: 'App Development',
+    name: 'Mobile App Development',
+    shortTitle: 'Mobile App',
+    headline: 'Cross-platform iOS and Android applications built with React Native and modern native features.',
+    shortDesc: 'Native performance, offline support, push notifications, and App Store / Play Store deployment readiness.',
+    description: 'Bring your product to mobile with native performance. We engineer responsive, fluid mobile applications for iOS and Android with complete state management, authentication, and API integrations.',
+    icon: Smartphone,
+    iconColor: '#0D9488',
+    iconBg: '#F0FDFA',
+    turnaround: '5–7 Days',
+    startingPrice: 1299,
+    backendServiceType: 'LANDING_PAGE',
+    backendSubService: 'MOBILE_APP',
+    whatYouGet: [
+      'Cross-Platform React Native App Repository',
+      'iOS & Android TestFlight / APK Build Deliverables',
+      'Authentication & Push Notification Systems',
+      'App Store / Play Store Submission Assistance'
+    ],
+    deliverablesSpec: [
+      { title: 'Mobile Source Repository', format: 'GitHub Repo', icon: Code },
+      { title: 'Installable TestFlight / APK Builds', format: 'Mobile Binaries', icon: Smartphone },
+      { title: 'App Store Submission Guide', format: 'Deployment Checklist PDF', icon: FileText }
+    ],
+    idealFor: 'Companies needing cross-platform mobile apps for iOS and Android with rapid turnaround.'
+  },
+  {
+    id: 'api-backend',
+    slug: 'api-backend',
+    channel: 'development',
+    channelLabel: 'App Development',
+    name: 'API & Backend Systems',
+    shortTitle: 'API & Backend',
+    headline: 'Robust RESTful & GraphQL backend APIs, microservices, and database architecture.',
+    shortDesc: 'Scalable server-side endpoints, PostgreSQL / MongoDB data pipelines, webhook integrations, and authentication.',
+    description: 'Scale your infrastructure with rock-solid server architectures. We build performant backend endpoints, secure authentication flows, third-party API integrations (Stripe, AI, CRMs), and optimized database schemas.',
+    icon: Terminal,
+    iconColor: '#6366F1',
+    iconBg: '#EEF2FF',
+    turnaround: '48–72 Hours',
+    startingPrice: 799,
+    backendServiceType: 'LANDING_PAGE',
+    backendSubService: 'API_BACKEND',
+    whatYouGet: [
+      'Secure REST / GraphQL API Microservice Endpoints',
+      'PostgreSQL / Database Migration Scripts',
+      'Third-Party Webhook & Service Integrations',
+      'Interactive Swagger / Postman Documentation'
+    ],
+    deliverablesSpec: [
+      { title: 'API Microservice Repository', format: 'Node.js / Python Code', icon: Code },
+      { title: 'Postman Collection & API Docs', format: 'Interactive API Docs', icon: FileText },
+      { title: 'Database Schema & Seeds', format: 'SQL Migration Scripts', icon: ShieldCheck }
+    ],
+    idealFor: 'Engineering teams needing dedicated backend endpoints, database migrations, or third-party API integrations.'
   }
 ];
 

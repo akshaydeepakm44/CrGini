@@ -43,6 +43,9 @@ const SERVICE_TYPE_MAP = {
       REDESIGN_REQUEST: 'Redesign Request',
       REDESIGN: 'Redesign Request',
       LANDING_PAGE: 'Redesign Request',
+      WEB_APP: 'Web Application MVP',
+      MOBILE_APP: 'Mobile App Development',
+      API_BACKEND: 'API & Backend Systems',
     }
   },
   COMPANY_UI: {
@@ -55,6 +58,16 @@ const SERVICE_TYPE_MAP = {
       REDESIGN_REQUEST: 'Redesign Request',
       REDESIGN: 'Redesign Request',
       LANDING_PAGE: 'Redesign Request',
+    }
+  },
+  COMPANY_DEV: {
+    defaultName: 'App Development Sprint',
+    channel: 'App Development',
+    channelSlug: 'development',
+    subServices: {
+      WEB_APP: 'Web Application MVP',
+      MOBILE_APP: 'Mobile App Development',
+      API_BACKEND: 'API & Backend Systems',
     }
   }
 };
@@ -120,8 +133,13 @@ export const adaptRequest = (raw) => {
   };
 
   const serviceName = (rawSubService && mapping.subServices?.[rawSubService]) || raw.service || mapping.defaultName;
-  const channel = mapping.channel;
-  const channelSlug = mapping.channelSlug;
+  let channel = mapping.channel;
+  let channelSlug = mapping.channelSlug;
+  const upperSub = String(rawSubService || '').toUpperCase();
+  if (['WEB_APP', 'MOBILE_APP', 'API_BACKEND'].includes(upperSub)) {
+    channel = 'App Development';
+    channelSlug = 'development';
+  }
 
   // Normalize status into client-friendly status strings
   const statusRaw = String(raw.status || 'IN_PROGRESS').toUpperCase();
@@ -162,39 +180,45 @@ export const adaptRequest = (raw) => {
 /**
  * Compute dashboard summary metrics from live requests
  */
-export const computeDashboardMetrics = (requests = []) => {
+export const computeDashboardMetrics = (requests = [], deliverables = []) => {
   if (!requests || requests.length === 0) {
     return {
       activeRequests: 0,
       completed: 0,
-      verifiedDeliverables: 0,
+      verifiedDeliverables: deliverables?.length || 0,
       pendingPayments: 0,
     };
   }
 
   let activeRequests = 0;
   let completed = 0;
-  let verifiedDeliverables = 0;
   let pendingPayments = 0;
 
   requests.forEach((req) => {
     const status = String(req.status).toUpperCase();
     if (status === 'COMPLETED' || status === 'APPROVED') {
       completed++;
-    } else {
+    } else if (status !== 'CANCELLED') {
       activeRequests++;
     }
 
-    if (req.submissions && Array.isArray(req.submissions)) {
-      verifiedDeliverables += req.submissions.length;
-    } else if (status === 'COMPLETED' || status === 'CLIENT_REVIEW') {
-      verifiedDeliverables++;
-    }
-
-    if (req.paymentStatus === 'PENDING') {
+    if (String(req.paymentStatus).toUpperCase() === 'PENDING') {
       pendingPayments++;
     }
   });
+
+  let verifiedDeliverables = 0;
+  if (deliverables && deliverables.length > 0) {
+    verifiedDeliverables = deliverables.length;
+  } else {
+    requests.forEach((req) => {
+      if (req.submissions && Array.isArray(req.submissions) && req.submissions.length > 0) {
+        verifiedDeliverables += req.submissions.length;
+      } else if (['CLIENT_REVIEW', 'COMPLETED', 'APPROVED'].includes(String(req.status).toUpperCase())) {
+        verifiedDeliverables++;
+      }
+    });
+  }
 
   return {
     activeRequests,

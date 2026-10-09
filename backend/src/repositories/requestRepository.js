@@ -65,6 +65,7 @@ const mapRequest = (row) => {
 
     attachments: row.attachments || [],
     deliverables: row.deliverables || [],
+    submissions: row.submissions || [],
     notes: row.notes,
 
     createdAt: row.created_at,
@@ -167,15 +168,57 @@ const requestSelect = `
             'title', rd.title,
             'url', rd.url,
             'description', rd.description,
-            'deliveredAt', rd.delivered_at
+            'deliveredAt', rd.created_at
           )
-          ORDER BY rd.delivered_at
+          ORDER BY rd.created_at
         )
         FROM request_deliverables rd
         WHERE rd.request_id = r.id
       ),
       '[]'::jsonb
     ) AS deliverables,
+
+    COALESCE(
+      (
+        SELECT jsonb_agg(
+          jsonb_build_object(
+            'id', s.id,
+            'ticketId', r.ticket_id,
+            'requestId', s.request_id,
+            'version', s.version,
+            'title', s.title,
+            'description', s.description,
+            'notes', s.notes,
+            'externalLink', s.external_link,
+            'status', s.status,
+            'submittedBy', s.submitted_by_name,
+            'submittedAt', s.submitted_at,
+            'createdAt', s.created_at,
+            'files', COALESCE(
+              (
+                SELECT jsonb_agg(
+                  jsonb_build_object(
+                    'id', sf.id,
+                    'name', sf.name,
+                    'url', sf.url,
+                    'size', sf.size,
+                    'type', sf.type
+                  )
+                  ORDER BY sf.created_at
+                )
+                FROM submission_files sf
+                WHERE sf.submission_id = s.id
+              ),
+              '[]'::jsonb
+            )
+          )
+          ORDER BY s.version DESC
+        )
+        FROM submissions s
+        WHERE s.request_id = r.id
+      ),
+      '[]'::jsonb
+    ) AS submissions,
 
     COALESCE(
       (

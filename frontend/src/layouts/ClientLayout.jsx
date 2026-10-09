@@ -9,6 +9,7 @@ import {
   CreditCard,
   User,
   Palette,
+  Code2,
 } from 'lucide-react';
 import Sidebar from '../components/navigation/Sidebar';
 import Header from '../components/navigation/Header';
@@ -94,6 +95,17 @@ export default function ClientLayout({
         { id: 'ui-ux-audit', label: 'UI/UX Audit', path: '/portal/design/ui-ux-audit' },
         { id: 'figma-project', label: 'Figma Project', path: '/portal/design/figma-project' },
         { id: 'redesign-request', label: 'Redesign Request', path: '/portal/design/redesign-request' },
+      ],
+    },
+    {
+      id: 'development',
+      label: 'App Development',
+      path: '/portal/development',
+      icon: Code2,
+      children: [
+        { id: 'web-app', label: 'Web Application', path: '/portal/development/web-app' },
+        { id: 'mobile-app', label: 'Mobile App', path: '/portal/development/mobile-app' },
+        { id: 'api-backend', label: 'API & Backend', path: '/portal/development/api-backend' },
       ],
     },
     {

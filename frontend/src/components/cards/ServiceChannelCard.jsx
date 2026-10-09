@@ -1,14 +1,13 @@
 import React from 'react';
-import { Rocket, Search, ArrowRight, Sparkles } from 'lucide-react';
+import { Rocket, Search, ArrowRight, Sparkles, Palette, Code2 } from 'lucide-react';
 import Button from '../common/Button';
 
 /**
  * Reusable ServiceChannelCard Component
- * Prominently presents the two core Service Channels: BOOSTING & DIGITALISING
- * Matches the bottom right "Service Channels" cards in the reference mockup
+ * Presents core Service Channels: BOOSTING, DIGITALISING, UI / DESIGN, and APP DEVELOPMENT
  */
 export default function ServiceChannelCard({
-  channel = 'boosting', // 'boosting' | 'digitalising'
+  channel = 'boosting', // 'boosting' | 'digitalising' | 'design' | 'development'
   title,
   description,
   servicesList = [],
@@ -23,9 +22,9 @@ export default function ServiceChannelCard({
       defaultServices: ['Strategic Planner', 'Content Creator', 'DevRel'],
       icon: Rocket,
       bg: 'linear-gradient(135deg, #FAF5FF 0%, #FFFFFF 100%)',
-      border: 'var(--cg-purple-200)',
-      iconBg: 'var(--cg-purple-100)',
-      iconColor: 'var(--cg-purple-600)',
+      border: 'var(--cg-purple-200, #E9D5FF)',
+      iconBg: 'var(--cg-purple-100, #F3E8FF)',
+      iconColor: 'var(--cg-purple-600, #7C3AED)',
       buttonVariant: 'primary',
       pillColor: 'purple',
     },
@@ -35,15 +34,46 @@ export default function ServiceChannelCard({
       defaultServices: ['Lead Research', 'Company Study', 'Key People Research', 'Pitch Support'],
       icon: Search,
       bg: 'linear-gradient(135deg, #F0F9FF 0%, #FFFFFF 100%)',
-      border: 'var(--cg-blue-200)',
-      iconBg: 'var(--cg-blue-100)',
-      iconColor: 'var(--cg-blue-600)',
+      border: 'var(--cg-blue-200, #BAE6FD)',
+      iconBg: 'var(--cg-blue-100, #E0F2FE)',
+      iconColor: 'var(--cg-blue-600, #0284C7)',
       buttonVariant: 'primary',
       pillColor: 'blue',
     },
+    design: {
+      defaultTitle: 'UI / Design',
+      defaultDesc: 'Professional interface design, heuristic audits, and design system engineering.',
+      defaultServices: ['UI/UX Audit', 'Figma Project', 'Redesign Request'],
+      icon: Palette,
+      bg: 'linear-gradient(135deg, #FDF4FF 0%, #FFFFFF 100%)',
+      border: '#F0ABFC',
+      iconBg: '#FAE8FF',
+      iconColor: '#C026D3',
+      buttonVariant: 'primary',
+      pillColor: 'purple',
+    },
+    development: {
+      defaultTitle: 'App Development',
+      defaultDesc: 'Turnkey full-stack web applications, cross-platform mobile apps, and scalable API systems.',
+      defaultServices: ['Web Applications', 'Mobile Apps', 'API & Backend'],
+      icon: Code2,
+      bg: 'linear-gradient(135deg, #ECFDF5 0%, #FFFFFF 100%)',
+      border: '#A7F3D0',
+      iconBg: '#D1FAE5',
+      iconColor: '#059669',
+      buttonVariant: 'primary',
+      pillColor: 'green',
+    },
   };
 
-  const config = channelConfig[channel.toLowerCase()] || channelConfig.boosting;
+  // Channel aliases
+  channelConfig['ui/design'] = channelConfig.design;
+  channelConfig['ui_design'] = channelConfig.design;
+  channelConfig['app development'] = channelConfig.development;
+  channelConfig['app_dev'] = channelConfig.development;
+  channelConfig['appdev'] = channelConfig.development;
+
+  const config = channelConfig[channel.toLowerCase().trim()] || channelConfig.boosting;
   const Icon = config.icon;
   const effectiveTitle = title || config.defaultTitle;
   const effectiveDesc = description || config.defaultDesc;
