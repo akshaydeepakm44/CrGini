@@ -37,7 +37,7 @@ export default function PlatformPreview({ onExplorePlatform }) {
             </div>
             <div className="cg-window-title-badge">
               <ShieldCheck size={14} color="#7C3AED" />
-              <span>app.creativegini.com — Acme Corporation Workspace</span>
+              <span>app.creativegini.com — Verified Client Workspace</span>
             </div>
             <div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>256-Bit Encrypted</div>
           </div>

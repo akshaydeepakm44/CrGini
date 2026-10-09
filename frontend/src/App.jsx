@@ -120,6 +120,7 @@ export default function App() {
               onSignIn={() => navigate('/signin')}
               onGetStarted={() => navigate('/signin?view=signup')}
               onGoToDashboard={() => navigate(getRoleHome(user))}
+              onSignOut={handleLogout}
             />
           }
         />

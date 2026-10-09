@@ -20,7 +20,8 @@ export default function LandingPage({
   user,
   onSignIn,
   onGetStarted,
-  onGoToDashboard
+  onGoToDashboard,
+  onSignOut
 }) {
   const containerRef = useRef(null);
 
@@ -86,6 +87,7 @@ export default function LandingPage({
         onSignIn={onSignIn}
         onGetStarted={onGetStarted || onSignIn}
         onGoToDashboard={onGoToDashboard}
+        onSignOut={onSignOut}
       />
 
       {/* Hero Section with Interactive Growth Ecosystem */}

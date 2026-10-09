@@ -35,30 +35,23 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
 
   const steps = [
     {
-      id: 'overview',
-      stepNum: '01',
-      badge: '01 // WORKSPACE OVERVIEW',
-      title: 'Everything in one place.',
-      subtitle: 'The client logs into a unified workspace. Review active tickets, track deliverables, explore services, and view real-time account status without messy email chains.'
-    },
-    {
       id: 'leads',
-      stepNum: '02',
-      badge: '02 // LEAD RESEARCH & DISCOVERY',
+      stepNum: '01',
+      badge: '01 // LEAD RESEARCH & DISCOVERY',
       title: 'The Client Views & Requests Leads',
       subtitle: 'Request bespoke prospect lists in minutes. Filter by industry, tech stack, and seniority. Every contact is human-verified with direct work emails and LinkedIn profiles.'
     },
     {
       id: 'boosting',
-      stepNum: '03',
-      badge: '03 // BRAND & GROWTH BOOSTING',
+      stepNum: '02',
+      badge: '02 // BRAND & GROWTH BOOSTING',
       title: 'When the Client Requires Boosting',
       subtitle: 'When you need market traction, our Boosting specialists execute go-to-market playbooks, high-conversion copywriting, paid campaigns, and developer advocacy sprints.'
     },
     {
       id: 'digitalising',
-      stepNum: '04',
-      badge: '04 // BUSINESS INTELLIGENCE & DIGITALISATION',
+      stepNum: '03',
+      badge: '03 // BUSINESS INTELLIGENCE & DIGITALISATION',
       title: 'Digitalising Market Intelligence & Org Insights',
       subtitle: 'Deep organizational studies and executive mapping. Understand target company hierarchies, technology vendor footprints, and buying committees before pitching.'
     }
@@ -89,13 +82,12 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
         anticipatePin: 1,
         invalidateOnRefresh: true,
         onUpdate: (self) => {
-          // Map progress [0, 1] to 4 cards (0, 1, 2, 3)
+          // Map progress [0, 1] to 3 cards (0, 1, 2)
           const p = self.progress;
           let step = 0;
-          if (p < 0.25) step = 0;
-          else if (p < 0.50) step = 1;
-          else if (p < 0.75) step = 2;
-          else step = 3;
+          if (p < 0.33) step = 0;
+          else if (p < 0.66) step = 1;
+          else step = 2;
 
           if (step !== activeStepRef.current) {
             setActiveStep(step);
@@ -119,7 +111,7 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
     const st = ScrollTrigger.getById('cg-client-journey-pin');
     if (st) {
       // Position scroll near the center of the step's segment
-      const targetProgress = (index + 0.35) / 4;
+      const targetProgress = (index + 0.35) / 3;
       const targetY = st.start + (st.end - st.start) * targetProgress;
       window.scrollTo({
         top: targetY,
@@ -160,10 +152,9 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
                 >
                   <span className="cg-tab-num">{st.stepNum}</span>
                   <span className="cg-tab-label">
-                    {idx === 0 && 'Workspace Overview'}
-                    {idx === 1 && 'Request Leads'}
-                    {idx === 2 && 'Boosting Services'}
-                    {idx === 3 && 'Digitalising Intel'}
+                    {idx === 0 && 'Request Leads'}
+                    {idx === 1 && 'Boosting Services'}
+                    {idx === 2 && 'Digitalising Intel'}
                   </span>
                   {activeStep === idx && <span className="cg-tab-indicator" />}
                 </button>
@@ -173,158 +164,8 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
 
           {/* Cards Display Stage */}
           <div className="cg-journey-stage">
-            {/* CARD 1: Everything in One Place (Dashboard Mockup from Reference Image) */}
+            {/* CARD 1: The Client Views & Requests Leads */}
             <div className={`cg-journey-card ${activeStep === 0 ? 'card-active' : activeStep > 0 ? 'card-prev' : 'card-next'}`}>
-              <div className="cg-window-chrome">
-                <div className="cg-window-dots">
-                  <span className="cg-window-dot red" />
-                  <span className="cg-window-dot yellow" />
-                  <span className="cg-window-dot green" />
-                </div>
-                <div className="cg-window-address">
-                  <ShieldCheck size={13} color="#7C3AED" />
-                  <span>app.creativegini.com/dashboard &mdash; Acme Corporation</span>
-                </div>
-                <div className="cg-window-status">Live Workspace</div>
-              </div>
-
-              <div className="cg-mockup-canvas">
-                {/* Greeting Hero Banner */}
-                <div className="cg-card-hero-banner">
-                  <div className="cg-card-hero-text">
-                    <span className="cg-card-hero-greeting">Good morning,</span>
-                    <h3 className="cg-card-hero-company">Acme Corporation</h3>
-                    <p className="cg-card-hero-sub">Here's what's happening with your CreativeGini account.</p>
-                  </div>
-                  <div className="cg-card-hero-tag">
-                    <Sparkles size={14} />
-                    <span>Your Growth, Our Priority</span>
-                  </div>
-                </div>
-
-                {/* 4 Metric Status Cards */}
-                <div className="cg-card-metrics-grid">
-                  <div className="cg-card-stat purple">
-                    <div className="cg-card-stat-header">
-                      <FolderGit2 size={15} />
-                      <span className="cg-card-stat-num">5</span>
-                    </div>
-                    <div className="cg-card-stat-name">Active Requests</div>
-                    <div className="cg-card-stat-delta">↑ 2 from last month</div>
-                  </div>
-
-                  <div className="cg-card-stat green">
-                    <div className="cg-card-stat-header">
-                      <CheckCircle2 size={15} />
-                      <span className="cg-card-stat-num">12</span>
-                    </div>
-                    <div className="cg-card-stat-name">Completed</div>
-                    <div className="cg-card-stat-delta">↑ 4 from last month</div>
-                  </div>
-
-                  <div className="cg-card-stat blue">
-                    <div className="cg-card-stat-header">
-                      <ShieldCheck size={15} />
-                      <span className="cg-card-stat-num">8</span>
-                    </div>
-                    <div className="cg-card-stat-name">Verified / Approved</div>
-                    <div className="cg-card-stat-delta">↑ 3 from last month</div>
-                  </div>
-
-                  <div className="cg-card-stat coral">
-                    <div className="cg-card-stat-header">
-                      <Clock size={15} />
-                      <span className="cg-card-stat-num">3</span>
-                    </div>
-                    <div className="cg-card-stat-name">Pending Payment</div>
-                    <div className="cg-card-stat-delta">↓ 1 from last month</div>
-                  </div>
-                </div>
-
-                {/* Split Content: Active Requests & Quick Actions */}
-                <div className="cg-card-split-grid">
-                  <div className="cg-card-panel">
-                    <div className="cg-panel-header">
-                      <span className="cg-panel-title">My Active Requests</span>
-                      <span className="cg-panel-link">View All →</span>
-                    </div>
-                    <div className="cg-mini-table-wrapper">
-                      <table className="cg-mini-table">
-                        <thead>
-                          <tr>
-                            <th>ID</th>
-                            <th>Service</th>
-                            <th>Title</th>
-                            <th>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td className="cg-ticket-cell">CG-1025</td>
-                            <td>Lead Research</td>
-                            <td>Healthcare Leads - US</td>
-                            <td><span className="cg-status-pill in-progress">In Progress</span></td>
-                          </tr>
-                          <tr>
-                            <td className="cg-ticket-cell">CG-1024</td>
-                            <td>Strategic Plan</td>
-                            <td>Growth Strategy Plan</td>
-                            <td><span className="cg-status-pill review">Client Review</span></td>
-                          </tr>
-                          <tr>
-                            <td className="cg-ticket-cell">CG-1023</td>
-                            <td>Company Study</td>
-                            <td>Competitor Analysis</td>
-                            <td><span className="cg-status-pill completed">Completed</span></td>
-                          </tr>
-                          <tr>
-                            <td className="cg-ticket-cell">CG-1022</td>
-                            <td>Content Creation</td>
-                            <td>Product Video (2 mins)</td>
-                            <td><span className="cg-status-pill in-progress">In Progress</span></td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div className="cg-card-panel">
-                    <div className="cg-panel-header">
-                      <span className="cg-panel-title">Quick Actions</span>
-                    </div>
-                    <div className="cg-quick-actions-list">
-                      <div className="cg-action-item">
-                        <div className="cg-action-icon purple"><FolderGit2 size={15} /></div>
-                        <div className="cg-action-info">
-                          <span className="cg-action-title">Request a Service</span>
-                          <span className="cg-action-desc">Start a new scoped request</span>
-                        </div>
-                        <ChevronRight size={13} className="cg-action-arrow" />
-                      </div>
-                      <div className="cg-action-item">
-                        <div className="cg-action-icon blue"><Search size={15} /></div>
-                        <div className="cg-action-info">
-                          <span className="cg-action-title">View Leads</span>
-                          <span className="cg-action-desc">Explore verified company leads</span>
-                        </div>
-                        <ChevronRight size={13} className="cg-action-arrow" />
-                      </div>
-                      <div className="cg-action-item">
-                        <div className="cg-action-icon pink"><Building2 size={15} /></div>
-                        <div className="cg-action-info">
-                          <span className="cg-action-title">View Company Study</span>
-                          <span className="cg-action-desc">Access study reports &amp; dossiers</span>
-                        </div>
-                        <ChevronRight size={13} className="cg-action-arrow" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* CARD 2: The Client Views & Requests Leads */}
-            <div className={`cg-journey-card ${activeStep === 1 ? 'card-active' : activeStep > 1 ? 'card-prev' : 'card-next'}`}>
               <div className="cg-window-chrome">
                 <div className="cg-window-dots">
                   <span className="cg-window-dot red" />
@@ -444,8 +285,8 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
               </div>
             </div>
 
-            {/* CARD 3: When the Client Requires Boosting */}
-            <div className={`cg-journey-card ${activeStep === 2 ? 'card-active' : activeStep > 2 ? 'card-prev' : 'card-next'}`}>
+            {/* CARD 2: When the Client Requires Boosting */}
+            <div className={`cg-journey-card ${activeStep === 1 ? 'card-active' : activeStep > 1 ? 'card-prev' : 'card-next'}`}>
               <div className="cg-window-chrome">
                 <div className="cg-window-dots">
                   <span className="cg-window-dot red" />
@@ -551,8 +392,8 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
               </div>
             </div>
 
-            {/* CARD 4: Digitalising Market Intelligence & Org Insights */}
-            <div className={`cg-journey-card ${activeStep === 3 ? 'card-active' : activeStep > 3 ? 'card-prev' : 'card-next'}`}>
+            {/* CARD 3: Digitalising Market Intelligence & Org Insights */}
+            <div className={`cg-journey-card ${activeStep === 2 ? 'card-active' : activeStep > 2 ? 'card-prev' : 'card-next'}`}>
               <div className="cg-window-chrome">
                 <div className="cg-window-dots">
                   <span className="cg-window-dot red" />
@@ -677,7 +518,7 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
           <div className="cg-journey-footer-controls">
             <div className="cg-journey-scroll-pill">
               <span className="cg-journey-scroll-indicator-text">
-                Step {steps[activeStep].stepNum} of 04 &bull; Scroll to explore next process
+                Step {steps[activeStep].stepNum} of 03 &bull; Scroll to explore next process
               </span>
               <div className="cg-journey-dots-indicator">
                 {steps.map((st, i) => (

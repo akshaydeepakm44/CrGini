@@ -61,6 +61,14 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
+// Prevent client/browser caching on API endpoints
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/company', companyRoutes);

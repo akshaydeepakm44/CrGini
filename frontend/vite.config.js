@@ -17,6 +17,9 @@ export default defineConfig({
     fs: {
       strict: false,
     },
+    headers: {
+      'Cache-Control': 'no-store',
+    },
   },
 });
 

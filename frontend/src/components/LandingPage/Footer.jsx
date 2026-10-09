@@ -50,7 +50,7 @@ export default function Footer({ onSignIn, onGetStarted }) {
               className="cg-footer-direct-contact"
               onClick={scrollTo('client-journey')}
             >
-              <span>Explore Client Portal Experience</span>
+              <span>Explore Workflow &amp; Deliverables</span>
               <ArrowRight size={14} />
             </a>
 

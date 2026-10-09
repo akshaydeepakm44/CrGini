@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, X, ArrowRight, UserCheck, LayoutDashboard } from 'lucide-react';
 
-export default function Navbar({ onSignIn, onGetStarted, user, onGoToDashboard }) {
+export default function Navbar({ onSignIn, onGetStarted, user, onGoToDashboard, onSignOut }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
@@ -115,7 +115,7 @@ export default function Navbar({ onSignIn, onGetStarted, user, onGoToDashboard }
                 className={`cg-nav-link ${activeSection === 'client-journey' ? 'active' : ''}`}
                 onClick={(e) => scrollToSection(e, 'client-journey')}
               >
-                Client Experience
+                Workflow &amp; Delivery
               </a>
             </li>
           </ul>
@@ -123,14 +123,24 @@ export default function Navbar({ onSignIn, onGetStarted, user, onGoToDashboard }
           {/* Action CTAs */}
           <div className="cg-nav-actions">
             {user ? (
-              <button
-                type="button"
-                className="cg-btn-cta"
-                onClick={onGoToDashboard}
-              >
-                <LayoutDashboard size={16} />
-                <span>Client Portal</span>
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="cg-btn-login"
+                  onClick={onSignOut}
+                  title={`Signed in as ${user.name || user.email}`}
+                >
+                  Sign Out
+                </button>
+                <button
+                  type="button"
+                  className="cg-btn-cta"
+                  onClick={onGoToDashboard}
+                >
+                  <LayoutDashboard size={15} />
+                  <span>Dashboard</span>
+                </button>
+              </div>
             ) : (
               <>
                 <button
@@ -211,33 +221,61 @@ export default function Navbar({ onSignIn, onGetStarted, user, onGoToDashboard }
               className="cg-nav-link"
               onClick={(e) => scrollToSection(e, 'client-journey')}
             >
-              Client Experience
+              Workflow &amp; Delivery
             </a>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-              <button
-                type="button"
-                className="cg-btn-login"
-                style={{ flex: 1, justifyContent: 'center' }}
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onSignIn();
-                }}
-              >
-                Login
-              </button>
-              <button
-                type="button"
-                className="cg-btn-cta"
-                style={{ flex: 1, justifyContent: 'center' }}
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onGetStarted();
-                }}
-              >
-                <span>Get Started</span>
-                <ArrowRight size={14} />
-              </button>
-            </div>
+            {user ? (
+              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="cg-btn-login"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onSignOut && onSignOut();
+                  }}
+                >
+                  Sign Out
+                </button>
+                <button
+                  type="button"
+                  className="cg-btn-cta"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onGoToDashboard && onGoToDashboard();
+                  }}
+                >
+                  <span>Dashboard</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="cg-btn-login"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onSignIn();
+                  }}
+                >
+                  Login
+                </button>
+                <button
+                  type="button"
+                  className="cg-btn-cta"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onGetStarted();
+                  }}
+                >
+                  <span>Get Started</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
