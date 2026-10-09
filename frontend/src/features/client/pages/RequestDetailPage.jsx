@@ -181,37 +181,6 @@ export default function RequestDetailPage({
     }
   };
 
-  // Find the pitch deck uploaded by the lead team across all submissions
-  const latestPitchDeck = useMemo(() => {
-    for (const sub of submissions) {
-      const detail = parseSubmissionDetails(sub);
-      if (detail.isParsed && detail.pitchDeck) {
-        return {
-          title: detail.pitchDeck.title || 'Tailored Pitch Deck Proposal',
-          fileName: detail.pitchDeck.fileName || 'Tailored_Pitch_Deck.pdf',
-          notes: detail.pitchDeck.notes || '',
-          version: sub.version || 1,
-          fileUrl: sub.files?.find(f => f.name === detail.pitchDeck.fileName)?.url || sub.fileUrl || '#',
-        };
-      }
-      const deckFile = sub.files?.find(f =>
-        f.name?.toLowerCase().includes('pitch') ||
-        f.name?.toLowerCase().includes('brochure') ||
-        f.name?.toLowerCase().includes('deck')
-      );
-      if (deckFile) {
-        return {
-          title: 'Tailored Pitch Deck Proposal',
-          fileName: deckFile.name,
-          notes: '',
-          version: sub.version || 1,
-          fileUrl: deckFile.url,
-        };
-      }
-    }
-    return null;
-  }, [submissions]);
-
   const handleCopyEmail = (email) => {
     if (!email) return;
     navigator.clipboard.writeText(email);
@@ -319,184 +288,57 @@ export default function RequestDetailPage({
         </div>
       </div>
 
-      {/* Main Grid: Pitch Deck, Deliverables & Messages */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
-        {/* Left Column: Tailored Pitch Deck & Deliverables */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-          {/* 1. TAILORED PITCH DECK (Replaced 'Sprint Scope & Requirements' as requested) */}
+      {/* Main Grid: Deliverables & Specialist Conversation */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+          gap: '24px',
+          alignItems: 'start',
+        }}
+      >
+        {/* Left Column: Deliverables & Submissions */}
+        <div
+          style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '20px',
+            border: '1px solid #E5E7EB',
+            padding: '24px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: '600px',
+          }}
+        >
           <div
             style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '20px',
-              border: '1px solid #E5E7EB',
-              padding: '24px',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px',
+              paddingBottom: '14px',
+              borderBottom: '1px solid #F3F4F6',
+              gap: '12px',
+              flexWrap: 'wrap',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
-                    color: '#FFFFFF',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
-                  }}
-                >
-                  <Presentation size={20} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.0625rem', fontWeight: 800, color: '#111827', margin: 0 }}>
-                    Tailored Pitch Deck
-                  </h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.78125rem', color: '#6B7280' }}>
-                    Customized commercial presentation & investor slides curated by the Lead Team
-                  </p>
-                </div>
-              </div>
-
-              {latestPitchDeck && (
-                <span
-                  style={{
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    color: '#059669',
-                    backgroundColor: '#ECFDF5',
-                    padding: '3px 8px',
-                    borderRadius: '6px',
-                    border: '1px solid #A7F3D0',
-                  }}
-                >
-                  ✓ Pitch Deck Uploaded (V{latestPitchDeck.version})
-                </span>
-              )}
-            </div>
-
-            {/* Pitch Deck PDF Presentation Box */}
-            {latestPitchDeck ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div
                 style={{
-                  borderRadius: '14px',
-                  border: '1px solid #DDD4FA',
-                  backgroundColor: '#FAF5FF',
-                  padding: '20px',
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  backgroundColor: '#F5F3FF',
+                  color: '#7C3AED',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: '14px',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid #EDE9FE',
+                  flexShrink: 0,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <div
-                      style={{
-                        width: '52px',
-                        height: '52px',
-                        borderRadius: '12px',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #E5E7EB',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Presentation size={22} color="#7C3AED" />
-                      <span style={{ fontSize: '0.5625rem', fontWeight: 800, color: '#7C3AED', textTransform: 'uppercase', marginTop: '1px' }}>
-                        PDF DECK
-                      </span>
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>
-                        {latestPitchDeck.title}
-                      </div>
-                      <div style={{ fontSize: '0.78125rem', color: '#6B7280', marginTop: '2px' }}>
-                        {latestPitchDeck.fileName} • 16:9 Presentation Format • Specialist Verified
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <a
-                      href={latestPitchDeck.fileUrl || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '8px 16px',
-                        borderRadius: '8px',
-                        backgroundColor: '#7C3AED',
-                        color: '#FFFFFF',
-                        fontSize: '0.8125rem',
-                        fontWeight: 700,
-                        textDecoration: 'none',
-                        boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
-                      }}
-                    >
-                      <Download size={14} />
-                      <span>Download Pitch Deck PDF</span>
-                    </a>
-                  </div>
-                </div>
-
-                {latestPitchDeck.notes && (
-                  <div
-                    style={{
-                      fontSize: '0.8125rem',
-                      color: '#4B5563',
-                      backgroundColor: '#FFFFFF',
-                      padding: '10px 14px',
-                      borderRadius: '8px',
-                      border: '1px solid #EDE9FE',
-                    }}
-                  >
-                    <strong>Specialist Pitch Strategy:</strong> {latestPitchDeck.notes}
-                  </div>
-                )}
+                <Package size={20} />
               </div>
-            ) : (
-              <div
-                style={{
-                  padding: '24px 16px',
-                  borderRadius: '12px',
-                  backgroundColor: '#FAFAFC',
-                  border: '1px dashed #D1D5DB',
-                  textAlign: 'center',
-                }}
-              >
-                <Presentation size={28} color="#9CA3AF" style={{ margin: '0 auto 8px' }} />
-                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#111827' }}>
-                  Tailored Pitch Deck in Preparation
-                </div>
-                <p style={{ fontSize: '0.78125rem', color: '#6B7280', margin: '4px 0 0' }}>
-                  The CreativeGini Lead team is compiling your customized pitch deck presentation matching your target ICP. Once uploaded by the lead team, the PDF deck and slide angles will appear here.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* 2. DELIVERABLES & SUBMISSIONS (Clean, formatted with rows of generated leads) */}
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '20px',
-              border: '1px solid #E5E7EB',
-              padding: '24px',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <div>
                 <h3 style={{ fontSize: '1.0625rem', fontWeight: 800, color: '#111827', margin: 0 }}>
                   Deliverables & Submissions
@@ -505,30 +347,48 @@ export default function RequestDetailPage({
                   Review delivered sprint packages, inspect generated prospect rows, and access individual lead studies.
                 </p>
               </div>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#7C3AED', backgroundColor: '#F5F3FF', padding: '2px 8px', borderRadius: '6px' }}>
-                {submissions.length} submission(s)
-              </span>
             </div>
+            <span
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: '#7C3AED',
+                backgroundColor: '#F5F3FF',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                border: '1px solid #DDD4FA',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {submissions.length} submission{submissions.length === 1 ? '' : 's'}
+            </span>
+          </div>
 
-            {submissions.length === 0 ? (
-              <div
-                style={{
-                  padding: '28px 16px',
-                  borderRadius: '12px',
-                  backgroundColor: '#FAFAFC',
-                  border: '1px dashed #D1D5DB',
-                  textAlign: 'center',
-                }}
-              >
-                <Package size={24} color="#9CA3AF" style={{ margin: '0 auto 6px' }} />
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>
-                  Specialist work is currently in progress
-                </div>
-                <p style={{ fontSize: '0.78125rem', color: '#6B7280', margin: '4px 0 0' }}>
-                  Once the specialist uploads the draft dossier or lead database, it will appear here for your review and approval.
-                </p>
+          {submissions.length === 0 ? (
+            <div
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '40px 20px',
+                borderRadius: '12px',
+                backgroundColor: '#FAFAFC',
+                border: '1px dashed #D1D5DB',
+                textAlign: 'center',
+                margin: 'auto 0',
+              }}
+            >
+              <Package size={32} color="#9CA3AF" style={{ marginBottom: '10px' }} />
+              <div style={{ fontSize: '0.925rem', fontWeight: 700, color: '#374151' }}>
+                Specialist work is currently in progress
               </div>
-            ) : (
+              <p style={{ fontSize: '0.8125rem', color: '#6B7280', margin: '6px 0 0', maxWidth: '380px' }}>
+                Once the specialist uploads deliverables, dossiers, or assets, they will appear here for your review and approval.
+              </p>
+            </div>
+          ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 {submissions.map((sub, idx) => {
                   const detail = parseSubmissionDetails(sub);
@@ -1013,7 +873,6 @@ export default function RequestDetailPage({
               </div>
             )}
           </div>
-        </div>
 
         {/* Right Column: Specialist Conversation */}
         <div
@@ -1025,19 +884,65 @@ export default function RequestDetailPage({
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
             display: 'flex',
             flexDirection: 'column',
-            height: '580px',
+            height: '600px',
+            position: 'sticky',
+            top: '24px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #F3F4F6' }}>
-            <MessageSquare size={18} color="#7C3AED" />
-            <div>
-              <h3 style={{ fontSize: '1.0625rem', fontWeight: 800, color: '#111827', margin: 0 }}>
-                Specialist Conversation
-              </h3>
-              <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>
-                Direct communication with your lead research pod
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px',
+              paddingBottom: '14px',
+              borderBottom: '1px solid #F3F4F6',
+              gap: '12px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  backgroundColor: '#F5F3FF',
+                  color: '#7C3AED',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid #EDE9FE',
+                  flexShrink: 0,
+                }}
+              >
+                <MessageSquare size={20} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.0625rem', fontWeight: 800, color: '#111827', margin: 0 }}>
+                  Specialist Conversation
+                </h3>
+                <div style={{ fontSize: '0.78125rem', color: '#6B7280', marginTop: '2px' }}>
+                  Direct communication with your assigned specialist pod
+                </div>
               </div>
             </div>
+            {messages.length > 0 && (
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#6B7280',
+                  backgroundColor: '#F9FAFB',
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  border: '1px solid #E5E7EB',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {messages.length} message{messages.length === 1 ? '' : 's'}
+              </span>
+            )}
           </div>
 
           {/* Messages scroll area */}
