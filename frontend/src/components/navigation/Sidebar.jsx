@@ -90,38 +90,22 @@ export default function Sidebar({
           }}
         >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#FFFFFF',
-              boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)',
-              flexShrink: 0,
-            }}
-          >
-            <Sparkles size={20} />
-          </div>
-
-          {!isCollapsed && (
-            <div>
-              <div
-                style={{
-                  fontFamily: 'var(--cg-font-heading)',
-                  fontSize: '1.1875rem',
-                  fontWeight: 800,
-                  letterSpacing: '-0.02em',
-                  background: 'linear-gradient(135deg, #6D28D9 0%, #EC4899 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}
-              >
-                CreativeGini
-              </div>
+          {isCollapsed ? (
+            <img
+              src="/logo-icon.png"
+              alt="CreativeGini"
+              style={{ width: '32px', height: '32px', objectFit: 'contain' }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+              <img
+                src="/logo.png"
+                alt="CreativeGini"
+                style={{ height: '34px', width: 'auto', objectFit: 'contain' }}
+              />
               {roleBadge && (
                 <div
                   style={{

@@ -62,13 +62,7 @@ export default function Navbar({ onSignIn, onGetStarted }) {
               src="/logo.png"
               alt="CreativeGini Logo"
               className="cg-nav-logo"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
             />
-            <span className="cg-nav-brand-text">
-              Creative<span>Gini</span>
-            </span>
           </a>
 
           {/* Navigation Links */}

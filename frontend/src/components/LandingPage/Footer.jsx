@@ -75,13 +75,7 @@ export default function Footer({ onSignIn, onGetStarted }) {
                 src="/logo.png"
                 alt="CreativeGini"
                 className="cg-footer-logo-img"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
               />
-              <span className="cg-nav-brand-text">
-                Creative<span>Gini</span>
-              </span>
             </a>
 
             <p className="cg-footer-manifesto-text">
