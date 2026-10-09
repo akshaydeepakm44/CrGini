@@ -223,6 +223,8 @@ export const loginUser = async (req, res) => {
       });
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
+
     let user = await findUserByEmail(normalizedEmail, {
       includePassword: true,
     });
