@@ -31,6 +31,12 @@ connectPostgres().then(async (ok) => {
     } catch (err) {
       console.error('[CreativeGini API] ensureDataI2IAccount error:', err.message);
     }
+    try {
+      const { ensureSampleTable } = await import('./repositories/sampleRepository.js');
+      await ensureSampleTable();
+    } catch (err) {
+      console.error('[CreativeGini API] ensureSampleTable error:', err.message);
+    }
   } else {
     console.error('[CreativeGini API] PostgreSQL connection failed. Check credentials.');
   }

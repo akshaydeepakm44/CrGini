@@ -186,9 +186,20 @@ export default function LeadShowcasesPage({ onNavigate }) {
         return;
       }
 
-      const generatedSlug = (formData.slug && formData.slug.trim())
-        ? formData.slug.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-')
-        : formData.companyName.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+      const formatSlug = (input) => {
+        if (!input) return '';
+        return String(input)
+          .replace(/^https?:\/\//i, '')
+          .replace(/^www\./i, '')
+          .replace(/\/+$/, '')
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9_-]/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '');
+      };
+
+      const generatedSlug = formatSlug(formData.slug) || formatSlug(formData.companyName) || `showcase-${Date.now()}`;
 
       const payload = {
         ...formData,
@@ -906,10 +917,11 @@ support@creativegini.com`;
                       value={formData.companyName}
                       onChange={(e) => {
                         const val = e.target.value;
+                        const formatSlug = (s) => s.replace(/^https?:\/\//i, '').replace(/^www\./i, '').toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
                         setFormData({
                           ...formData,
                           companyName: val,
-                          slug: formData.slug ? formData.slug : val.toLowerCase().replace(/[^a-z0-9_-]/g, '-'),
+                          slug: formData.slug ? formData.slug : formatSlug(val),
                         });
                       }}
                       style={{
@@ -929,9 +941,12 @@ support@creativegini.com`;
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. data-i2i"
+                        placeholder="e.g. data-i2i or meetfranz"
                         value={formData.slug}
-                        onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                        onChange={(e) => {
+                          const cleaned = e.target.value.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+                          setFormData({ ...formData, slug: cleaned });
+                        }}
                         style={{
                           width: '100%',
                           padding: '10px 14px',
@@ -941,7 +956,7 @@ support@creativegini.com`;
                         }}
                       />
                       <span style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '4px', display: 'block' }}>
-                        Live URL: {window.location.origin}/samples/{formData.slug || 'company-slug'}
+                        Live URL: {window.location.origin}/samples/{formData.slug ? formData.slug.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-') : 'company-slug'}
                       </span>
                     </div>
 

@@ -380,6 +380,19 @@ export const getAdminSampleById = async (req, res) => {
   }
 };
 
+const cleanSlug = (input) => {
+  if (!input) return '';
+  return String(input)
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/+$/, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+};
+
 /**
  * @desc    Create new prospect sample showcase
  * @route   POST /api/samples-manage
@@ -404,13 +417,11 @@ export const createAdminSample = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Target company name is required.' });
     }
 
-    const effectiveSlug = (slug && slug.trim())
-      ? slug.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-')
-      : companyName.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    const effectiveSlug = cleanSlug(slug) || cleanSlug(companyName) || `showcase-${Date.now()}`;
 
     const effectiveTitle = (title && title.trim())
       ? title.trim()
-      : `${companyName} Intelligence & Growth Showcase`;
+      : `${companyName.trim()} Intelligence & Growth Showcase`;
 
     const existing = await findSampleBySlug(effectiveSlug, false);
     if (existing) {
@@ -446,7 +457,7 @@ export const createAdminSample = async (req, res) => {
     console.error('[SampleController.createAdminSample] Error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to create sample showcase.',
+      message: error.message || 'Failed to create sample showcase.',
     });
   }
 };
@@ -464,7 +475,12 @@ export const updateAdminSample = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Sample showcase not found.' });
     }
 
-    const updated = await updateSampleShowcase(id, req.body);
+    const body = { ...req.body };
+    if (body.slug) {
+      body.slug = cleanSlug(body.slug);
+    }
+
+    const updated = await updateSampleShowcase(id, body);
     return res.status(200).json({
       success: true,
       sample: updated,
@@ -474,7 +490,7 @@ export const updateAdminSample = async (req, res) => {
     console.error('[SampleController.updateAdminSample] Error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to update sample showcase.',
+      message: error.message || 'Failed to update sample showcase.',
     });
   }
 };

@@ -1,5 +1,36 @@
 import { query } from '../config/postgres.js';
 
+let tableEnsured = false;
+export async function ensureSampleTable() {
+  if (tableEnsured) return;
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS public_sample_showcases (
+        id              SERIAL PRIMARY KEY,
+        slug            VARCHAR(255) UNIQUE NOT NULL,
+        title           VARCHAR(255) NOT NULL,
+        company_name    VARCHAR(255) NOT NULL,
+        description     TEXT,
+        logo_url        TEXT,
+        status          VARCHAR(50) NOT NULL DEFAULT 'PUBLISHED',
+        company_study   JSONB DEFAULT '{}'::jsonb,
+        leads           JSONB DEFAULT '[]'::jsonb,
+        lead_studies    JSONB DEFAULT '[]'::jsonb,
+        pitch_deck      JSONB DEFAULT '{}'::jsonb,
+        published_at    TIMESTAMPTZ DEFAULT NOW(),
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_public_samples_slug ON public_sample_showcases (slug);
+      CREATE INDEX IF NOT EXISTS idx_public_samples_status ON public_sample_showcases (status);
+    `);
+    tableEnsured = true;
+  } catch (err) {
+    console.error('[SampleRepository] Failed to ensure public_sample_showcases table:', err.message);
+  }
+}
+
 const mapSampleRow = (row) => {
   if (!row) return null;
   return {
@@ -21,6 +52,7 @@ const mapSampleRow = (row) => {
 };
 
 export const findSampleBySlug = async (slug, onlyPublished = true) => {
+  await ensureSampleTable();
   if (!slug) return null;
   const conditions = ['slug = $1'];
   const params = [String(slug).toLowerCase().trim()];
@@ -55,6 +87,7 @@ export const findSampleBySlug = async (slug, onlyPublished = true) => {
 };
 
 export const findSampleById = async (id) => {
+  await ensureSampleTable();
   if (!id) return null;
   const result = await query(
     `
@@ -83,6 +116,7 @@ export const findSampleById = async (id) => {
 };
 
 export const findAllSamples = async (includeDrafts = false) => {
+  await ensureSampleTable();
   const where = includeDrafts ? '' : "WHERE status = 'PUBLISHED'";
   const result = await query(
     `
@@ -121,6 +155,7 @@ export const createSampleShowcase = async ({
   leadStudies = [],
   pitchDeck = {},
 }) => {
+  await ensureSampleTable();
   const result = await query(
     `
     INSERT INTO public_sample_showcases (
@@ -156,6 +191,7 @@ export const createSampleShowcase = async ({
 };
 
 export const updateSampleShowcase = async (id, updates = {}) => {
+  await ensureSampleTable();
   const allowed = {
     title: 'title',
     companyName: 'company_name',
@@ -194,6 +230,7 @@ export const updateSampleShowcase = async (id, updates = {}) => {
 };
 
 export const deleteSampleShowcase = async (id) => {
+  await ensureSampleTable();
   await query('DELETE FROM public_sample_showcases WHERE id = $1', [id]);
   return true;
 };
