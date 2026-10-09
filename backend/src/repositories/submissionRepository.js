@@ -15,7 +15,20 @@ const mapSubmission = (row) => {
     title: row.title,
     description: row.description,
 
-    files: row.files || [],
+    files: (row.files || []).map((f) => {
+      const fileId = f.id;
+      const isAbsoluteHttp = f.url && (f.url.startsWith('http://') || f.url.startsWith('https://'));
+      const downloadPath = fileId ? `/api/assets/${fileId}/download` : (f.url || '#');
+      const streamPath = fileId ? `/api/assets/${fileId}/stream` : (f.url || '#');
+      return {
+        ...f,
+        id: fileId,
+        downloadUrl: downloadPath,
+        streamUrl: streamPath,
+        url: isAbsoluteHttp ? f.url : downloadPath,
+        rawKey: f.url,
+      };
+    }),
 
     externalLink: row.external_link,
     notes: row.notes,
@@ -82,6 +95,7 @@ const submissionSelect = `
       (
         SELECT jsonb_agg(
           jsonb_build_object(
+            'id', sf.id,
             'name', sf.name,
             'url', sf.url,
             'size', sf.size,

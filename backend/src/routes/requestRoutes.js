@@ -19,7 +19,8 @@ import {
   getSubmissions,
   getSubmissionByVersion,
   approveSubmission,
-  requestChanges
+  requestChanges,
+  downloadRequestFile
 } from '../controllers/submissionController.js';
 import { protect, optionalProtect, authorize } from '../middleware/auth.js';
 
@@ -74,5 +75,12 @@ router.route('/:id/submissions/:submissionId/approve')
 
 router.route('/:id/submissions/:submissionId/request-changes')
   .post(protect, requestChanges);
+
+// File downloads (deliverables and ticket attachments)
+router.route('/:id/files/:fileId/download')
+  .get(protect, downloadRequestFile);
+
+router.route('/:id/submissions/:submissionId/files/:fileId/download')
+  .get(protect, downloadRequestFile);
 
 export default router;

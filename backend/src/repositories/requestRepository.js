@@ -146,6 +146,7 @@ const requestSelect = `
       (
         SELECT jsonb_agg(
           jsonb_build_object(
+            'id', ra.id,
             'name', ra.name,
             'url', ra.url,
             'size', ra.size,

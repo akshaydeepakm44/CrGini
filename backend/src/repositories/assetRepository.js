@@ -217,14 +217,56 @@ export const findAssetById = async (assetId) => {
     JOIN requests r ON r.id = s.request_id
     LEFT JOIN companies c ON c.id = r.company_id
     LEFT JOIN users u ON u.id = r.user_id
-    WHERE sf.id = $1
+    WHERE sf.id::text = $1 OR sf.name = $1 OR sf.url = $1
     LIMIT 1
   `;
 
-  const result = await query(sql, [assetId]);
-  if (!result.rows || result.rows.length === 0) return null;
+  const result = await query(sql, [String(assetId)]);
+  if (result.rows && result.rows.length > 0) {
+    return mapAssetRow(result.rows[0]);
+  }
 
-  return mapAssetRow(result.rows[0]);
+  // Fallback: Check request_attachments
+  try {
+    const reqAttachSql = `
+      SELECT
+        ra.id,
+        ra.name AS file_name,
+        ra.url AS storage_url,
+        ra.size AS file_size,
+        ra.type AS mime_type,
+        ra.created_at,
+        NULL::integer AS submission_id,
+        1 AS submission_version,
+        'Initial Ticket Attachment' AS submission_title,
+        'APPROVED' AS submission_status,
+        ra.created_at AS submitted_at,
+        r.id AS request_id,
+        r.ticket_id AS ticket_code,
+        r.title AS request_title,
+        r.service_type,
+        r.user_id,
+        r.company_id,
+        r.payment_status,
+        c.name AS company_name,
+        u.name AS client_name,
+        u.email AS client_email
+      FROM request_attachments ra
+      JOIN requests r ON r.id = ra.request_id
+      LEFT JOIN companies c ON c.id = r.company_id
+      LEFT JOIN users u ON u.id = r.user_id
+      WHERE ra.id::text = $1 OR ra.name = $1 OR ra.url = $1
+      LIMIT 1
+    `;
+    const raResult = await query(reqAttachSql, [String(assetId)]);
+    if (raResult.rows && raResult.rows.length > 0) {
+      return mapAssetRow(raResult.rows[0]);
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return null;
 };
 
 /**

@@ -445,10 +445,41 @@ export const uploadFile = async ({
 };
 
 /**
+ * Helper to attempt locating file on local filesystem if stored or cached locally
+ */
+const findLocalFileForObjectKey = (objectKey, bucket = getBucketName()) => {
+  if (!objectKey) return null;
+  const cleanKey = String(objectKey).replace(/\\/g, '/').replace(/^\/+/, '');
+  const basename = path.basename(cleanKey);
+  const candidates = [
+    path.resolve(process.cwd(), 'storage', 'buckets', bucket, cleanKey),
+    path.resolve(process.cwd(), 'storage', 'buckets', 'creativegini-assets', cleanKey),
+    path.resolve(process.cwd(), cleanKey),
+    path.resolve(process.cwd(), 'uploads', basename),
+    path.resolve(process.cwd(), 'storage', cleanKey),
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+        return p;
+      }
+    } catch (e) {}
+  }
+  return null;
+};
+
+/**
  * Retrieve a readable stream for an object from Object Storage.
  */
 export const getFileStream = async (objectKey, { bucket = getBucketName(), offset = 0, length = null } = {}) => {
+  const localFilePath = findLocalFileForObjectKey(objectKey, bucket);
+
   let client = getMinioClient();
+  if (!client && localFilePath) {
+    const end = length !== null && length > 0 ? offset + length - 1 : undefined;
+    return fs.createReadStream(localFilePath, { start: offset, end });
+  }
+
   if (!client) {
     throw new Error('Storage client is not available.');
   }
@@ -459,14 +490,28 @@ export const getFileStream = async (objectKey, { bucket = getBucketName(), offse
     }
     return await client.getObject(bucket, objectKey);
   } catch (err) {
+    if (localFilePath) {
+      const end = length !== null && length > 0 ? offset + length - 1 : undefined;
+      return fs.createReadStream(localFilePath, { start: offset, end });
+    }
+
     if (client instanceof Minio.Client) {
       isMinioReachable = false;
       minioClient = null;
       client = getMinioClient();
-      if (length !== null && length > 0) {
-        return await client.getPartialObject(bucket, objectKey, offset, length);
+      try {
+        if (length !== null && length > 0) {
+          return await client.getPartialObject(bucket, objectKey, offset, length);
+        }
+        return await client.getObject(bucket, objectKey);
+      } catch (fallbackErr) {
+        const diskFallback = findLocalFileForObjectKey(objectKey, bucket);
+        if (diskFallback) {
+          const end = length !== null && length > 0 ? offset + length - 1 : undefined;
+          return fs.createReadStream(diskFallback, { start: offset, end });
+        }
+        throw fallbackErr;
       }
-      return await client.getObject(bucket, objectKey);
     }
     throw err;
   }
@@ -476,7 +521,19 @@ export const getFileStream = async (objectKey, { bucket = getBucketName(), offse
  * Get object metadata and stat from Object Storage.
  */
 export const getObjectStat = async (objectKey, bucket = getBucketName()) => {
+  const localFilePath = findLocalFileForObjectKey(objectKey, bucket);
+
   let client = getMinioClient();
+  if (!client && localFilePath) {
+    const stat = fs.statSync(localFilePath);
+    return {
+      size: stat.size,
+      metaData: {},
+      lastModified: stat.mtime,
+      etag: crypto.createHash('md5').update(objectKey).digest('hex'),
+    };
+  }
+
   if (!client) {
     throw new Error('Storage client is not available.');
   }
@@ -484,11 +541,35 @@ export const getObjectStat = async (objectKey, bucket = getBucketName()) => {
   try {
     return await client.statObject(bucket, objectKey);
   } catch (err) {
+    if (localFilePath) {
+      const stat = fs.statSync(localFilePath);
+      return {
+        size: stat.size,
+        metaData: {},
+        lastModified: stat.mtime,
+        etag: crypto.createHash('md5').update(objectKey).digest('hex'),
+      };
+    }
+
     if (client instanceof Minio.Client) {
       isMinioReachable = false;
       minioClient = null;
       client = getMinioClient();
-      return await client.statObject(bucket, objectKey);
+      try {
+        return await client.statObject(bucket, objectKey);
+      } catch (fallbackErr) {
+        const diskFallback = findLocalFileForObjectKey(objectKey, bucket);
+        if (diskFallback) {
+          const stat = fs.statSync(diskFallback);
+          return {
+            size: stat.size,
+            metaData: {},
+            lastModified: stat.mtime,
+            etag: crypto.createHash('md5').update(objectKey).digest('hex'),
+          };
+        }
+        throw fallbackErr;
+      }
     }
     throw err;
   }

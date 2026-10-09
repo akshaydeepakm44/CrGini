@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import dotenv from 'dotenv';
 import { connectPostgres, getPool } from './config/postgres.js';
 import authRoutes from './routes/authRoutes.js';
@@ -15,6 +16,10 @@ dotenv.config();
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
+
+// Direct static media fallbacks
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+app.use('/storage', express.static(path.resolve(process.cwd(), 'storage')));
 
 // Connect to PostgreSQL
 connectPostgres().then(async (ok) => {

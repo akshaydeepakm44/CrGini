@@ -951,6 +951,46 @@ export const api = {
     return data;
   },
 
+  getAssetDownloadUrl(assetId) {
+    if (!assetId) return '#';
+    const token = localStorage.getItem('cg_auth_token');
+    const base = `${API_BASE}/assets/${encodeURIComponent(assetId)}/download`;
+    return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+  },
+
+  getAssetStreamUrl(assetId) {
+    if (!assetId) return '#';
+    const token = localStorage.getItem('cg_auth_token');
+    const base = `${API_BASE}/assets/${encodeURIComponent(assetId)}/stream`;
+    return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+  },
+
+  async downloadAssetBlob(assetId, defaultFilename = 'download') {
+    const token = localStorage.getItem('cg_auth_token');
+    const url = `${API_BASE}/assets/${encodeURIComponent(assetId)}/download${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    const res = await fetch(url, {
+      headers: getHeaders(true)
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to download file (HTTP ${res.status})`);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('content-disposition');
+    let filename = defaultFilename;
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename="?([^";]+)"?/);
+      if (match && match[1]) filename = match[1];
+    }
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+  },
+
   // Public Sample Showcase
   async getPublicSample(slug) {
     const res = await fetch(`${API_BASE}/samples/${encodeURIComponent(slug)}`, {

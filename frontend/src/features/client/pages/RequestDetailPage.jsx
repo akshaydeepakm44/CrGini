@@ -750,32 +750,76 @@ export default function RequestDetailPage({
 
                       {/* Attached Uploaded Files */}
                       {sub.files && sub.files.length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                          {sub.files.map((f, fIdx) => (
-                            <a
-                              key={fIdx}
-                              href={f.url || '#'}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                backgroundColor: '#FFFFFF',
-                                border: '1px solid #DDD4FA',
-                                color: '#374151',
-                                fontSize: '0.78125rem',
-                                fontWeight: 600,
-                                textDecoration: 'none',
-                              }}
-                            >
-                              <FileText size={14} color="#7C3AED" />
-                              <span>{f.name}</span>
-                              <Download size={13} color="#6B7280" />
-                            </a>
-                          ))}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+                          {sub.files.map((f, fIdx) => {
+                            const token = localStorage.getItem('cg_auth_token') || '';
+                            const fileId = f.id || f._id;
+
+                            // Determine reliable download URL
+                            let downloadHref = '#';
+                            if (fileId) {
+                              downloadHref = api.getAssetDownloadUrl(fileId);
+                            } else if (f.downloadUrl) {
+                              downloadHref = token 
+                                ? `${f.downloadUrl}${f.downloadUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`
+                                : f.downloadUrl;
+                            } else if (f.url) {
+                              if (f.url.startsWith('http://') || f.url.startsWith('https://')) {
+                                downloadHref = f.url;
+                              } else {
+                                downloadHref = `/api/assets/${encodeURIComponent(f.url)}/download${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+                              }
+                            }
+
+                            return (
+                              <a
+                                key={fIdx}
+                                href={downloadHref}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={f.name || 'download'}
+                                onClick={async (e) => {
+                                  if (fileId) {
+                                    e.preventDefault();
+                                    try {
+                                      await api.downloadAssetBlob(fileId, f.name);
+                                    } catch (err) {
+                                      window.open(downloadHref, '_blank');
+                                    }
+                                  }
+                                }}
+                                title={`Download ${f.name}`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '7px 14px',
+                                  borderRadius: '8px',
+                                  backgroundColor: '#FFFFFF',
+                                  border: '1px solid #C4B5FD',
+                                  color: '#374151',
+                                  fontSize: '0.8125rem',
+                                  fontWeight: 600,
+                                  textDecoration: 'none',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.borderColor = '#7C3AED';
+                                  e.currentTarget.style.backgroundColor = '#F5F3FF';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.borderColor = '#C4B5FD';
+                                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                                }}
+                              >
+                                <FileText size={15} color="#7C3AED" />
+                                <span>{f.name}</span>
+                                <Download size={14} color="#6B7280" />
+                              </a>
+                            );
+                          })}
                         </div>
                       )}
 

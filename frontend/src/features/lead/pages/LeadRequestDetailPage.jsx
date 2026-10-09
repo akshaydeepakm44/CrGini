@@ -490,30 +490,61 @@ export default function LeadRequestDetailPage({ onNavigate, user }) {
                     {/* Files attached */}
                     {sub.files && sub.files.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                        {sub.files.map((f, fIdx) => (
-                          <a
-                            key={fIdx}
-                            href={f.downloadUrl || f.url || '#'}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '6px 12px',
-                              borderRadius: '6px',
-                              backgroundColor: '#F3F4F6',
-                              color: '#374151',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              textDecoration: 'none',
-                            }}
-                          >
-                            <FileText size={13} color="#7C3AED" />
-                            <span>{f.name}</span>
-                            <Download size={12} color="#6B7280" />
-                          </a>
-                        ))}
+                        {sub.files.map((f, fIdx) => {
+                          const token = localStorage.getItem('cg_auth_token') || '';
+                          const fileId = f.id || f._id;
+                          let downloadHref = '#';
+                          if (fileId) {
+                            downloadHref = api.getAssetDownloadUrl(fileId);
+                          } else if (f.downloadUrl) {
+                            downloadHref = token 
+                              ? `${f.downloadUrl}${f.downloadUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`
+                              : f.downloadUrl;
+                          } else if (f.url) {
+                            if (f.url.startsWith('http://') || f.url.startsWith('https://')) {
+                              downloadHref = f.url;
+                            } else {
+                              downloadHref = `/api/assets/${encodeURIComponent(f.url)}/download${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+                            }
+                          }
+
+                          return (
+                            <a
+                              key={fIdx}
+                              href={downloadHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              download={f.name || 'download'}
+                              onClick={async (e) => {
+                                if (fileId) {
+                                  e.preventDefault();
+                                  try {
+                                    await api.downloadAssetBlob(fileId, f.name);
+                                  } catch (err) {
+                                    window.open(downloadHref, '_blank');
+                                  }
+                                }
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                backgroundColor: '#F3F4F6',
+                                color: '#374151',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                textDecoration: 'none',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <FileText size={13} color="#7C3AED" />
+                              <span>{f.name}</span>
+                              <Download size={12} color="#6B7280" />
+                            </a>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

@@ -10,7 +10,7 @@ import path from 'path';
  */
 const canUserAccessAsset = (user, asset) => {
   if (!user || !asset) return false;
-  if (user.role === 'ADMIN') return true;
+  if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') return true;
 
   if (['COMPANY_LEAD', 'COMPANY_BOOST', 'LANDING_PAGE'].includes(user.role)) {
     const serviceMap = {
@@ -19,7 +19,7 @@ const canUserAccessAsset = (user, asset) => {
       LANDING_PAGE: ['LANDING_PAGE'],
     };
     const allowed = serviceMap[user.role] || [];
-    return allowed.includes(asset.serviceType);
+    if (allowed.includes(asset.serviceType)) return true;
   }
 
   // Client user check
@@ -27,7 +27,12 @@ const canUserAccessAsset = (user, asset) => {
   const isCompanyMatch = Boolean(userCompanyId && asset.companyId && String(userCompanyId) === String(asset.companyId));
   const isUserMatch = Boolean(asset.userId && String(user._id || user.id) === String(asset.userId));
 
-  return isCompanyMatch || isUserMatch;
+  if (isCompanyMatch || isUserMatch) return true;
+
+  // If asset has no explicit owner/company (e.g. system asset)
+  if (!asset.companyId && !asset.userId) return true;
+
+  return false;
 };
 
 /**
@@ -316,9 +321,26 @@ export const streamAsset = async (req, res) => {
     }
 
     // Handle Local File Path if storageUrl points to disk
-    if (storageUrl && (storageUrl.startsWith('/') || storageUrl.startsWith('./') || fs.existsSync(storageUrl))) {
-      const filePath = path.resolve(storageUrl);
-      if (fs.existsSync(filePath)) {
+    const cleanStreamUrl = (storageUrl || '').replace(/^\/+/, '');
+    const localCandidates = [
+      storageUrl,
+      path.resolve(process.cwd(), cleanStreamUrl),
+      path.resolve(process.cwd(), 'uploads', path.basename(cleanStreamUrl)),
+      path.resolve(process.cwd(), 'storage', 'buckets', 'creativegini-assets', cleanStreamUrl),
+      path.resolve(process.cwd(), 'storage', cleanStreamUrl),
+    ];
+    let matchedFilePath = null;
+    for (const p of localCandidates) {
+      try {
+        if (p && fs.existsSync(p) && fs.statSync(p).isFile()) {
+          matchedFilePath = p;
+          break;
+        }
+      } catch (e) {}
+    }
+
+    if (matchedFilePath) {
+      const filePath = matchedFilePath;
         const stat = fs.statSync(filePath);
         const totalSize = stat.size;
         const range = req.headers.range;
@@ -475,41 +497,47 @@ export const downloadAsset = async (req, res) => {
       return res.end(buffer);
     }
 
-    // Handle local file
-    if (storageUrl && fs.existsSync(storageUrl)) {
-      return res.download(storageUrl, safeFilename);
+    // Handle local file candidates
+    const cleanStorageUrl = (storageUrl || '').replace(/^\/+/, '');
+    const localCandidates = [
+      storageUrl,
+      path.resolve(process.cwd(), cleanStorageUrl),
+      path.resolve(process.cwd(), 'uploads', path.basename(cleanStorageUrl)),
+      path.resolve(process.cwd(), 'storage', 'buckets', 'creativegini-assets', cleanStorageUrl),
+      path.resolve(process.cwd(), 'storage', cleanStorageUrl),
+    ];
+    for (const p of localCandidates) {
+      try {
+        if (p && fs.existsSync(p) && fs.statSync(p).isFile()) {
+          return res.download(p, safeFilename);
+        }
+      } catch (e) {}
+    }
+
+    // Handle MinIO / Object Storage
+    try {
+      const stat = await getObjectStat(storageUrl).catch(() => null);
+      const effectiveMime = stat?.metaData?.['content-type'] || mimeType;
+      const stream = await getFileStream(storageUrl);
+
+      const headers = {
+        'Content-Type': effectiveMime,
+        'Content-Disposition': `attachment; filename="${safeFilename}"`,
+        'Cache-Control': 'no-cache',
+      };
+      if (stat?.size) {
+        headers['Content-Length'] = stat.size;
+      }
+
+      res.writeHead(200, headers);
+      return stream.pipe(res);
+    } catch (minioErr) {
+      console.warn('[AssetController.downloadAsset] Object storage fetch error:', minioErr.message);
     }
 
     // Handle external URL
-    if (storageUrl && storageUrl.startsWith('http')) {
+    if (storageUrl && (storageUrl.startsWith('http://') || storageUrl.startsWith('https://'))) {
       return res.redirect(storageUrl);
-    }
-
-    // Handle MinIO Object Key
-    if (storageUrl && (isMinioObjectKey(storageUrl) || (!storageUrl.startsWith('data:') && !storageUrl.startsWith('http') && !fs.existsSync(storageUrl)))) {
-      try {
-        const stat = await getObjectStat(storageUrl).catch(() => null);
-        const effectiveMime = stat?.metaData?.['content-type'] || mimeType;
-        const stream = await getFileStream(storageUrl);
-
-        const headers = {
-          'Content-Type': effectiveMime,
-          'Content-Disposition': `attachment; filename="${safeFilename}"`,
-          'Cache-Control': 'no-cache',
-        };
-        if (stat?.size) {
-          headers['Content-Length'] = stat.size;
-        }
-
-        res.writeHead(200, headers);
-        return stream.pipe(res);
-      } catch (minioErr) {
-        console.error('[AssetController.downloadAsset] MinIO download error:', minioErr.message);
-        return res.status(404).json({
-          success: false,
-          message: 'Asset file not available for download from object storage.',
-        });
-      }
     }
 
     return res.status(404).json({

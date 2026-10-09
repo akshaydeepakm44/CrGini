@@ -717,3 +717,15 @@ export const requestChanges = async (req, res) => {
     });
   }
 };
+
+/**
+ * @desc    Download submission file via ticket-scoped route
+ * @route   GET /api/requests/:id/files/:fileId/download
+ * @access  Private
+ */
+export const downloadRequestFile = async (req, res) => {
+  const { downloadAsset } = await import('./assetController.js');
+  req.params.id = req.params.fileId;
+  return downloadAsset(req, res);
+};
+
