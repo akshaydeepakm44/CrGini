@@ -17,11 +17,8 @@ import '../../styles/landing-redesign.css';
  * interactive growth ecosystem, natural scrolling, and clean component structure.
  */
 export default function LandingPage({
-  user,
   onSignIn,
-  onGetStarted,
-  onGoToDashboard,
-  onSignOut
+  onGetStarted
 }) {
   const containerRef = useRef(null);
 
@@ -64,10 +61,9 @@ export default function LandingPage({
   };
 
   const handleSelectChannel = (channel) => {
-    if (user) {
-      onGoToDashboard && onGoToDashboard();
-    } else {
-      onSignIn && onSignIn();
+    const el = document.getElementById('services');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
@@ -83,11 +79,8 @@ export default function LandingPage({
 
       {/* Sticky Header */}
       <Navbar
-        user={user}
         onSignIn={onSignIn}
         onGetStarted={onGetStarted || onSignIn}
-        onGoToDashboard={onGoToDashboard}
-        onSignOut={onSignOut}
       />
 
       {/* Hero Section with Interactive Growth Ecosystem */}
@@ -123,11 +116,7 @@ export default function LandingPage({
       <div className="cg-reveal-section">
         <FeaturedServices
           onExploreService={(srv) => {
-            if (user) {
-              onGoToDashboard && onGoToDashboard();
-            } else {
-              onSignIn && onSignIn();
-            }
+            handleSelectService(srv);
           }}
         />
       </div>
@@ -135,11 +124,7 @@ export default function LandingPage({
       {/* Section 7: Client Experience Process Journey (Scroll-Driven Stacking Cards) */}
       <ClientExperienceJourney
         onExplorePlatform={() => {
-          if (user) {
-            onGoToDashboard && onGoToDashboard();
-          } else {
-            onSignIn && onSignIn();
-          }
+          onGetStarted && onGetStarted();
         }}
         onExploreService={handleSelectService}
       />

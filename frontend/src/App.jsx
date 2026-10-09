@@ -116,11 +116,8 @@ export default function App() {
           path="/"
           element={
             <LandingPage
-              user={user}
               onSignIn={() => navigate('/signin')}
               onGetStarted={() => navigate('/signin?view=signup')}
-              onGoToDashboard={() => navigate(getRoleHome(user))}
-              onSignOut={handleLogout}
             />
           }
         />
