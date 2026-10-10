@@ -17,10 +17,11 @@ import {
   Bot,
   ShieldCheck,
   Download,
-  Image
+  Image,
+  FileSpreadsheet
 } from 'lucide-react';
 import { api } from '../../../services/api';
-import { parseLeadsFile, enrichLeadRow } from '../../client/utils/leadDataEnricher';
+import { parseLeadsFile, enrichLeadRow, downloadBulkLeadsTemplate } from '../../client/utils/leadDataEnricher';
 
 export default function DeliverableUploadModal({
   isOpen,
@@ -58,13 +59,15 @@ export default function DeliverableUploadModal({
     const wantsLeadList = Boolean(reqs.leadResearch || reqs.leadList || briefLower.includes('lead'));
     const wantsKeyPeople = Boolean(reqs.keyPeople || briefLower.includes('people') || briefLower.includes('decision') || briefLower.includes('cto') || briefLower.includes('vp'));
     const wantsPitchDeck = Boolean(reqs.pitchSupport || reqs.pitchDeck || briefLower.includes('pitch') || briefLower.includes('deck'));
+    const wantsBulkUpload = Boolean(reqs.bulkUpload || reqs.bulk_upload || reqs.bulkData || briefLower.includes('bulk data') || briefLower.includes('bulk upload') || briefLower.includes('excel'));
 
     // If none detected, enable company study and lead list by default
     return {
-      companyStudy: wantsCompanyStudy || (!wantsLeadList && !wantsKeyPeople && !wantsPitchDeck),
-      leadList: wantsLeadList || (!wantsCompanyStudy && !wantsKeyPeople && !wantsPitchDeck),
+      companyStudy: wantsCompanyStudy || (!wantsLeadList && !wantsKeyPeople && !wantsPitchDeck && !wantsBulkUpload),
+      leadList: wantsLeadList || (!wantsCompanyStudy && !wantsKeyPeople && !wantsPitchDeck && !wantsBulkUpload),
       keyPeople: wantsKeyPeople,
       pitchDeck: wantsPitchDeck,
+      bulkUpload: wantsBulkUpload,
     };
   }, [activeTicket, clientBrief, ticketTitle]);
 
@@ -100,6 +103,13 @@ export default function DeliverableUploadModal({
   const [pitchDeckFile, setPitchDeckFile] = useState(null);
   const [pitchDeckTitle, setPitchDeckTitle] = useState(`${clientCompany} Tailored Pitch Deck Proposal`);
   const [pitchDeckNotes, setPitchDeckNotes] = useState('');
+
+  // 5. Bulk Data (13 Columns: Executive Lead Name, Title / Role, Target Company, Company Website, Direct Work Email, LinkedIn Profile, Verification Status, Fit Rationale, Why Relevant, Observed Context, Suggested Approach, Lead Study PDF, Proposal Pitch Deck)
+  const [bulkUploadFile, setBulkUploadFile] = useState(null);
+  const [bulkUploadTitle, setBulkUploadTitle] = useState(`${clientCompany} Bulk Intelligence Dataset`);
+  const [bulkLeads, setBulkLeads] = useState([]);
+  const [isParsingBulkFile, setIsParsingBulkFile] = useState(false);
+  const [showBulkPreview, setShowBulkPreview] = useState(false);
 
   // Key people list helpers
   const handleAddPerson = () => {
@@ -170,7 +180,7 @@ export default function DeliverableUploadModal({
     setError('');
 
     // Check if at least one requirement is enabled
-    const hasAnyActive = activeReqs.companyStudy || activeReqs.leadList || activeReqs.keyPeople || activeReqs.pitchDeck;
+    const hasAnyActive = activeReqs.companyStudy || activeReqs.leadList || activeReqs.keyPeople || activeReqs.pitchDeck || activeReqs.bulkUpload;
     if (!hasAnyActive) {
       setError('Please select at least one deliverable requirement to fulfill for this ticket.');
       return;
@@ -197,6 +207,11 @@ export default function DeliverableUploadModal({
 
     if (activeReqs.pitchDeck && !pitchDeckFile && pitchDeckNotes.trim().length < 20) {
       setError('Please upload the Tailored Pitch Deck presentation (PDF/PPTX) or outline the pitch strategy before proceeding.');
+      return;
+    }
+
+    if (activeReqs.bulkUpload && !bulkUploadFile && bulkLeads.length === 0) {
+      setError('Please upload the Bulk Intelligence Spreadsheet (Excel/CSV) before proceeding.');
       return;
     }
 
@@ -232,6 +247,10 @@ export default function DeliverableUploadModal({
         const f = await readFileAsDataUrl(pitchDeckFile);
         if (f) uploadedFiles.push({ ...f, category: 'Tailored Pitch Deck' });
       }
+      if (activeReqs.bulkUpload && bulkUploadFile) {
+        const f = await readFileAsDataUrl(bulkUploadFile);
+        if (f) uploadedFiles.push({ ...f, category: 'Bulk Intelligence Spreadsheet' });
+      }
 
       // Resolve and enrich leads
       let finalLeads = Array.isArray(parsedLeads) && parsedLeads.length > 0 ? parsedLeads : [];
@@ -249,15 +268,17 @@ export default function DeliverableUploadModal({
         finalLeads = validPeople.map((p, idx) => enrichLeadRow(p, idx, { companyName: clientCompany }));
       }
 
-      const totalCount = finalLeads.length > 0 ? String(finalLeads.length) : (leadCount || '50');
+      const leadsToDeliver = Array.isArray(bulkLeads) && bulkLeads.length > 0 ? bulkLeads : finalLeads;
+      const totalCount = leadsToDeliver.length > 0 ? String(leadsToDeliver.length) : (leadCount || '50');
 
       const payload = {
         title: `Deliverable Package V${versionNumber} for ${ticketId}`,
         description: `Delivered components: ${[
           activeReqs.companyStudy ? 'Company Study' : null,
           activeReqs.leadList ? `Lead List (${totalCount} verified leads)` : null,
-          activeReqs.keyPeople ? `${validPeople.length || finalLeads.length} Key People` : null,
+          activeReqs.keyPeople ? `${validPeople.length || leadsToDeliver.length} Key People` : null,
           activeReqs.pitchDeck ? 'Tailored Pitch Deck' : null,
+          activeReqs.bulkUpload ? `Bulk Intelligence Dataset (${bulkLeads.length || totalCount} leads)` : null,
         ].filter(Boolean).join(', ')}`,
         notes: JSON.stringify({
           version: versionNumber,
@@ -268,9 +289,17 @@ export default function DeliverableUploadModal({
             count: totalCount,
             fileName: leadListFile?.name || 'Lead_List.csv',
             companyLogo: batchCompanyLogoUrl || '',
-            leads: finalLeads
+            leads: leadsToDeliver
           } : null,
-          keyPeople: activeReqs.keyPeople && validPeople.length > 0 ? validPeople : finalLeads,
+          bulkUpload: activeReqs.bulkUpload ? {
+            title: bulkUploadTitle,
+            count: bulkLeads.length || totalCount,
+            fileName: bulkUploadFile?.name || 'Bulk_Leads_Dataset.xlsx',
+            leads: bulkLeads.length > 0 ? bulkLeads : leadsToDeliver,
+          } : null,
+          bulkLeads: bulkLeads.length > 0 ? bulkLeads : undefined,
+          leads: leadsToDeliver.length > 0 ? leadsToDeliver : undefined,
+          keyPeople: activeReqs.keyPeople && validPeople.length > 0 ? validPeople : leadsToDeliver,
           pitchDeck: activeReqs.pitchDeck ? { title: pitchDeckTitle, fileName: pitchDeckFile?.name || 'Pitch_Deck.pdf', notes: pitchDeckNotes } : null,
           verification: {
             method: 'Specialist Quality Verification',
@@ -731,6 +760,16 @@ export default function DeliverableUploadModal({
                       style={{ accentColor: '#7C3AED' }}
                     />
                     Tailored Pitch Deck (File Upload)
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', fontWeight: 600, color: '#1F2937', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={activeReqs.bulkUpload}
+                      onChange={(e) => setActiveReqs({ ...activeReqs, bulkUpload: e.target.checked })}
+                      style={{ accentColor: '#7C3AED' }}
+                    />
+                    Bulk Data (Excel / CSV)
                   </label>
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#6B7280', marginTop: '6px' }}>
@@ -1280,6 +1319,164 @@ export default function DeliverableUploadModal({
                       }}
                     />
                   </div>
+                </div>
+              )}
+
+              {/* Requirement 5: Bulk Data Spreadsheet (Excel / CSV Upload) */}
+              {activeReqs.bulkUpload && (
+                <div
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '12px',
+                    border: '1px solid #E5E7EB',
+                    padding: '18px',
+                    marginBottom: '18px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FileSpreadsheet size={18} color="#7C3AED" />
+                      <h3 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 800, color: '#111827' }}>
+                        5. Bulk Leads & Intelligence Spreadsheet (CSV / Excel Upload)
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => downloadBulkLeadsTemplate()}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '5px 10px',
+                        borderRadius: '6px',
+                        backgroundColor: '#F5F3FF',
+                        border: '1px solid #DDD6FE',
+                        color: '#7C3AED',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Download size={13} />
+                      <span>Download 13-Col Template</span>
+                    </button>
+                  </div>
+
+                  <p style={{ margin: '0 0 12px', fontSize: '0.78rem', color: '#6B7280', lineHeight: 1.4 }}>
+                    Upload spreadsheet with 13 columns: Executive Lead Name, Title / Role, Target Company, Company Website, Direct Work Email, LinkedIn Profile, Verification Status, Fit Rationale, Why Relevant, Observed Context, Suggested Approach, Lead Study PDF, Proposal Pitch Deck.
+                  </p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.6fr', gap: '14px', marginBottom: '10px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
+                        Dataset Deliverable Title
+                      </label>
+                      <input
+                        type="text"
+                        value={bulkUploadTitle}
+                        onChange={(e) => setBulkUploadTitle(e.target.value)}
+                        placeholder="Bulk Dataset Title..."
+                        style={{
+                          width: '100%',
+                          padding: '9px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #D1D5DB',
+                          fontSize: '0.84rem',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
+                        Upload Spreadsheet (XLSX, CSV)
+                      </label>
+                      {bulkUploadFile ? (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            backgroundColor: '#EFF6FF',
+                            border: '1px solid #BFDBFE',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                            <FileSpreadsheet size={16} color="#2563EB" />
+                            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1E40AF', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                              {bulkUploadFile.name}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBulkUploadFile(null);
+                              setBulkLeads([]);
+                            }}
+                            style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: 0 }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            padding: '9px 12px',
+                            borderRadius: '8px',
+                            border: '1px dashed #CBD5E1',
+                            backgroundColor: '#FAFAFC',
+                            color: '#6B7280',
+                            fontSize: '0.8125rem',
+                            fontWeight: 600,
+                            cursor: isParsingBulkFile ? 'wait' : 'pointer',
+                          }}
+                        >
+                          <Upload size={14} />
+                          <span>{isParsingBulkFile ? 'Parsing...' : 'Select File (.xlsx, .csv)'}</span>
+                          <input
+                            type="file"
+                            accept=".xlsx,.csv,.xls,.tsv"
+                            disabled={isParsingBulkFile}
+                            style={{ display: 'none' }}
+                            onChange={async (e) => {
+                              if (e.target.files?.[0]) {
+                                const file = e.target.files[0];
+                                setBulkUploadFile(file);
+                                setIsParsingBulkFile(true);
+                                try {
+                                  const parsed = await parseLeadsFile(file, {
+                                    companyName: clientCompany,
+                                    batchLogoUrl: batchCompanyLogoUrl
+                                  });
+                                  if (parsed && parsed.length > 0) {
+                                    setBulkLeads(parsed);
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to parse file:', err);
+                                } finally {
+                                  setIsParsingBulkFile(false);
+                                }
+                              }
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  {bulkLeads.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#059669', fontSize: '0.78rem', fontWeight: 700, marginTop: '6px' }}>
+                      <CheckCircle2 size={13} />
+                      <span>{bulkLeads.length} leads successfully parsed and structured for client deliverable</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

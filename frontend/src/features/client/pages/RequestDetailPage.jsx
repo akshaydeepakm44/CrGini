@@ -71,9 +71,13 @@ function parseSubmissionDetails(sub) {
   }
 
   if (parsed && typeof parsed === 'object') {
-    const rawLeads = Array.isArray(parsed.leadList?.leads)
+    const rawLeads = Array.isArray(parsed.bulkLeads) && parsed.bulkLeads.length > 0
+      ? parsed.bulkLeads
+      : Array.isArray(parsed.bulkUpload?.leads) && parsed.bulkUpload.leads.length > 0
+      ? parsed.bulkUpload.leads
+      : Array.isArray(parsed.leadList?.leads) && parsed.leadList.leads.length > 0
       ? parsed.leadList.leads
-      : Array.isArray(parsed.leads)
+      : Array.isArray(parsed.leads) && parsed.leads.length > 0
       ? parsed.leads
       : Array.isArray(parsed.keyPeople)
       ? parsed.keyPeople
@@ -84,6 +88,8 @@ function parseSubmissionDetails(sub) {
       data: parsed,
       keyPeople: Array.isArray(parsed.keyPeople) ? parsed.keyPeople : [],
       leadList: parsed.leadList || null,
+      bulkUpload: parsed.bulkUpload || null,
+      bulkLeads: Array.isArray(parsed.bulkLeads) ? parsed.bulkLeads : (Array.isArray(parsed.bulkUpload?.leads) ? parsed.bulkUpload.leads : []),
       companyStudy: parsed.companyStudy || null,
       pitchDeck: parsed.pitchDeck || null,
       aiVerification: parsed.aiVerification || null,
@@ -631,6 +637,27 @@ export default function RequestDetailPage({
                           >
                             <CheckCircle2 size={12} />
                             <span>{detail.keyPeople.length} Executive Decision Makers Curated</span>
+                          </span>
+                        )}
+
+                        {(detail.bulkUpload || (detail.bulkLeads && detail.bulkLeads.length > 0)) && (
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              color: '#6D28D9',
+                              backgroundColor: '#F5F3FF',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #DDD4FA',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                            }}
+                            title="Bulk Dataset Deliverable"
+                          >
+                            <FileSpreadsheet size={12} />
+                            <span>Bulk Intelligence Dataset ({detail.bulkLeads?.length || resolvedLeads.length} Leads)</span>
                           </span>
                         )}
 

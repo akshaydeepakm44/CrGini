@@ -31,18 +31,19 @@ import {
   Bot,
   Layers,
   X,
-  Image
+  Image,
+  FileSpreadsheet
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { adaptLeadRequest, LEAD_STATUS_CONFIG, PRIORITY_CONFIG, formatDateTime, formatDateTimeWithTime } from '../data/leadAdapters';
-import { parseLeadsFile, enrichLeadRow } from '../../client/utils/leadDataEnricher';
+import { parseLeadsFile, enrichLeadRow, downloadBulkLeadsTemplate } from '../../client/utils/leadDataEnricher';
 
 /**
  * Robust requirement detector tailored to client's brief for each unique ticket
  */
 function detectTicketRequirements(ticket) {
   if (!ticket) {
-    return { companyStudy: false, leadList: true, keyPeople: true, pitchDeck: false };
+    return { companyStudy: false, leadList: true, keyPeople: true, pitchDeck: false, bulkUpload: false };
   }
 
   const reqs = ticket.requirements || {};
@@ -53,6 +54,7 @@ function detectTicketRequirements(ticket) {
   let wantsLeadList = Boolean(reqs.leadResearch || reqs.leadList || reqs.lead_list || reqs.leads);
   let wantsKeyPeople = Boolean(reqs.keyPeople || reqs.key_people || reqs.people);
   let wantsPitchDeck = Boolean(reqs.pitchSupport || reqs.pitchDeck || reqs.pitch_deck || reqs.pitch);
+  let wantsBulkUpload = Boolean(reqs.bulkUpload || reqs.bulk_upload || reqs.bulkData || reqs.bulk_data);
 
   // Inferences from text
   if (!wantsCompanyStudy && (text.includes('company study') || text.includes('company dossier') || text.includes('competitor audit') || text.includes('market study'))) {
@@ -67,9 +69,12 @@ function detectTicketRequirements(ticket) {
   if (!wantsPitchDeck && (text.includes('pitch deck') || text.includes('pitch support') || text.includes('presentation') || text.includes('deck') || text.includes('proposal deck'))) {
     wantsPitchDeck = true;
   }
+  if (!wantsBulkUpload && (text.includes('bulk data') || text.includes('bulk upload') || text.includes('bulk leads') || text.includes('excel sheet') || text.includes('excel file') || text.includes('spreadsheet upload'))) {
+    wantsBulkUpload = true;
+  }
 
   // Fallback
-  if (!wantsCompanyStudy && !wantsLeadList && !wantsKeyPeople && !wantsPitchDeck) {
+  if (!wantsCompanyStudy && !wantsLeadList && !wantsKeyPeople && !wantsPitchDeck && !wantsBulkUpload) {
     wantsLeadList = true;
     wantsKeyPeople = true;
   }
@@ -79,6 +84,7 @@ function detectTicketRequirements(ticket) {
     leadList: wantsLeadList,
     keyPeople: wantsKeyPeople,
     pitchDeck: wantsPitchDeck,
+    bulkUpload: wantsBulkUpload,
   };
 }
 
@@ -178,6 +184,7 @@ export default function ResearchWorkspacePage({ onNavigate }) {
     leadList: true,
     keyPeople: true,
     pitchDeck: false,
+    bulkUpload: false,
   });
 
   // Uploaded and updated state for each deliverable requirement
@@ -190,6 +197,14 @@ export default function ResearchWorkspacePage({ onNavigate }) {
   const [leadCount, setLeadCount] = useState('');
   const [batchCompanyLogoUrl, setBatchCompanyLogoUrl] = useState('');
   const [leads, setLeads] = useState([]);
+
+  // Bulk Upload (13 Columns: Executive Lead Name, Title / Role, Target Company, Company Website, Direct Work Email, LinkedIn Profile, Verification Status, Fit Rationale, Why Relevant, Observed Context, Suggested Approach, Lead Study PDF, Proposal Pitch Deck)
+  const [bulkUploadFile, setBulkUploadFile] = useState(null);
+  const [bulkUploadTitle, setBulkUploadTitle] = useState('');
+  const [bulkLeads, setBulkLeads] = useState([]);
+  const [isParsingBulkFile, setIsParsingBulkFile] = useState(false);
+  const [bulkParseError, setBulkParseError] = useState('');
+  const [showBulkLeadsPreview, setShowBulkLeadsPreview] = useState(false);
 
   // Key People: Structured contact entry with Logo upload
   const [keyPeople, setKeyPeople] = useState([
@@ -252,11 +267,16 @@ export default function ResearchWorkspacePage({ onNavigate }) {
     setCompanyStudyTitle(`${ticket.clientCompany || 'Client'} Comprehensive Company Study`);
     setLeadListTitle(`${ticket.clientCompany || 'Client'} Researched Lead List`);
     setPitchDeckTitle(`${ticket.clientCompany || 'Client'} Tailored Pitch Deck Proposal`);
+    setBulkUploadTitle(`${ticket.clientCompany || 'Client'} Bulk Verified Leads & Intelligence Dataset`);
 
     // Reset upload state for fresh review
     setCompanyStudyFile(null);
     setLeadListFile(null);
     setPitchDeckFile(null);
+    setBulkUploadFile(null);
+    setBulkLeads([]);
+    setBulkParseError('');
+    setShowBulkLeadsPreview(false);
     setBatchCompanyLogoUrl('');
     setSubmissionSuccess(false);
     setLeads([]);
@@ -290,6 +310,12 @@ export default function ResearchWorkspacePage({ onNavigate }) {
             if (parsed.companyStudy?.fileName) setCompanyStudyFile({ name: parsed.companyStudy.fileName, size: '1.1 MB' });
             if (parsed.pitchDeck?.fileName) setPitchDeckFile({ name: parsed.pitchDeck.fileName, size: '3.8 MB' });
             if (parsed.keyPeople?.length > 0) setKeyPeople(parsed.keyPeople);
+            if (parsed.data?.bulkLeads && Array.isArray(parsed.data.bulkLeads) && parsed.data.bulkLeads.length > 0) {
+              setBulkLeads(parsed.data.bulkLeads);
+            }
+            if (parsed.data?.bulkUpload?.fileName) {
+              setBulkUploadFile({ name: parsed.data.bulkUpload.fileName, size: '2.5 MB' });
+            }
           }
         }
       }
@@ -405,6 +431,13 @@ export default function ResearchWorkspacePage({ onNavigate }) {
       if (isDone) totalCompleted += 1;
     }
 
+    if (activeReqs.bulkUpload) {
+      totalRequired += 1;
+      const isDone = Boolean(bulkUploadFile || bulkLeads.length > 0);
+      status.bulkUpload = isDone;
+      if (isDone) totalCompleted += 1;
+    }
+
     const allCompleted = totalRequired > 0 && totalCompleted === totalRequired;
     const progressPercent = totalRequired > 0 ? Math.round((totalCompleted / totalRequired) * 100) : 0;
 
@@ -415,7 +448,7 @@ export default function ResearchWorkspacePage({ onNavigate }) {
       allCompleted,
       progressPercent,
     };
-  }, [activeReqs, companyStudyFile, companyStudyNotes, leadListFile, leads, keyPeople, pitchDeckFile, pitchDeckNotes]);
+  }, [activeReqs, companyStudyFile, companyStudyNotes, leadListFile, leads, keyPeople, pitchDeckFile, pitchDeckNotes, bulkUploadFile, bulkLeads]);
 
   // Handle Start Work
   const handleStartWork = async () => {
@@ -474,15 +507,21 @@ export default function ResearchWorkspacePage({ onNavigate }) {
         finalLeads = validPeople.map((p, idx) => enrichLeadRow(p, idx, { companyName: selectedTicket?.clientCompany }));
       }
 
-      const totalCount = finalLeads.length > 0 ? String(finalLeads.length) : (leadCount || '50');
+      // If bulk upload was used, merge/prioritize bulkLeads
+      const leadsToDeliver = Array.isArray(bulkLeads) && bulkLeads.length > 0
+        ? bulkLeads
+        : finalLeads;
+
+      const totalCount = leadsToDeliver.length > 0 ? String(leadsToDeliver.length) : (leadCount || '50');
 
       const payload = {
         title: `Deliverable Package V${(selectedTicket.currentSubmissionVersion || 1) + 1} for ${ticketKey}`,
         description: `Delivered assets matching client brief: ${[
           activeReqs.companyStudy ? 'Company Study' : null,
           activeReqs.leadList ? `Lead List (${totalCount} verified leads)` : null,
-          activeReqs.keyPeople ? `${validPeople.length || finalLeads.length} Key People (with verified executive logos)` : null,
+          activeReqs.keyPeople ? `${validPeople.length || leadsToDeliver.length} Key People (with verified executive logos)` : null,
           activeReqs.pitchDeck ? 'Tailored Pitch Deck' : null,
+          activeReqs.bulkUpload ? `Bulk Intelligence Dataset (${bulkLeads.length || totalCount} leads)` : null,
         ].filter(Boolean).join(', ')}`,
         notes: JSON.stringify({
           version: (selectedTicket.currentSubmissionVersion || 1) + 1,
@@ -493,9 +532,17 @@ export default function ResearchWorkspacePage({ onNavigate }) {
             count: totalCount,
             fileName: leadListFile?.name || 'tasks-report.csv',
             companyLogo: batchCompanyLogoUrl || null,
-            leads: finalLeads
+            leads: leadsToDeliver
           } : null,
-          keyPeople: activeReqs.keyPeople && validPeople.length > 0 ? validPeople : finalLeads,
+          bulkUpload: activeReqs.bulkUpload ? {
+            title: bulkUploadTitle,
+            count: bulkLeads.length || totalCount,
+            fileName: bulkUploadFile?.name || 'Bulk_Leads_Dataset.xlsx',
+            leads: bulkLeads.length > 0 ? bulkLeads : leadsToDeliver,
+          } : null,
+          bulkLeads: bulkLeads.length > 0 ? bulkLeads : undefined,
+          leads: leadsToDeliver.length > 0 ? leadsToDeliver : undefined,
+          keyPeople: activeReqs.keyPeople && validPeople.length > 0 ? validPeople : leadsToDeliver,
           pitchDeck: activeReqs.pitchDeck ? { title: pitchDeckTitle, fileName: pitchDeckFile?.name || 'dizitalgini brochure (1).pdf', notes: pitchDeckNotes } : null,
           verification: {
             method: 'Specialist Quality Verification',
@@ -1762,6 +1809,298 @@ export default function ResearchWorkspacePage({ onNavigate }) {
                     </div>
                   </div>
                 )}
+
+                {/* 5. BULK DATA & INTELLIGENCE SPREADSHEET (CSV / EXCEL) */}
+                {activeReqs.bulkUpload && (
+                  <div
+                    style={{
+                      borderRadius: '12px',
+                      border: '1px solid #E5E7EB',
+                      padding: '18px',
+                      backgroundColor: requirementStatus.status.bulkUpload ? '#F8FCF9' : '#FFFFFF',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <FileSpreadsheet size={18} color="#7C3AED" />
+                        <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#111827' }}>
+                          5. Bulk Leads & Intelligence Spreadsheet (CSV / Excel)
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: requirementStatus.status.bulkUpload ? '#ECFDF5' : '#FFFBEB',
+                          color: requirementStatus.status.bulkUpload ? '#059669' : '#D97706',
+                          border: requirementStatus.status.bulkUpload ? '1px solid #A7F3D0' : '1px solid #FDE68A',
+                        }}
+                      >
+                        {requirementStatus.status.bulkUpload ? `✓ Ready (${bulkLeads.length || leadCount || 'Data'} Leads Parsed)` : 'Pending Upload'}
+                      </span>
+                    </div>
+
+                    {/* Information banner & Download Template button */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '10px',
+                        padding: '10px 14px',
+                        backgroundColor: '#F5F3FF',
+                        borderRadius: '8px',
+                        border: '1px solid #DDD6FE',
+                        marginBottom: '14px',
+                      }}
+                    >
+                      <div style={{ fontSize: '0.78rem', color: '#5B21B6', maxWidth: '640px', lineHeight: 1.4 }}>
+                        <strong>13-Column Intelligence Format Supported:</strong> Executive Lead Name, Title / Role, Target Company, Company Website, Direct Work Email, LinkedIn Profile, Verification Status, Fit Rationale, Why Relevant, Observed Context, Suggested Approach, Lead Study PDF, Proposal Pitch Deck.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => downloadBulkLeadsTemplate()}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #7C3AED',
+                          color: '#7C3AED',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                        title="Download sample CSV file with all 13 columns configured"
+                      >
+                        <Download size={13} />
+                        <span>Download 13-Col Template (.csv)</span>
+                      </button>
+                    </div>
+
+                    {/* Input Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.8fr 1.6fr', gap: '12px', marginBottom: '8px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
+                          Deliverable Title
+                        </label>
+                        <input
+                          type="text"
+                          value={bulkUploadTitle}
+                          onChange={(e) => setBulkUploadTitle(e.target.value)}
+                          placeholder="e.g. Bulk Verified Leads & Intelligence Dataset"
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #D1D5DB',
+                            fontSize: '0.84rem',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
+                          Verified Leads
+                        </label>
+                        <input
+                          type="number"
+                          value={bulkLeads.length || leadCount || ''}
+                          onChange={(e) => setLeadCount(e.target.value)}
+                          placeholder="0"
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #D1D5DB',
+                            fontSize: '0.84rem',
+                            boxSizing: 'border-box',
+                            fontWeight: 700,
+                            color: '#7C3AED',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
+                          Spreadsheet (Excel / CSV)
+                        </label>
+                        {bulkUploadFile ? (
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              backgroundColor: '#EFF6FF',
+                              border: '1px solid #BFDBFE',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                              <FileSpreadsheet size={15} color="#2563EB" />
+                              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1E40AF', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                {bulkUploadFile.name}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBulkUploadFile(null);
+                                setBulkLeads([]);
+                              }}
+                              style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: 0 }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              border: '1px dashed #CBD5E1',
+                              backgroundColor: '#FAFAFC',
+                              color: '#6B7280',
+                              fontSize: '0.8125rem',
+                              fontWeight: 600,
+                              cursor: isParsingBulkFile ? 'wait' : 'pointer',
+                            }}
+                          >
+                            <Upload size={14} />
+                            <span>{isParsingBulkFile ? 'Parsing Spreadsheet...' : 'Select File (.xlsx, .csv)'}</span>
+                            <input
+                              type="file"
+                              accept=".xlsx,.csv,.xls,.tsv"
+                              disabled={isParsingBulkFile}
+                              style={{ display: 'none' }}
+                              onChange={async (e) => {
+                                if (e.target.files?.[0]) {
+                                  const file = e.target.files[0];
+                                  setBulkUploadFile(file);
+                                  setIsParsingBulkFile(true);
+                                  setBulkParseError('');
+                                  try {
+                                    const parsed = await parseLeadsFile(file, {
+                                      companyName: selectedTicket?.clientCompany,
+                                      batchLogoUrl: batchCompanyLogoUrl
+                                    });
+                                    if (parsed && parsed.length > 0) {
+                                      setBulkLeads(parsed);
+                                      setLeadCount(String(parsed.length));
+                                      if (!leads || leads.length === 0) {
+                                        setLeads(parsed);
+                                      }
+                                      setShowBulkLeadsPreview(true);
+                                    } else {
+                                      setBulkParseError('No lead rows detected in file. Ensure headers match required names.');
+                                    }
+                                  } catch (err) {
+                                    console.error('Failed to parse bulk file:', err);
+                                    setBulkParseError('Failed to parse file: ' + err.message);
+                                  } finally {
+                                    setIsParsingBulkFile(false);
+                                  }
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Parsed Status Strip & Collapsible Preview */}
+                    {bulkLeads.length > 0 && (
+                      <div style={{ marginTop: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#ECFDF5', borderRadius: '8px', border: '1px solid #A7F3D0' }}>
+                          <div style={{ fontSize: '0.8125rem', color: '#065F46', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <CheckCircle2 size={14} color="#059669" />
+                            <span>{bulkLeads.length} leads parsed & enriched with 13 intelligence columns</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowBulkLeadsPreview(!showBulkLeadsPreview)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#047857',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                            }}
+                          >
+                            {showBulkLeadsPreview ? 'Hide Preview Table' : `Inspect Parsed Table (${bulkLeads.length})`}
+                          </button>
+                        </div>
+
+                        {/* Collapsible preview table */}
+                        {showBulkLeadsPreview && (
+                          <div style={{ marginTop: '10px', overflowX: 'auto', maxHeight: '320px', border: '1px solid #E5E7EB', borderRadius: '8px' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
+                              <thead style={{ backgroundColor: '#F8FAFC', position: 'sticky', top: 0, zIndex: 1 }}>
+                                <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
+                                  <th style={{ padding: '8px 10px', fontWeight: 700, color: '#475569' }}>#</th>
+                                  <th style={{ padding: '8px 10px', fontWeight: 700, color: '#475569' }}>Executive Lead</th>
+                                  <th style={{ padding: '8px 10px', fontWeight: 700, color: '#475569' }}>Title / Role</th>
+                                  <th style={{ padding: '8px 10px', fontWeight: 700, color: '#475569' }}>Target Company</th>
+                                  <th style={{ padding: '8px 10px', fontWeight: 700, color: '#475569' }}>Work Email</th>
+                                  <th style={{ padding: '8px 10px', fontWeight: 700, color: '#475569' }}>Verification</th>
+                                  <th style={{ padding: '8px 10px', fontWeight: 700, color: '#475569' }}>Lead Study</th>
+                                  <th style={{ padding: '8px 10px', fontWeight: 700, color: '#475569' }}>Pitch Deck</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {bulkLeads.slice(0, 15).map((l, idx) => (
+                                  <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9', backgroundColor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFC' }}>
+                                    <td style={{ padding: '8px 10px', color: '#94A3B8', fontWeight: 600 }}>{idx + 1}</td>
+                                    <td style={{ padding: '8px 10px', fontWeight: 700, color: '#0F172A' }}>{l.name}</td>
+                                    <td style={{ padding: '8px 10px', color: '#334155' }}>{l.title}</td>
+                                    <td style={{ padding: '8px 10px', color: '#334155' }}>{l.company}</td>
+                                    <td style={{ padding: '8px 10px', fontFamily: 'monospace', color: '#2563EB' }}>{l.email}</td>
+                                    <td style={{ padding: '8px 10px' }}>
+                                      <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#ECFDF5', color: '#059669', fontWeight: 700, fontSize: '0.6875rem' }}>
+                                        VERIFIED
+                                      </span>
+                                    </td>
+                                    <td style={{ padding: '8px 10px', color: '#7C3AED', fontWeight: 600 }}>
+                                      {l.leadStudyPdf ? '✓ PDF Ready' : '—'}
+                                    </td>
+                                    <td style={{ padding: '8px 10px', color: '#059669', fontWeight: 600 }}>
+                                      {l.pitchDeckPdf ? '✓ Deck Ready' : '—'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            {bulkLeads.length > 15 && (
+                              <div style={{ padding: '6px 12px', fontSize: '0.72rem', color: '#64748B', backgroundColor: '#F8FAFC', textAlign: 'center', borderTop: '1px solid #E2E8F0' }}>
+                                + {bulkLeads.length - 15} more lead rows will be delivered to client dashboard
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {bulkParseError && (
+                      <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#DC2626', fontWeight: 600 }}>
+                        {bulkParseError}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Requirement Customizer Toggle */}
@@ -1786,6 +2125,7 @@ export default function ResearchWorkspacePage({ onNavigate }) {
                     { id: 'leadList', label: 'Lead List' },
                     { id: 'keyPeople', label: 'Key People' },
                     { id: 'pitchDeck', label: 'Tailored Pitch Deck' },
+                    { id: 'bulkUpload', label: 'Bulk Data (Excel / CSV)' },
                   ].map((req) => (
                     <button
                       key={req.id}
@@ -2315,6 +2655,19 @@ export default function ResearchWorkspacePage({ onNavigate }) {
                         <span>
                           <strong>Tailored Pitch Deck:</strong>{' '}
                           {pitchDeckFile ? `Presentation Attached: ${pitchDeckFile.name}` : (pitchDeckNotes.trim().length > 30 ? 'Pitch Framework Outlined' : 'Missing (Upload PDF/PPTX required)')}
+                        </span>
+                      </div>
+                    )}
+                    {activeReqs.bulkUpload && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', color: requirementStatus.status.bulkUpload ? '#374151' : '#DC2626' }}>
+                        {requirementStatus.status.bulkUpload ? (
+                          <CheckCircle2 size={16} color="#10B981" />
+                        ) : (
+                          <AlertCircle size={16} color="#EF4444" />
+                        )}
+                        <span>
+                          <strong>Bulk Intelligence Dataset:</strong>{' '}
+                          {bulkUploadFile ? `Spreadsheet Attached: ${bulkUploadFile.name} (${bulkLeads.length} Leads Parsed)` : (bulkLeads.length > 0 ? `${bulkLeads.length} Leads Parsed with 13 Intelligence Columns` : 'Missing (Upload 13-Column CSV/Excel)')}
                         </span>
                       </div>
                     )}

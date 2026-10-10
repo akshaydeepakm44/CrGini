@@ -73,8 +73,8 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
     return '';
   };
 
-  // 1. Lead Name
-  let name = getField(['leadname', 'contactperson', 'contactname', 'fullname', 'personname', 'contact', 'name', 'decisionmaker']);
+  // 1. Executive Lead Name
+  let name = getField(['executiveleadname', 'leadname', 'executivename', 'contactperson', 'contactname', 'fullname', 'personname', 'contact', 'name', 'decisionmaker']);
   if (!name) {
     // If rawRow is a string or has only one property
     const firstVal = Object.values(rawRow)[0];
@@ -90,16 +90,8 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
   const firstName = nameParts[0] || 'lead';
   const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : 'exec';
 
-  // 2. Company Name
-  let company = getField(['companyname', 'company', 'organization', 'account', 'firm', 'business', 'leadcompany']);
-  if (!company) {
-    company = context.companyName || (index === 0 ? 'Acme Global Systems' : index === 1 ? 'Snowflake Labs' : index === 2 ? 'Veloce Data' : 'NexaScale Global');
-  }
-
-  const companyDomain = inferCompanyDomain(company);
-
-  // 3. Title / Designation
-  let title = getField(['jobtitle', 'title', 'role', 'position', 'designation', 'seniority']);
+  // 2. Title / Role
+  let title = getField(['titlerole', 'jobtitle', 'title', 'role', 'position', 'designation', 'seniority']);
   if (!title) {
     if (index === 0 && name.toLowerCase().includes('sarah')) {
       title = 'VP of Global Enterprise Architecture';
@@ -108,35 +100,46 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
     }
   }
 
-  // 4. Company Link / Website
-  let companyLink = getField(['companylink', 'companywebsite', 'website', 'domain', 'url', 'site']);
+  // 3. Target Company
+  let company = getField(['targetcompany', 'companyname', 'company', 'organization', 'account', 'firm', 'business', 'leadcompany']);
+  if (!company) {
+    company = context.companyName || (index === 0 ? 'Acme Global Systems' : index === 1 ? 'Snowflake Labs' : index === 2 ? 'Veloce Data' : 'NexaScale Global');
+  }
+
+  const companyDomain = inferCompanyDomain(company);
+
+  // 4. Company Website / Link
+  let companyLink = getField(['companywebsite', 'companylink', 'website', 'domain', 'url', 'site']);
   if (!companyLink) {
     companyLink = `https://${companyDomain}`;
   } else if (!companyLink.startsWith('http')) {
     companyLink = `https://${companyLink}`;
   }
 
-  // 5. LinkedIn Profile
-  let linkedin = getField(['linkedinurl', 'linkedinprofile', 'linkedin', 'socialurl', 'social']);
+  // 5. Direct Work Email
+  let email = getField(['directworkemail', 'workemail', 'emailaddress', 'contactemail', 'directemail', 'email']);
+  if (!email || !email.includes('@')) {
+    email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${companyDomain}`;
+  }
+
+  // 6. LinkedIn Profile
+  let linkedin = getField(['linkedinprofile', 'linkedinurl', 'linkedin', 'socialurl', 'social']);
   if (!linkedin) {
     linkedin = `https://linkedin.com/in/${nameSlug}`;
   } else if (!linkedin.startsWith('http')) {
     linkedin = `https://${linkedin}`;
   }
 
-  // 6. Direct Work Email
-  let email = getField(['workemail', 'emailaddress', 'contactemail', 'directemail', 'email']);
-  if (!email || !email.includes('@')) {
-    email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${companyDomain}`;
-  }
+  // 7. Verification Status
+  let verificationStatus = getField(['verificationstatus', 'verifystatus', 'verification', 'status', 'verified']) || 'VERIFIED_100_PERCENT';
 
-  // 7. Logo URL
+  // 8. Logo URL
   let logo = getField(['companylogourl', 'companylogo', 'logourl', 'logolink', 'logo', 'imageurl', 'avatar']);
   if (!logo) {
     logo = context.logoUrl || context.batchLogoUrl || '';
   }
 
-  // 8. Location / Industry
+  // 9. Location / Industry
   let location = getField(['location', 'headquarters', 'hq', 'city', 'country', 'region']);
   let industry = getField(['industry', 'sector', 'vertical', 'category']);
   if (!location) {
@@ -146,8 +149,8 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
     industry = context.industry || 'B2B Enterprise';
   }
 
-  // 9. Why This Lead Suits Best / Fit Rationale
-  let whySuitsBest = getField(['whysuitsbest', 'fitrationale', 'rationale', 'researchnotes', 'notes', 'overview', 'summary']);
+  // 10. Fit Rationale / Why This Lead Suits Best
+  let whySuitsBest = getField(['fitrationale', 'whysuitsbest', 'rationale', 'researchnotes', 'notes', 'overview', 'summary']);
   if (!whySuitsBest) {
     if (index === 0 && company.toLowerCase().includes('acme')) {
       whySuitsBest = 'Leading multi-region platform migration with open Q3 procurement budget.';
@@ -156,13 +159,14 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
     }
   }
 
-  // 10. About Company
+  // 11. About Company
   let aboutCompany = getField(['aboutcompany', 'companyoverview', 'about', 'companydescription']);
   if (!aboutCompany) {
     aboutCompany = `${company} is a leading enterprise operating within the ${industry} vertical, actively expanding infrastructure and digital capabilities.`;
   }
 
-  // 11. Lead Study Deep-Dive
+  // 12. Lead Study (Why Relevant, Observed Context, Suggested Approach, PDF)
+  const userLeadStudyPdf = getField(['leadstudypdf', 'leadstudy', 'studypdf', 'companypdf']);
   const leadStudy = {
     whyRelevant: getField(['whyrelevant', 'studywhyrelevant']) ||
       `Direct budget authority for integration and architecture overhaul at ${company}.`,
@@ -170,19 +174,26 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
       `Active enterprise procurement signals observed; scaling cloud initiatives and evaluating specialized partner solutions.`,
     suggestedApproach: getField(['suggestedapproach', 'studysuggestedapproach']) ||
       `Lead with rapid technical deliverables, verifiable SLA guarantees, and architecture blueprint demonstrations.`,
+    pdfUrl: userLeadStudyPdf || `/api/samples/lead-study-pdf?name=${encodeURIComponent(name)}&company=${encodeURIComponent(company)}`,
   };
 
-  const leadStudyPdfName = `Lead_Study_${name.replace(/\s+/g, '_')}.pdf`;
+  const leadStudyPdfName = userLeadStudyPdf 
+    ? (userLeadStudyPdf.includes('/') ? userLeadStudyPdf.split('/').pop() : userLeadStudyPdf)
+    : `Lead_Study_${name.replace(/\s+/g, '_')}.pdf`;
 
-  // 12. Tailored Pitch Deck
+  // 13. Proposal Pitch Deck (Pitch Deck PDF)
+  const userPitchDeckPdf = getField(['proposalpitchdeck', 'pitchdeckpdf', 'pitchdeck', 'proposalsummary', 'deckpdf']);
   const pitchDeck = {
     title: getField(['pitchdecktitle', 'decktitle']) ||
       `Tailored Commercial Pitch Deck for ${name}`,
     summary: getField(['pitchdecksummary', 'decksummary']) ||
-      `Turnkey strategic presentation crafted specifically to engage and convert ${name} and leadership.`,
+      `Turnkey strategic presentation crafted specifically to engage and convert ${name} and leadership at ${company}.`,
+    pdfUrl: userPitchDeckPdf || `/api/samples/pitch-deck-pdf?name=${encodeURIComponent(name)}&company=${encodeURIComponent(company)}`,
   };
 
-  const pitchDeckPdfName = `Pitch_Deck_${name.replace(/\s+/g, '_')}.pdf`;
+  const pitchDeckPdfName = userPitchDeckPdf 
+    ? (userPitchDeckPdf.includes('/') ? userPitchDeckPdf.split('/').pop() : userPitchDeckPdf)
+    : `Pitch_Deck_${name.replace(/\s+/g, '_')}.pdf`;
 
   return {
     id: rawRow.id || `lead-${index + 1}-${nameSlug}`,
@@ -201,12 +212,13 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
     leadStudy,
     leadStudyPdf: leadStudyPdfName,
     leadStudyPdfName,
-    leadStudyPdfUrl: rawRow.leadStudyPdfUrl || rawRow.leadStudyPdf || '#',
+    leadStudyPdfUrl: userLeadStudyPdf || `/api/samples/lead-study-pdf?name=${encodeURIComponent(name)}&company=${encodeURIComponent(company)}`,
     pitchDeck,
     pitchDeckPdf: pitchDeckPdfName,
     pitchDeckPdfName,
-    pitchDeckPdfUrl: rawRow.pitchDeckPdfUrl || rawRow.pitchDeckPdf || '#',
-    status: 'VERIFIED',
+    pitchDeckPdfUrl: userPitchDeckPdf || `/api/samples/pitch-deck-pdf?name=${encodeURIComponent(name)}&company=${encodeURIComponent(company)}`,
+    status: verificationStatus,
+    verificationStatus,
     isVerified: true,
   };
 }
@@ -322,6 +334,10 @@ export function resolveSubmissionLeads(sub, ticket = {}, companyLeads = []) {
   }
 
   if (notesObj) {
+    // If notes.bulkLeads has items
+    if (Array.isArray(notesObj.bulkLeads) && notesObj.bulkLeads.length > 0) {
+      return notesObj.bulkLeads.map((l, idx) => enrichLeadRow(l, idx, { companyName: ticket?.clientCompany }));
+    }
     // If notes.leadList.leads has items
     if (Array.isArray(notesObj.leadList?.leads) && notesObj.leadList.leads.length > 0) {
       return notesObj.leadList.leads.map((l, idx) => enrichLeadRow(l, idx, { companyName: ticket?.clientCompany }));
@@ -398,6 +414,74 @@ export function exportLeadsToCsv(leads = [], fileName = 'Verified_Leads.csv') {
   const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
 
   const blob = new Blob([csvOutput], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', fileName);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/**
+ * Generates and downloads a pre-formatted Bulk Leads spreadsheet template matching the exact 13 required columns
+ */
+export function downloadBulkLeadsTemplate(fileName = 'CreativeGini_Bulk_Leads_Template.csv') {
+  const headers = [
+    'Executive Lead Name',
+    'Title / Role',
+    'Target Company',
+    'Company Website',
+    'Direct Work Email',
+    'LinkedIn Profile',
+    'Verification Status',
+    'Fit Rationale',
+    'Why Relevant',
+    'Observed Context',
+    'Suggested Approach',
+    'Lead Study PDF',
+    'Proposal Pitch Deck'
+  ];
+
+  const sampleRows = [
+    [
+      'Sarah Jenkins',
+      'VP of Global Enterprise Architecture',
+      'Acme Global Systems',
+      'https://acmeglobal.com',
+      's.jenkins@acmeglobal.com',
+      'https://linkedin.com/in/sarah-jenkins',
+      'VERIFIED_100_PERCENT',
+      'Leading multi-region platform migration with open Q3 procurement budget.',
+      'Direct budget authority for integration and architecture overhaul.',
+      'Actively scaling modern cloud and microservices tooling.',
+      'Lead with rapid technical deliverables and verifiable SLAs.',
+      'Lead_Study_Sarah_Jenkins.pdf',
+      'Proposal_Pitch_Deck_Sarah_Jenkins.pdf'
+    ],
+    [
+      'Marcus Vance',
+      'Chief Technology Officer',
+      'Snowflake Labs',
+      'https://snowflakelabs.com',
+      'marcus.v@snowflakelabs.com',
+      'https://linkedin.com/in/marcus-vance',
+      'VERIFIED_100_PERCENT',
+      'Evaluating enterprise acceleration and automation partners for H2.',
+      'Oversees $2M annual technology budget and team workflows.',
+      'Initiated quarterly modernization initiative across product infrastructure.',
+      'Highlight speed of delivery and SLA guarantees.',
+      'Lead_Study_Marcus_Vance.pdf',
+      'Proposal_Pitch_Deck_Marcus_Vance.pdf'
+    ]
+  ];
+
+  const csvRows = [
+    headers.join(','),
+    ...sampleRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+  ];
+
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
