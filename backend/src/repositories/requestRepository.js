@@ -153,7 +153,7 @@ const requestSelect = `
             'size', ra.size,
             'type', ra.type
           )
-          ORDER BY ra.created_at
+          ORDER BY ra.id ASC
         )
         FROM request_attachments ra
         WHERE ra.request_id = r.id
@@ -165,12 +165,12 @@ const requestSelect = `
       (
         SELECT jsonb_agg(
           jsonb_build_object(
+            'id', rd.id,
             'title', rd.title,
             'url', rd.url,
-            'description', rd.description,
-            'deliveredAt', rd.created_at
+            'description', rd.description
           )
-          ORDER BY rd.created_at
+          ORDER BY rd.id ASC
         )
         FROM request_deliverables rd
         WHERE rd.request_id = r.id
@@ -915,8 +915,7 @@ export const addDeliverable = async (
       id,
       title,
       url,
-      description,
-      created_at AS delivered_at
+      description
     `,
     [
       requestId,
@@ -939,11 +938,10 @@ export const getAttachments = async (
       name,
       url,
       size,
-      type,
-      created_at
+      type
     FROM request_attachments
     WHERE request_id = $1
-    ORDER BY created_at ASC
+    ORDER BY id ASC
     `,
     [requestId]
   );
@@ -960,11 +958,10 @@ export const getDeliverables = async (
       id,
       title,
       url,
-      description,
-      created_at AS delivered_at
+      description
     FROM request_deliverables
     WHERE request_id = $1
-    ORDER BY created_at ASC
+    ORDER BY id ASC
     `,
     [requestId]
   );
