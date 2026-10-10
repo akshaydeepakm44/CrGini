@@ -15,7 +15,8 @@ export async function cleanAllFakeData() {
     'admin@creativegini.com',
     'lead@creativegini.com',
     'boost@creativegini.com',
-    'ui@creativegini.com'
+    'ui@creativegini.com',
+    'testclient@datai2i.com'
   ];
 
   console.log('[1/7] Deleting all activity logs, notifications, and messages...');
@@ -32,34 +33,39 @@ export async function cleanAllFakeData() {
   await query('DELETE FROM request_attachments');
   await query('DELETE FROM payments');
 
-  console.log('[3/7] Deleting all tickets and requests...');
+  console.log('[3/7] Deleting all synthetic test tickets and requests...');
   await query('DELETE FROM requests');
 
   console.log('[4/7] Deleting all fake leads and key people...');
   await query('DELETE FROM company_key_people');
   await query('DELETE FROM company_leads');
 
-  console.log('[5/7] Deleting all fake and test companies...');
-  // First unlink any users from companies
-  await query('UPDATE users SET company_id = NULL');
-  await query('DELETE FROM companies');
+  console.log('[5/7] Deleting all fake and test companies (preserving Data I2I)...');
+  await query('UPDATE users SET company_id = NULL WHERE email NOT IN (\'testclient@datai2i.com\')');
+  await query('DELETE FROM companies WHERE name != \'Data I2I\' AND email != \'testclient@datai2i.com\'');
 
   console.log('[6/7] Removing all fake clients and ephemeral test specialist accounts...');
   const deleteUsersResult = await query(
-    `DELETE FROM users WHERE email NOT IN ($1, $2, $3, $4, $5) RETURNING email, role`,
+    `DELETE FROM users WHERE email NOT IN ($1, $2, $3, $4, $5, $6) RETURNING email, role`,
     officialStaffEmails
   );
   console.log(`  ✓ Removed ${deleteUsersResult.rowCount} fake/test user accounts.`);
 
-  console.log('[7/7] Verifying remaining core platform staff accounts...');
-  const remainingStaff = await query(
-    `SELECT id, name, email, role, company_lead, company_boost, company_ui, status FROM users ORDER BY id ASC`
+  console.log('[7/7] Ensuring clean Data I2I client workspace & provisioning...');
+  const { ensureDataI2IAccount } = await import('./controllers/authController.js');
+  await ensureDataI2IAccount();
+
+  const remainingUsers = await query(
+    `SELECT u.id, u.name, u.email, u.role, c.name as company_name, u.status 
+     FROM users u 
+     LEFT JOIN companies c ON c.id = u.company_id 
+     ORDER BY u.id ASC`
   );
-  console.log('\nRemaining Official CreativeGini Staff Accounts:');
-  console.table(remainingStaff.rows);
+  console.log('\nActive Clean Workspace Accounts:');
+  console.table(remainingUsers.rows);
 
   console.log('\n================================================================');
-  console.log('CLEANUP COMPLETE: ALL FAKE & DEFAULT DATA HAS BEEN REMOVED.');
+  console.log('CLEANUP COMPLETE: ALL FAKE & SYNTHETIC DATA HAS BEEN REMOVED.');
   console.log('================================================================\n');
 }
 

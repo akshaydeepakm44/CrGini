@@ -10,16 +10,43 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const { Pool } = pg;
 
-const pool = new Pool({
-  host: process.env.POSTGRES_HOST || '127.0.0.1',
-  port: Number(process.env.POSTGRES_PORT || 5432),
-  database: process.env.POSTGRES_DB || 'creativegini',
-  user: process.env.POSTGRES_USER || 'creativegini_app',
-  password: process.env.POSTGRES_PASSWORD,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-});
+const sanitizeEnv = (val) => {
+  if (!val) return val;
+  const str = String(val).trim();
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    return str.slice(1, -1);
+  }
+  return str;
+};
+
+const pgPassword = sanitizeEnv(process.env.POSTGRES_PASSWORD);
+const pgUser = sanitizeEnv(process.env.POSTGRES_USER) || 'postgres';
+const pgHost = sanitizeEnv(process.env.POSTGRES_HOST) || '127.0.0.1';
+const pgPort = Number(process.env.POSTGRES_PORT || 5432);
+const pgDatabase = sanitizeEnv(process.env.POSTGRES_DB) || 'creativegini';
+const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+
+const poolConfig = databaseUrl
+  ? {
+      connectionString: databaseUrl,
+      max: Number(process.env.POSTGRES_MAX_POOL || 15),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 7000,
+      ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    }
+  : {
+      host: pgHost,
+      port: pgPort,
+      database: pgDatabase,
+      user: pgUser,
+      password: pgPassword,
+      max: Number(process.env.POSTGRES_MAX_POOL || 15),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 7000,
+      ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    };
+
+const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => {
   console.error('[PostgreSQL Pool Error]:', err.message);
@@ -48,8 +75,19 @@ export const connectPostgres = async () => {
   }
 };
 
+export const checkDatabaseHealth = async () => {
+  try {
+    const start = Date.now();
+    await pool.query('SELECT 1');
+    return { status: 'healthy', latencyMs: Date.now() - start };
+  } catch (err) {
+    return { status: 'unhealthy', error: err.message };
+  }
+};
+
 export const query = (text, params) => pool.query(text, params);
 
 export const getPool = () => pool;
 
 export default pool;
+

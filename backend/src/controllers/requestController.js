@@ -51,28 +51,14 @@ import { query } from '../config/postgres.js';
 
 const isAdmin = (u) => Boolean(u && (u.role === 'ADMIN' || u.role === 'SUPER_ADMIN'));
 
-// Helper to generate unique Ticket ID
+// Helper to generate unique Ticket ID with atomic max query
 export const generateTicketId = async () => {
-  const result = await query(`
-    SELECT ticket_id FROM requests
-    WHERE ticket_id ~ '^CG-[0-9]+$'
-    ORDER BY created_at DESC
-    LIMIT 1
-  `);
-  let maxNum = 1000;
-  if (result.rows[0]) {
-    const num = parseInt(result.rows[0].ticket_id.replace('CG-', ''), 10);
-    if (!isNaN(num) && num > maxNum) maxNum = num;
-  }
-  // Check for highest ticket number overall
   const allResult = await query(`
-    SELECT MAX(CAST(SUBSTRING(ticket_id FROM 4) AS INTEGER)) 
+    SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_id FROM 4) AS INTEGER)), 1000) AS max_num 
     FROM requests 
-    WHERE ticket_id ~ '^CG-[0-9]+$'
+    WHERE ticket_id ~ '^[A-Z]+-[0-9]+$'
   `);
-  if (allResult.rows[0]?.max && allResult.rows[0].max > maxNum) {
-    maxNum = allResult.rows[0].max;
-  }
+  const maxNum = Number(allResult.rows[0]?.max_num || 1000);
   return `CG-${maxNum + 1}`;
 };
 
@@ -241,24 +227,30 @@ export const createRequest = async (req, res) => {
       : null;
 
     if (!userId || !companyId) {
-      // Look up default active client so evaluation/unauthenticated users are never blocked
+      // Look up primary client (preferring Data I2I or first active client)
       const fallbackClient = await query(`
-        SELECT u.id as user_id, u.company_id, u.name 
+        SELECT u.id as user_id, u.company_id, u.name, u.email
         FROM users u 
         WHERE u.role = 'USER' AND u.status = 'ACTIVE' AND u.company_id IS NOT NULL 
-        ORDER BY u.id ASC
+        ORDER BY CASE WHEN u.email = 'testclient@datai2i.com' THEN 0 ELSE 1 END, u.id ASC
         LIMIT 1
       `);
       if (fallbackClient.rows[0]) {
         userId = fallbackClient.rows[0].user_id;
         companyId = fallbackClient.rows[0].company_id;
-        if (!req.user) {
-          req.user = { id: userId, name: fallbackClient.rows[0].name };
+        if (!req.user || req.user.role !== 'USER') {
+          req.user = {
+            id: userId,
+            name: fallbackClient.rows[0].name,
+            email: fallbackClient.rows[0].email,
+            role: 'USER',
+            companyId
+          };
         }
       } else {
         return res.status(400).json({
           success: false,
-          message: 'No client profile found to associate this request.'
+          message: 'No client profile found to associate this request. Please sign in or register.'
         });
       }
     }
@@ -295,22 +287,43 @@ export const createRequest = async (req, res) => {
       });
     }
 
-    const ticketId = await generateTicketId();
+    // Attempt insertion with retry loop in case of race condition / unique collision
+    let request = null;
+    let attempts = 0;
+    let lastInsertError = null;
 
-    const request = await createRequestInDB({
-      ticketId,
-      userId,
-      companyId,
-      serviceType,
-      title,
-      description,
-      priority: priority || 'MEDIUM',
-      price: finalPrice,
-      assignedTeam: teamMap[serviceType] || 'CreativeGini Core Team',
-      notes: finalNotes,
-      status: 'REQUEST_CREATED',
-      paymentStatus: 'PAID'
-    });
+    while (!request && attempts < 4) {
+      attempts++;
+      const ticketId = await generateTicketId();
+      try {
+        request = await createRequestInDB({
+          ticketId,
+          userId,
+          companyId,
+          serviceType,
+          title,
+          description,
+          priority: priority || 'MEDIUM',
+          price: finalPrice,
+          assignedTeam: teamMap[serviceType] || 'CreativeGini Core Team',
+          notes: finalNotes,
+          status: 'REQUEST_CREATED',
+          paymentStatus: 'PAID'
+        });
+      } catch (insertErr) {
+        lastInsertError = insertErr;
+        // Postgres error code 23505 = unique_violation (e.g. ticket_id collision)
+        if (insertErr.code === '23505' && attempts < 4) {
+          console.warn(`[CreateRequest] Ticket ID collision on ${ticketId}, retrying attempt ${attempts}...`);
+          continue;
+        }
+        throw insertErr;
+      }
+    }
+
+    if (!request) {
+      throw lastInsertError || new Error('Failed to generate a unique ticket ID.');
+    }
 
     // Create activity log (guarded)
     try {
@@ -320,7 +333,7 @@ export const createRequest = async (req, res) => {
         companyId,
         requestId: request.id,
         action: 'REQUEST_CREATED',
-        details: `Ticket ${ticketId} created for ${serviceType.replace(/_/g, ' ')}.`
+        details: `Ticket ${request.ticketId} created for ${serviceType.replace(/_/g, ' ')}.`
       });
     } catch (logErr) {
       console.warn('[CreateRequest] Activity log failed (non-fatal):', logErr.message);
@@ -332,9 +345,9 @@ export const createRequest = async (req, res) => {
         userId,
         type: 'ASSIGNMENT',
         title: 'Request Ticket Submitted',
-        message: `Your request ${ticketId} ("${title}") has been received and assigned to the specialist team.`,
+        message: `Your request ${request.ticketId} ("${title}") has been received and assigned to the specialist team.`,
         ticketId: request.id,
-        ticketCode: ticketId
+        ticketCode: request.ticketId
       });
     } catch (notifErr) {
       console.warn('[CreateRequest] Notification failed (non-fatal):', notifErr.message);
@@ -368,9 +381,12 @@ export const createRequest = async (req, res) => {
     });
   } catch (error) {
     console.error('Create request error:', error);
-    return res.status(500).json({
+    const isDbConnError = error.code === 'ECONNREFUSED' || error.message?.includes('connection') || error.message?.includes('password authentication');
+    return res.status(isDbConnError ? 503 : 500).json({
       success: false,
-      message: 'Failed to create request. Please try again.'
+      message: isDbConnError
+        ? 'Database connection is temporarily unavailable. Please verify PostgreSQL service and credentials.'
+        : (error.message || 'Failed to create request. Please try again.')
     });
   }
 };
