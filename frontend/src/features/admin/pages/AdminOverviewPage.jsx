@@ -49,6 +49,17 @@ export default function AdminOverviewPage() {
 
   useEffect(() => {
     loadOverview();
+    const interval = setInterval(() => {
+      loadOverview(true);
+    }, 5 * 60 * 1000); // 5-minute auto-refresh interval
+
+    const onFocus = () => loadOverview(true);
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   if (loading) {

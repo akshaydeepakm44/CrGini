@@ -76,16 +76,6 @@ export default function DesignDashboardPage({
       desc: 'Awaiting triage / assignment',
     },
     {
-      label: 'Assigned to Me',
-      value: liveMetrics.assignedToMe,
-      icon: UserCheck,
-      color: '#7C3AED',
-      bg: '#F5F3FF',
-      border: '#DDD6FE',
-      path: '/design/requests/assigned',
-      desc: 'Active specialist workload',
-    },
-    {
       label: 'In Progress',
       value: liveMetrics.inProgress,
       icon: Clock,

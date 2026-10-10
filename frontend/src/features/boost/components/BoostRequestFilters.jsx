@@ -16,7 +16,6 @@ export default function BoostRequestFilters({
   const statusTabs = [
     { key: 'ALL', label: 'All Requests', count: metrics.total, activeColor: '#7C3AED', badgeBg: '#EDE9FE', badgeColor: '#6D28D9' },
     { key: 'NEW', label: 'New', count: metrics.newRequests, activeColor: '#2563EB', badgeBg: '#EFF6FF', badgeColor: '#2563EB' },
-    { key: 'ASSIGNED', label: 'Assigned', count: null, activeColor: '#7C3AED', badgeBg: '#F5F3FF', badgeColor: '#7C3AED' },
     { key: 'IN_PROGRESS', label: 'In Progress', count: metrics.inProgress, activeColor: '#D97706', badgeBg: '#FFFBEB', badgeColor: '#D97706' },
     { key: 'CLIENT_REVIEW', label: 'Client Review', count: metrics.clientReview, activeColor: '#DB2777', badgeBg: '#FDF2F8', badgeColor: '#DB2777' },
     { key: 'CHANGES_REQUESTED', label: 'Changes Requested', count: metrics.changesRequested, activeColor: '#DC2626', badgeBg: '#FEF2F2', badgeColor: '#DC2626' },

@@ -110,7 +110,7 @@ export default function DesignReviewPanel({ ticket, latestSubmission }) {
       >
         {[
           { step: 1, label: 'Request', desc: 'Brief Submitted' },
-          { step: 2, label: 'Assigned', desc: 'Specialist Assigned' },
+          { step: 2, label: 'Sprint Queued', desc: 'Ready for Work' },
           { step: 3, label: 'In Progress', desc: 'Design Active' },
           { step: 4, label: isChangesRequested ? 'Changes Requested' : 'Client Review', desc: isChangesRequested ? 'Feedback Provided' : 'Review Deliverable' },
           { step: 5, label: 'Completed', desc: 'Approved & Final' }

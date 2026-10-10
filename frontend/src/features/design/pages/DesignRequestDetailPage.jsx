@@ -407,7 +407,7 @@ export default function DesignRequestDetailPage({ user, onNavigate }) {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <User size={15} style={{ color: '#94A3B8' }} />
-            <span>Assigned: <strong style={{ color: '#1E293B' }}>{ticket.assignedTo}</strong></span>
+            <span>Specialist: <strong style={{ color: '#1E293B' }}>{ticket.assignedTo}</strong></span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

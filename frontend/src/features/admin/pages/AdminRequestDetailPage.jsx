@@ -347,7 +347,7 @@ export default function AdminRequestDetailPage() {
 
           {/* ASSIGNMENT */}
           <div className="cg-side-card">
-            <h4 className="cg-side-card-title">Assigned Responsibility</h4>
+            <h4 className="cg-side-card-title">Specialist Responsibility</h4>
             <div className="cg-side-entity">
               <UserCheck size={16} className="text-success" />
               <div>

@@ -75,7 +75,7 @@ export default function LeadPortal({ user, onLogout }) {
     loadData();
     const interval = setInterval(() => {
       loadData();
-    }, 10000);
+    }, 5 * 60 * 1000); // 5-minute auto-refresh interval
 
     const onFocus = () => loadData();
     window.addEventListener('focus', onFocus);

@@ -25,8 +25,7 @@ export default function DesignRequestFilters({
   const statusTabs = [
     { key: 'ALL', label: 'All Requests', count: metrics.total },
     { key: 'NEW', label: 'New', count: metrics.newRequests },
-    { key: 'ASSIGNED', label: 'Assigned', count: metrics.assigned },
-    { key: 'IN_PROGRESS', label: 'In Progress', count: metrics.inProgress },
+    { key: 'IN_PROGRESS', label: 'In Progress', count: (metrics.inProgress || 0) + (metrics.assigned || 0) },
     { key: 'CLIENT_REVIEW', label: 'Client Review', count: metrics.clientReview },
     { key: 'CHANGES_REQUESTED', label: 'Changes Requested', count: metrics.changesRequested },
     { key: 'COMPLETED', label: 'Completed', count: metrics.completed }

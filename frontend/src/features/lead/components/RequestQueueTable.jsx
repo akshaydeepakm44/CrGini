@@ -70,7 +70,7 @@ export default function RequestQueueTable({
                 Service & Title
               </th>
               <th style={{ padding: '12px 18px', fontSize: '0.72rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Assigned To
+                Specialist
               </th>
               <th style={{ padding: '12px 18px', fontSize: '0.72rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Status
@@ -205,7 +205,7 @@ export default function RequestQueueTable({
                         }}
                       />
                       <span style={{ fontSize: '0.8125rem', color: '#374151', fontWeight: 500 }}>
-                        {typeof req.assignedTo === 'object' ? (req.assignedTo?.name || 'Assigned') : (req.assignedTo || 'Unassigned')}
+                        {typeof req.assignedTo === 'object' ? (req.assignedTo?.name || 'Active Specialist') : (req.assignedTo || 'Unassigned')}
                       </span>
                     </div>
                   </td>

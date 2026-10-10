@@ -259,7 +259,7 @@ export default function LeadRequestDetailPage({ onNavigate, user }) {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.8125rem', color: '#6B7280' }}>
               <span>Client: <strong>{request.clientName}</strong> ({request.clientEmail})</span>
-              <span>Assigned: <strong>{typeof request.assignedTo === 'object' ? (request.assignedTo?.name || 'Specialist Queue') : (request.assignedTo || 'Specialist Queue')}</strong></span>
+              <span>Specialist: <strong>{typeof request.assignedTo === 'object' ? (request.assignedTo?.name || 'Specialist Queue') : (request.assignedTo || 'Specialist Queue')}</strong></span>
               <span>Created: {formatDateTime(request.createdAt)}</span>
             </div>
           </div>

@@ -4,7 +4,7 @@
 
 export const WORKFLOW_STAGES = [
   { key: 'REQUEST', label: 'Request Created', step: 1 },
-  { key: 'ASSIGNED', label: 'Assigned', step: 2 },
+  { key: 'ASSIGNED', label: 'Sprint Queued', step: 2 },
   { key: 'IN_PROGRESS', label: 'In Progress', step: 3 },
   { key: 'CLIENT_REVIEW', label: 'Client Review', step: 4 },
   { key: 'CHANGES_REQUESTED', label: 'Changes Requested', step: 4.5 },

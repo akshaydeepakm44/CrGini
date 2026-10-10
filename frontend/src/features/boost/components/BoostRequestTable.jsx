@@ -131,7 +131,7 @@ export default function BoostRequestTable({
                 </div>
               </th>
               <th style={{ padding: '12px 16px' }}>Status</th>
-              <th style={{ padding: '12px 16px' }}>Assigned To</th>
+              <th style={{ padding: '12px 16px' }}>Specialist</th>
               <th
                 style={{ padding: '12px 16px', cursor: 'pointer', userSelect: 'none' }}
                 onClick={() => handleSort('createdAt')}

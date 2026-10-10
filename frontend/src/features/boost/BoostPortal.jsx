@@ -96,6 +96,17 @@ export default function BoostPortal({ user, onLogout }) {
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(() => {
+      loadData();
+    }, 5 * 60 * 1000); // 5-minute auto-refresh interval
+
+    const onFocus = () => loadData();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   const handleNavigate = (path) => {

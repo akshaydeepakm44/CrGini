@@ -28,8 +28,7 @@ export default function DesignRequestQueue({
   const filteredRequests = requests.filter((r) => {
     // Status
     if (activeStatus === 'NEW' && !['REQUEST_CREATED', 'PAYMENT_COMPLETED'].includes(r.status)) return false;
-    if (activeStatus === 'ASSIGNED' && r.status !== 'ASSIGNED') return false;
-    if (activeStatus === 'IN_PROGRESS' && !['IN_PROGRESS', 'UNDER_REVIEW'].includes(r.status)) return false;
+    if (activeStatus === 'IN_PROGRESS' && !['IN_PROGRESS', 'ASSIGNED', 'UNDER_REVIEW'].includes(r.status)) return false;
     if (activeStatus === 'CLIENT_REVIEW' && !['CLIENT_REVIEW', 'WORK_SUBMITTED', 'WORK_RESUBMITTED'].includes(r.status)) return false;
     if (activeStatus === 'CHANGES_REQUESTED' && r.status !== 'CHANGES_REQUESTED') return false;
     if (activeStatus === 'COMPLETED' && !['COMPLETED', 'APPROVED'].includes(r.status)) return false;
@@ -64,12 +63,7 @@ export default function DesignRequestQueue({
       case 'NEW':
         return {
           title: 'No new design requests',
-          description: 'All submitted client requests have been assigned or are currently in progress.'
-        };
-      case 'ASSIGNED':
-        return {
-          title: 'No unstarted assigned requests',
-          description: 'Assigned design work is currently active or awaiting client feedback.'
+          description: 'All submitted client requests are currently in progress or completed.'
         };
       case 'IN_PROGRESS':
         return {

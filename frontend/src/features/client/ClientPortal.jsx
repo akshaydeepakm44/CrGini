@@ -136,7 +136,7 @@ export default function ClientPortal({ user, onLogout }) {
     loadPortalData();
     const interval = setInterval(() => {
       loadPortalData();
-    }, 10000);
+    }, 5 * 60 * 1000); // 5-minute auto-refresh interval
 
     const onFocus = () => loadPortalData();
     window.addEventListener('focus', onFocus);

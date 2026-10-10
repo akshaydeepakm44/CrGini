@@ -5,7 +5,7 @@
 
 export const LEAD_STATUS_CONFIG = {
   REQUEST_CREATED: { label: 'New', color: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE' },
-  ASSIGNED: { label: 'Assigned', color: '#8B5CF6', bg: '#F5F3FF', border: '#DDD6FE' },
+  ASSIGNED: { label: 'In Progress', color: '#F59E0B', bg: '#FFFBEB', border: '#FDE68A' },
   IN_PROGRESS: { label: 'In Progress', color: '#F59E0B', bg: '#FFFBEB', border: '#FDE68A' },
   CLIENT_REVIEW: { label: 'Client Review', color: '#EC4899', bg: '#FDF2F8', border: '#FBCFE8' },
   CHANGES_REQUESTED: { label: 'Changes Requested', color: '#EF4444', bg: '#FEF2F2', border: '#FECACA' },

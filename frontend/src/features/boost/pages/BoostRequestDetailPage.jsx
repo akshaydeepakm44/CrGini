@@ -262,7 +262,7 @@ export default function BoostRequestDetailPage({ onNavigate, user, ticketIdProp 
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <UserCheck size={14} />
-                Assigned: <strong style={{ color: '#374151' }}>{ticket.assignedTo}</strong>
+                Specialist: <strong style={{ color: '#374151' }}>{ticket.assignedTo}</strong>
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Calendar size={14} />

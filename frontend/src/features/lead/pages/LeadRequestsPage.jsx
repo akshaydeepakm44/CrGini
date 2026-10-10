@@ -25,8 +25,7 @@ export default function LeadRequestsPage({
   const tabs = [
     { id: 'ALL', label: 'All Requests', count: requests.length },
     { id: 'NEW', label: 'New', count: requests.filter((r) => r.status === 'REQUEST_CREATED').length },
-    { id: 'ASSIGNED', label: 'Assigned', count: requests.filter((r) => r.status === 'ASSIGNED').length },
-    { id: 'IN_PROGRESS', label: 'In Progress', count: requests.filter((r) => r.status === 'IN_PROGRESS').length },
+    { id: 'IN_PROGRESS', label: 'In Progress', count: requests.filter((r) => r.status === 'IN_PROGRESS' || r.status === 'ASSIGNED').length },
     { id: 'CLIENT_REVIEW', label: 'Client Review', count: requests.filter((r) => r.status === 'CLIENT_REVIEW' || r.status === 'CHANGES_REQUESTED').length },
     { id: 'COMPLETED', label: 'Completed', count: requests.filter((r) => r.status === 'COMPLETED').length },
   ];
@@ -44,8 +43,7 @@ export default function LeadRequestsPage({
     return requests.filter((req) => {
       // 1. Tab Status Filter
       if (activeTab === 'NEW' && req.status !== 'REQUEST_CREATED') return false;
-      if (activeTab === 'ASSIGNED' && req.status !== 'ASSIGNED') return false;
-      if (activeTab === 'IN_PROGRESS' && req.status !== 'IN_PROGRESS') return false;
+      if (activeTab === 'IN_PROGRESS' && req.status !== 'IN_PROGRESS' && req.status !== 'ASSIGNED') return false;
       if (activeTab === 'CLIENT_REVIEW' && req.status !== 'CLIENT_REVIEW' && req.status !== 'CHANGES_REQUESTED') return false;
       if (activeTab === 'COMPLETED' && req.status !== 'COMPLETED') return false;
 

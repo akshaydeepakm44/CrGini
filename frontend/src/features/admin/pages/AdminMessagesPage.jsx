@@ -176,7 +176,7 @@ export default function AdminMessagesPage() {
                 <div>
                   <h3 className="cg-pane-title">{activeTicket.ticketId}: {activeTicket.title}</h3>
                   <span className="cg-pane-meta">
-                    Client: {activeTicket.client?.name} ({activeTicket.client?.email}) • Assigned: {activeTicket.specialist?.name || 'Unassigned'}
+                    Client: {activeTicket.client?.name} ({activeTicket.client?.email}) • Specialist: {activeTicket.specialist?.name || 'Unassigned'}
                   </span>
                 </div>
                 <button

@@ -18,7 +18,7 @@ export default function TicketTimeline({
   // Define linear lifecycle progression
   const baseSteps = [
     { key: 'SUBMITTED', label: 'Request Submitted', icon: Clock },
-    { key: 'ASSIGNED', label: 'Specialist Assigned', icon: PlayCircle },
+    { key: 'ASSIGNED', label: 'Sprint Queued', icon: PlayCircle },
     { key: 'IN_PROGRESS', label: 'Work In Progress', icon: PlayCircle },
     { key: 'CLIENT_REVIEW', label: `Client Review (V${version})`, icon: Eye },
     { key: 'COMPLETED', label: 'Approved & Completed', icon: ShieldCheck },
@@ -28,7 +28,7 @@ export default function TicketTimeline({
   const steps = hasRevisions || normalized === 'CHANGES_REQUESTED' || normalized === 'WORK_RESUBMITTED'
     ? [
         { key: 'SUBMITTED', label: 'Request Submitted', icon: Clock },
-        { key: 'ASSIGNED', label: 'Specialist Assigned', icon: PlayCircle },
+        { key: 'ASSIGNED', label: 'Sprint Queued', icon: PlayCircle },
         { key: 'IN_PROGRESS', label: 'Work In Progress', icon: PlayCircle },
         { key: 'CLIENT_REVIEW', label: 'V1 Review', icon: Eye },
         { key: 'CHANGES_REQUESTED', label: 'Changes Requested', icon: AlertCircle, isRevision: true },

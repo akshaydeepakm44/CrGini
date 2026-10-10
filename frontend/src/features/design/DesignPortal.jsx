@@ -121,6 +121,7 @@ export default function DesignPortal({ user, onLogout }) {
             list.filter((n) => !n.isRead && !n.is_read).length
         );
       }
+      setLastSyncedAt(new Date());
     } catch (err) {
       console.error('Failed to load UI/Design portal operational data:', err);
     } finally {
@@ -131,6 +132,17 @@ export default function DesignPortal({ user, onLogout }) {
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(() => {
+      loadData();
+    }, 5 * 60 * 1000); // 5-minute auto-refresh interval
+
+    const onFocus = () => loadData();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   const handleNavigate = (path) => {

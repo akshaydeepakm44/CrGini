@@ -8,7 +8,7 @@ import { detectBoostService, BOOST_SERVICES } from './boostServiceData';
 export const BOOST_STATUS_CONFIG = {
   REQUEST_CREATED: { label: 'New', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', step: 1 },
   PAYMENT_COMPLETED: { label: 'New', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', step: 1 },
-  ASSIGNED: { label: 'Assigned', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', step: 2 },
+  ASSIGNED: { label: 'In Progress', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', step: 2 },
   IN_PROGRESS: { label: 'In Progress', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', step: 3 },
   UNDER_REVIEW: { label: 'Reviewing', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', step: 3 },
   CLIENT_REVIEW: { label: 'Client Review', color: '#DB2777', bg: '#FDF2F8', border: '#FBCFE8', step: 4 },

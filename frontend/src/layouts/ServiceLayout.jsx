@@ -58,7 +58,6 @@ export default function ServiceLayout({
       domainNav: [
         { id: 'dashboard', label: 'Dashboard', path: '/internal/lead/dashboard', icon: LayoutDashboard },
         { id: 'new-requests', label: 'New Requests', path: '/internal/lead/requests?status=NEW', icon: Inbox, badge: 3 },
-        { id: 'assigned', label: 'Assigned Requests', path: '/internal/lead/requests?status=ASSIGNED', icon: UserCheck },
         { id: 'in-progress', label: 'In Progress', path: '/internal/lead/requests?status=IN_PROGRESS', icon: PlayCircle },
         { id: 'client-review', label: 'Client Review', path: '/internal/lead/requests?status=REVIEW', icon: Eye },
         { id: 'completed', label: 'Completed', path: '/internal/lead/requests?status=COMPLETED', icon: CheckCircle2 },

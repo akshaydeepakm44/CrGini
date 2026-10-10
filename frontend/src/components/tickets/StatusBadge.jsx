@@ -34,11 +34,11 @@ export default function StatusBadge({ status, size = 'md', showIcon = true, clas
       icon: Clock,
     },
 
-    // 2. Assignment
+    // 2. Assignment (mapped to In Progress)
     ASSIGNED: {
-      label: 'Assigned',
+      label: 'In Progress',
       variant: 'blue',
-      icon: UserCheck,
+      icon: PlayCircle,
     },
 
     // 3. In Progress
