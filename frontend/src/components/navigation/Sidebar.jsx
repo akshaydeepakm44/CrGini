@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react';
 import Button from '../common/Button';
+import { BRAND_LOGO, BRAND_ICON } from '../../assets/branding';
 
 /**
  * Reusable Sidebar Component
@@ -92,7 +93,7 @@ export default function Sidebar({
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {isCollapsed ? (
             <img
-              src="/logo-icon.png"
+              src={BRAND_ICON}
               alt="CreativeGini"
               style={{ width: '32px', height: '32px', objectFit: 'contain' }}
               onError={(e) => {
@@ -102,7 +103,7 @@ export default function Sidebar({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
               <img
-                src="/logo.png"
+                src={BRAND_LOGO}
                 alt="CreativeGini"
                 style={{ height: '34px', width: 'auto', objectFit: 'contain' }}
               />

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { ShieldAlert, ArrowLeft, LogOut, LayoutDashboard } from 'lucide-react';
+import { BRAND_LOGO } from '../../assets/branding';
 
 export const getRoleHome = (userOrRole) => {
   if (!userOrRole) return '/portal';
@@ -66,7 +67,7 @@ export default function ProtectedRoute({
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#030712', color: '#fff' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-          <img src="/logo.png" alt="CreativeGini" style={{ height: '36px' }} />
+          <img src={BRAND_LOGO} alt="CreativeGini" style={{ height: '36px' }} />
           <div style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Verifying secure session...</div>
         </div>
       </div>

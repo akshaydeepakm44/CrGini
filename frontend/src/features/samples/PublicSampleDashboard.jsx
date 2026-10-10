@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { BRAND_LOGO } from '../../assets/branding';
 import {
   Building2,
   Users,
@@ -154,7 +155,7 @@ export default function PublicSampleDashboard() {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-              <img src="/logo.png" alt="CreativeGini" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
+              <img src={BRAND_LOGO} alt="CreativeGini" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
             </Link>
             <span style={{ height: '18px', width: '1px', background: '#CBD5E1' }} />
             <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#475569', background: '#F1F5F9', padding: '4px 10px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>

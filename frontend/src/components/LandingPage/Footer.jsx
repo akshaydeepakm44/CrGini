@@ -8,6 +8,7 @@ import {
   Lock,
   CheckCircle2
 } from 'lucide-react';
+import { BRAND_LOGO } from '../../assets/branding';
 
 export default function Footer({ onSignIn, onGetStarted }) {
   const scrollTo = (id) => (e) => {
@@ -72,7 +73,7 @@ export default function Footer({ onSignIn, onGetStarted }) {
           <div className="cg-footer-manifesto-col">
             <a href="/" className="cg-footer-brand-lockup" onClick={scrollTo('top')}>
               <img
-                src="/logo.png"
+                src={BRAND_LOGO}
                 alt="CreativeGini"
                 className="cg-footer-logo-img"
               />

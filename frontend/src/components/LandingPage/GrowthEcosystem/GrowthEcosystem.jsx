@@ -13,6 +13,7 @@ import {
 import OrbitRing from './OrbitRing';
 import OrbitNode from './OrbitNode';
 import ServiceInfoCard from './ServiceInfoCard';
+import { BRAND_ICON } from '../../../assets/branding';
 
 const RINGS = [
   { id: 0, radius: 135, stroke: 'rgba(196, 181, 253, 0.45)', strokeDasharray: '4 6', strokeWidth: 1.2, rotationClass: 'cg-ring-rotation-1' },
@@ -223,7 +224,7 @@ export default function GrowthEcosystem({ onSelectService, onExploreService }) {
         >
           <div className="cg-center-pulse-ring" />
           <img
-            src="/logo-icon.png"
+            src={BRAND_ICON}
             alt="CreativeGini Core"
             className="cg-center-logo-img"
             onError={(e) => {

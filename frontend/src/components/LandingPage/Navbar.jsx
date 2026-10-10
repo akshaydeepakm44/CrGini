@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, X, ArrowRight, UserCheck, LayoutDashboard } from 'lucide-react';
+import { BRAND_LOGO } from '../../assets/branding';
 
 export default function Navbar({ onSignIn, onGetStarted }) {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -59,7 +60,7 @@ export default function Navbar({ onSignIn, onGetStarted }) {
             aria-label="CreativeGini Home"
           >
             <img
-              src="/logo.png"
+              src={BRAND_LOGO}
               alt="CreativeGini Logo"
               className="cg-nav-logo"
             />

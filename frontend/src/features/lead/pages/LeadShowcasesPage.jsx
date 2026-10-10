@@ -26,9 +26,15 @@ import {
   Globe,
   UserPlus,
   CheckCircle,
+  CheckCircle2,
+  FileSpreadsheet,
+  UploadCloud,
+  RefreshCw,
   X
 } from 'lucide-react';
 import { api } from '../../../services/api';
+import { parseLeadsFile, enrichLeadRow } from '../../client/utils/leadDataEnricher';
+import { BRAND_LOGO, BRAND_ICON } from '../../../assets/branding';
 
 export default function LeadShowcasesPage({ onNavigate }) {
   const [showcases, setShowcases] = useState([]);
@@ -88,6 +94,9 @@ export default function LeadShowcasesPage({ onNavigate }) {
   const [editingLeadIndex, setEditingLeadIndex] = useState(null);
   const [bulkLeadText, setBulkLeadText] = useState('');
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [isUploadingBulkFile, setIsUploadingBulkFile] = useState(false);
+  const [bulkUploadFeedback, setBulkUploadFeedback] = useState(null);
+  const [replaceExistingLeads, setReplaceExistingLeads] = useState(false);
 
   // Upload state
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
@@ -467,6 +476,47 @@ support@creativegini.com`;
     }
   };
 
+  // Bulk Upload Spreadsheet File (Excel / CSV) with auto-enrichment
+  const handleBulkSpreadsheetUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingBulkFile(true);
+      setBulkUploadFeedback(null);
+
+      const parsed = await parseLeadsFile(file, {
+        companyName: formData.companyName || formData.title || 'Target Organization',
+        industry: formData.companyStudy?.industry || 'Enterprise Software & Tech',
+      });
+
+      if (!parsed || parsed.length === 0) {
+        alert('Could not find any lead records in the uploaded spreadsheet. Please check the columns and rows.');
+        return;
+      }
+
+      const updatedLeads = replaceExistingLeads
+        ? parsed
+        : [...formData.leads, ...parsed];
+
+      setFormData((prev) => ({
+        ...prev,
+        leads: updatedLeads,
+      }));
+
+      setBulkUploadFeedback({
+        fileName: file.name,
+        importedCount: parsed.length,
+        totalCount: updatedLeads.length,
+      });
+    } catch (err) {
+      alert(`Failed to parse spreadsheet: ${err.message}`);
+    } finally {
+      setIsUploadingBulkFile(false);
+      e.target.value = '';
+    }
+  };
+
   const filteredShowcases = showcases.filter((s) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -496,27 +546,54 @@ support@creativegini.com`;
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreateModal}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: '#7C3AED',
-            color: '#FFFFFF',
-            border: 'none',
-            padding: '10px 20px',
-            borderRadius: '10px',
-            fontWeight: 700,
-            fontSize: '0.875rem',
-            cursor: 'pointer',
-            boxShadow: '0 2px 10px rgba(124, 58, 237, 0.25)',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          <Plus size={18} />
-          Create Prospect Showcase
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              handleOpenCreateModal();
+              setActiveTab('leads');
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: '#FAF5FF',
+              color: '#7C3AED',
+              border: '1.5px solid #DDD4FA',
+              padding: '10px 18px',
+              borderRadius: '10px',
+              fontWeight: 700,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(124, 58, 237, 0.08)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <FileSpreadsheet size={18} color="#7C3AED" />
+            <span>⚡ Bulk Upload CSV / Excel</span>
+          </button>
+
+          <button
+            onClick={handleOpenCreateModal}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: '#7C3AED',
+              color: '#FFFFFF',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '10px',
+              fontWeight: 700,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              boxShadow: '0 2px 10px rgba(124, 58, 237, 0.25)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Plus size={18} />
+            Create Prospect Showcase
+          </button>
+        </div>
       </div>
 
       {/* 2. Strategy & Outreach Quick Bar */}
@@ -1207,24 +1284,147 @@ support@creativegini.com`;
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => setShowBulkImport(!showBulkImport)}
-                      style={{
-                        background: '#F3F4F6',
-                        color: '#374151',
-                        border: '1px solid #D1D5DB',
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        fontSize: '0.8125rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {showBulkImport ? 'Close Bulk Import' : '📋 Quick Import (Excel / CSV Paste)'}
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        onClick={() => setShowBulkImport(!showBulkImport)}
+                        style={{
+                          background: showBulkImport ? '#EDE9FE' : '#F3F4F6',
+                          color: showBulkImport ? '#6D28D9' : '#374151',
+                          border: '1px solid',
+                          borderColor: showBulkImport ? '#C4B5FD' : '#D1D5DB',
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '0.8125rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {showBulkImport ? 'Close Text Paste' : '📋 Paste Text / CSV'}
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Bulk Import Box */}
+                  {/* 1. PRIMARY: BULK UPLOAD SPREADSHEET (EXCEL / CSV) ZONE */}
+                  <div
+                    style={{
+                      background: 'linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 100%)',
+                      border: '2px dashed #C4B5FD',
+                      borderRadius: '14px',
+                      padding: '22px 24px',
+                      textAlign: 'center',
+                      position: 'relative',
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <div
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '12px',
+                          background: '#7C3AED',
+                          color: '#FFFFFF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 12px rgba(124, 58, 237, 0.25)',
+                        }}
+                      >
+                        <FileSpreadsheet size={24} />
+                      </div>
+
+                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1E1B4B' }}>
+                        Bulk Upload Leads Spreadsheet (Excel or CSV)
+                      </div>
+
+                      <p style={{ margin: '0 auto', maxWidth: '580px', fontSize: '0.8125rem', color: '#6D28D9', lineHeight: 1.5 }}>
+                        Upload your <strong>.xlsx</strong>, <strong>.xls</strong>, or <strong>.csv</strong> file. Even if your spreadsheet only contains lead names, our AI enrichment engine automatically detects and generates full executive titles, verified LinkedIn URLs, corporate emails, company logos, in-depth lead studies, and tailored pitch decks!
+                      </p>
+
+                      <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <label
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: '#7C3AED',
+                            color: '#FFFFFF',
+                            padding: '10px 22px',
+                            borderRadius: '10px',
+                            fontSize: '0.875rem',
+                            fontWeight: 700,
+                            cursor: isUploadingBulkFile ? 'not-allowed' : 'pointer',
+                            boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {isUploadingBulkFile ? (
+                            <>
+                              <RefreshCw size={16} className="spin-animation" />
+                              <span>Parsing & Enriching Leads...</span>
+                            </>
+                          ) : (
+                            <>
+                              <UploadCloud size={16} />
+                              <span>Select Excel / CSV File</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept=".xlsx,.csv,.xls,.tsv"
+                            onChange={handleBulkSpreadsheetUpload}
+                            disabled={isUploadingBulkFile}
+                            style={{ display: 'none' }}
+                          />
+                        </label>
+
+                        <label
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '0.8125rem',
+                            fontWeight: 600,
+                            color: '#4B5563',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={replaceExistingLeads}
+                            onChange={(e) => setReplaceExistingLeads(e.target.checked)}
+                            style={{ accentColor: '#7C3AED' }}
+                          />
+                          <span>Replace existing leads in this showcase</span>
+                        </label>
+                      </div>
+
+                      {bulkUploadFeedback && (
+                        <div
+                          style={{
+                            marginTop: '12px',
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            backgroundColor: '#ECFDF5',
+                            border: '1px solid #A7F3D0',
+                            color: '#065F46',
+                            fontSize: '0.8125rem',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <CheckCircle2 size={16} color="#059669" />
+                          <span>
+                            ✓ Successfully loaded & auto-enriched {bulkUploadFeedback.importedCount} leads from <strong>{bulkUploadFeedback.fileName}</strong>! (Total in showcase: {bulkUploadFeedback.totalCount})
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 2. SECONDARY: Textarea Text / CSV Paste */}
                   {showBulkImport && (
                     <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '10px', border: '1px solid #CBD5E1' }}>
                       <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#1E293B', marginBottom: '4px' }}>

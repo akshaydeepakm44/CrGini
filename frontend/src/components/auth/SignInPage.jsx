@@ -17,6 +17,7 @@ import {
   Building
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { BRAND_LOGO } from '../../assets/branding';
 
 export default function SignInPage({ onLogin, onBackHome, showToast, initialView = 'signin' }) {
   const [viewMode, setViewMode] = useState(initialView);
@@ -241,7 +242,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
         </button>
 
         <div className="signin-nav-brand" onClick={onBackHome} style={{ cursor: 'pointer' }}>
-          <img src="/logo.png" alt="CreativeGini" className="signin-nav-logo" />
+          <img src={BRAND_LOGO} alt="CreativeGini" className="signin-nav-logo" />
         </div>
       </header>
 
@@ -256,7 +257,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
               {/* Header inside Card */}
               <div className="signin-card-header" style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-                  <img src="/logo.png" alt="CreativeGini" style={{ height: '38px', width: 'auto' }} />
+                  <img src={BRAND_LOGO} alt="CreativeGini" style={{ height: '38px', width: 'auto' }} />
                 </div>
                 <h1 className="signin-title" style={{ fontSize: '1.5rem', marginBottom: '0.35rem' }}>
                   {viewMode === 'signin' ? 'Sign In to CreativeGini' : viewMode === 'signup' ? 'Create Your Account' : 'Reset Your Password'}

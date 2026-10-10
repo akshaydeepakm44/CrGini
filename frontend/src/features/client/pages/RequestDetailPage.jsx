@@ -532,7 +532,7 @@ export default function RequestDetailPage({
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <button
                             type="button"
                             onClick={() => toggleSubExpanded(subKey)}
@@ -554,9 +554,41 @@ export default function RequestDetailPage({
                             title="Click to toggle row-wise leads view"
                           >
                             <Users size={13} color={isSubExpanded ? '#6D28D9' : '#2563EB'} />
-                            <span>{isSubExpanded ? 'Hide Leads Table' : `Inspect Leads (${resolvedLeads.length})`}</span>
+                            <span>{isSubExpanded ? 'Hide Leads Table' : resolvedLeads.length > 0 ? `Inspect Leads (${resolvedLeads.length})` : 'Inspect / Upload Leads'}</span>
                             {isSubExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                           </button>
+
+                          <label
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              backgroundColor: '#FAF5FF',
+                              border: '1px solid #DDD4FA',
+                              color: '#6D28D9',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                            title="Upload or replace leads with CSV / Excel file"
+                          >
+                            <Upload size={13} color="#7C3AED" />
+                            <span>{isUploadingSpreadsheet ? 'Parsing...' : 'Upload CSV/Excel'}</span>
+                            <input
+                              type="file"
+                              accept=".xlsx,.csv,.xls,.tsv"
+                              style={{ display: 'none' }}
+                              onChange={(e) => {
+                                if (e.target.files?.[0]) {
+                                  handleClientSpreadsheetUpload(subKey, e.target.files[0]);
+                                }
+                              }}
+                            />
+                          </label>
+
                           <StatusBadge status={sub.status || 'CLIENT_REVIEW'} size="sm" />
                         </div>
                       </div>
@@ -794,7 +826,7 @@ export default function RequestDetailPage({
                       )}
 
                       {/* PROSPECT SHOWCASE ROW-WISE LEADS TABLE (MATCHING SCREENSHOT 2) */}
-                      {isSubExpanded && resolvedLeads.length > 0 && (
+                      {isSubExpanded && (
                         <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                           {/* Leads Showcase Header, Toolbar & Controls */}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
@@ -933,8 +965,42 @@ export default function RequestDetailPage({
 
                             {/* Table Rows matching Screenshot 2 */}
                             {filteredLeads.length === 0 ? (
-                              <div style={{ padding: '30px', textAlign: 'center', color: '#64748B', fontSize: '0.85rem' }}>
-                                No leads matching "{leadSearchQuery}". Clear search to view all {resolvedLeads.length} leads.
+                              <div style={{ padding: '36px 20px', textAlign: 'center', backgroundColor: '#FAFAFC' }}>
+                                <Users size={32} color="#94A3B8" style={{ margin: '0 auto 8px auto' }} />
+                                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>
+                                  {leadSearchQuery ? `No leads matching "${leadSearchQuery}"` : 'No lead records loaded in this submission yet'}
+                                </div>
+                                <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '4px auto 14px auto', maxWidth: '440px' }}>
+                                  Upload an Excel or CSV file to bulk import and auto-enrich leads for this sprint package.
+                                </p>
+                                <label
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '8px 18px',
+                                    backgroundColor: '#7C3AED',
+                                    color: '#FFFFFF',
+                                    borderRadius: '8px',
+                                    fontSize: '0.8125rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
+                                  }}
+                                >
+                                  <Upload size={14} />
+                                  <span>Upload Leads File (CSV / Excel)</span>
+                                  <input
+                                    type="file"
+                                    accept=".xlsx,.csv,.xls,.tsv"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => {
+                                      if (e.target.files?.[0]) {
+                                        handleClientSpreadsheetUpload(subKey, e.target.files[0]);
+                                      }
+                                    }}
+                                  />
+                                </label>
                               </div>
                             ) : (
                               filteredLeads.map((lead, lIdx) => (
