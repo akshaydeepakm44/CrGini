@@ -64,121 +64,218 @@ export const generateTicketId = async () => {
 
 // Authoritative backend pricing calculation engine
 export const calculateServicePrice = ({ serviceType, subService, requirements = {}, selectedServices = [] }) => {
-  let basePrice = 799;
+  const INDIVIDUAL_PRICES = {
+    strategicPlan: 19,
+    'strategic-planner': 19,
+    content: 29,
+    'content-creator': 29,
+    brandIdentity: 5,
+    'brand-identity': 5,
+    adCreatives: 10,
+    'ad-creatives': 10,
+    gtm: 19,
+    'gtm-strategy': 19,
+    devrel: 49,
+    leadResearch: 2,
+    'lead-research': 2,
+    companyStudy: 1,
+    'company-study': 1,
+    keyPeople: 2,
+    'key-people': 2,
+    pitchSupport: 2,
+    'pitch-support': 2,
+    uiUxAudit: 19,
+    'ui-ux-audit': 19,
+    figmaProject: 9,
+    'figma-project': 9,
+    redesign: 59,
+    redesignRequest: 59,
+    'redesign-request': 59,
+    technicalDiscovery: 49,
+    'technical-discovery': 49,
+    clickablePrototype: 199,
+    'clickable-prototype': 199,
+    webApp: 1500,
+    'web-app': 1500,
+  };
+
+  const BUNDLE_PRICES = {
+    'gtm-launchpad': 99,
+    'content-branding-engine': 69,
+    'b2b-pipeline-pack': 49,
+    'mvp-launch-sprint': 1500,
+    'developer-adoption-sprint': 99,
+    'executive-pitch-blueprint': 79,
+  };
+
+  let basePrice = 19;
   let breakdown = [];
   let serviceLabel = 'Company Boost Sprint';
 
+  const bundleKey = requirements.bundleId || requirements.bundle_id || requirements.bundle;
+  if (bundleKey && BUNDLE_PRICES[bundleKey]) {
+    basePrice = BUNDLE_PRICES[bundleKey];
+    serviceLabel = `Offer Bundle: ${bundleKey}`;
+    breakdown.push({ item: `Curated Specialist Bundle (${bundleKey})`, amount: basePrice });
+    return {
+      price: basePrice,
+      currency: 'USD',
+      pricingStatus: 'CONFIGURED',
+      serviceLabel,
+      breakdown
+    };
+  }
+
   if (serviceType === 'COMPANY_LEAD' || serviceType === 'LEAD_RESEARCH') {
     if (subService === 'COMPANY_STUDY') {
-      basePrice = 699;
+      basePrice = 1;
       serviceLabel = 'Digitalising: Company Study Dossier Sprint';
-      breakdown.push({ item: 'Account Architecture & Intelligence Mining', amount: 449 });
-      breakdown.push({ item: 'Executive Briefing Dossier & Strategic Signals', amount: 250 });
+      breakdown.push({ item: 'Personal Company Study & Org Architecture', amount: 1 });
     } else if (subService === 'KEY_PEOPLE') {
-      basePrice = 599;
+      basePrice = 2;
       serviceLabel = 'Digitalising: Key People Research Sprint';
-      breakdown.push({ item: 'Executive Mapping & Hierarchy Verification', amount: 399 });
-      breakdown.push({ item: 'Direct Channel Contact Signals & Verified Details', amount: 200 });
+      breakdown.push({ item: 'Key Profile Mapping & Direct Mail', amount: 2 });
     } else if (subService === 'PITCH_SUPPORT') {
-      basePrice = 799;
+      basePrice = 2;
       serviceLabel = 'Digitalising: Pitch Support & Narrative Sprint';
-      breakdown.push({ item: 'Core Narrative & Objection Engineering', amount: 499 });
-      breakdown.push({ item: 'Collateral & Pitch Deck Optimization', amount: 300 });
+      breakdown.push({ item: 'Pitch Support & Competitor Analysis', amount: 2 });
     } else if (subService === 'CUSTOM') {
-      basePrice = 799;
+      let customSum = 0;
+      if (typeof requirements.totalPrice === 'number' && requirements.totalPrice > 0) {
+        customSum = requirements.totalPrice;
+      } else if (Array.isArray(selectedServices) && selectedServices.length > 0) {
+        selectedServices.forEach((s) => {
+          customSum += INDIVIDUAL_PRICES[s] || INDIVIDUAL_PRICES[s.key] || 10;
+        });
+      } else if (typeof selectedServices === 'object' && selectedServices !== null) {
+        Object.entries(selectedServices).forEach(([k, v]) => {
+          if (v && INDIVIDUAL_PRICES[k]) customSum += INDIVIDUAL_PRICES[k];
+        });
+      }
+      basePrice = customSum > 0 ? customSum : 19;
       serviceLabel = 'Digitalising: Custom Research Sprint';
-      const count = Array.isArray(selectedServices) && selectedServices.length > 0 ? selectedServices.length : 1;
-      breakdown.push({ item: `Custom Intelligence Scope (${count} Service Areas)`, amount: 799 });
+      breakdown.push({ item: 'Configured Custom Multi-Service Scope', amount: basePrice });
     } else {
-      basePrice = 499;
+      basePrice = 2;
       serviceLabel = 'Digitalising: Target Lead Research Sprint';
-      const countLabel = requirements.leadsCount ? `${requirements.leadsCount} Target Leads` : '50 Verified Leads';
-      breakdown.push({ item: `Prospecting & Profile Discovery (${countLabel})`, amount: 349 });
-      breakdown.push({ item: 'Direct Contact & Decision-Maker Verification', amount: 150 });
+      const countLabel = requirements.leadsCount ? `${requirements.leadsCount} Target Leads` : '$2 per lead';
+      breakdown.push({ item: `Lead Research (${countLabel})`, amount: 2 });
     }
   } else if (serviceType === 'LANDING_PAGE') {
     if (subService === 'UI_UX_AUDIT') {
-      basePrice = 499;
+      basePrice = 19;
       serviceLabel = 'UI / Design: UI/UX Audit & Usability Sprint';
-      breakdown.push({ item: 'Heuristic Evaluation & Usability Diagnostics', amount: 299 });
-      breakdown.push({ item: 'Annotated Interface Review & Severity Matrix', amount: 200 });
+      breakdown.push({ item: 'Mock screens & prototype review diagnostics', amount: 10 });
+      breakdown.push({ item: 'Heuristic Evaluation & Severity Matrix', amount: 9 });
     } else if (subService === 'FIGMA_PROJECT') {
-      basePrice = 599;
+      basePrice = 9;
       serviceLabel = 'UI / Design: Figma Component System Sprint';
-      breakdown.push({ item: 'Design System & Component Token Architecture', amount: 399 });
-      breakdown.push({ item: 'Production-Ready Interactive Frames & Layouts', amount: 200 });
+      breakdown.push({ item: 'Mock screens + prototype components', amount: 5 });
+      breakdown.push({ item: 'Design System & Component Token Specs', amount: 4 });
     } else if (subService === 'REDESIGN_REQUEST' || subService === 'REDESIGN') {
-      basePrice = 599;
-      serviceLabel = 'UI / Design: Full Page Redesign Sprint';
-      breakdown.push({ item: 'High-Impact Hero & Conversion Layout Architecture', amount: 399 });
-      breakdown.push({ item: 'Production Component Specs & Before/After Deck', amount: 200 });
+      basePrice = 59;
+      serviceLabel = 'UI / Design: Landing Page Redesign Sprint';
+      breakdown.push({ item: 'Full Page Redesign Master Architecture', amount: 39 });
+      breakdown.push({ item: 'Production Component Specs & Comparison Deck', amount: 20 });
+    } else if (subService === 'WEB_APP') {
+      basePrice = 1500;
+      serviceLabel = 'App Development: MVP Development Sprint';
+      breakdown.push({ item: 'POC + V1 turnkey full-stack application core', amount: 1500 });
+    } else if (subService === 'MOBILE_APP') {
+      basePrice = 199;
+      serviceLabel = 'App Development: Clickable App Prototype Sprint';
+      breakdown.push({ item: 'Interactive mobile & web prototype', amount: 199 });
+    } else if (subService === 'API_BACKEND') {
+      basePrice = 49;
+      serviceLabel = 'App Development: Technical Discovery Sprint';
+      breakdown.push({ item: 'System architecture blueprint & data schema', amount: 49 });
     } else {
-      basePrice = 599;
+      basePrice = 59;
       serviceLabel = 'Landing Page Enhancement Sprint';
-      breakdown.push({ item: 'UI/UX Enhancement Sprint', amount: 599 });
+      breakdown.push({ item: 'Landing Page Redesign Sprint', amount: 59 });
     }
   } else if (serviceType === 'COMPANY_BOOST') {
     if (subService === 'STRATEGIC_PLAN') {
-      basePrice = 799;
+      basePrice = 19;
       serviceLabel = 'Company Boost: Strategic Plan Sprint';
-      breakdown.push({ item: 'Market & Positioning Architecture', amount: 499 });
-      breakdown.push({ item: 'Outbound Playbook & Growth Sequencing', amount: 300 });
+      breakdown.push({ item: 'Market & Positioning Architecture (3 months plan)', amount: 10 });
+      breakdown.push({ item: 'Outbound Playbook & Growth Sequencing', amount: 9 });
     } else if (subService === 'CONTENT') {
-      basePrice = 799;
+      basePrice = 29;
       serviceLabel = 'Company Boost: Content Production Sprint';
-      breakdown.push({ item: 'Branded Poster & Visual Creative Assets', amount: 399 });
-      breakdown.push({ item: 'High-Definition Product Showcase Video', amount: 400 });
+      breakdown.push({ item: 'Branded Posters (2 posters + 1 branding)', amount: 15 });
+      breakdown.push({ item: 'Reels & Visual Creative Assets (3 reels)', amount: 14 });
     } else if (subService === 'DEVREL_PLAN' || subService === 'DEVREL') {
-      basePrice = 799;
+      basePrice = 49;
       serviceLabel = 'Company Boost: DevRel Strategy Sprint';
-      breakdown.push({ item: 'Developer Ecosystem & Documentation Audit', amount: 499 });
-      breakdown.push({ item: 'Technical Community & Outreach Roadmap', amount: 300 });
+      breakdown.push({ item: 'Developer Ecosystem & Documentation Audit', amount: 25 });
+      breakdown.push({ item: 'Community, content creation & developer feedback', amount: 24 });
     } else if (subService === 'GTM_STRATEGY' || subService === 'GTM') {
-      basePrice = 799;
+      basePrice = 19;
       serviceLabel = 'Company Boost: GTM Strategy Sprint';
-      breakdown.push({ item: 'GTM Launch Playbook & Channel Distribution Roadmap', amount: 499 });
-      breakdown.push({ item: 'GTM Strategy Brochure & Collateral Deck', amount: 300 });
+      breakdown.push({ item: 'GTM Launch Playbook & 2 Months Reach Plan', amount: 10 });
+      breakdown.push({ item: 'GTM Strategy Brochure & Collateral Deck', amount: 9 });
     } else if (subService === 'AD_CREATIVES' || subService === 'ADS' || subService === 'AD_CREATIVE') {
-      basePrice = 799;
+      basePrice = 10;
       serviceLabel = 'Company Boost: Ad Creatives Sprint';
-      breakdown.push({ item: 'Multi-Format Visual Ad Creative Pack (1:1, 9:16, 16:9)', amount: 499 });
-      breakdown.push({ item: 'Ad Copy Angles & Creative Testing Matrix', amount: 300 });
+      breakdown.push({ item: 'Visual Ad Creative Pack (4 posters + boosting)', amount: 6 });
+      breakdown.push({ item: 'Ad Copy Angles & Creative Testing Matrix', amount: 4 });
+    } else if (subService === 'BRAND_IDENTITY') {
+      basePrice = 5;
+      serviceLabel = 'Company Boost: Brand Identity Sprint';
+      breakdown.push({ item: 'Platforms access Meta + Insta + FB', amount: 3 });
+      breakdown.push({ item: 'Brand Guidelines & Narrative Matrix', amount: 2 });
     } else if (subService === 'CUSTOM') {
-      basePrice = 799;
+      let customSum = 0;
+      if (typeof requirements.totalPrice === 'number' && requirements.totalPrice > 0) {
+        customSum = requirements.totalPrice;
+      } else if (Array.isArray(selectedServices) && selectedServices.length > 0) {
+        selectedServices.forEach((s) => {
+          customSum += INDIVIDUAL_PRICES[s] || INDIVIDUAL_PRICES[s.key] || 10;
+        });
+      } else if (typeof selectedServices === 'object' && selectedServices !== null) {
+        Object.entries(selectedServices).forEach(([k, v]) => {
+          if (v && INDIVIDUAL_PRICES[k]) customSum += INDIVIDUAL_PRICES[k];
+        });
+      }
+      basePrice = customSum > 0 ? customSum : 19;
       serviceLabel = 'Company Boost: Custom Scope Sprint';
-      const count = Array.isArray(selectedServices) && selectedServices.length > 0 ? selectedServices.length : 1;
-      breakdown.push({ item: `Custom Multidisciplinary Scope (${count} Service Areas)`, amount: 799 });
+      breakdown.push({ item: 'Configured Custom Multi-Service Scope', amount: basePrice });
     } else {
-      basePrice = 799;
+      basePrice = 19;
       serviceLabel = 'Company Boost Growth Sprint';
-      breakdown.push({ item: 'Standard Growth Operations Sprint', amount: 799 });
+      breakdown.push({ item: 'Standard Growth Operations Sprint', amount: 19 });
     }
   } else if (serviceType === 'APP_DEVELOPMENT' || serviceType === 'DEVELOPMENT') {
-    if (subService === 'WEB_APP') {
-      basePrice = 1499;
-      serviceLabel = 'App Development: Web Application MVP Sprint';
-      breakdown.push({ item: 'Full-Stack Architecture & Application Core', amount: 999 });
-      breakdown.push({ item: 'Responsive Frontend, State & API Integration', amount: 500 });
-    } else if (subService === 'MOBILE_APP') {
-      basePrice = 1699;
-      serviceLabel = 'App Development: Mobile App Sprint';
-      breakdown.push({ item: 'Cross-Platform React Native Architecture', amount: 1199 });
-      breakdown.push({ item: 'App Store / Play Store Build Pipeline', amount: 500 });
-    } else if (subService === 'API_BACKEND') {
-      basePrice = 1299;
-      serviceLabel = 'App Development: Scalable API & Backend Sprint';
-      breakdown.push({ item: 'Relational Schema, Indexing & Authentication Engine', amount: 799 });
-      breakdown.push({ item: 'RESTful API Endpoints & Telemetry Testing', amount: 500 });
+    if (subService === 'WEB_APP' || subService === 'MVP_DEVELOPMENT') {
+      basePrice = 1500;
+      serviceLabel = 'App Development: MVP Development Sprint';
+      breakdown.push({ item: 'POC + V1 turnkey full-stack application core', amount: 1500 });
+    } else if (subService === 'MOBILE_APP' || subService === 'CLICKABLE_PROTOTYPE') {
+      basePrice = 199;
+      serviceLabel = 'App Development: Clickable App Prototype Sprint';
+      breakdown.push({ item: 'Interactive mobile & web prototype', amount: 199 });
+    } else if (subService === 'API_BACKEND' || subService === 'TECHNICAL_DISCOVERY') {
+      basePrice = 49;
+      serviceLabel = 'App Development: Technical Discovery Sprint';
+      breakdown.push({ item: 'System architecture blueprint & data schema', amount: 49 });
     } else {
-      basePrice = 1499;
+      basePrice = 1500;
       serviceLabel = 'App Development Sprint';
-      breakdown.push({ item: 'Turnkey Software Engineering Sprint', amount: 1499 });
+      breakdown.push({ item: 'Software Engineering MVP Sprint', amount: 1500 });
     }
   } else if (serviceType === 'BUNDLE' || serviceType === 'CUSTOM_BUNDLE') {
-    basePrice = 1299;
+    let customSum = 0;
+    if (typeof requirements.totalPrice === 'number' && requirements.totalPrice > 0) {
+      customSum = requirements.totalPrice;
+    } else if (Array.isArray(selectedServices) && selectedServices.length > 0) {
+      selectedServices.forEach((s) => {
+        customSum += INDIVIDUAL_PRICES[s] || INDIVIDUAL_PRICES[s.key] || 10;
+      });
+    }
+    basePrice = customSum > 0 ? customSum : 99;
     serviceLabel = 'Specialist Bundle Sprint';
-    const count = Array.isArray(selectedServices) && selectedServices.length > 0 ? selectedServices.length : 1;
-    breakdown.push({ item: `Selected Multi-Service Bundle (${count} Services Included)`, amount: 1299 });
+    breakdown.push({ item: `Selected Multi-Service Bundle`, amount: basePrice });
   }
 
   return {

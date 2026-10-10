@@ -30,10 +30,10 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Company Boost: Strategic Plan Sprint',
     accentColor: '#EC4899',
     accentBg: '#FDF2F8',
-    price: 799,
+    price: 19,
     breakdown: [
-      { item: 'Market & Positioning Architecture', amount: 499 },
-      { item: 'Outbound Playbook & Growth Sequencing', amount: 300 },
+      { item: 'Market & Positioning Architecture (3 months plan)', amount: 10 },
+      { item: 'Outbound Playbook & Growth Sequencing', amount: 9 },
     ],
   },
   'content-creator': {
@@ -45,10 +45,10 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Company Boost: Content Production Sprint',
     accentColor: '#F43F5E',
     accentBg: '#FFF1F2',
-    price: 799,
+    price: 29,
     breakdown: [
-      { item: 'Branded Poster & Visual Creative Assets', amount: 399 },
-      { item: 'High-Definition Product Showcase Video', amount: 400 },
+      { item: 'Branded Posters (2 posters + 1 branding)', amount: 15 },
+      { item: 'Reels & Visual Creative Assets (3 reels)', amount: 14 },
     ],
   },
   'devrel': {
@@ -60,10 +60,10 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Company Boost: DevRel Strategy Sprint',
     accentColor: '#8B5CF6',
     accentBg: '#F5F3FF',
-    price: 799,
+    price: 49,
     breakdown: [
-      { item: 'Developer Ecosystem & Documentation Audit', amount: 499 },
-      { item: 'Technical Community & Outreach Roadmap', amount: 300 },
+      { item: 'Developer Ecosystem & Documentation Audit', amount: 25 },
+      { item: 'Community, content creation & developer feedback', amount: 24 },
     ],
   },
   'gtm': {
@@ -75,10 +75,10 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Company Boost: GTM Strategy Sprint',
     accentColor: '#10B981',
     accentBg: '#ECFDF5',
-    price: 799,
+    price: 19,
     breakdown: [
-      { item: 'GTM Launch Playbook & Channel Distribution Roadmap', amount: 499 },
-      { item: 'GTM Strategy Brochure & Collateral Deck', amount: 300 },
+      { item: 'GTM Launch Playbook & 2 Months Reach Plan', amount: 10 },
+      { item: 'GTM Strategy Brochure & Collateral Deck', amount: 9 },
     ],
   },
   'gtm-strategy': {
@@ -90,10 +90,10 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Company Boost: GTM Strategy Sprint',
     accentColor: '#10B981',
     accentBg: '#ECFDF5',
-    price: 799,
+    price: 19,
     breakdown: [
-      { item: 'GTM Launch Playbook & Channel Distribution Roadmap', amount: 499 },
-      { item: 'GTM Strategy Brochure & Collateral Deck', amount: 300 },
+      { item: 'GTM Launch Playbook & 2 Months Reach Plan', amount: 10 },
+      { item: 'GTM Strategy Brochure & Collateral Deck', amount: 9 },
     ],
   },
   'ad-creatives': {
@@ -105,10 +105,10 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Company Boost: Ad Creatives Sprint',
     accentColor: '#EF4444',
     accentBg: '#FEF2F2',
-    price: 799,
+    price: 10,
     breakdown: [
-      { item: 'Multi-Format Visual Ad Creative Pack (1:1, 9:16, 16:9)', amount: 499 },
-      { item: 'Ad Copy Angles & Creative Testing Matrix', amount: 300 },
+      { item: 'Visual Ad Creative Pack (4 posters + boosting)', amount: 6 },
+      { item: 'Ad Copy Angles & Creative Testing Matrix', amount: 4 },
     ],
   },
   'brand-identity': {
@@ -120,10 +120,10 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Company Boost: Brand Identity Sprint',
     accentColor: '#3B82F6',
     accentBg: '#EFF6FF',
-    price: 799,
+    price: 5,
     breakdown: [
-      { item: 'Brand Architecture & Identity Guidelines', amount: 499 },
-      { item: 'Tone of Voice Playbook & Narrative Matrix', amount: 300 },
+      { item: 'Platforms access like Meta + Instagram + Facebook', amount: 3 },
+      { item: 'Brand Guidelines & Narrative Matrix', amount: 2 },
     ],
   },
   'custom-boosting': {
@@ -135,9 +135,9 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Custom Scope Growth Sprint',
     accentColor: '#7C3AED',
     accentBg: '#F5F3FF',
-    price: 799,
+    price: 19,
     breakdown: [
-      { item: 'Custom Multidisciplinary Scope (Configured Service Areas)', amount: 799 },
+      { item: 'Custom Multidisciplinary Scope (Configured Service Areas)', amount: 19 },
     ],
   },
   'lead-research': {
@@ -149,10 +149,10 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Digitalising: Target Lead Research Sprint',
     accentColor: '#7C3AED',
     accentBg: '#EDE9FE',
-    price: 499,
+    price: 2,
     breakdown: [
-      { item: 'Prospecting & Profile Discovery (50 Verified Leads)', amount: 349 },
-      { item: 'Direct Contact & Decision-Maker Verification', amount: 150 },
+      { item: 'Prospecting & Lead Study ($2 per lead)', amount: 1 },
+      { item: 'Direct Contact & Pitch Deck Verification', amount: 1 },
     ],
   },
   'company-study': {
@@ -164,10 +164,9 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Digitalising: Company Study Dossier Sprint',
     accentColor: '#6366F1',
     accentBg: '#EEF2FF',
-    price: 699,
+    price: 1,
     breakdown: [
-      { item: 'Account Architecture & Intelligence Mining', amount: 449 },
-      { item: 'Executive Briefing Dossier & Strategic Signals', amount: 250 },
+      { item: 'Personal Company Study & Org Architecture', amount: 1 },
     ],
   },
   'key-people': {
@@ -179,10 +178,10 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Digitalising: Key People Research Sprint',
     accentColor: '#0EA5E9',
     accentBg: '#F0F9FF',
-    price: 599,
+    price: 2,
     breakdown: [
-      { item: 'Executive Mapping & Hierarchy Verification', amount: 399 },
-      { item: 'Direct Channel Contact Signals & Verified Details', amount: 200 },
+      { item: 'Key Profile Mapping & Hierarchy', amount: 1 },
+      { item: 'Direct Mail Contact Signals', amount: 1 },
     ],
   },
   'pitch-support': {
@@ -194,10 +193,10 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Digitalising: Pitch Support & Narrative Sprint',
     accentColor: '#0284C7',
     accentBg: '#E0F2FE',
-    price: 799,
+    price: 2,
     breakdown: [
-      { item: 'Core Narrative & Objection Engineering', amount: 499 },
-      { item: 'Collateral & Pitch Deck Optimization', amount: 300 },
+      { item: 'Pitch Support & Core Narrative', amount: 1 },
+      { item: 'Competitor Analysis & Objection Engineering', amount: 1 },
     ],
   },
   'custom-digitalising': {
@@ -209,9 +208,9 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Custom Scope Growth Sprint',
     accentColor: '#7C3AED',
     accentBg: '#F5F3FF',
-    price: 799,
+    price: 2,
     breakdown: [
-      { item: 'Custom Multidisciplinary Scope (Configured Service Areas)', amount: 799 },
+      { item: 'Custom Multidisciplinary Scope (Configured Service Areas)', amount: 2 },
     ],
   },
   'custom': {
@@ -223,9 +222,9 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'Custom Multi-Service Sprint',
     accentColor: '#7C3AED',
     accentBg: '#F5F3FF',
-    price: 799,
+    price: 19,
     breakdown: [
-      { item: 'Custom Multi-Service Scope (Configured Service Modules)', amount: 799 },
+      { item: 'Custom Multi-Service Scope (Configured Service Modules)', amount: 19 },
     ],
   },
   'ui-ux-audit': {
@@ -237,10 +236,10 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'UI / Design: UI/UX Audit & Usability Sprint',
     accentColor: '#0284C7',
     accentBg: '#F0F9FF',
-    price: 499,
+    price: 19,
     breakdown: [
-      { item: 'Heuristic Evaluation & Usability Diagnostics', amount: 299 },
-      { item: 'Annotated Interface Review & Severity Matrix', amount: 200 },
+      { item: 'Mock screens + prototype review diagnostics', amount: 10 },
+      { item: 'Heuristic Evaluation & Severity Matrix', amount: 9 },
     ],
   },
   'figma-project': {
@@ -252,27 +251,46 @@ const SERVICE_CONFIGS = {
     serviceLabel: 'UI / Design: Figma Component System Sprint',
     accentColor: '#8B5CF6',
     accentBg: '#F5F3FF',
-    price: 599,
+    price: 9,
     breakdown: [
-      { item: 'Design System & Component Token Architecture', amount: 399 },
-      { item: 'Production-Ready Interactive Frames & Layouts', amount: 200 },
+      { item: 'Mock screens + prototype components', amount: 5 },
+      { item: 'Design System & Component Token Specs', amount: 4 },
     ],
   },
   'redesign-request': {
     serviceType: 'LANDING_PAGE',
     subService: 'REDESIGN_REQUEST',
     channel: 'design',
-    badge: 'INTERFACE REDESIGN SPRINT',
+    badge: 'LANDING PAGE REDESIGN SPRINT',
     categoryLabel: 'UI/Design Service',
-    serviceLabel: 'UI / Design: Full Page Redesign Sprint',
+    serviceLabel: 'UI / Design: Landing Page Redesign Sprint',
     accentColor: '#EC4899',
     accentBg: '#FDF2F8',
-    price: 599,
+    price: 59,
     breakdown: [
-      { item: 'High-Impact Hero & Conversion Layout Architecture', amount: 399 },
-      { item: 'Production Component Specs & Before/After Deck', amount: 200 },
+      { item: 'High-Impact Hero & Conversion Layout Architecture', amount: 39 },
+      { item: 'Production Component Specs & Before/After Deck', amount: 20 },
     ],
   },
+};
+
+const CUSTOM_SERVICE_PRICES = {
+  strategicPlan: 19,
+  content: 29,
+  brandIdentity: 5,
+  adCreatives: 10,
+  gtm: 19,
+  devrel: 49,
+  leadResearch: 2,
+  companyStudy: 1,
+  keyPeople: 2,
+  pitchSupport: 2,
+  uiUxAudit: 19,
+  figmaProject: 9,
+  redesignRequest: 59,
+  apiBackend: 49,
+  mobileApp: 199,
+  webApp: 1500,
 };
 
 export default function NewRequestModal({
@@ -620,12 +638,30 @@ export default function NewRequestModal({
       setStep(3);
     } catch (err) {
       console.warn('Backend price calculation fallback to local config:', err);
+      let fallbackPrice = currentConfig.price;
+      let fallbackBreakdown = currentConfig.breakdown;
+
+      if (activeServiceId.startsWith('custom')) {
+        const dynamicSum = Object.entries(customForm.selectedServices).reduce((sum, [k, v]) => {
+          return v ? sum + (CUSTOM_SERVICE_PRICES[k] || 0) : sum;
+        }, 0);
+        if (dynamicSum > 0) {
+          fallbackPrice = dynamicSum;
+          fallbackBreakdown = Object.entries(customForm.selectedServices)
+            .filter(([_, v]) => v)
+            .map(([k]) => ({
+              item: k,
+              amount: CUSTOM_SERVICE_PRICES[k] || 0,
+            }));
+        }
+      }
+
       setServerPriceData({
-        price: currentConfig.price,
+        price: fallbackPrice,
         currency: 'USD',
         pricingStatus: 'CONFIGURED',
         serviceLabel: currentConfig.serviceLabel,
-        breakdown: currentConfig.breakdown,
+        breakdown: fallbackBreakdown,
       });
       setStep(3);
     } finally {
@@ -643,9 +679,13 @@ export default function NewRequestModal({
         return { ...devrelForm, serviceId: activeServiceId };
       case 'custom':
       case 'custom-boosting':
-      case 'custom-digitalising':
+      case 'custom-digitalising': {
+        const dynamicSum = Object.entries(customForm.selectedServices).reduce((sum, [k, v]) => {
+          return v ? sum + (CUSTOM_SERVICE_PRICES[k] || 0) : sum;
+        }, 0);
         return {
           ...customForm,
+          totalPrice: customForm.totalPrice || (dynamicSum > 0 ? dynamicSum : 19),
           serviceId: activeServiceId,
           contentDetails: customForm.selectedServices.content ? contentForm : undefined,
           devrelDetails: customForm.selectedServices.devrel ? devrelForm : undefined,
@@ -657,6 +697,7 @@ export default function NewRequestModal({
           pitchSupportDetails: customForm.selectedServices.pitchSupport ? pitchSupportForm : undefined,
           strategicPlanDetails: customForm.selectedServices.strategicPlan ? strategicForm : undefined,
         };
+      }
       case 'gtm':
       case 'gtm-strategy':
         return { ...gtmForm, serviceId: activeServiceId };
@@ -1421,19 +1462,34 @@ export default function NewRequestModal({
                       <label style={{ ...labelStyle, marginBottom: 0 }}>
                         SELECT WHAT YOU NEED: <span style={{ color: '#EF4444' }}>*</span>
                       </label>
-                      <span
-                        style={{
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          color: '#7C3AED',
-                          backgroundColor: '#F5F3FF',
-                          padding: '3px 10px',
-                          borderRadius: '9999px',
-                          border: '1px solid #DDD4FA',
-                        }}
-                      >
-                        {Object.values(customForm.selectedServices).filter(Boolean).length} Services Selected
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span
+                          style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: '#7C3AED',
+                            backgroundColor: '#F5F3FF',
+                            padding: '3px 10px',
+                            borderRadius: '9999px',
+                            border: '1px solid #DDD4FA',
+                          }}
+                        >
+                          {Object.values(customForm.selectedServices).filter(Boolean).length} Services Selected
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            color: '#059669',
+                            backgroundColor: '#ECFDF5',
+                            padding: '3px 10px',
+                            borderRadius: '9999px',
+                            border: '1px solid #A7F3D0',
+                          }}
+                        >
+                          Est: ${Object.entries(customForm.selectedServices).reduce((sum, [k, v]) => v ? sum + (CUSTOM_SERVICE_PRICES[k] || 0) : sum, 0).toLocaleString()} USD
+                        </span>
+                      </div>
                     </div>
 
                     {/* Filter Tabs */}
@@ -1479,25 +1535,25 @@ export default function NewRequestModal({
                     >
                       {[
                         // Boosting
-                        { key: 'strategicPlan', category: 'boosting', label: 'Strategic Plan', sub: 'Positioning & ICP Roadmap', color: '#EC4899', bg: '#FDF2F8' },
-                        { key: 'content', category: 'boosting', label: 'Content Creator', sub: 'Branded Collateral & Videos', color: '#F43F5E', bg: '#FFF1F2' },
-                        { key: 'devrel', category: 'boosting', label: 'DevRel & Tech Advocacy', sub: 'Developer Relations Strategy', color: '#8B5CF6', bg: '#F5F3FF' },
-                        { key: 'gtm', category: 'boosting', label: 'GTM Strategy', sub: 'Go-To-Market & Launch Blueprints', color: '#10B981', bg: '#ECFDF5' },
-                        { key: 'adCreatives', category: 'boosting', label: 'Ad Creatives', sub: 'Multi-Format Visual Ads & Copy', color: '#EF4444', bg: '#FEF2F2' },
-                        { key: 'brandIdentity', category: 'boosting', label: 'Brand Identity', sub: 'Visual Language & Guidelines', color: '#3B82F6', bg: '#EFF6FF' },
+                        { key: 'strategicPlan', category: 'boosting', label: 'Strategic Planner', sub: '3 months plan', price: 19, color: '#EC4899', bg: '#FDF2F8' },
+                        { key: 'content', category: 'boosting', label: 'Content Creator', sub: '2 posters + 3 reels + 1 branding', price: 29, color: '#F43F5E', bg: '#FFF1F2' },
+                        { key: 'brandIdentity', category: 'boosting', label: 'Brand Identity', sub: 'Meta + Insta + FB platforms access', price: 5, color: '#3B82F6', bg: '#EFF6FF' },
+                        { key: 'adCreatives', category: 'boosting', label: 'Ad Creatives', sub: '4 posters + boosting angles', price: 10, color: '#EF4444', bg: '#FEF2F2' },
+                        { key: 'gtm', category: 'boosting', label: 'GTM Strategy', sub: '2 months reach plan', price: 19, color: '#10B981', bg: '#ECFDF5' },
+                        { key: 'devrel', category: 'boosting', label: 'DevRel', sub: 'Community + content + feedback', price: 49, color: '#8B5CF6', bg: '#F5F3FF' },
                         // Digitalising
-                        { key: 'leadResearch', category: 'digitalising', label: 'Lead Research', sub: 'Target Verified Lead Telemetry', color: '#7C3AED', bg: '#EDE9FE' },
-                        { key: 'companyStudy', category: 'digitalising', label: 'Company Study', sub: 'Comprehensive Account Dossier', color: '#6366F1', bg: '#EEF2FF' },
-                        { key: 'keyPeople', category: 'digitalising', label: 'Key People Research', sub: 'Executive Hierarchy & Contacts', color: '#0EA5E9', bg: '#F0F9FF' },
-                        { key: 'pitchSupport', category: 'digitalising', label: 'Pitch Support', sub: 'Narrative & Objection Handling', color: '#10B981', bg: '#ECFDF5' },
+                        { key: 'leadResearch', category: 'digitalising', label: 'Lead Research', sub: 'Lead study + pitch deck ($2 per lead)', price: 2, color: '#7C3AED', bg: '#EDE9FE' },
+                        { key: 'companyStudy', category: 'digitalising', label: 'Company Study', sub: 'Personal company study', price: 1, color: '#6366F1', bg: '#EEF2FF' },
+                        { key: 'keyPeople', category: 'digitalising', label: 'Key People Research', sub: 'Key profile + direct mail', price: 2, color: '#0EA5E9', bg: '#F0F9FF' },
+                        { key: 'pitchSupport', category: 'digitalising', label: 'Pitch Support', sub: 'Pitch + competitor analysis', price: 2, color: '#10B981', bg: '#ECFDF5' },
                         // UI / Design
-                        { key: 'uiUxAudit', category: 'design', label: 'UI/UX Audit', sub: 'Heuristic Review & Usability', color: '#0284C7', bg: '#F0F9FF' },
-                        { key: 'figmaProject', category: 'design', label: 'Figma Project', sub: 'Component Library & UI Kit', color: '#7C3AED', bg: '#FAF5FF' },
-                        { key: 'redesignRequest', category: 'design', label: 'Redesign Request', sub: 'Full Page Layout Redesign', color: '#EC4899', bg: '#FDF2F8' },
+                        { key: 'uiUxAudit', category: 'design', label: 'UI/UX Audit', sub: 'Mock screens + prototype review', price: 19, color: '#0284C7', bg: '#F0F9FF' },
+                        { key: 'figmaProject', category: 'design', label: 'Figma Project', sub: 'Mock screens + prototype UI kit', price: 9, color: '#7C3AED', bg: '#FAF5FF' },
+                        { key: 'redesignRequest', category: 'design', label: 'Landing Page Redesign', sub: 'Full page redesign & conversion overhaul', price: 59, color: '#EC4899', bg: '#FDF2F8' },
                         // App Development
-                        { key: 'webApp', category: 'development', label: 'Web Application MVP', sub: 'Turnkey Full-Stack Application', color: '#10B981', bg: '#ECFDF5' },
-                        { key: 'mobileApp', category: 'development', label: 'Mobile App', sub: 'Cross-Platform React Native App', color: '#6366F1', bg: '#EEF2FF' },
-                        { key: 'apiBackend', category: 'development', label: 'API & Backend Systems', sub: 'Scalable Architecture & APIs', color: '#0EA5E9', bg: '#F0F9FF' },
+                        { key: 'apiBackend', category: 'development', label: 'Technical Discovery', sub: 'Architecture & schema planning', price: 49, color: '#6366F1', bg: '#EEF2FF' },
+                        { key: 'mobileApp', category: 'development', label: 'Clickable App Prototype', sub: 'Interactive clickable prototype', price: 199, color: '#0D9488', bg: '#F0FDFA' },
+                        { key: 'webApp', category: 'development', label: 'MVP Development', sub: 'POC + V1 turnkey application', price: 1500, color: '#059669', bg: '#ECFDF5' },
                       ]
                         .filter((s) => customModalTab === 'all' || s.category === customModalTab)
                         .map((srv) => {
@@ -1529,8 +1585,23 @@ export default function NewRequestModal({
                                 {isChecked ? <CheckSquare size={16} color="#7C3AED" /> : <Square size={16} color="#9CA3AF" />}
                               </div>
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: isChecked ? '#6D28D9' : '#111827' }}>
-                                  {srv.label}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.875rem', fontWeight: 700, color: isChecked ? '#6D28D9' : '#111827' }}>
+                                    {srv.label}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: '0.72rem',
+                                      fontWeight: 800,
+                                      color: isChecked ? '#7C3AED' : '#059669',
+                                      backgroundColor: isChecked ? '#EDE9FE' : '#ECFDF5',
+                                      padding: '2px 7px',
+                                      borderRadius: '6px',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    ${srv.price.toLocaleString()}
+                                  </span>
                                 </div>
                                 <div style={{ fontSize: '0.72rem', color: '#6B7280', marginTop: '2px' }}>
                                   {srv.sub}

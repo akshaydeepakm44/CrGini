@@ -16,91 +16,225 @@ import {
   Presentation,
   Clock,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Palette,
+  Code2,
+  Smartphone,
+  Terminal,
+  Globe
 } from 'lucide-react';
 
 /**
  * CustomPage Component
  * Dedicated full page for Custom Requests located after Pitch Support under Digitalising.
- * Faithfully implements the uploaded Custom Request functionality strictly in the application light theme.
+ * Faithfully implements the uploaded Custom Request functionality with dynamic real-time price updates.
  */
 export default function CustomPage({ onRequestService, onNavigate }) {
-  // Service selection state matching user mockup
+  // Service selection state matching all individual services
   const [selectedServices, setSelectedServices] = useState({
     strategicPlan: true,
     content: true,
+    brandIdentity: false,
+    adCreatives: false,
+    gtm: false,
     devrel: false,
     leadResearch: false,
     companyStudy: false,
     keyPeople: false,
     pitchSupport: false,
+    uiUxAudit: false,
+    figmaProject: false,
+    redesign: false,
+    technicalDiscovery: false,
+    clickablePrototype: false,
+    webApp: false,
   });
 
-  const [activeTab, setActiveTab] = useState('all'); // 'all', 'boosting', 'digitalising'
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'boosting', 'digitalising', 'design', 'development'
   const [customRequirements, setCustomRequirements] = useState('');
 
   const servicesList = [
+    // Boosting
     {
       key: 'strategicPlan',
+      serviceSlug: 'strategic-planner',
       category: 'boosting',
-      label: 'Strategic Plan',
-      sub: 'Positioning & ICP Roadmap',
+      label: 'Strategic Planner',
+      sub: '3 months growth & positioning plan',
+      price: 19,
       icon: Compass,
       color: '#EC4899',
       bg: '#FDF2F8',
     },
     {
       key: 'content',
+      serviceSlug: 'content-creator',
       category: 'boosting',
-      label: 'Content for Your Company',
-      sub: 'Branded Posters & Demo Videos',
+      label: 'Content Creator',
+      sub: '2 posters + 3 reels + 1 branding',
+      price: 29,
       icon: PenTool,
       color: '#F43F5E',
       bg: '#FFF1F2',
     },
     {
-      key: 'devrel',
+      key: 'brandIdentity',
+      serviceSlug: 'brand-identity',
       category: 'boosting',
-      label: 'DevRel Plan',
-      sub: 'Developer Relations Strategy',
+      label: 'Brand Identity',
+      sub: 'Platforms access like Meta + Insta + FB',
+      price: 5,
+      icon: ShieldCheck,
+      color: '#3B82F6',
+      bg: '#EFF6FF',
+    },
+    {
+      key: 'adCreatives',
+      serviceSlug: 'ad-creatives',
+      category: 'boosting',
+      label: 'Ad Creatives',
+      sub: '4 posters + boosting angles',
+      price: 10,
+      icon: Sparkles,
+      color: '#EF4444',
+      bg: '#FEF2F2',
+    },
+    {
+      key: 'gtm',
+      serviceSlug: 'gtm',
+      category: 'boosting',
+      label: 'GTM Strategy',
+      sub: '2 months reach distribution plan',
+      price: 19,
+      icon: Target,
+      color: '#10B981',
+      bg: '#ECFDF5',
+    },
+    {
+      key: 'devrel',
+      serviceSlug: 'devrel',
+      category: 'boosting',
+      label: 'DevRel',
+      sub: 'Community + content + developer feedback',
+      price: 49,
       icon: Code,
       color: '#8B5CF6',
       bg: '#F5F3FF',
     },
+
+    // Digitalising
     {
       key: 'leadResearch',
+      serviceSlug: 'lead-research',
       category: 'digitalising',
       label: 'Lead Research',
-      sub: 'Target Verified Lead Telemetry',
+      sub: 'Lead study + pitch deck ($2 per lead)',
+      price: 2,
       icon: Target,
       color: '#7C3AED',
       bg: '#EDE9FE',
     },
     {
       key: 'companyStudy',
+      serviceSlug: 'company-study',
       category: 'digitalising',
       label: 'Company Study',
-      sub: 'Comprehensive Account Dossier',
+      sub: 'Personal company study & tech audit',
+      price: 1,
       icon: Building2,
       color: '#6366F1',
       bg: '#EEF2FF',
     },
     {
       key: 'keyPeople',
+      serviceSlug: 'key-people',
       category: 'digitalising',
       label: 'Key People Research',
-      sub: 'Executive Hierarchy & Contacts',
+      sub: 'Key profile + direct mail',
+      price: 2,
       icon: Users,
       color: '#0EA5E9',
       bg: '#F0F9FF',
     },
     {
       key: 'pitchSupport',
+      serviceSlug: 'pitch-support',
       category: 'digitalising',
       label: 'Pitch Support',
-      sub: 'Narrative & Objection Handling',
+      sub: 'Pitch + competitor analysis',
+      price: 2,
       icon: Presentation,
       color: '#10B981',
+      bg: '#ECFDF5',
+    },
+
+    // UI / Design
+    {
+      key: 'uiUxAudit',
+      serviceSlug: 'ui-ux-audit',
+      category: 'design',
+      label: 'UI/UX Audit',
+      sub: 'Mock screens + prototype review',
+      price: 19,
+      icon: Palette,
+      color: '#0284C7',
+      bg: '#F0F9FF',
+    },
+    {
+      key: 'figmaProject',
+      serviceSlug: 'figma-project',
+      category: 'design',
+      label: 'Figma Project',
+      sub: 'Mock screens + prototype components',
+      price: 9,
+      icon: Palette,
+      color: '#7C3AED',
+      bg: '#FAF5FF',
+    },
+    {
+      key: 'redesign',
+      serviceSlug: 'redesign-request',
+      category: 'design',
+      label: 'Landing Page Redesign',
+      sub: 'Full page redesign & conversion overhaul',
+      price: 59,
+      icon: Palette,
+      color: '#EC4899',
+      bg: '#FDF2F8',
+    },
+
+    // App Development
+    {
+      key: 'technicalDiscovery',
+      serviceSlug: 'technical-discovery',
+      category: 'development',
+      label: 'Technical Discovery',
+      sub: 'Architecture blueprint & data schema',
+      price: 49,
+      icon: Terminal,
+      color: '#6366F1',
+      bg: '#EEF2FF',
+    },
+    {
+      key: 'clickablePrototype',
+      serviceSlug: 'clickable-prototype',
+      category: 'development',
+      label: 'Clickable App Prototype',
+      sub: 'Interactive mobile & web prototype',
+      price: 199,
+      icon: Smartphone,
+      color: '#0D9488',
+      bg: '#F0FDFA',
+    },
+    {
+      key: 'webApp',
+      serviceSlug: 'web-app',
+      category: 'development',
+      label: 'MVP Development',
+      sub: 'POC + V1 turnkey full-stack application',
+      price: 1500,
+      icon: Globe,
+      color: '#059669',
       bg: '#ECFDF5',
     },
   ];
@@ -117,12 +251,16 @@ export default function CustomPage({ onRequestService, onNavigate }) {
   };
 
   const selectedCount = Object.values(selectedServices).filter(Boolean).length;
+  const selectedTotalPrice = servicesList.reduce((acc, s) => {
+    return selectedServices[s.key] ? acc + (s.price || 0) : acc;
+  }, 0);
 
   const handleConfigureCustom = () => {
     if (onRequestService) {
       onRequestService('custom', {
         selectedServices,
         requirements: customRequirements,
+        totalPrice: selectedTotalPrice,
       });
     }
   };
@@ -337,17 +475,17 @@ export default function CustomPage({ onRequestService, onNavigate }) {
                 fontWeight: 700,
               }}
             >
-              PRICING MODEL
+              ESTIMATED TOTAL
             </div>
             <div
               style={{
-                fontSize: '0.9375rem',
+                fontSize: '1.25rem',
                 fontWeight: 800,
                 color: '#7C3AED',
                 marginTop: '2px',
               }}
             >
-              Pricing based on scope
+              ${selectedTotalPrice.toLocaleString()}
             </div>
           </div>
         </div>
@@ -360,12 +498,15 @@ export default function CustomPage({ onRequestService, onNavigate }) {
             gap: '8px',
             marginTop: '20px',
             marginBottom: '16px',
+            flexWrap: 'wrap',
           }}
         >
           {[
             { id: 'all', label: 'All Services' },
             { id: 'boosting', label: 'Boosting Sprints' },
             { id: 'digitalising', label: 'Digitalising Intelligence' },
+            { id: 'design', label: 'UI / Design' },
+            { id: 'development', label: 'App Development' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -468,9 +609,24 @@ export default function CustomPage({ onRequestService, onNavigate }) {
                           fontSize: '0.925rem',
                           fontWeight: 700,
                           color: isChecked ? '#6D28D9' : '#111827',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
                         }}
                       >
-                        {srv.label}
+                        <span>{srv.label}</span>
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '6px',
+                            backgroundColor: isChecked ? '#EDE9FE' : '#F3F4F6',
+                            color: isChecked ? '#6D28D9' : '#4B5563',
+                          }}
+                        >
+                          ${srv.price.toLocaleString()}
+                        </span>
                       </div>
                       <div
                         style={{
@@ -561,7 +717,7 @@ export default function CustomPage({ onRequestService, onNavigate }) {
           }}
         >
           <div style={{ fontSize: '0.84375rem', color: '#6B7280' }}>
-            <strong style={{ color: '#111827' }}>{selectedCount}</strong> {selectedCount === 1 ? 'service area' : 'service areas'} selected • Pricing calculated dynamically upon review
+            <strong style={{ color: '#111827' }}>{selectedCount}</strong> {selectedCount === 1 ? 'service area' : 'service areas'} selected • Total: <strong style={{ color: '#7C3AED' }}>${selectedTotalPrice.toLocaleString()}</strong>
           </div>
 
           <button
