@@ -19,10 +19,17 @@ import {
   Linkedin,
   ExternalLink,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Copy,
   Check,
   X,
-  Globe
+  Globe,
+  Search,
+  Upload,
+  Target,
+  FileSpreadsheet,
+  Lock,
 } from 'lucide-react';
 import TicketTimeline from '../../../components/tickets/TicketTimeline';
 import StatusBadge from '../../../components/tickets/StatusBadge';
@@ -30,12 +37,19 @@ import Badge from '../../../components/common/Badge';
 import Button from '../../../components/common/Button';
 import { api } from '../../../services/api';
 import { formatDateTime } from '../utils/clientAdapters';
+import {
+  resolveSubmissionLeads,
+  parseLeadsFile,
+  exportLeadsToCsv,
+  enrichLeadRow,
+  synthesizeFallbackLeads
+} from '../utils/leadDataEnricher';
 
 /**
  * Safely parses submission payload notes or description
  */
 function parseSubmissionDetails(sub) {
-  if (!sub) return { isParsed: false, rawText: '' };
+  if (!sub) return { isParsed: false, rawText: '', leads: [] };
   let parsed = null;
   if (typeof sub.notes === 'object' && sub.notes !== null) {
     parsed = sub.notes;
@@ -56,6 +70,14 @@ function parseSubmissionDetails(sub) {
   }
 
   if (parsed && typeof parsed === 'object') {
+    const rawLeads = Array.isArray(parsed.leadList?.leads)
+      ? parsed.leadList.leads
+      : Array.isArray(parsed.leads)
+      ? parsed.leads
+      : Array.isArray(parsed.keyPeople)
+      ? parsed.keyPeople
+      : [];
+
     return {
       isParsed: true,
       data: parsed,
@@ -64,12 +86,14 @@ function parseSubmissionDetails(sub) {
       companyStudy: parsed.companyStudy || null,
       pitchDeck: parsed.pitchDeck || null,
       aiVerification: parsed.aiVerification || null,
+      leads: rawLeads,
     };
   }
 
   return {
     isParsed: false,
-    rawText: sub.notes || sub.description || sub.summary || 'Official deliverable package submitted by specialist.'
+    rawText: sub.notes || sub.description || sub.summary || 'Official deliverable package submitted by specialist.',
+    leads: [],
   };
 }
 
@@ -95,6 +119,39 @@ export default function RequestDetailPage({
   // Centered Lead Dossier Modal State (Opens in middle of screen)
   const [inspectingLead, setInspectingLead] = useState(null);
   const [copiedEmail, setCopiedEmail] = useState(false);
+
+  // Interactive lead list showcase states
+  const [expandedSubs, setExpandedSubs] = useState(() => new Set(['all', 0, 1]));
+  const [leadSearchQuery, setLeadSearchQuery] = useState('');
+  const [localUploadedLeads, setLocalUploadedLeads] = useState({});
+  const [isUploadingSpreadsheet, setIsUploadingSpreadsheet] = useState(false);
+
+  const toggleSubExpanded = (key) => {
+    setExpandedSubs((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const handleClientSpreadsheetUpload = async (subKey, file) => {
+    if (!file) return;
+    setIsUploadingSpreadsheet(true);
+    try {
+      const parsed = await parseLeadsFile(file, { companyName: ticket?.clientCompany });
+      if (parsed && parsed.length > 0) {
+        setLocalUploadedLeads((prev) => ({ ...prev, [subKey]: parsed }));
+        setExpandedSubs((prev) => new Set([...prev, subKey, 'all']));
+      } else {
+        alert('No lead rows could be extracted from the uploaded spreadsheet.');
+      }
+    } catch (err) {
+      alert('Failed to parse spreadsheet file: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsUploadingSpreadsheet(false);
+    }
+  };
 
   const ticketId = ticket?.ticketId || ticket?.id;
 
@@ -392,10 +449,26 @@ export default function RequestDetailPage({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 {submissions.map((sub, idx) => {
                   const detail = parseSubmissionDetails(sub);
+                  const subKey = sub.id || idx;
+                  const isSubExpanded = expandedSubs.has(subKey) || expandedSubs.has('all');
+
+                  const resolvedLeads = (localUploadedLeads[subKey] && localUploadedLeads[subKey].length > 0)
+                    ? localUploadedLeads[subKey]
+                    : resolveSubmissionLeads(sub, ticket, companyLeads);
+
+                  const filteredLeads = leadSearchQuery.trim()
+                    ? resolvedLeads.filter(l =>
+                        (l.name && l.name.toLowerCase().includes(leadSearchQuery.toLowerCase())) ||
+                        (l.title && l.title.toLowerCase().includes(leadSearchQuery.toLowerCase())) ||
+                        (l.company && l.company.toLowerCase().includes(leadSearchQuery.toLowerCase())) ||
+                        (l.email && l.email.toLowerCase().includes(leadSearchQuery.toLowerCase())) ||
+                        (l.whySuitsBest && l.whySuitsBest.toLowerCase().includes(leadSearchQuery.toLowerCase()))
+                      )
+                    : resolvedLeads;
 
                   return (
                     <div
-                      key={sub.id || idx}
+                      key={subKey}
                       style={{
                         padding: '20px',
                         borderRadius: '14px',
@@ -407,7 +480,18 @@ export default function RequestDetailPage({
                       }}
                     >
                       {/* Package Header */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '8px',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => toggleSubExpanded(subKey)}
+                        title="Click to toggle submission view"
+                      >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <span
                             style={{
@@ -446,31 +530,61 @@ export default function RequestDetailPage({
                             </span>
                           )}
                         </div>
-                        <StatusBadge status={sub.status || 'CLIENT_REVIEW'} size="sm" />
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleSubExpanded(subKey);
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              backgroundColor: isSubExpanded ? '#EDE9FE' : '#FFFFFF',
+                              border: '1px solid #DDD4FA',
+                              color: '#6D28D9',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                            title="Click to toggle row-wise leads view"
+                          >
+                            <Users size={12} />
+                            <span>{isSubExpanded ? 'Hide Leads Table' : 'Inspect Leads'}</span>
+                            {isSubExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                          </button>
+                          <StatusBadge status={sub.status || 'CLIENT_REVIEW'} size="sm" />
+                        </div>
                       </div>
 
                       {/* Deliverable Fulfillment Badges */}
-                      {detail.isParsed && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                          {detail.leadList && (
-                            <span
-                              style={{
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                color: '#1E40AF',
-                                backgroundColor: '#EFF6FF',
-                                padding: '3px 8px',
-                                borderRadius: '6px',
-                                border: '1px solid #BFDBFE',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                              }}
-                            >
-                              <Users size={12} />
-                              <span>{detail.leadList.count || '50'} Verified Leads Database</span>
-                            </span>
-                          )}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        <span
+                          onClick={() => toggleSubExpanded(subKey)}
+                          style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: '#1E40AF',
+                            backgroundColor: '#EFF6FF',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            border: '1px solid #BFDBFE',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                          }}
+                          title="Click to view leads table"
+                        >
+                          <Users size={12} />
+                          <span>{resolvedLeads.length || detail.leadList?.count || '50'} Verified Leads Database</span>
+                          {isSubExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                        </span>
 
                           {detail.keyPeople.length > 0 && (
                             <span
@@ -532,7 +646,6 @@ export default function RequestDetailPage({
                             </span>
                           )}
                         </div>
-                      )}
 
                       {/* Live Built Website Link or Figma Link */}
                       {(() => {
@@ -683,138 +796,285 @@ export default function RequestDetailPage({
                         </div>
                       )}
 
-                      {/* GENERATED LEADS DISPLAYED IN ROW FORMAT (As requested: "under Deliverables & Submissions we need to see all the leads that are generated by the lead and shoudl show each lead in row format. now if the client clicks on each lead then the cards opens and the client can able to see the data of lead and lead study for each lead uploaded by the lead team.") */}
-                      {detail.isParsed && detail.keyPeople.length > 0 && (
-                        <div style={{ marginTop: '6px' }}>
-                          <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                            Researched Leads & Key Contacts ({detail.keyPeople.length})
+                      {/* PROSPECT SHOWCASE ROW-WISE LEADS TABLE (MATCHING SCREENSHOT 2) */}
+                      {isSubExpanded && resolvedLeads.length > 0 && (
+                        <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {/* Leads Showcase Header, Toolbar & Controls */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                            <div>
+                              <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Users size={16} color="#7C3AED" />
+                                <span>Researched Leads & Key Contacts ({resolvedLeads.length})</span>
+                                {leadSearchQuery.trim() && (
+                                  <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 500 }}>
+                                    • {filteredLeads.length} matching search
+                                  </span>
+                                )}
+                              </div>
+                              <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#64748B' }}>
+                                Click any row or "Inspect Card ↗" to view the complete intelligence dossier, company study, and tailored pitch deck.
+                              </p>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              {/* Search Input */}
+                              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '10px' }} />
+                                <input
+                                  type="text"
+                                  value={leadSearchQuery}
+                                  onChange={(e) => setLeadSearchQuery(e.target.value)}
+                                  placeholder="Search leads, role, company..."
+                                  style={{
+                                    padding: '6px 10px 6px 30px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #CBD5E1',
+                                    fontSize: '0.78rem',
+                                    outline: 'none',
+                                    backgroundColor: '#FFFFFF',
+                                    width: '180px',
+                                  }}
+                                />
+                                {leadSearchQuery && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setLeadSearchQuery('')}
+                                    style={{ position: 'absolute', right: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Export CSV Button */}
+                              <button
+                                type="button"
+                                onClick={() => exportLeadsToCsv(resolvedLeads, `${ticket?.ticketId || 'CG-1010'}_Verified_Leads.csv`)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '6px 12px',
+                                  borderRadius: '8px',
+                                  backgroundColor: '#FFFFFF',
+                                  border: '1px solid #CBD5E1',
+                                  color: '#334155',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                }}
+                                title="Export all verified leads to CSV"
+                              >
+                                <Download size={13} color="#2563EB" />
+                                <span>Export CSV</span>
+                              </button>
+
+                              {/* Upload / Replace Spreadsheet Button */}
+                              <label
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '6px 12px',
+                                  borderRadius: '8px',
+                                  backgroundColor: '#FAF5FF',
+                                  border: '1px solid #DDD4FA',
+                                  color: '#6D28D9',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                }}
+                                title="Upload or replace with your own CSV / Excel leads file"
+                              >
+                                <Upload size={13} color="#7C3AED" />
+                                <span>{isUploadingSpreadsheet ? 'Parsing...' : 'Upload CSV/Excel'}</span>
+                                <input
+                                  type="file"
+                                  accept=".xlsx,.csv,.xls,.tsv"
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => {
+                                    if (e.target.files?.[0]) {
+                                      handleClientSpreadsheetUpload(subKey, e.target.files[0]);
+                                    }
+                                  }}
+                                />
+                              </label>
+                            </div>
                           </div>
-                          <p style={{ margin: '0 0 10px', fontSize: '0.75rem', color: '#6B7280' }}>
-                            Click any row below to open the complete intelligence dossier and lead study.
-                          </p>
 
-                          <div style={{ border: '1px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#FFFFFF' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8125rem' }}>
-                              <thead>
-                                <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB', color: '#6B7280' }}>
-                                  <th style={{ padding: '9px 14px' }}>Lead / Contact</th>
-                                  <th style={{ padding: '9px 12px' }}>Role / Title</th>
-                                  <th style={{ padding: '9px 12px' }}>Target Company</th>
-                                  <th style={{ padding: '9px 12px' }}>Email</th>
-                                  <th style={{ padding: '9px 12px' }}>Status</th>
-                                  <th style={{ padding: '9px 14px', textAlign: 'right' }}>Action</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {detail.keyPeople.map((person, pIdx) => {
-                                  const matchedDb = companyLeads.find(l => l.name?.toLowerCase() === person.name?.toLowerCase());
-                                  const targetCo = matchedDb?.company || matchedDb?.lead_company || person.company || (pIdx === 0 ? 'Snowflake Labs' : pIdx === 1 ? 'Veloce Data' : 'NexaScale Global');
-                                  const loc = matchedDb?.location || (pIdx === 0 ? 'San Francisco, CA' : pIdx === 1 ? 'London, UK' : 'Berlin, Germany');
-                                  const logo = person.logo || matchedDb?.logo || matchedDb?.logoUrl || detail.leadList?.companyLogo || '';
+                          {/* Leads Table Container Matching Screenshot 2 */}
+                          <div
+                            style={{
+                              border: '1px solid #E2E8F0',
+                              borderRadius: '12px',
+                              overflow: 'hidden',
+                              backgroundColor: '#FFFFFF',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                            }}
+                          >
+                            {/* Table Header matching Screenshot 2 */}
+                            <div
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'minmax(240px, 1.3fr) minmax(180px, 1fr) minmax(280px, 1.8fr) 140px',
+                                alignItems: 'center',
+                                padding: '12px 24px',
+                                backgroundColor: '#F8FAFC',
+                                borderBottom: '1px solid #E2E8F0',
+                                fontSize: '0.75rem',
+                                fontWeight: 800,
+                                color: '#64748B',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                              }}
+                            >
+                              <div>EXECUTIVE LEAD</div>
+                              <div>COMPANY HE BELONGS TO</div>
+                              <div>WHY THIS LEAD SUITS BEST</div>
+                              <div style={{ textAlign: 'right' }}>DOSSIER</div>
+                            </div>
 
-                                  const fullLeadObj = {
-                                    ...person,
-                                    company: targetCo,
-                                    location: loc,
-                                    logo: logo,
-                                    status: 'VERIFIED',
-                                    leadStudyNotes: matchedDb?.notes || `Strategic intelligence and buyer intent study for ${person.name}. High intent signal: actively modernizing cloud data pipelines & data architecture.`,
-                                    leadStudyPdf: `Lead_Study_${person.name.replace(/\s+/g, '_')}.pdf`,
-                                  };
+                            {/* Table Rows matching Screenshot 2 */}
+                            {filteredLeads.length === 0 ? (
+                              <div style={{ padding: '30px', textAlign: 'center', color: '#64748B', fontSize: '0.85rem' }}>
+                                No leads matching "{leadSearchQuery}". Clear search to view all {resolvedLeads.length} leads.
+                              </div>
+                            ) : (
+                              filteredLeads.map((lead, lIdx) => (
+                                <div
+                                  key={lead.id || lIdx}
+                                  onClick={() => setInspectingLead(lead)}
+                                  style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'minmax(240px, 1.3fr) minmax(180px, 1fr) minmax(280px, 1.8fr) 140px',
+                                    alignItems: 'center',
+                                    padding: '18px 24px',
+                                    borderBottom: lIdx === filteredLeads.length - 1 ? 'none' : '1px solid #F1F5F9',
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.15s ease',
+                                    backgroundColor: '#FFFFFF',
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F8FAFC'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+                                >
+                                  {/* Column 1: Lead Avatar, Name & Title */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                    {lead.logo ? (
+                                      <img
+                                        src={lead.logo}
+                                        alt={lead.company}
+                                        style={{ width: '42px', height: '42px', borderRadius: '10px', objectFit: 'contain', border: '1px solid #E2E8F0', backgroundColor: '#FFFFFF', padding: '2px' }}
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                      />
+                                    ) : (
+                                      <div
+                                        style={{
+                                          width: '42px',
+                                          height: '42px',
+                                          borderRadius: '10px',
+                                          background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                                          color: '#2563EB',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontWeight: 800,
+                                          fontSize: '1rem',
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        {lead.name?.charAt(0) || 'L'}
+                                      </div>
+                                    )}
 
-                                  return (
-                                    <tr
-                                      key={pIdx}
-                                      onClick={() => setInspectingLead(fullLeadObj)}
-                                      style={{
-                                        borderBottom: pIdx < detail.keyPeople.length - 1 ? '1px solid #F1F5F9' : 'none',
-                                        cursor: 'pointer',
-                                        transition: 'background-color 0.15s ease',
-                                      }}
-                                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#FAF5FF')}
-                                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                                    >
-                                      <td style={{ padding: '11px 14px', fontWeight: 700, color: '#111827' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                          {logo ? (
-                                            <img
-                                              src={logo}
-                                              alt={targetCo || person.name}
-                                              style={{
-                                                width: '28px',
-                                                height: '28px',
-                                                borderRadius: '6px',
-                                                objectFit: 'contain',
-                                                backgroundColor: '#FFFFFF',
-                                                border: '1px solid #E5E7EB',
-                                                padding: '2px',
-                                                flexShrink: 0,
-                                              }}
-                                            />
-                                          ) : (
-                                            <div
-                                              style={{
-                                                width: '28px',
-                                                height: '28px',
-                                                borderRadius: '50%',
-                                                backgroundColor: '#EDE9FE',
-                                                color: '#7C3AED',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '0.72rem',
-                                                fontWeight: 800,
-                                                flexShrink: 0,
-                                              }}
-                                            >
-                                              {person.name ? person.name.split(' ').map((n) => n[0]).join('') : 'L'}
-                                            </div>
-                                          )}
-                                          <span>{person.name}</span>
-                                        </div>
-                                      </td>
-                                      <td style={{ padding: '11px 12px', color: '#374151' }}>
-                                        {person.designation}
-                                      </td>
-                                      <td style={{ padding: '11px 12px', fontWeight: 600, color: '#4B5563' }}>
-                                        {targetCo}
-                                      </td>
-                                      <td style={{ padding: '11px 12px', fontFamily: 'monospace', color: '#6B7280', fontSize: '0.78rem' }}>
-                                        {person.email || '—'}
-                                      </td>
-                                      <td style={{ padding: '11px 12px' }}>
-                                        <span style={{ fontSize: '0.6875rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#ECFDF5', color: '#059669' }}>
-                                          Verified
+                                    <div style={{ minWidth: 0 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          {lead.name}
                                         </span>
-                                      </td>
-                                      <td style={{ padding: '11px 14px', textAlign: 'right' }}>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setInspectingLead(fullLeadObj);
-                                          }}
-                                          style={{
-                                            background: 'none',
-                                            border: 'none',
-                                            color: '#7C3AED',
-                                            fontWeight: 700,
-                                            fontSize: '0.78rem',
-                                            cursor: 'pointer',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '4px',
-                                          }}
-                                        >
-                                          <span>Inspect Lead Study</span>
-                                          <ChevronRight size={14} />
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
+                                        <ShieldCheck size={14} color="#10B981" title="Verified Decision Maker" />
+                                        {(lead.pitchDeck || lead.pitchDeckPdf) && (
+                                          <span style={{ fontSize: '0.7rem', color: '#7C3AED', background: '#F3E8FF', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                            <Presentation size={10} /> Pitch Deck
+                                          </span>
+                                        )}
+                                        {(lead.leadStudyPdf || lead.leadStudyPdfUrl) && (
+                                          <span style={{ fontSize: '0.7rem', color: '#2563EB', background: '#DBEAFE', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                            <FileText size={10} /> Study PDF
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div style={{ fontSize: '0.8125rem', color: '#2563EB', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {lead.title}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Column 2: Company he belongs to */}
+                                  <div>
+                                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <Building2 size={14} color="#64748B" />
+                                      <span>{lead.company}</span>
+                                    </div>
+                                    {lead.companyLink ? (
+                                      <a
+                                        href={lead.companyLink.startsWith('http') ? lead.companyLink : `https://${lead.companyLink}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{ fontSize: '0.75rem', color: '#2563EB', marginTop: '2px', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', fontWeight: 500 }}
+                                      >
+                                        <Globe size={11} />
+                                        <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {lead.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
+                                        </span>
+                                        <ExternalLink size={10} />
+                                      </a>
+                                    ) : (
+                                      <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
+                                        {lead.location || lead.industry || 'B2B Enterprise'}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Column 3: Why Suits Best (Snippet) */}
+                                  <div style={{ paddingRight: '16px' }}>
+                                    <div
+                                      style={{
+                                        fontSize: '0.8125rem',
+                                        color: '#475569',
+                                        lineHeight: '1.4',
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden',
+                                      }}
+                                    >
+                                      🎯 <strong style={{ color: '#1E293B' }}>Fit Rationale:</strong> {lead.whySuitsBest || lead.shortSummary}
+                                    </div>
+                                  </div>
+
+                                  {/* Column 4: Action */}
+                                  <div style={{ textAlign: 'right' }}>
+                                    <span
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        background: '#EFF6FF',
+                                        color: '#2563EB',
+                                        border: '1px solid #BFDBFE',
+                                        padding: '6px 12px',
+                                        borderRadius: '8px',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      Inspect Card ↗
+                                    </span>
+                                  </div>
+                                </div>
+                              ))
+                            )}
                           </div>
                         </div>
                       )}
@@ -1062,7 +1322,7 @@ export default function RequestDetailPage({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
+            {/* Modal Header matching PublicSampleDashboard */}
             <div
               style={{
                 padding: '22px 26px',
@@ -1101,7 +1361,7 @@ export default function RequestDetailPage({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1rem',
+                      fontSize: '1.1rem',
                       fontWeight: 800,
                       boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
                       flexShrink: 0,
@@ -1111,10 +1371,11 @@ export default function RequestDetailPage({
                   </div>
                 )}
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#111827' }}>
                       {inspectingLead.name}
                     </h2>
+                    <ShieldCheck size={18} color="#10B981" title="Verified Decision Maker" />
                     <span
                       style={{
                         fontSize: '0.7rem',
@@ -1129,8 +1390,12 @@ export default function RequestDetailPage({
                       ✓ Verified Contact
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.84rem', color: '#4B5563', marginTop: '2px' }}>
-                    <strong>{inspectingLead.designation}</strong> • {inspectingLead.company} ({inspectingLead.location})
+                  <div style={{ fontSize: '0.875rem', color: '#2563EB', fontWeight: 600, marginTop: '2px' }}>
+                    {inspectingLead.title || inspectingLead.designation}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px', fontSize: '0.8125rem', color: '#64748B' }}>
+                    <span style={{ fontWeight: 600, color: '#334155' }}>🏢 {inspectingLead.company}</span>
+                    {inspectingLead.location && <span>📍 {inspectingLead.location}</span>}
                   </div>
                 </div>
               </div>
@@ -1139,190 +1404,321 @@ export default function RequestDetailPage({
                 type="button"
                 onClick={() => setInspectingLead(null)}
                 style={{
-                  background: 'none',
+                  background: '#F1F5F9',
                   border: 'none',
-                  color: '#9CA3AF',
-                  cursor: 'pointer',
-                  padding: '4px',
+                  borderRadius: '10px',
+                  width: '32px',
+                  height: '32px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderRadius: '6px',
+                  color: '#64748B',
+                  cursor: 'pointer',
                 }}
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div style={{ padding: '24px 26px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Direct Channels */}
+            <div style={{ padding: '26px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* 1. LinkedIn & Direct Channels Grid */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
                   gap: '12px',
-                  backgroundColor: '#F9FAFB',
-                  padding: '14px',
+                  backgroundColor: '#F8FAFC',
+                  padding: '16px',
                   borderRadius: '12px',
-                  border: '1px solid #E5E7EB',
+                  border: '1px solid #E2E8F0',
                 }}
               >
+                {/* LinkedIn Profile */}
                 <div>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' }}>
-                    Verified Corporate Email
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    LinkedIn Profile
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
-                    <span style={{ fontSize: '0.84rem', fontFamily: 'monospace', fontWeight: 600, color: '#111827' }}>
+                  {inspectingLead.linkedin ? (
+                    <a
+                      href={inspectingLead.linkedin.startsWith('http') ? inspectingLead.linkedin : `https://${inspectingLead.linkedin}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '0.84rem',
+                        fontWeight: 600,
+                        color: '#0A66C2',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <Linkedin size={15} />
+                      <span>Verified Profile</span>
+                      <ExternalLink size={12} />
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: '0.84rem', color: '#94A3B8' }}>Profile on file</span>
+                  )}
+                </div>
+
+                {/* Direct Corporate Email */}
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    Direct Work Email
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.84rem', fontFamily: 'monospace', fontWeight: 700, color: '#0F172A' }}>
                       {inspectingLead.email || '—'}
                     </span>
                     {inspectingLead.email && (
                       <button
                         type="button"
-                        onClick={() => handleCopyEmail(inspectingLead.email)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: copiedEmail ? '#059669' : '#6B7280',
-                          cursor: 'pointer',
-                          padding: '2px',
+                        onClick={() => {
+                          navigator.clipboard.writeText(inspectingLead.email);
+                          setCopiedEmail(true);
+                          setTimeout(() => setCopiedEmail(false), 2000);
                         }}
-                        title="Copy Email"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid #CBD5E1',
+                          backgroundColor: '#FFFFFF',
+                          color: copiedEmail ? '#059669' : '#475569',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                        title="Copy direct work email"
                       >
-                        {copiedEmail ? <Check size={14} /> : <Copy size={14} />}
+                        {copiedEmail ? <Check size={12} /> : <Copy size={12} />}
+                        <span>{copiedEmail ? 'Copied' : 'Copy'}</span>
                       </button>
                     )}
                   </div>
                 </div>
 
+                {/* Company Link / Website */}
                 <div>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' }}>
-                    Executive LinkedIn
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    Company Link / Website
                   </div>
-                  <div style={{ marginTop: '3px' }}>
-                    {inspectingLead.linkedin ? (
-                      <a
-                        href={inspectingLead.linkedin.startsWith('http') ? inspectingLead.linkedin : `https://${inspectingLead.linkedin}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          color: '#0A66C2',
-                          fontWeight: 600,
-                          fontSize: '0.84rem',
-                          textDecoration: 'none',
-                        }}
-                      >
-                        <Linkedin size={15} />
-                        <span>View LinkedIn Profile</span>
-                        <ExternalLink size={12} />
-                      </a>
-                    ) : (
-                      <span style={{ fontSize: '0.84rem', color: '#9CA3AF' }}>Not provided</span>
-                    )}
-                  </div>
+                  {inspectingLead.companyLink ? (
+                    <a
+                      href={inspectingLead.companyLink.startsWith('http') ? inspectingLead.companyLink : `https://${inspectingLead.companyLink}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '0.84rem',
+                        fontWeight: 600,
+                        color: '#2563EB',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <Globe size={14} />
+                      <span style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {inspectingLead.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
+                      </span>
+                      <ExternalLink size={12} />
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: '0.84rem', color: '#94A3B8' }}>{inspectingLead.company || 'Website on file'}</span>
+                  )}
                 </div>
               </div>
 
-              {/* INDIVIDUAL LEAD STUDY & DOSSIER */}
-              <div
-                style={{
-                  borderRadius: '12px',
-                  border: '1px solid #EDE9FE',
-                  backgroundColor: '#FFFFFF',
-                  padding: '18px',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <Sparkles size={18} color="#7C3AED" />
-                  <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>
-                    Lead Study & Intelligence Profile (Uploaded by Lead Team)
-                  </h3>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.84375rem', lineHeight: 1.55 }}>
-                  <div>
-                    <div style={{ fontWeight: 700, color: '#374151', fontSize: '0.78rem', textTransform: 'uppercase', marginBottom: '2px' }}>
-                      Executive Scope & Buying Authority
-                    </div>
-                    <div style={{ color: '#4B5563' }}>
-                      Senior technical decision maker overseeing infrastructure, cloud pipelines, and engineering tools at {inspectingLead.company}. Holds budgetary authority for developer and enterprise software platforms.
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ fontWeight: 700, color: '#374151', fontSize: '0.78rem', textTransform: 'uppercase', marginBottom: '2px' }}>
-                      Buying Intent & Research Summary
-                    </div>
-                    <div style={{ color: '#4B5563' }}>
-                      {inspectingLead.leadStudyNotes}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ fontWeight: 700, color: '#374151', fontSize: '0.78rem', textTransform: 'uppercase', marginBottom: '2px' }}>
-                      Recommended Outreach Angle & Talking Points
-                    </div>
-                    <div style={{ color: '#4B5563' }}>
-                      • Focus on low-friction deployment, enterprise-grade data security, and verifiable ROI metrics.<br />
-                      • Reference modern infrastructure compliance requirements and cloud cost efficiency.<br />
-                      • Call to Action: Invite to a focused 15-minute technical capability architecture review.
-                    </div>
-                  </div>
-                </div>
-
-                {/* Lead Study PDF Asset Download */}
+              {/* 2. Lead Study PDF Attachment */}
+              {(inspectingLead.leadStudyPdf || inspectingLead.leadStudyPdfUrl) && (
                 <div
                   style={{
-                    marginTop: '16px',
-                    padding: '12px 14px',
-                    borderRadius: '10px',
-                    backgroundColor: '#FAF5FF',
-                    border: '1px solid #DDD4FA',
+                    background: '#EFF6FF',
+                    border: '1px solid #BFDBFE',
+                    borderRadius: '12px',
+                    padding: '14px 18px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
+                    gap: '12px',
+                    flexWrap: 'wrap',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <FileText size={20} color="#7C3AED" />
+                    <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#DBEAFE', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FileText size={18} />
+                    </div>
                     <div>
-                      <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#111827' }}>
-                        {inspectingLead.leadStudyPdf}
+                      <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1E40AF' }}>
+                        Lead Study Research PDF
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>
-                        Individual Account Qualification Study • 2.4 MB PDF
+                      <div style={{ fontSize: '0.75rem', color: '#3B82F6' }}>
+                        {inspectingLead.leadStudyPdfName || inspectingLead.leadStudyPdf || `${inspectingLead.name} - Deep-Dive Research.pdf`}
                       </div>
                     </div>
                   </div>
 
                   <a
-                    href="#"
+                    href={inspectingLead.leadStudyPdfUrl && inspectingLead.leadStudyPdfUrl !== '#' ? inspectingLead.leadStudyPdfUrl : '#'}
                     onClick={(e) => {
-                      e.preventDefault();
-                      alert(`Downloading complete Lead Study PDF for ${inspectingLead.name}...`);
+                      if (!inspectingLead.leadStudyPdfUrl || inspectingLead.leadStudyPdfUrl === '#') {
+                        e.preventDefault();
+                        alert(`Downloading complete Lead Study PDF for ${inspectingLead.name}...`);
+                      }
                     }}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={inspectingLead.leadStudyPdfName || inspectingLead.leadStudyPdf || `${inspectingLead.name}_Lead_Study.pdf`}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '4px',
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      backgroundColor: '#7C3AED',
+                      gap: '6px',
+                      background: '#2563EB',
                       color: '#FFFFFF',
-                      fontSize: '0.78rem',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      fontSize: '0.8125rem',
                       fontWeight: 700,
                       textDecoration: 'none',
+                      boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
                     }}
                   >
-                    <Download size={13} />
-                    <span>Download Study</span>
+                    <Download size={14} />
+                    <span>Download / View PDF</span>
+                    <ExternalLink size={12} />
                   </a>
                 </div>
+              )}
+
+              {/* 3. About the Lead Company */}
+              <div>
+                <h4 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1E293B', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Building2 size={15} color="#2563EB" />
+                  About The Lead's Company ({inspectingLead.company})
+                </h4>
+                <p style={{ fontSize: '0.875rem', color: '#475569', lineHeight: '1.5', margin: 0, background: '#FFFFFF', padding: '12px 14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                  {inspectingLead.aboutCompany || `Leading enterprise operating within the ${inspectingLead.industry || 'technology'} vertical.`}
+                </p>
               </div>
+
+              {/* 4. Why This Lead Suits Best For You */}
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 100%)',
+                  border: '1px solid #DDD4FA',
+                  borderRadius: '12px',
+                  padding: '16px 18px',
+                }}
+              >
+                <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#6D28D9', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Target size={15} color="#7C3AED" />
+                  Why This Lead Suits Best For You
+                </div>
+                <p style={{ fontSize: '0.9rem', color: '#4C1D95', lineHeight: '1.5', margin: 0, fontWeight: 500 }}>
+                  {inspectingLead.whySuitsBest || inspectingLead.shortSummary || 'High-probability prospect with immediate authority and strategic alignment with your growth objectives.'}
+                </p>
+              </div>
+
+              {/* 5. Lead Study Deep-Dive */}
+              <div>
+                <h4 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1E293B', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FileText size={15} color="#D97706" />
+                  Lead Study: What You Should Know About This Prospect
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                  <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>
+                      🎯 Why Relevant
+                    </div>
+                    <p style={{ fontSize: '0.8125rem', color: '#475569', margin: 0, lineHeight: '1.4' }}>
+                      {inspectingLead.leadStudy?.whyRelevant || 'Direct budget decision maker aligned with key pain points.'}
+                    </p>
+                  </div>
+
+                  <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>
+                      🔍 Observed Context
+                    </div>
+                    <p style={{ fontSize: '0.8125rem', color: '#475569', margin: 0, lineHeight: '1.4' }}>
+                      {inspectingLead.leadStudy?.observedContext || 'Observed operational growth and procurement signals.'}
+                    </p>
+                  </div>
+
+                  <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>
+                      🧭 Suggested Approach Angle
+                    </div>
+                    <p style={{ fontSize: '0.8125rem', color: '#475569', margin: 0, lineHeight: '1.4' }}>
+                      {inspectingLead.leadStudy?.suggestedApproach || 'Lead with rapid technical deliverables and measurable SLA proof.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 6. Pitch Deck Proposal For This Lead */}
+              {(inspectingLead.pitchDeck || inspectingLead.pitchDeckPdf) && (
+                <div
+                  style={{
+                    background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)',
+                    borderRadius: '14px',
+                    padding: '20px 22px',
+                    color: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '14px',
+                  }}
+                >
+                  <div style={{ maxWidth: '420px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#A5B4FC', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Proposal Pitch Deck For This Lead
+                    </div>
+                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#FFFFFF', marginTop: '2px' }}>
+                      {inspectingLead.pitchDeck?.title || `Tailored Pitch Proposal for ${inspectingLead.name}`}
+                    </div>
+                    <p style={{ fontSize: '0.8125rem', color: '#C7D2FE', margin: '4px 0 0 0', lineHeight: '1.4' }}>
+                      {inspectingLead.pitchDeck?.summary || 'Turnkey presentation proposal crafted specifically to engage and convert this stakeholder.'}
+                    </p>
+                  </div>
+
+                  <a
+                    href={inspectingLead.pitchDeckPdfUrl && inspectingLead.pitchDeckPdfUrl !== '#' ? inspectingLead.pitchDeckPdfUrl : '#'}
+                    onClick={(e) => {
+                      if (!inspectingLead.pitchDeckPdfUrl || inspectingLead.pitchDeckPdfUrl === '#') {
+                        e.preventDefault();
+                        alert(`Viewing tailored pitch deck proposal for ${inspectingLead.name}...`);
+                      }
+                    }}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={inspectingLead.pitchDeckPdfName || inspectingLead.pitchDeckPdf || `${inspectingLead.name}_Pitch_Deck.pdf`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: '#FFFFFF',
+                      color: '#1E1B4B',
+                      padding: '10px 18px',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                    }}
+                  >
+                    <Presentation size={15} />
+                    <span>View Lead Pitch Deck PDF</span>
+                    <ExternalLink size={13} />
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}

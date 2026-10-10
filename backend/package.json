@@ -17,7 +17,8 @@
     "test:workflow": "node tests/e2e/ticket-email-lifecycle.test.js",
     "test:e2e": "node tests/e2e/onboarding-workflow.test.js",
     "test:lifecycle": "node tests/e2e/multi-service-lifecycle.test.js",
-    "test:integration": "node tests/integration/email-complete-audit.test.js"
+    "test:integration": "node tests/integration/email-complete-audit.test.js",
+    "test:bulk-import": "node tests/integration/bulk-lead-import.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -27,6 +28,7 @@
     "jsonwebtoken": "^9.0.2",
     "minio": "^8.0.7",
     "nodemailer": "^10.0.10",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "xlsx": "^0.18.5"
   }
 }

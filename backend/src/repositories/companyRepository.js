@@ -22,7 +22,7 @@ const mapCompany = (row) => {
       .replace(/\[Website:\s*[^\]]+\]/g, '')
       .trim();
     const websiteMatch = (l.notes || '').match(/\[Website:\s*([^\]]+)\]/);
-    const website = (l.linkedin && /^https?:\/\//i.test(l.linkedin)) ? l.linkedin : (websiteMatch ? websiteMatch[1] : (l.linkedin || ''));
+    const website = l.website || (websiteMatch ? websiteMatch[1] : ((l.linkedin && /^https?:\/\//i.test(l.linkedin)) ? l.linkedin : (l.linkedin || '')));
     const companyName = l.company || l.lead_company || l.name;
     const assetIdMatch = source_reference ? source_reference.match(/\/api\/assets\/([a-f0-9\-]+)\/stream/i) : null;
     const assetId = assetIdMatch ? assetIdMatch[1] : null;
@@ -36,7 +36,7 @@ const mapCompany = (row) => {
     const kpAssetMatch = kpRef ? kpRef.match(/\/api\/assets\/([a-f0-9\-]+)\/stream/i) : null;
     const kpAssetId = kpAssetMatch ? kpAssetMatch[1] : null;
 
-    const logoUrl = logoMatch ? logoMatch[1] : null;
+    const logoUrl = l.logo_url || (logoMatch ? logoMatch[1] : null);
 
     const leadStudy = source_reference ? {
       id: assetId,
@@ -168,6 +168,8 @@ const companySelect = `
             'location', l.location,
             'status', l.status,
             'notes', l.notes,
+            'logo_url', l.logo_url,
+            'website', l.website,
             'createdAt', l.created_at,
             'updatedAt', l.updated_at
           )
@@ -398,6 +400,9 @@ export const addCompanyLead = async (
   companyId,
   lead = {}
 ) => {
+  const logoValue = lead.logo || lead.logoUrl || null;
+  const websiteValue = lead.website || null;
+
   const result = await query(
     `
     INSERT INTO company_leads (
@@ -409,7 +414,9 @@ export const addCompanyLead = async (
       linkedin,
       location,
       status,
-      notes
+      notes,
+      logo_url,
+      website
     )
     VALUES (
       $1,
@@ -420,7 +427,9 @@ export const addCompanyLead = async (
       $6,
       $7,
       $8,
-      $9
+      $9,
+      $10,
+      $11
     )
     RETURNING
       id,
@@ -432,6 +441,8 @@ export const addCompanyLead = async (
       location,
       status,
       notes,
+      logo_url,
+      website,
       created_at,
       updated_at
     `,
@@ -444,9 +455,11 @@ export const addCompanyLead = async (
       lead.linkedin || null,
       lead.location || null,
       lead.status || 'PENDING',
-      lead.logo || lead.logoUrl
-        ? `${lead.notes || ''}\n[Logo: ${lead.logo || lead.logoUrl}]`.trim()
+      logoValue
+        ? `${lead.notes || ''}\n[Logo: ${logoValue}]`.trim()
         : (lead.notes || null),
+      logoValue,
+      websiteValue,
     ]
   );
 
@@ -511,6 +524,8 @@ export const getCompanyLeads = async (companyId) => {
       location,
       status,
       notes,
+      logo_url,
+      website,
       created_at,
       updated_at
     FROM company_leads
@@ -524,14 +539,14 @@ export const getCompanyLeads = async (companyId) => {
     const pdfMatch = (r.notes || '').match(/\[Lead PDF:\s*([^\]]+)\]/);
     const source_reference = pdfMatch ? pdfMatch[1] : null;
     const logoMatch = (r.notes || '').match(/\[(Lead )?Logo:\s*([^\]]+)\]/i);
-    const logo = logoMatch ? logoMatch[2].trim() : null;
+    const logo = r.logo_url || (logoMatch ? logoMatch[2].trim() : null);
     const cleanNotes = (r.notes || '')
       .replace(/\[Lead PDF:\s*[^\]]+\]/g, '')
       .replace(/\[Website:\s*[^\]]+\]/g, '')
       .replace(/\[(Lead )?Logo:\s*[^\]]+\]/gi, '')
       .trim();
     const websiteMatch = (r.notes || '').match(/\[Website:\s*([^\]]+)\]/);
-    const website = (r.linkedin && /^https?:\/\//i.test(r.linkedin)) ? r.linkedin : (websiteMatch ? websiteMatch[1] : (r.linkedin || ''));
+    const website = r.website || (websiteMatch ? websiteMatch[1] : ((r.linkedin && /^https?:\/\//i.test(r.linkedin)) ? r.linkedin : (r.linkedin || '')));
     const companyName = r.lead_company || r.name;
     const assetIdMatch = source_reference ? source_reference.match(/\/api\/assets\/([a-f0-9\-]+)\/stream/i) : null;
     const assetId = assetIdMatch ? assetIdMatch[1] : null;
@@ -644,6 +659,8 @@ export const findLeadById = async (leadId) => {
       l.location,
       l.status,
       l.notes,
+      l.logo_url,
+      l.website,
       l.created_at,
       l.updated_at,
       c.name AS target_company_name,
@@ -660,7 +677,9 @@ export const findLeadById = async (leadId) => {
   if (!result.rows[0]) return null;
   const row = result.rows[0];
   const logoMatch = (row.notes || '').match(/\[(Lead )?Logo:\s*([^\]]+)\]/i);
-  const logo = logoMatch ? logoMatch[2].trim() : null;
+  const logo = row.logo_url || (logoMatch ? logoMatch[2].trim() : null);
+  const websiteMatch = (row.notes || '').match(/\[Website:\s*([^\]]+)\]/);
+  const website = row.website || (websiteMatch ? websiteMatch[1] : ((row.linkedin && /^https?:\/\//i.test(row.linkedin)) ? row.linkedin : (row.linkedin || '')));
   const cleanNotes = (row.notes || '')
     .replace(/\[Lead PDF:\s*[^\]]+\]/g, '')
     .replace(/\[Website:\s*[^\]]+\]/g, '')
@@ -668,6 +687,7 @@ export const findLeadById = async (leadId) => {
     .trim();
   return {
     ...row,
+    website,
     logo,
     logoUrl: logo,
     notes: cleanNotes,
@@ -684,7 +704,10 @@ export const updateCompanyLead = async (leadId, updates = {}) => {
     linkedin: 'linkedin',
     location: 'location',
     status: 'status',
-    notes: 'notes'
+    notes: 'notes',
+    logo_url: 'logo_url',
+    logoUrl: 'logo_url',
+    website: 'website'
   };
 
   const setClauses = [];
@@ -718,6 +741,8 @@ export const updateCompanyLead = async (leadId, updates = {}) => {
       location,
       status,
       notes,
+      logo_url,
+      website,
       created_at,
       updated_at
   `;

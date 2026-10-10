@@ -19,8 +19,12 @@ import {
   getOnboardingClients,
   updateCompanyResearchHandler,
   getCompanyLeadsByCompanyId,
+  downloadLeadsTemplate,
+  previewLeadsImport,
+  executeLeadsImport,
+  getLeadLogo,
 } from '../controllers/companyController.js';
-import { protect, authorize } from '../middleware/auth.js';
+import { protect, optionalProtect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -68,6 +72,12 @@ router.post('/:companyId/unlock-key-people', protect, unlockKeyPeople);
 router.get('/my-company', protect, getMyCompany);
 router.get('/my-company/leads', protect, getMyCompanyLeads);
 router.get('/my-company/leads/:id', protect, getMyCompanyLeadDetail);
+
+// Bulk Lead Import & Template routes
+router.get('/leads/template', protect, authorize('ADMIN', 'COMPANY_LEAD'), downloadLeadsTemplate);
+router.get('/leads/:id/logo', optionalProtect, getLeadLogo);
+router.post('/:companyId/leads/import/preview', protect, authorize('ADMIN', 'COMPANY_LEAD'), previewLeadsImport);
+router.post('/:companyId/leads/import', protect, authorize('ADMIN', 'COMPANY_LEAD'), executeLeadsImport);
 
 // Specialist / Admin Lead & Stakeholder management routes
 router.get('/:companyId/leads', protect, authorize('ADMIN', 'COMPANY_LEAD'), getCompanyLeadsByCompanyId);

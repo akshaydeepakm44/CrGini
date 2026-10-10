@@ -911,6 +911,59 @@ export const api = {
     return data;
   },
 
+  async downloadLeadsTemplate(format = 'xlsx') {
+    const res = await fetch(`${API_BASE}/company/leads/template?format=${format}`, {
+      headers: getHeaders(true)
+    });
+    if (!res.ok) {
+      throw new Error('Failed to download lead import template');
+    }
+    const blob = await res.blob();
+    const filename = format === 'csv' ? 'creativegini_leads_import_template.csv' : 'creativegini_leads_import_template.xlsx';
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(blobUrl);
+    return true;
+  },
+
+  async previewLeadsImport(companyId, payload) {
+    const res = await fetch(`${API_BASE}/company/${companyId}/leads/import/preview`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to preview spreadsheet leads');
+    }
+    return data;
+  },
+
+  async executeLeadsImport(companyId, payload) {
+    const res = await fetch(`${API_BASE}/company/${companyId}/leads/import`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to execute bulk lead import');
+    }
+    return data;
+  },
+
+  getLeadLogoUrl(leadId) {
+    if (!leadId) return null;
+    const token = localStorage.getItem('token');
+    const base = `${API_BASE}/company/leads/${leadId}/logo`;
+    return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+  },
+
   async addKeyPerson(companyId, payload) {
     const res = await fetch(`${API_BASE}/company/${companyId}/key-people`, {
       method: 'POST',

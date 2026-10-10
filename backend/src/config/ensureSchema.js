@@ -68,6 +68,21 @@ export async function ensureSchemaIntegrity() {
       ADD COLUMN IF NOT EXISTS price NUMERIC(10, 2) DEFAULT 0;
     `);
 
+    // 4. Ensure company_leads table has logo_url, website and performance index
+    await query(`
+      ALTER TABLE company_leads 
+      ADD COLUMN IF NOT EXISTS logo_url TEXT;
+    `);
+
+    await query(`
+      ALTER TABLE company_leads 
+      ADD COLUMN IF NOT EXISTS website TEXT;
+    `);
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_company_leads_company_id ON company_leads (company_id);
+    `);
+
     console.log('[Schema] Database schema integrity verified & updated successfully.');
     return true;
   } catch (err) {

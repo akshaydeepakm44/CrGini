@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { adaptLeadRequest, LEAD_STATUS_CONFIG, PRIORITY_CONFIG, formatDateTime, formatDateTimeWithTime } from '../data/leadAdapters';
+import { parseLeadsFile, enrichLeadRow } from '../../client/utils/leadDataEnricher';
 
 /**
  * Robust requirement detector tailored to client's brief for each unique ticket
@@ -457,20 +458,44 @@ export default function ResearchWorkspacePage({ onNavigate }) {
         logoName: p.logoName || null,
       }));
 
+      // Resolve and enrich all lead rows from spreadsheet or key people
+      let finalLeads = Array.isArray(leads) && leads.length > 0 ? leads : [];
+      if (finalLeads.length === 0 && leadListFile) {
+        try {
+          finalLeads = await parseLeadsFile(leadListFile, {
+            companyName: selectedTicket?.clientCompany,
+            batchLogoUrl: batchCompanyLogoUrl
+          });
+        } catch (e) {
+          console.warn('Could not parse leadListFile during submit:', e);
+        }
+      }
+      if (finalLeads.length === 0 && validPeople.length > 0) {
+        finalLeads = validPeople.map((p, idx) => enrichLeadRow(p, idx, { companyName: selectedTicket?.clientCompany }));
+      }
+
+      const totalCount = finalLeads.length > 0 ? String(finalLeads.length) : (leadCount || '50');
+
       const payload = {
         title: `Deliverable Package V${(selectedTicket.currentSubmissionVersion || 1) + 1} for ${ticketKey}`,
         description: `Delivered assets matching client brief: ${[
           activeReqs.companyStudy ? 'Company Study' : null,
-          activeReqs.leadList ? `Lead List (${leadCount} verified leads)` : null,
-          activeReqs.keyPeople ? `${validPeople.length} Key People (with verified executive logos)` : null,
+          activeReqs.leadList ? `Lead List (${totalCount} verified leads)` : null,
+          activeReqs.keyPeople ? `${validPeople.length || finalLeads.length} Key People (with verified executive logos)` : null,
           activeReqs.pitchDeck ? 'Tailored Pitch Deck' : null,
         ].filter(Boolean).join(', ')}`,
         notes: JSON.stringify({
           version: (selectedTicket.currentSubmissionVersion || 1) + 1,
           requirementsFulfilled: activeReqs,
           companyStudy: activeReqs.companyStudy ? { title: companyStudyTitle, fileName: companyStudyFile?.name || 'Company_Study.pdf', notes: companyStudyNotes } : null,
-          leadList: activeReqs.leadList ? { title: leadListTitle, count: leadCount, fileName: leadListFile?.name || 'tasks-report.csv', companyLogo: batchCompanyLogoUrl || null } : null,
-          keyPeople: activeReqs.keyPeople ? validPeople : [],
+          leadList: activeReqs.leadList ? {
+            title: leadListTitle,
+            count: totalCount,
+            fileName: leadListFile?.name || 'tasks-report.csv',
+            companyLogo: batchCompanyLogoUrl || null,
+            leads: finalLeads
+          } : null,
+          keyPeople: activeReqs.keyPeople && validPeople.length > 0 ? validPeople : finalLeads,
           pitchDeck: activeReqs.pitchDeck ? { title: pitchDeckTitle, fileName: pitchDeckFile?.name || 'dizitalgini brochure (1).pdf', notes: pitchDeckNotes } : null,
           verification: {
             method: 'Specialist Quality Verification',
@@ -1240,7 +1265,10 @@ export default function ResearchWorkspacePage({ onNavigate }) {
                             </div>
                             <button
                               type="button"
-                              onClick={() => setLeadListFile(null)}
+                              onClick={() => {
+                                setLeadListFile(null);
+                                setLeads([]);
+                              }}
                               style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: 0 }}
                             >
                               <Trash2 size={14} />
@@ -1269,11 +1297,32 @@ export default function ResearchWorkspacePage({ onNavigate }) {
                               type="file"
                               accept=".xlsx,.csv,.xls,.pdf"
                               style={{ display: 'none' }}
-                              onChange={(e) => {
-                                if (e.target.files?.[0]) setLeadListFile(e.target.files[0]);
+                              onChange={async (e) => {
+                                if (e.target.files?.[0]) {
+                                  const file = e.target.files[0];
+                                  setLeadListFile(file);
+                                  try {
+                                    const parsed = await parseLeadsFile(file, {
+                                      companyName: selectedTicket?.clientCompany,
+                                      batchLogoUrl: batchCompanyLogoUrl
+                                    });
+                                    if (parsed && parsed.length > 0) {
+                                      setLeads(parsed);
+                                      setLeadCount(String(parsed.length));
+                                    }
+                                  } catch (err) {
+                                    console.warn('Could not parse lead list file:', err);
+                                  }
+                                }
                               }}
                             />
                           </label>
+                        )}
+                        {leads.length > 0 && (
+                          <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#059669', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <CheckCircle2 size={12} />
+                            <span>{leads.length} verified leads parsed from file</span>
+                          </div>
                         )}
                       </div>
 

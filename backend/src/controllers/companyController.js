@@ -11,7 +11,12 @@ import {
   updateCompany,
 } from '../repositories/companyRepository.js';
 import { query } from '../config/postgres.js';
-import { uploadFile, deleteFile, isDataUrl, isMinioObjectKey } from '../services/storageService.js';
+import { uploadFile, deleteFile, isDataUrl, parseDataUrl, isMinioObjectKey, getFileStream, getObjectStat } from '../services/storageService.js';
+import {
+  previewLeadsImport as previewSpreadsheetImport,
+  executeLeadsImport as runBulkLeadImport,
+  generateLeadImportTemplate,
+} from '../services/leadImportService.js';
 
 // Verification validation helper
 const isLeadVerified = (lead) => {
@@ -235,7 +240,7 @@ export const getCompanyById = async (req, res) => {
 export const addLead = async (req, res) => {
   try {
     const { companyId } = req.params;
-    const { name, title, company, lead_company, email, linkedin, location, status, notes, logo, logoUrl } = req.body;
+    const { name, title, company, lead_company, email, linkedin, location, status, notes, logo, logoUrl, website } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({
@@ -269,6 +274,8 @@ export const addLead = async (req, res) => {
       status: finalStatus,
       notes: finalNotes || null,
       logo: actualLogo || null,
+      logo_url: actualLogo || null,
+      website: website?.trim() || null,
     });
 
     return res.status(201).json({
@@ -299,7 +306,7 @@ export const updateLead = async (req, res) => {
       });
     }
 
-    const { name, title, company, email, linkedin, location, status, notes, logo, logoUrl } = req.body;
+    const { name, title, company, email, linkedin, location, status, notes, logo, logoUrl, website } = req.body;
 
     // If changing to VERIFIED, verify notes exist
     if (status && status.toUpperCase() === 'VERIFIED') {
@@ -330,6 +337,8 @@ export const updateLead = async (req, res) => {
       location,
       status,
       notes: finalNotes,
+      logo_url: actualLogo !== undefined ? actualLogo : undefined,
+      website: website !== undefined ? website : undefined,
     });
 
     return res.json({
@@ -2068,6 +2077,261 @@ export const unlockKeyPeople = async (req, res) => {
   } catch (error) {
     console.error('[Unlock Key People Error]:', error);
     return res.status(500).json({ success: false, message: 'Failed to initiate Key People unlock.' });
+  }
+};
+
+// ============================================================================
+// BULK LEAD IMPORT & LOGO PERSISTENCE ENDPOINTS
+// ============================================================================
+
+/**
+ * @desc    Download sample Excel/CSV template for bulk lead import
+ * @route   GET /api/company/leads/template
+ * @access  Private (ADMIN, COMPANY_LEAD)
+ */
+export const downloadLeadsTemplate = async (req, res) => {
+  try {
+    const format = (req.query.format || 'xlsx').toLowerCase() === 'csv' ? 'csv' : 'xlsx';
+    const { buffer, contentType, filename } = generateLeadImportTemplate(format);
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    return res.end(buffer);
+  } catch (error) {
+    console.error('[Download Leads Template Error]:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate lead import template.',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Preview spreadsheet leads import before committing
+ * @route   POST /api/company/:companyId/leads/import/preview
+ * @access  Private (ADMIN, COMPANY_LEAD)
+ */
+export const previewLeadsImport = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { fileData, filename, mappingOverride } = req.body;
+
+    if (!fileData) {
+      return res.status(400).json({
+        success: false,
+        message: 'No spreadsheet file data provided.',
+      });
+    }
+
+    let fileBuffer;
+    if (isDataUrl(fileData)) {
+      fileBuffer = parseDataUrl(fileData).buffer;
+    } else if (typeof fileData === 'string') {
+      fileBuffer = Buffer.from(fileData, 'base64');
+    } else if (Buffer.isBuffer(fileData)) {
+      fileBuffer = fileData;
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid file payload format. Expected base64 string or data URL.',
+      });
+    }
+
+    const previewResult = await previewSpreadsheetImport(
+      companyId,
+      fileBuffer,
+      {
+        fileName: filename || 'leads.xlsx',
+        customMapping: mappingOverride,
+      }
+    );
+
+    return res.json({
+      success: true,
+      ...previewResult,
+    });
+  } catch (error) {
+    console.error('[Preview Leads Import Error]:', error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to preview spreadsheet import.',
+    });
+  }
+};
+
+/**
+ * @desc    Execute confirmed bulk lead import
+ * @route   POST /api/company/:companyId/leads/import
+ * @access  Private (ADMIN, COMPANY_LEAD)
+ */
+export const executeLeadsImport = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { fileData, filename, mappingOverride, duplicatePolicy } = req.body;
+
+    if (!fileData) {
+      return res.status(400).json({
+        success: false,
+        message: 'No spreadsheet file data provided.',
+      });
+    }
+
+    let fileBuffer;
+    if (isDataUrl(fileData)) {
+      fileBuffer = parseDataUrl(fileData).buffer;
+    } else if (typeof fileData === 'string') {
+      fileBuffer = Buffer.from(fileData, 'base64');
+    } else if (Buffer.isBuffer(fileData)) {
+      fileBuffer = fileData;
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid file payload format. Expected base64 string or data URL.',
+      });
+    }
+
+    const importResult = await runBulkLeadImport({
+      companyId,
+      fileBuffer,
+      fileName: filename || 'leads.xlsx',
+      columnMapping: mappingOverride,
+      updateDuplicates: duplicatePolicy === 'update',
+      downloadLogos: true,
+    });
+
+    return res.json({
+      success: true,
+      ...importResult,
+    });
+  } catch (error) {
+    console.error('[Execute Leads Import Error]:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to execute lead import.',
+    });
+  }
+};
+
+/**
+ * @desc    Stream lead logo image with authentication and tenant verification
+ * @route   GET /api/company/leads/:id/logo
+ * @access  Private / Public (if lead belongs to published showcase)
+ */
+export const getLeadLogo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lead = await findLeadById(id);
+
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: 'Lead record not found.',
+      });
+    }
+
+    // Verify Authorization: Lead Specialist / Admin, or client of the same company
+    let isAuthorized = false;
+    if (req.user) {
+      const userRole = (req.user.role || '').toUpperCase();
+      if (userRole === 'ADMIN' || userRole === 'COMPANY_LEAD' || userRole === 'SUPER_ADMIN') {
+        isAuthorized = true;
+      } else if (String(req.user.companyId || req.user.company_id) === String(lead.company_id)) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
+      // Check if this lead belongs to an explicitly published public sample showcase
+      try {
+        const sampleCheck = await query(
+          `SELECT id FROM public_sample_showcases 
+           WHERE status = 'PUBLISHED' 
+             AND (leads @> $1::jsonb OR leads @> $2::jsonb) 
+           LIMIT 1`,
+          [
+            JSON.stringify([{ id: lead.id }]),
+            JSON.stringify([{ leadId: lead.id }])
+          ]
+        );
+        if (sampleCheck.rowCount > 0) {
+          isAuthorized = true;
+        }
+      } catch (e) {
+        // Table or json query error ignored
+      }
+    }
+
+    if (!isAuthorized) {
+      return res.status(req.user ? 403 : 401).json({
+        success: false,
+        message: req.user
+          ? 'Forbidden: Cross-tenant lead logo access is not permitted.'
+          : 'Access denied: Authentication required to view private company lead logos.',
+      });
+    }
+
+    const logoRef = lead.logo_url || lead.logo;
+    if (!logoRef || !logoRef.trim()) {
+      return res.status(404).json({
+        success: false,
+        message: 'Lead does not have a logo associated with it.',
+      });
+    }
+
+    const cleanRef = logoRef.trim();
+
+    // 1. Data URL (legacy Base64)
+    if (isDataUrl(cleanRef)) {
+      const { buffer, mimeType } = parseDataUrl(cleanRef);
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+      return res.send(buffer);
+    }
+
+    // 2. MinIO Object Key (or path containing /companies/ or /assets/)
+    if (isMinioObjectKey(cleanRef) || cleanRef.startsWith('companies/') || cleanRef.startsWith('assets/')) {
+      try {
+        const stat = await getObjectStat(cleanRef);
+        let mimeType = stat?.metaData?.['content-type'] || 'image/png';
+        if (cleanRef.endsWith('.svg')) mimeType = 'image/svg+xml';
+        else if (cleanRef.endsWith('.jpg') || cleanRef.endsWith('.jpeg')) mimeType = 'image/jpeg';
+        else if (cleanRef.endsWith('.webp')) mimeType = 'image/webp';
+        else if (cleanRef.endsWith('.gif')) mimeType = 'image/gif';
+
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Cache-Control', 'private, max-age=86400');
+        if (stat?.size) {
+          res.setHeader('Content-Length', stat.size);
+        }
+
+        const stream = await getFileStream(cleanRef);
+        return stream.pipe(res);
+      } catch (storageErr) {
+        console.error('[Lead Logo Storage Error]:', storageErr.message);
+        return res.status(404).json({
+          success: false,
+          message: 'Logo object not found in storage.',
+        });
+      }
+    }
+
+    // 3. External HTTP/HTTPS URL
+    if (/^https?:\/\//i.test(cleanRef)) {
+      return res.redirect(cleanRef);
+    }
+
+    return res.status(404).json({
+      success: false,
+      message: 'Unknown logo format or location.',
+    });
+  } catch (error) {
+    console.error('[Get Lead Logo Error]:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve lead logo.',
+    });
   }
 };
 

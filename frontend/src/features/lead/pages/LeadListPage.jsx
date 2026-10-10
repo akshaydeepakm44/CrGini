@@ -11,11 +11,13 @@ import {
   Eye,
   MapPin,
   Globe,
-  Mail
+  Mail,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { adaptCompanyLead, formatDateTime } from '../data/leadAdapters';
 import LeadModal from '../components/LeadModal';
+import LeadImportModal from '../components/LeadImportModal';
 import ResearchLeadRowDrawer from '../components/ResearchLeadRowDrawer';
 
 export default function LeadListPage({ onNavigate }) {
@@ -28,6 +30,7 @@ export default function LeadListPage({ onNavigate }) {
 
   // Modal & Drawer State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
   const [inspectingLead, setInspectingLead] = useState(null);
 
@@ -121,30 +124,54 @@ export default function LeadListPage({ onNavigate }) {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setEditingLead(null);
-            setIsModalOpen(true);
-          }}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '9px 18px',
-            borderRadius: '9px',
-            border: 'none',
-            background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
-            color: '#FFFFFF',
-            fontSize: '0.84375rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
-          }}
-        >
-          <Plus size={16} />
-          <span>Add New Lead</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 16px',
+              borderRadius: '9px',
+              border: '1px solid #DDD4FA',
+              backgroundColor: '#F5F3FF',
+              color: '#6D28D9',
+              fontSize: '0.84375rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <FileSpreadsheet size={16} />
+            <span>Import Leads</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEditingLead(null);
+              setIsModalOpen(true);
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 18px',
+              borderRadius: '9px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+              color: '#FFFFFF',
+              fontSize: '0.84375rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
+            }}
+          >
+            <Plus size={16} />
+            <span>Add New Lead</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. Filter Bar */}
@@ -280,14 +307,60 @@ export default function LeadListPage({ onNavigate }) {
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                   >
                     <td style={{ padding: '14px 18px' }}>
-                      <div
-                        onClick={() => setInspectingLead(lead)}
-                        style={{ fontSize: '0.875rem', fontWeight: 700, color: '#7C3AED', cursor: 'pointer' }}
-                      >
-                        {lead.company || lead.name}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '2px' }}>
-                        {lead.name}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div
+                          style={{
+                            width: '38px',
+                            height: '38px',
+                            borderRadius: '8px',
+                            backgroundColor: '#F3F4F6',
+                            border: '1px solid #E5E7EB',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {lead.logoUrl || lead.logo ? (
+                            <img
+                              src={
+                                (lead.logoUrl || lead.logo)?.startsWith('http') || (lead.logoUrl || lead.logo)?.startsWith('data:')
+                                  ? (lead.logoUrl || lead.logo)
+                                  : api.getLeadLogoUrl(lead.id)
+                              }
+                              alt={lead.company}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                              }}
+                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                            />
+                          ) : null}
+                          <span
+                            style={{
+                              display: lead.logoUrl || lead.logo ? 'none' : 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.8125rem',
+                              fontWeight: 700,
+                              color: '#6B7280',
+                            }}
+                          >
+                            {(lead.company || lead.name || 'C').charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <div
+                            onClick={() => setInspectingLead(lead)}
+                            style={{ fontSize: '0.875rem', fontWeight: 700, color: '#7C3AED', cursor: 'pointer' }}
+                          >
+                            {lead.company || lead.name}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '2px' }}>
+                            {lead.name}
+                          </div>
+                        </div>
                       </div>
                     </td>
 
@@ -381,6 +454,15 @@ export default function LeadListPage({ onNavigate }) {
         onClose={() => setIsModalOpen(false)}
         initialLead={editingLead}
         companies={companies}
+        onSuccess={loadData}
+      />
+
+      {/* Bulk Import Modal */}
+      <LeadImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        companies={companies}
+        selectedCompanyId={selectedCompanyId}
         onSuccess={loadData}
       />
 

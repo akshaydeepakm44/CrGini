@@ -20,6 +20,7 @@ import {
   Image
 } from 'lucide-react';
 import { api } from '../../../services/api';
+import { parseLeadsFile, enrichLeadRow } from '../../client/utils/leadDataEnricher';
 
 export default function DeliverableUploadModal({
   isOpen,
@@ -88,6 +89,7 @@ export default function DeliverableUploadModal({
   const [leadListTitle, setLeadListTitle] = useState(`${clientCompany} Researched Lead List`);
   const [leadCount, setLeadCount] = useState('');
   const [batchCompanyLogoUrl, setBatchCompanyLogoUrl] = useState('');
+  const [parsedLeads, setParsedLeads] = useState([]);
 
   // 3. Key People (Structured Data Entry with Logo Upload)
   const [keyPeople, setKeyPeople] = useState([
@@ -231,20 +233,44 @@ export default function DeliverableUploadModal({
         if (f) uploadedFiles.push({ ...f, category: 'Tailored Pitch Deck' });
       }
 
+      // Resolve and enrich leads
+      let finalLeads = Array.isArray(parsedLeads) && parsedLeads.length > 0 ? parsedLeads : [];
+      if (finalLeads.length === 0 && leadListFile) {
+        try {
+          finalLeads = await parseLeadsFile(leadListFile, {
+            companyName: clientCompany,
+            batchLogoUrl: batchCompanyLogoUrl
+          });
+        } catch (err) {
+          console.warn('Could not parse leadListFile:', err);
+        }
+      }
+      if (finalLeads.length === 0 && validPeople.length > 0) {
+        finalLeads = validPeople.map((p, idx) => enrichLeadRow(p, idx, { companyName: clientCompany }));
+      }
+
+      const totalCount = finalLeads.length > 0 ? String(finalLeads.length) : (leadCount || '50');
+
       const payload = {
         title: `Deliverable Package V${versionNumber} for ${ticketId}`,
         description: `Delivered components: ${[
           activeReqs.companyStudy ? 'Company Study' : null,
-          activeReqs.leadList ? `Lead List (${leadCount} leads)` : null,
-          activeReqs.keyPeople ? `${validPeople.length} Key People` : null,
+          activeReqs.leadList ? `Lead List (${totalCount} verified leads)` : null,
+          activeReqs.keyPeople ? `${validPeople.length || finalLeads.length} Key People` : null,
           activeReqs.pitchDeck ? 'Tailored Pitch Deck' : null,
         ].filter(Boolean).join(', ')}`,
         notes: JSON.stringify({
           version: versionNumber,
           requirementsFulfilled: activeReqs,
           companyStudy: activeReqs.companyStudy ? { title: companyStudyTitle, fileName: companyStudyFile?.name || 'Company_Study.pdf', notes: companyStudyNotes } : null,
-          leadList: activeReqs.leadList ? { title: leadListTitle, count: leadCount, fileName: leadListFile?.name || 'Lead_List.pdf', companyLogo: batchCompanyLogoUrl || '' } : null,
-          keyPeople: activeReqs.keyPeople ? validPeople : [],
+          leadList: activeReqs.leadList ? {
+            title: leadListTitle,
+            count: totalCount,
+            fileName: leadListFile?.name || 'Lead_List.csv',
+            companyLogo: batchCompanyLogoUrl || '',
+            leads: finalLeads
+          } : null,
+          keyPeople: activeReqs.keyPeople && validPeople.length > 0 ? validPeople : finalLeads,
           pitchDeck: activeReqs.pitchDeck ? { title: pitchDeckTitle, fileName: pitchDeckFile?.name || 'Pitch_Deck.pdf', notes: pitchDeckNotes } : null,
           verification: {
             method: 'Specialist Quality Verification',
@@ -865,7 +891,24 @@ export default function DeliverableUploadModal({
                       <input
                         type="file"
                         accept=".pdf,.csv,.xlsx,.xls"
-                        onChange={(e) => setLeadListFile(e.target.files[0])}
+                        onChange={async (e) => {
+                          if (e.target.files?.[0]) {
+                            const file = e.target.files[0];
+                            setLeadListFile(file);
+                            try {
+                              const parsed = await parseLeadsFile(file, {
+                                companyName: clientCompany,
+                                batchLogoUrl: batchCompanyLogoUrl
+                              });
+                              if (parsed && parsed.length > 0) {
+                                setParsedLeads(parsed);
+                                setLeadCount(String(parsed.length));
+                              }
+                            } catch (err) {
+                              console.warn('Could not parse leads in modal:', err);
+                            }
+                          }
+                        }}
                         style={{
                           width: '100%',
                           padding: '7px',
@@ -876,6 +919,12 @@ export default function DeliverableUploadModal({
                           backgroundColor: '#FAFAFC',
                         }}
                       />
+                      {parsedLeads.length > 0 && (
+                        <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#059669', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <CheckCircle2 size={12} />
+                          <span>{parsedLeads.length} leads detected & parsed</span>
+                        </div>
+                      )}
                     </div>
 
                     <div>

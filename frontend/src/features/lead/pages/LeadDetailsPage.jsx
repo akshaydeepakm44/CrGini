@@ -156,14 +156,34 @@ export default function LeadDetailsPage({ onNavigate }) {
                 borderRadius: '12px',
                 backgroundColor: '#EDE9FE',
                 color: '#7C3AED',
+                border: '1px solid #DDD4FA',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontWeight: 800,
                 fontSize: '1.25rem',
+                overflow: 'hidden',
+                flexShrink: 0,
               }}
             >
-              {(lead.company || lead.name || 'C').charAt(0).toUpperCase()}
+              {(lead.logoUrl || lead.logo) ? (
+                <img
+                  src={
+                    (lead.logoUrl || lead.logo)?.startsWith('http') || (lead.logoUrl || lead.logo)?.startsWith('data:')
+                      ? (lead.logoUrl || lead.logo)
+                      : api.getLeadLogoUrl(lead.id)
+                  }
+                  alt={lead.company}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                  }}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                />
+              ) : null}
+              <span style={{ display: (lead.logoUrl || lead.logo) ? 'none' : 'flex' }}>
+                {(lead.company || lead.name || 'C').charAt(0).toUpperCase()}
+              </span>
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#111827' }}>
@@ -233,6 +253,19 @@ export default function LeadDetailsPage({ onNavigate }) {
           </h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.84375rem' }}>
+            {(lead.website || lead.domain) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Globe size={16} color="#7C3AED" />
+                <a
+                  href={(lead.website || lead.domain)?.startsWith('http') ? (lead.website || lead.domain) : `https://${lead.website || lead.domain}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: '#7C3AED', textDecoration: 'none', fontWeight: 600 }}
+                >
+                  {lead.website || lead.domain}
+                </a>
+              </div>
+            )}
             {lead.email && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Mail size={16} color="#6B7280" />
