@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { query, connectPostgres } from './config/postgres.js';
+import { ensureSchemaIntegrity } from './config/ensureSchema.js';
 
 dotenv.config();
 
@@ -9,6 +10,7 @@ export async function cleanAllFakeData() {
   console.log('================================================================\n');
 
   await connectPostgres();
+  await ensureSchemaIntegrity();
 
   const officialStaffEmails = [
     'team@creativegini.com',

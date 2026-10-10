@@ -26,6 +26,12 @@ connectPostgres().then(async (ok) => {
   if (ok) {
     console.log('[CreativeGini API] PostgreSQL connected successfully.');
     try {
+      const { ensureSchemaIntegrity } = await import('./config/ensureSchema.js');
+      await ensureSchemaIntegrity();
+    } catch (err) {
+      console.error('[CreativeGini API] ensureSchemaIntegrity error:', err.message);
+    }
+    try {
       const { ensureDataI2IAccount } = await import('./controllers/authController.js');
       await ensureDataI2IAccount();
     } catch (err) {
