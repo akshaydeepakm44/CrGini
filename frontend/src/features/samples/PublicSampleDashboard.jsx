@@ -153,11 +153,8 @@ export default function PublicSampleDashboard() {
         <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-              <img src="/logo.png" alt="CreativeGini" style={{ height: '34px', width: 'auto' }} />
-              <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.3px' }}>
-                Creative<span style={{ color: '#2563EB' }}>Gini</span>
-              </span>
+            <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+              <img src="/logo.png" alt="CreativeGini" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
             </Link>
             <span style={{ height: '18px', width: '1px', background: '#CBD5E1' }} />
             <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#475569', background: '#F1F5F9', padding: '4px 10px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>

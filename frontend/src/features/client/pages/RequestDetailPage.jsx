@@ -30,6 +30,7 @@ import {
   Target,
   FileSpreadsheet,
   Lock,
+  Mail,
 } from 'lucide-react';
 import TicketTimeline from '../../../components/tickets/TicketTimeline';
 import StatusBadge from '../../../components/tickets/StatusBadge';
@@ -105,9 +106,9 @@ export default function RequestDetailPage({
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const [submissions, setSubmissions] = useState([]);
+  const [submissions, setSubmissions] = useState(() => ticket?.submissions || []);
   const [companyLeads, setCompanyLeads] = useState([]);
-  const [isLoadingDetails, setIsLoadingDetails] = useState(true);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(!ticket?.submissions?.length);
 
   // Review modal state
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -470,13 +471,14 @@ export default function RequestDetailPage({
                     <div
                       key={subKey}
                       style={{
-                        padding: '20px',
-                        borderRadius: '14px',
-                        border: '1px solid #EDE9FE',
-                        backgroundColor: '#FAF5FF',
+                        padding: '24px',
+                        borderRadius: '16px',
+                        border: '1px solid #E2E8F0',
+                        backgroundColor: '#FFFFFF',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '14px',
+                        gap: '16px',
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
                       }}
                     >
                       {/* Package Header */}
@@ -486,27 +488,26 @@ export default function RequestDetailPage({
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           flexWrap: 'wrap',
-                          gap: '8px',
-                          cursor: 'pointer',
+                          gap: '12px',
+                          borderBottom: '1px solid #F1F5F9',
+                          paddingBottom: '14px',
                         }}
-                        onClick={() => toggleSubExpanded(subKey)}
-                        title="Click to toggle submission view"
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                           <span
                             style={{
                               fontSize: '0.75rem',
                               fontWeight: 800,
-                              color: '#6D28D9',
-                              backgroundColor: '#FFFFFF',
-                              padding: '2px 8px',
+                              color: '#475569',
+                              backgroundColor: '#F1F5F9',
+                              padding: '3px 9px',
                               borderRadius: '6px',
-                              border: '1px solid #DDD4FA',
+                              border: '1px solid #E2E8F0',
                             }}
                           >
                             Version {sub.version || idx + 1}
                           </span>
-                          <span style={{ fontSize: '0.925rem', fontWeight: 800, color: '#111827' }}>
+                          <span style={{ fontSize: '1rem', fontWeight: 800, color: '#0F172A' }}>
                             {sub.title || `${ticket.service} Package`}
                           </span>
                           {(sub.submittedAt || sub.submitted_at || sub.createdAt || sub.created_at) && (
@@ -516,95 +517,91 @@ export default function RequestDetailPage({
                                 alignItems: 'center',
                                 gap: '4px',
                                 fontSize: '0.75rem',
-                                color: '#4B5563',
+                                color: '#64748B',
                                 fontWeight: 500,
-                                backgroundColor: '#FFFFFF',
-                                padding: '2px 8px',
+                                backgroundColor: '#F8FAFC',
+                                padding: '3px 8px',
                                 borderRadius: '6px',
-                                border: '1px solid #E5E7EB',
+                                border: '1px solid #E2E8F0',
                               }}
                               title="Uploaded Date & Time"
                             >
-                              <Clock size={12} color="#6B7280" />
+                              <Clock size={12} color="#64748B" />
                               <span>{formatDateTime(sub.submittedAt || sub.submitted_at || sub.createdAt || sub.created_at)}</span>
                             </span>
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleSubExpanded(subKey);
-                            }}
+                            onClick={() => toggleSubExpanded(subKey)}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '5px',
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              backgroundColor: isSubExpanded ? '#EDE9FE' : '#FFFFFF',
-                              border: '1px solid #DDD4FA',
-                              color: '#6D28D9',
-                              fontSize: '0.75rem',
+                              gap: '6px',
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              backgroundColor: isSubExpanded ? '#EDE9FE' : '#F8FAFC',
+                              border: '1px solid',
+                              borderColor: isSubExpanded ? '#C4B5FD' : '#CBD5E1',
+                              color: isSubExpanded ? '#6D28D9' : '#334155',
+                              fontSize: '0.78rem',
                               fontWeight: 700,
                               cursor: 'pointer',
                               transition: 'all 0.15s ease',
                             }}
                             title="Click to toggle row-wise leads view"
                           >
-                            <Users size={12} />
-                            <span>{isSubExpanded ? 'Hide Leads Table' : 'Inspect Leads'}</span>
-                            {isSubExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            <Users size={13} color={isSubExpanded ? '#6D28D9' : '#2563EB'} />
+                            <span>{isSubExpanded ? 'Hide Leads Table' : `Inspect Leads (${resolvedLeads.length})`}</span>
+                            {isSubExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                           </button>
                           <StatusBadge status={sub.status || 'CLIENT_REVIEW'} size="sm" />
                         </div>
                       </div>
 
-                      {/* Deliverable Fulfillment Badges */}
+                      {/* Deliverable Fulfillment Badges (Informative chips) */}
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                         <span
-                          onClick={() => toggleSubExpanded(subKey)}
                           style={{
                             fontSize: '0.75rem',
                             fontWeight: 700,
                             color: '#1E40AF',
                             backgroundColor: '#EFF6FF',
-                            padding: '3px 8px',
+                            padding: '4px 10px',
                             borderRadius: '6px',
                             border: '1px solid #BFDBFE',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px',
-                            cursor: 'pointer',
+                            gap: '5px',
                           }}
-                          title="Click to view leads table"
+                          title="Verified lead count"
                         >
                           <Users size={12} />
                           <span>{resolvedLeads.length || detail.leadList?.count || '50'} Verified Leads Database</span>
-                          {isSubExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                         </span>
 
-                          {detail.keyPeople.length > 0 && (
-                            <span
-                              style={{
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                color: '#7C3AED',
-                                backgroundColor: '#F5F3FF',
-                                padding: '3px 8px',
-                                borderRadius: '6px',
-                                border: '1px solid #DDD4FA',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                              }}
-                            >
-                              <CheckCircle2 size={12} />
-                              <span>{detail.keyPeople.length} Executive Decision Makers Curated</span>
-                            </span>
-                          )}
+                        {detail.keyPeople && detail.keyPeople.length > 0 && (
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              color: '#7C3AED',
+                              backgroundColor: '#F5F3FF',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #DDD4FA',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                            }}
+                          >
+                            <CheckCircle2 size={12} />
+                            <span>{detail.keyPeople.length} Executive Decision Makers Curated</span>
+                          </span>
+                        )}
+
 
                           {detail.pitchDeck && (
                             <span
@@ -1422,115 +1419,182 @@ export default function RequestDetailPage({
 
             {/* Modal Body */}
             <div style={{ padding: '26px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* 1. LinkedIn & Direct Channels Grid */}
+              {/* 1. Direct Contact & Professional Profiles */}
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  display: 'flex',
+                  flexDirection: 'column',
                   gap: '12px',
                   backgroundColor: '#F8FAFC',
                   padding: '16px',
-                  borderRadius: '12px',
+                  borderRadius: '14px',
                   border: '1px solid #E2E8F0',
                 }}
               >
-                {/* LinkedIn Profile */}
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
-                    LinkedIn Profile
+                {/* Row A: Direct Work Email with 1-Click Copy */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '10px',
+                    padding: '12px 16px',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '10px',
+                    border: '1px solid #E2E8F0',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        backgroundColor: '#EFF6FF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#2563EB',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Mail size={16} />
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        DIRECT WORK EMAIL
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '0.88rem',
+                          fontFamily: 'monospace',
+                          fontWeight: 700,
+                          color: '#0F172A',
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {inspectingLead.email || '—'}
+                      </div>
+                    </div>
                   </div>
-                  {inspectingLead.linkedin ? (
-                    <a
-                      href={inspectingLead.linkedin.startsWith('http') ? inspectingLead.linkedin : `https://${inspectingLead.linkedin}`}
-                      target="_blank"
-                      rel="noreferrer"
+
+                  {inspectingLead.email && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(inspectingLead.email);
+                        setCopiedEmail(true);
+                        setTimeout(() => setCopiedEmail(false), 2000);
+                      }}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px',
-                        fontSize: '0.84rem',
-                        fontWeight: 600,
-                        color: '#0A66C2',
-                        textDecoration: 'none',
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid',
+                        borderColor: copiedEmail ? '#059669' : '#CBD5E1',
+                        backgroundColor: copiedEmail ? '#ECFDF5' : '#FFFFFF',
+                        color: copiedEmail ? '#059669' : '#334155',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        flexShrink: 0,
                       }}
+                      title="Copy direct work email"
                     >
-                      <Linkedin size={15} />
-                      <span>Verified Profile</span>
-                      <ExternalLink size={12} />
-                    </a>
-                  ) : (
-                    <span style={{ fontSize: '0.84rem', color: '#94A3B8' }}>Profile on file</span>
+                      {copiedEmail ? <Check size={13} /> : <Copy size={13} />}
+                      <span>{copiedEmail ? 'Copied ✓' : 'Copy Email'}</span>
+                    </button>
                   )}
                 </div>
 
-                {/* Direct Corporate Email */}
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
-                    Direct Work Email
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.84rem', fontFamily: 'monospace', fontWeight: 700, color: '#0F172A' }}>
-                      {inspectingLead.email || '—'}
-                    </span>
-                    {inspectingLead.email && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(inspectingLead.email);
-                          setCopiedEmail(true);
-                          setTimeout(() => setCopiedEmail(false), 2000);
-                        }}
+                {/* Row B: Two Equal Columns for LinkedIn & Company Website */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  {/* LinkedIn Profile */}
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '10px',
+                      border: '1px solid #E2E8F0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      minWidth: 0,
+                    }}
+                  >
+                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      LINKEDIN PROFILE
+                    </div>
+                    {inspectingLead.linkedin ? (
+                      <a
+                        href={inspectingLead.linkedin.startsWith('http') ? inspectingLead.linkedin : `https://${inspectingLead.linkedin}`}
+                        target="_blank"
+                        rel="noreferrer"
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px',
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid #CBD5E1',
-                          backgroundColor: '#FFFFFF',
-                          color: copiedEmail ? '#059669' : '#475569',
-                          fontSize: '0.72rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
+                          gap: '6px',
+                          fontSize: '0.84rem',
+                          fontWeight: 700,
+                          color: '#0A66C2',
+                          textDecoration: 'none',
                         }}
-                        title="Copy direct work email"
                       >
-                        {copiedEmail ? <Check size={12} /> : <Copy size={12} />}
-                        <span>{copiedEmail ? 'Copied' : 'Copy'}</span>
-                      </button>
+                        <Linkedin size={15} />
+                        <span>Verified Profile</span>
+                        <ExternalLink size={12} />
+                      </a>
+                    ) : (
+                      <span style={{ fontSize: '0.84rem', color: '#94A3B8' }}>Profile on file</span>
                     )}
                   </div>
-                </div>
 
-                {/* Company Link / Website */}
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
-                    Company Link / Website
+                  {/* Company Website */}
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '10px',
+                      border: '1px solid #E2E8F0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      minWidth: 0,
+                    }}
+                  >
+                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      COMPANY WEBSITE
+                    </div>
+                    {inspectingLead.companyLink ? (
+                      <a
+                        href={inspectingLead.companyLink.startsWith('http') ? inspectingLead.companyLink : `https://${inspectingLead.companyLink}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '0.84rem',
+                          fontWeight: 700,
+                          color: '#2563EB',
+                          textDecoration: 'none',
+                          minWidth: 0,
+                        }}
+                      >
+                        <Globe size={15} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {inspectingLead.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
+                        </span>
+                        <ExternalLink size={12} />
+                      </a>
+                    ) : (
+                      <span style={{ fontSize: '0.84rem', color: '#94A3B8' }}>{inspectingLead.company || 'Website on file'}</span>
+                    )}
                   </div>
-                  {inspectingLead.companyLink ? (
-                    <a
-                      href={inspectingLead.companyLink.startsWith('http') ? inspectingLead.companyLink : `https://${inspectingLead.companyLink}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '0.84rem',
-                        fontWeight: 600,
-                        color: '#2563EB',
-                        textDecoration: 'none',
-                      }}
-                    >
-                      <Globe size={14} />
-                      <span style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {inspectingLead.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
-                      </span>
-                      <ExternalLink size={12} />
-                    </a>
-                  ) : (
-                    <span style={{ fontSize: '0.84rem', color: '#94A3B8' }}>{inspectingLead.company || 'Website on file'}</span>
-                  )}
                 </div>
               </div>
 

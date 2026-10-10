@@ -490,11 +490,34 @@ export default function NewRequestModal({
   // Initialize service when modal opens
   useEffect(() => {
     if (isOpen) {
-      setStep(1);
       setErrors({});
       setSubmitError('');
-      setServerPriceData(null);
       setCustomModalTab('all');
+
+      const isBundleRequest = Boolean(
+        initialCustomData?.isDirectPayment ||
+        initialCustomData?.isBundle ||
+        initialCustomData?.bundleId ||
+        initialCustomData?.bundlePrice
+      );
+
+      if (isBundleRequest) {
+        const bundlePrice = initialCustomData.totalPrice || initialCustomData.bundlePrice || 99;
+        const bundleTitle = initialCustomData.bundleTitle || 'Turnkey Specialist Bundle';
+        setServerPriceData({
+          price: bundlePrice,
+          currency: 'USD',
+          pricingStatus: 'CONFIGURED',
+          serviceLabel: bundleTitle,
+          breakdown: initialCustomData.breakdown || [
+            { item: `${bundleTitle} (All-Inclusive Bundle Price)`, amount: bundlePrice },
+          ],
+        });
+        setStep(3); // Directly open Step 3: Payment page
+      } else {
+        setServerPriceData(null);
+        setStep(1);
+      }
 
       let serviceToUse = initialServiceId || 'custom';
       if (
@@ -759,6 +782,7 @@ export default function NewRequestModal({
       case 'redesign-request':
         return `Redesign Request: ${redesignForm.targetUrl || 'Page Redesign'}`;
       case 'custom':
+        if (initialCustomData?.bundleTitle) return `${initialCustomData.bundleTitle} Sprint`;
         return 'Custom Scope Growth Sprint';
       case 'custom-boosting':
         return 'Custom Boost Growth Sprint';
@@ -775,25 +799,39 @@ export default function NewRequestModal({
     setSubmitError('');
 
     try {
+      const isBundle = Boolean(
+        initialCustomData?.isDirectPayment ||
+        initialCustomData?.isBundle ||
+        initialCustomData?.bundleId ||
+        initialCustomData?.bundlePrice
+      );
+      const lockedPrice = serverPriceData?.price ?? initialCustomData?.totalPrice ?? initialCustomData?.bundlePrice;
+
       const payload = {
         title: getComputedTitle(),
         description:
+          customForm.requirements ||
           strategicForm.mainGoal ||
           gtmForm.launchGoal ||
           adCreativesForm.campaignObjective ||
           contentForm.mainPurpose ||
           devrelForm.mainDevrelGoal ||
-          customForm.requirements ||
           leadForm.qualificationCriteria ||
           companyStudyForm.researchObjective ||
           auditForm.knownFriction ||
           figmaForm.designScope ||
           redesignForm.redesignObjective ||
           `Configured request for ${currentConfig.serviceLabel}`,
-        serviceType: currentConfig.serviceType,
-        subService: currentConfig.subService,
+        serviceType: isBundle ? 'BUNDLE' : currentConfig.serviceType,
+        subService: isBundle ? 'CUSTOM' : currentConfig.subService,
         priority: 'MEDIUM',
-        requirements: getActiveRequirements(),
+        requirements: {
+          ...getActiveRequirements(),
+          totalPrice: lockedPrice,
+          bundlePrice: lockedPrice,
+          bundleId: initialCustomData?.bundleId || undefined,
+          bundleTitle: initialCustomData?.bundleTitle || undefined,
+        },
         selectedServices: getActiveSelectedServices(),
       };
 
@@ -864,9 +902,9 @@ export default function NewRequestModal({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
               <span
                 style={{
-                  background: currentConfig.accentBg,
-                  color: currentConfig.accentColor,
-                  border: `1px solid ${currentConfig.accentColor}30`,
+                  background: (initialCustomData?.isDirectPayment || initialCustomData?.isBundle) ? '#F5F3FF' : currentConfig.accentBg,
+                  color: (initialCustomData?.isDirectPayment || initialCustomData?.isBundle) ? '#7C3AED' : currentConfig.accentColor,
+                  border: `1px solid ${(initialCustomData?.isDirectPayment || initialCustomData?.isBundle) ? '#DDD4FA' : currentConfig.accentColor + '30'}`,
                   padding: '3px 10px',
                   borderRadius: '9999px',
                   fontSize: '0.72rem',
@@ -875,10 +913,12 @@ export default function NewRequestModal({
                   letterSpacing: '0.04em',
                 }}
               >
-                {currentConfig.badge}
+                {(initialCustomData?.isDirectPayment || initialCustomData?.isBundle) ? 'TURNKEY OFFER BUNDLE' : currentConfig.badge}
               </span>
               <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>•</span>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6B7280' }}>{currentConfig.categoryLabel}</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6B7280' }}>
+                {(initialCustomData?.isDirectPayment || initialCustomData?.isBundle) ? 'Direct Sprint Checkout' : currentConfig.categoryLabel}
+              </span>
             </div>
 
             <h3
@@ -891,56 +931,77 @@ export default function NewRequestModal({
                 letterSpacing: '-0.02em',
               }}
             >
-              {step === 1 && 'Tell us what you need'}
-              {step === 2 && 'Review Your Requirements'}
-              {step === 3 && 'Your Request Price'}
+              {(initialCustomData?.isDirectPayment || initialCustomData?.isBundle)
+                ? `Complete Your ${initialCustomData.bundleTitle || 'Offer Bundle'} Request`
+                : (step === 1 && 'Tell us what you need') ||
+                  (step === 2 && 'Review Your Requirements') ||
+                  (step === 3 && 'Your Request Price')}
             </h3>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             {/* Stepper Progress Pill Indicator */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {[
-                { num: 1, label: '1 Scope' },
-                { num: 2, label: '2 Review' },
-                { num: 3, label: '3 Price' },
-              ].map((s, idx) => (
-                <React.Fragment key={s.num}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '4px 10px',
-                      borderRadius: '12px',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      background:
-                        step === s.num
-                          ? '#EDE9FE'
-                          : step > s.num
-                          ? '#ECFDF5'
-                          : '#F3F4F6',
-                      color:
-                        step === s.num
-                          ? '#7C3AED'
-                          : step > s.num
-                          ? '#059669'
-                          : '#6B7280',
-                      border:
-                        step === s.num
-                          ? '1px solid #C4B5FD'
-                          : step > s.num
-                          ? '1px solid #A7F3D0'
-                          : '1px solid transparent',
-                    }}
-                  >
-                    <span>{s.label}</span>
-                  </div>
-                  {idx < 2 && <span style={{ color: '#D1D5DB', fontSize: '0.75rem' }}>→</span>}
-                </React.Fragment>
-              ))}
-            </div>
+            {(initialCustomData?.isDirectPayment || initialCustomData?.isBundle) ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '12px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  background: '#ECFDF5',
+                  color: '#059669',
+                  border: '1px solid #A7F3D0',
+                }}
+              >
+                <span>⚡ Direct Checkout (${displayPrice})</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {[
+                  { num: 1, label: '1 Scope' },
+                  { num: 2, label: '2 Review' },
+                  { num: 3, label: '3 Price' },
+                ].map((s, idx) => (
+                  <React.Fragment key={s.num}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        background:
+                          step === s.num
+                            ? '#EDE9FE'
+                            : step > s.num
+                            ? '#ECFDF5'
+                            : '#F3F4F6',
+                        color:
+                          step === s.num
+                            ? '#7C3AED'
+                            : step > s.num
+                            ? '#059669'
+                            : '#6B7280',
+                        border:
+                          step === s.num
+                            ? '1px solid #C4B5FD'
+                            : step > s.num
+                            ? '1px solid #A7F3D0'
+                            : '1px solid transparent',
+                      }}
+                    >
+                      <span>{s.label}</span>
+                    </div>
+                    {idx < 2 && <span style={{ color: '#D1D5DB', fontSize: '0.75rem' }}>→</span>}
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
 
             {/* Close Button */}
             <button
@@ -3342,6 +3403,32 @@ export default function NewRequestModal({
                   </div>
                 </div>
 
+                {/* Included Bundle Deliverables */}
+                {initialCustomData?.deliverables && Array.isArray(initialCustomData.deliverables) && initialCustomData.deliverables.length > 0 && (
+                  <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem', marginBottom: '1rem' }}>
+                    <div
+                      style={{
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        color: '#4B5563',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        marginBottom: '0.75rem',
+                      }}
+                    >
+                      INCLUDED SPRINT DELIVERABLES
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {initialCustomData.deliverables.map((del, dIdx) => (
+                        <div key={dIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.86rem', color: '#1E293B' }}>
+                          <CheckCircle2 size={16} color="#059669" style={{ flexShrink: 0 }} />
+                          <span>{del}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Itemized Scope Breakdown Table */}
                 <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem' }}>
                   <div
@@ -3434,7 +3521,7 @@ export default function NewRequestModal({
             flexShrink: 0,
           }}
         >
-          {step === 1 ? (
+          {step === 1 || (initialCustomData?.isDirectPayment || initialCustomData?.isBundle) ? (
             <button
               type="button"
               onClick={onClose}
@@ -3481,7 +3568,7 @@ export default function NewRequestModal({
             </button>
           )}
 
-          {step === 1 && (
+          {step === 1 && !(initialCustomData?.isDirectPayment || initialCustomData?.isBundle) && (
             <button
               type="button"
               onClick={handleProceedToReview}
@@ -3557,7 +3644,13 @@ export default function NewRequestModal({
                 transition: 'all 0.15s ease',
               }}
             >
-              <span>{isSubmitting ? 'Submitting Sprint Ticket...' : 'Confirm & Submit Request'}</span>
+              <span>
+                {isSubmitting
+                  ? 'Submitting Sprint Ticket...'
+                  : (initialCustomData?.isDirectPayment || initialCustomData?.isBundle)
+                  ? `Confirm & Submit Bundle Request ($${displayPrice})`
+                  : 'Confirm & Submit Request'}
+              </span>
               <ArrowRight size={15} />
             </button>
           )}

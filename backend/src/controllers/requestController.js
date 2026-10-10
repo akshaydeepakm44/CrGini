@@ -112,17 +112,24 @@ export const calculateServicePrice = ({ serviceType, subService, requirements = 
   let breakdown = [];
   let serviceLabel = 'Company Boost Sprint';
 
+  const explicitPrice = (typeof requirements.totalPrice === 'number' && requirements.totalPrice > 0)
+    ? requirements.totalPrice
+    : (typeof requirements.bundlePrice === 'number' && requirements.bundlePrice > 0)
+    ? requirements.bundlePrice
+    : null;
+
   const bundleKey = requirements.bundleId || requirements.bundle_id || requirements.bundle;
-  if (bundleKey && BUNDLE_PRICES[bundleKey]) {
-    basePrice = BUNDLE_PRICES[bundleKey];
-    serviceLabel = `Offer Bundle: ${bundleKey}`;
-    breakdown.push({ item: `Curated Specialist Bundle (${bundleKey})`, amount: basePrice });
+  if (explicitPrice !== null || (bundleKey && BUNDLE_PRICES[bundleKey])) {
+    basePrice = explicitPrice !== null ? explicitPrice : BUNDLE_PRICES[bundleKey];
+    const finalTitle = requirements.bundleTitle || (bundleKey ? `Offer Bundle: ${bundleKey}` : 'Specialist Bundle');
+    serviceLabel = finalTitle;
+    breakdown.push({ item: `${finalTitle} (All-Inclusive Bundle Price)`, amount: basePrice });
     return {
       price: basePrice,
       currency: 'USD',
       pricingStatus: 'CONFIGURED',
       serviceLabel,
-      breakdown
+      breakdown,
     };
   }
 

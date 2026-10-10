@@ -184,7 +184,16 @@ export default function OfferBundlePage({ onRequestBundle, onNavigate }) {
     if (onRequestBundle) {
       onRequestBundle('custom', {
         bundleId: bundle.id,
+        bundleTitle: bundle.title,
+        bundlePrice: bundle.bundlePrice,
         totalPrice: bundle.bundlePrice,
+        isBundle: true,
+        isDirectPayment: true,
+        deliverables: bundle.deliverables,
+        services: bundle.services,
+        breakdown: [
+          { item: `${bundle.title} (Turnkey Specialist Bundle)`, amount: bundle.bundlePrice },
+        ],
         selectedServices: bundle.serviceIds.reduce((acc, sid) => {
           // map to custom form keys
           const keyMap = {
@@ -537,7 +546,7 @@ export default function OfferBundlePage({ onRequestBundle, onNavigate }) {
                 onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-1px)')}
                 onMouseLeave={(e) => (e.currentTarget.style.transform = 'none')}
               >
-                <span>Request {b.title.split(' ')[0]} Bundle</span>
+                <span>Request Full Bundle (${b.bundlePrice})</span>
                 <ArrowRight size={14} />
               </button>
             </div>

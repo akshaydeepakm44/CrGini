@@ -13,6 +13,11 @@ import {
   deleteFile,
   isDataUrl,
 } from '../services/storageService.js';
+import {
+  streamGeneratedCompanyStudyPdf,
+  streamGeneratedLeadStudyPdf,
+  streamGeneratedPitchDeckPdf,
+} from '../services/pdfService.js';
 
 /**
  * Public Sample Controller
@@ -78,8 +83,8 @@ export const getPublicSampleBySlug = async (req, res) => {
       marketPosition: companyStudyData.marketPosition || '',
       keyObservations: companyStudyData.keyObservations || '',
       potentialOpportunity: companyStudyData.potentialOpportunity || '',
-      hasPdf: Boolean(companyStudyData.pdfAssetKey),
-      pdfUrl: companyStudyData.pdfAssetKey ? `/api/samples/${sample.slug}/company-study-pdf` : null,
+      hasPdf: true,
+      pdfUrl: `/api/samples/${sample.slug}/company-study-pdf`,
       pdfFileName: companyStudyData.pdfFileName || `${sample.companyName} - Company Study.pdf`,
     };
 
@@ -206,36 +211,44 @@ export const streamPublicPitchDeck = async (req, res) => {
     const { download } = req.query;
 
     const sample = await findSampleBySlug(slug, true);
-    if (!sample || !sample.pitchDeck || !sample.pitchDeck.assetKey) {
+    if (!sample) {
       return res.status(404).json({
         success: false,
-        message: 'Pitch deck asset not found or not published.',
+        message: 'Sample showcase not found.',
       });
     }
 
-    const assetKey = sample.pitchDeck.assetKey;
-    const mimeType = sample.pitchDeck.mimeType || 'application/pdf';
-    const fileName = (sample.pitchDeck.fileName || 'CreativeGini_Sample_Pitch_Deck.pdf').replace(/["\r\n]/g, '_');
+    if (sample.pitchDeck?.assetKey) {
+      try {
+        const assetKey = sample.pitchDeck.assetKey;
+        const mimeType = sample.pitchDeck.mimeType || 'application/pdf';
+        const fileName = (sample.pitchDeck.fileName || 'CreativeGini_Sample_Pitch_Deck.pdf').replace(/["\r\n]/g, '_');
+        const stat = await getObjectStat(assetKey).catch(() => null);
+        const stream = await getFileStream(assetKey);
 
-    const stat = await getObjectStat(assetKey).catch(() => null);
-    const stream = await getFileStream(assetKey);
+        const disposition = download === 'true'
+          ? `attachment; filename="${fileName}"`
+          : `inline; filename="${fileName}"`;
 
-    const disposition = download === 'true'
-      ? `attachment; filename="${fileName}"`
-      : `inline; filename="${fileName}"`;
+        const headers = {
+          'Content-Type': mimeType,
+          'Content-Disposition': disposition,
+          'Cache-Control': 'public, max-age=3600',
+        };
 
-    const headers = {
-      'Content-Type': mimeType,
-      'Content-Disposition': disposition,
-      'Cache-Control': 'public, max-age=3600',
-    };
+        if (stat?.size) {
+          headers['Content-Length'] = stat.size;
+        }
 
-    if (stat?.size) {
-      headers['Content-Length'] = stat.size;
+        res.writeHead(200, headers);
+        return stream.pipe(res);
+      } catch (streamErr) {
+        console.warn('[SampleController.streamPublicPitchDeck] MinIO stream failed, falling back to dynamic generation:', streamErr?.message);
+      }
     }
 
-    res.writeHead(200, headers);
-    return stream.pipe(res);
+    // Dynamic generation fallback
+    return streamGeneratedPitchDeckPdf(sample, null, res, download === 'true');
   } catch (error) {
     console.error('[SampleController.streamPublicPitchDeck] Error:', error);
     return res.status(500).json({
@@ -246,7 +259,7 @@ export const streamPublicPitchDeck = async (req, res) => {
 };
 
 /**
- * @desc    Stream published Company Study PDF securely from Object Storage
+ * @desc    Stream published Company Study PDF securely from Object Storage or generate dynamically
  * @route   GET /api/samples/:slug/company-study-pdf
  * @access  Public (No Auth Required)
  */
@@ -256,36 +269,46 @@ export const streamCompanyStudyPdf = async (req, res) => {
     const { download } = req.query;
 
     const sample = await findSampleBySlug(slug, true);
-    if (!sample || !sample.companyStudy || !sample.companyStudy.pdfAssetKey) {
+    if (!sample) {
       return res.status(404).json({
         success: false,
-        message: 'Company study document not found or not published.',
+        message: 'Prospect intelligence showcase not found.',
       });
     }
 
-    const assetKey = sample.companyStudy.pdfAssetKey;
-    const mimeType = sample.companyStudy.pdfMimeType || 'application/pdf';
-    const fileName = (sample.companyStudy.pdfFileName || `${sample.companyName}_Company_Study.pdf`).replace(/["\r\n]/g, '_');
+    // If PDF assetKey is in MinIO, try streaming it
+    if (sample.companyStudy?.pdfAssetKey) {
+      try {
+        const assetKey = sample.companyStudy.pdfAssetKey;
+        const mimeType = sample.companyStudy.pdfMimeType || 'application/pdf';
+        const fileName = (sample.companyStudy.pdfFileName || `${sample.companyName}_Company_Study.pdf`).replace(/["\r\n]/g, '_');
 
-    const stat = await getObjectStat(assetKey).catch(() => null);
-    const stream = await getFileStream(assetKey);
+        const stat = await getObjectStat(assetKey).catch(() => null);
+        const stream = await getFileStream(assetKey);
 
-    const disposition = download === 'true'
-      ? `attachment; filename="${fileName}"`
-      : `inline; filename="${fileName}"`;
+        const disposition = download === 'true'
+          ? `attachment; filename="${fileName}"`
+          : `inline; filename="${fileName}"`;
 
-    const headers = {
-      'Content-Type': mimeType,
-      'Content-Disposition': disposition,
-      'Cache-Control': 'public, max-age=3600',
-    };
+        const headers = {
+          'Content-Type': mimeType,
+          'Content-Disposition': disposition,
+          'Cache-Control': 'public, max-age=3600',
+        };
 
-    if (stat?.size) {
-      headers['Content-Length'] = stat.size;
+        if (stat?.size) {
+          headers['Content-Length'] = stat.size;
+        }
+
+        res.writeHead(200, headers);
+        return stream.pipe(res);
+      } catch (streamErr) {
+        console.warn('[SampleController.streamCompanyStudyPdf] MinIO stream failed, generating document on the fly:', streamErr?.message);
+      }
     }
 
-    res.writeHead(200, headers);
-    return stream.pipe(res);
+    // Dynamic on-the-fly generation: Executive Company Study PDF
+    return streamGeneratedCompanyStudyPdf(sample, res, download === 'true');
   } catch (error) {
     console.error('[SampleController.streamCompanyStudyPdf] Error:', error);
     return res.status(500).json({
@@ -401,33 +424,35 @@ export const streamLeadStudyPdf = async (req, res) => {
     let assetKey = lead?.leadStudyPdfAssetKey || lead?.leadStudy?.assetKey;
     let fileName = lead?.leadStudyPdfName || `${lead?.name || 'Lead'}_Study.pdf`;
 
-    if (!assetKey) {
-      return res.status(404).json({
-        success: false,
-        message: 'Lead study document for this lead is not currently available.',
-      });
+    if (assetKey) {
+      try {
+        fileName = fileName.replace(/["\r\n]/g, '_');
+        const stat = await getObjectStat(assetKey).catch(() => null);
+        const stream = await getFileStream(assetKey);
+
+        const disposition = download === 'true'
+          ? `attachment; filename="${fileName}"`
+          : `inline; filename="${fileName}"`;
+
+        const headers = {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': disposition,
+          'Cache-Control': 'public, max-age=3600',
+        };
+
+        if (stat?.size) {
+          headers['Content-Length'] = stat.size;
+        }
+
+        res.writeHead(200, headers);
+        return stream.pipe(res);
+      } catch (streamErr) {
+        console.warn('[SampleController.streamLeadStudyPdf] MinIO stream failed, falling back to dynamic generation:', streamErr?.message);
+      }
     }
 
-    fileName = fileName.replace(/["\r\n]/g, '_');
-    const stat = await getObjectStat(assetKey).catch(() => null);
-    const stream = await getFileStream(assetKey);
-
-    const disposition = download === 'true'
-      ? `attachment; filename="${fileName}"`
-      : `inline; filename="${fileName}"`;
-
-    const headers = {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': disposition,
-      'Cache-Control': 'public, max-age=3600',
-    };
-
-    if (stat?.size) {
-      headers['Content-Length'] = stat.size;
-    }
-
-    res.writeHead(200, headers);
-    return stream.pipe(res);
+    // Dynamic generation fallback
+    return streamGeneratedLeadStudyPdf(lead || { name: 'Executive Lead' }, sample, res, download === 'true');
   } catch (error) {
     console.error('[SampleController.streamLeadStudyPdf] Error:', error);
     return res.status(500).json({
