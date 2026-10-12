@@ -79,7 +79,7 @@ export default function AdminSidebar({
             className={({ isActive }) => `cg-nav-link ${isActive ? 'active' : ''}`}
           >
             <Sparkles size={17} className="cg-nav-icon" />
-            <span className="cg-nav-label">Services (Page View)</span>
+            <span className="cg-nav-label">Services Channel : Page View</span>
           </NavLink>
         </div>
 

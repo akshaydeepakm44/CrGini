@@ -328,7 +328,7 @@ export default function CustomBundlePage({ onRequestCustomBundle, onNavigate }) 
         </h1>
 
         <p style={{ margin: 0, fontSize: '1rem', color: 'var(--cg-text-secondary, #4B5563)', maxWidth: '780px', lineHeight: 1.6 }}>
-          Build your custom sprint by picking any services across Boosting, Digitalising, UI/Design, and App Development. Automatically unlock volume bundle savings as you select capabilities.
+          Build your custom sprint by picking any services across {isChannelActive('digitalising') ? 'Boosting, Digitalising, UI/Design, and App Development' : 'Boosting, UI / Design, and App Development'}. Automatically unlock volume bundle savings as you select capabilities.
         </p>
       </div>
 

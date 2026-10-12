@@ -320,15 +320,31 @@ export default function CustomPage({ onRequestService, onNavigate }) {
           Dashboard
         </span>
         <ChevronRight size={14} color="#9CA3AF" />
-        <span
-          onClick={() => onNavigate && onNavigate('/portal/digitalising')}
-          style={{ cursor: 'pointer', transition: 'color 0.15s ease' }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#7C3AED')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = '#6B7280')}
-        >
-          Digitalising
-        </span>
-        <ChevronRight size={14} color="#9CA3AF" />
+        {isChannelActive('digitalising') ? (
+          <>
+            <span
+              onClick={() => onNavigate && onNavigate('/portal/digitalising')}
+              style={{ cursor: 'pointer', transition: 'color 0.15s ease' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#7C3AED')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#6B7280')}
+            >
+              Digitalising
+            </span>
+            <ChevronRight size={14} color="#9CA3AF" />
+          </>
+        ) : (
+          <>
+            <span
+              onClick={() => onNavigate && onNavigate('/portal/dashboard')}
+              style={{ cursor: 'pointer', transition: 'color 0.15s ease' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#7C3AED')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#6B7280')}
+            >
+              Services
+            </span>
+            <ChevronRight size={14} color="#9CA3AF" />
+          </>
+        )}
         <span style={{ color: '#111827', fontWeight: 600 }}>Custom Request</span>
       </div>
 
