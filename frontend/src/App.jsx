@@ -42,7 +42,7 @@ function TicketRedirect({ user, isAuthChecking }) {
   if (user.role === 'USER') {
     return <Navigate to={`/portal/requests/${encodeURIComponent(ticketId)}`} replace />;
   }
-  if (user.role === 'COMPANY_LEAD' || user.dashboardAccess?.companyLead || user.role === 'COMPANY_BOOST' || user.role === 'LANDING_PAGE') {
+  if (user.role === 'COMPANY_LEAD' || user.dashboardAccess?.companyLead) {
     return <Navigate to={`/lead/requests/${encodeURIComponent(ticketId)}`} replace />;
   }
 

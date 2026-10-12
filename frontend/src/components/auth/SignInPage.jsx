@@ -451,39 +451,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
                         🔍 Lead Specialist
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleQuickDemoLogin('boost@creativegini.com', 'Boost@123')}
-                        style={{
-                          background: '#F0FDFA',
-                          border: '1px solid #99F6E4',
-                          color: '#0F766E',
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        📈 Boost Strategist
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleQuickDemoLogin('ui@creativegini.com', 'UI@123')}
-                        style={{
-                          background: '#FAF5FF',
-                          border: '1px solid #DDD6FE',
-                          color: '#6D28D9',
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        🎨 UI Architect
-                      </button>
+                      
                     </div>
                   </div>
 

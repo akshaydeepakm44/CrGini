@@ -249,8 +249,6 @@ export default function AdminTeamPage() {
                   disabled={isUpdatingRole}
                 >
                   <option value="COMPANY_LEAD">COMPANY_LEAD (Digitalising / Lead Research)</option>
-                  <option value="COMPANY_BOOST">COMPANY_BOOST (Boosting / Growth & Outbound)</option>
-                  <option value="LANDING_PAGE">LANDING_PAGE (Landing Page & UI/UX Architect)</option>
                   <option value="ADMIN">ADMIN (Administrative Specialist)</option>
                   <option value="SUPER_ADMIN">SUPER_ADMIN (Full Platform Governance)</option>
                   <option value="USER">USER (Client User)</option>
