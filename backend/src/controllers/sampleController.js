@@ -92,6 +92,7 @@ export const getPublicSampleBySlug = async (req, res) => {
     const publicLeads = (sample.leads || []).map((l, index) => {
       const leadId = l.id || `lead-${index + 1}`;
       const leadName = l.name || 'Executive Lead';
+      const isFirstLead = index === 0;
 
       // Find matching lead study if available in leadStudies or attached directly to lead
       const matchedStudy = l.leadStudy || (sample.leadStudies || []).find((s) => s.leadName === leadName || s.id === leadId) || {};
@@ -110,15 +111,33 @@ export const getPublicSampleBySlug = async (req, res) => {
         streamUrl: `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck`,
       } : null));
 
+      // Extract real or inferred company link / website
+      let companyLink = l.companyLink || l.company_link || l.website || l.companyWebsite || l.domain || '';
+      if (!companyLink && l.company && l.company.includes('.')) {
+        companyLink = l.company.startsWith('http') ? l.company : `https://${l.company}`;
+      } else if (!companyLink && sample.companyName && sample.companyName.includes('.')) {
+        companyLink = `https://${sample.companyName}`;
+      }
+
+      // Extract real LinkedIn URL
+      const linkedinUrl = l.linkedin || l.linkedinUrl || l.linkedin_url || l.linkedinProfile || '';
+
+      // Direct email: Open & unmasked for the first lead
+      const unmaskedEmail = l.email || l.directWorkEmail || l.workEmail || '';
+      const emailForFirst = unmaskedEmail || (l.maskedEmail ? l.maskedEmail.replace('••••', 'contact') : '');
+
       return {
         id: leadId,
         name: leadName,
         title: l.title || 'Decision Maker',
         company: l.company || l.lead_company || sample.companyName,
+        companyLink: companyLink,
         logo: l.logo || null,
         industry: l.industry || '',
         location: l.location || '',
-        linkedin: l.linkedin || '',
+        linkedin: linkedinUrl,
+        email: isFirstLead ? emailForFirst : undefined,
+        isUnlocked: isFirstLead,
         leadStudyPdf: l.leadStudyPdf || null,
         leadStudyPdfName: l.leadStudyPdfName || null,
         pitchDeckPdf: l.pitchDeckPdf || null,

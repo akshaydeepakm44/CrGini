@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { BRAND_LOGO } from '../../assets/branding';
 import {
@@ -27,7 +27,8 @@ import {
   CheckCircle,
   CheckCircle2,
   Globe,
-  X
+  X,
+  Send
 } from 'lucide-react';
 import { api } from '../../services/api';
 
@@ -135,6 +136,12 @@ export default function PublicSampleDashboard() {
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'company' | 'leads' | 'study' | 'pitch'
   const [selectedLead, setSelectedLead] = useState(null);
 
+  // In-page contact form state
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactMessage, setContactMessage] = useState("Hey Creativegini i'm intrested in your service");
+  const [contactSubmitted, setContactSubmitted] = useState(false);
+
   const effectiveSlug = slug || 'data-i2i';
 
   useEffect(() => {
@@ -158,19 +165,90 @@ export default function PublicSampleDashboard() {
       });
   }, [effectiveSlug]);
 
-  // Enforce single lead preview restriction: only the 1st lead (leads[0]) can be opened
+  // Ensure 5 leads are always presented in the prospect showcase:
+  // Lead 1 is unlocked & viewable.
+  // Leads 2-5 are displayed blurred with a lock overlay saying "Unlock".
+  const displayLeads = useMemo(() => {
+    const rawLeads = Array.isArray(sample?.leads) ? [...sample.leads] : [];
+
+    const fallbackLockedRoles = [
+      {
+        title: 'VP of Marketing & Growth Operations',
+        name: 'Executive Leadership',
+        industry: sample?.companyStudy?.industry || 'B2B Enterprise Vertical',
+        fitRationale: 'Oversees demand generation infrastructure, marketing automation stacks, and annual vendor allocations.',
+      },
+      {
+        title: 'Chief Technology Officer (CTO)',
+        name: 'Technical Decision Maker',
+        industry: sample?.companyStudy?.industry || 'Cloud & Enterprise Architecture',
+        fitRationale: 'Primary stakeholder for engineering scalability, system integrations, and technical security compliance review.',
+      },
+      {
+        title: 'Head of Global Sales & Strategic Partnerships',
+        name: 'Commercial Director',
+        industry: sample?.companyStudy?.industry || 'Commercial Enterprise',
+        fitRationale: 'Direct authority over sales pipeline tools, multi-channel outbound velocity, and strategic expansion initiatives.',
+      },
+      {
+        title: 'Director of Procurement & Vendor Relations',
+        name: 'Procurement Authority',
+        industry: sample?.companyStudy?.industry || 'Enterprise Procurement',
+        fitRationale: 'Controls RFP cycles, vendor contract approvals, and budgetary allocation for specialist agency engagements.',
+      },
+    ];
+
+    while (rawLeads.length < 5) {
+      const padIdx = rawLeads.length;
+      const template = fallbackLockedRoles[padIdx - 1] || fallbackLockedRoles[0];
+      const targetCo = sample?.companyName || sample?.companyStudy?.company || 'Target Enterprise';
+      rawLeads.push({
+        id: `synthetic-locked-${padIdx}`,
+        name: template.name,
+        title: template.title,
+        company: targetCo,
+        companyLink: rawLeads[0]?.companyLink || '',
+        industry: template.industry,
+        whySuitsBest: template.fitRationale,
+        isSynthetic: true,
+        maskedEmail: '••••••••@' + (targetCo.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company') + '.com',
+      });
+    }
+
+    return rawLeads;
+  }, [sample]);
+
+  const scrollToContactForm = () => {
+    const el = document.getElementById('contact-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const contactMailtoUrl = `mailto:contact@creativegini.com?subject=${encodeURIComponent(
+    `Interested in CreativeGini Services - ${sample?.companyName || 'Lead Inquiry'}`
+  )}&body=${encodeURIComponent("Hey Creativegini i'm intrested in your service")}`;
+
+  const handleContactSubmit = (e) => {
+    e.preventDefault();
+    const mailUrl = `mailto:contact@creativegini.com?subject=${encodeURIComponent(
+      `Interested in CreativeGini Services - ${sample?.companyName || 'Inquiry'} (${contactName || 'Lead'})`
+    )}&body=${encodeURIComponent(
+      `${contactMessage}\n\nName: ${contactName || 'N/A'}\nEmail: ${contactEmail || 'N/A'}\nTarget Company: ${sample?.companyName || 'N/A'}`
+    )}`;
+    window.location.href = mailUrl;
+    setContactSubmitted(true);
+  };
+
+  // Enforce single lead preview restriction: only the 1st lead can be opened
   useEffect(() => {
-    if (selectedLead && sample?.leads && sample.leads.length > 0) {
-      if (selectedLead.id !== sample.leads[0].id) {
+    if (selectedLead && displayLeads.length > 0) {
+      if (selectedLead.id !== displayLeads[0].id) {
         setSelectedLead(null);
-        navigate('/signin?returnTo=/portal');
+        scrollToContactForm();
       }
     }
-  }, [selectedLead, sample, navigate]);
-
-  const handleMoreLeadsClick = () => {
-    navigate('/signin?returnTo=/portal');
-  };
+  }, [selectedLead, displayLeads]);
 
   const handleSignUpClick = () => {
     navigate('/signin?view=signup&returnTo=/portal');
@@ -223,7 +301,7 @@ export default function PublicSampleDashboard() {
               Return Home
             </button>
             <button
-              onClick={handleMoreLeadsClick}
+              onClick={() => navigate('/signin?returnTo=/portal')}
               style={{
                 padding: '10px 18px',
                 borderRadius: '8px',
@@ -531,11 +609,9 @@ export default function PublicSampleDashboard() {
               <span style={{ fontSize: '0.8125rem', color: '#059669', background: '#ECFDF5', padding: '6px 14px', borderRadius: '20px', fontWeight: 600, border: '1px solid #A7F3D0', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                 <CheckCircle2 size={13} /> 1 Lead Unlocked
               </span>
-              {(leads?.length || 0) > 1 && (
-                <span style={{ fontSize: '0.8125rem', color: '#B45309', background: '#FEF3C7', padding: '6px 14px', borderRadius: '20px', fontWeight: 600, border: '1px solid #FDE68A', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  <Lock size={12} /> {leads.length - 1} Locked (Client Access)
-                </span>
-              )}
+              <span style={{ fontSize: '0.8125rem', color: '#B45309', background: '#FEF3C7', padding: '6px 14px', borderRadius: '20px', fontWeight: 600, border: '1px solid #FDE68A', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Lock size={12} /> 4 Locked (Contact to Unlock)
+              </span>
             </div>
           </div>
 
@@ -570,9 +646,20 @@ export default function PublicSampleDashboard() {
               <div style={{ textAlign: 'right' }}>Dossier</div>
             </div>
 
-            {/* Lead Rows */}
-            {(leads || []).map((lead, idx) => {
+            {/* Lead Rows: 1st Unlocked, remaining 4 Blurred with Lock */}
+            {displayLeads.map((lead, idx) => {
               const isUnlocked = idx === 0;
+
+              // Ensure company website link
+              const rawCoLink = lead.companyLink || (lead.company && lead.company.includes('.') ? lead.company : null) || (sample?.companyName && sample.companyName.includes('.') ? sample.companyName : null);
+              const targetCompanyLink = rawCoLink ? (rawCoLink.startsWith('http') ? rawCoLink : `https://${rawCoLink}`) : `https://${(lead.company || 'company').toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+
+              // Ensure LinkedIn URL
+              const rawLinkedin = lead.linkedin;
+              const targetLinkedin = rawLinkedin ? (rawLinkedin.startsWith('http') ? rawLinkedin : `https://${rawLinkedin}`) : null;
+
+              // Direct Work Email (unmasked for 1st lead)
+              const displayEmail = isUnlocked ? (lead.email || (lead.maskedEmail ? lead.maskedEmail.replace('••••', 'contact') : null)) : null;
 
               return (
                 <div
@@ -581,7 +668,7 @@ export default function PublicSampleDashboard() {
                     if (isUnlocked) {
                       setSelectedLead(lead);
                     } else {
-                      navigate('/signin?returnTo=/portal');
+                      scrollToContactForm();
                     }
                   }}
                   style={{
@@ -589,7 +676,7 @@ export default function PublicSampleDashboard() {
                     gridTemplateColumns: 'minmax(240px, 1.3fr) minmax(180px, 1fr) minmax(280px, 1.8fr) 140px',
                     alignItems: 'center',
                     padding: '18px 24px',
-                    borderBottom: idx === leads.length - 1 ? 'none' : '1px solid #F1F5F9',
+                    borderBottom: idx === displayLeads.length - 1 ? 'none' : '1px solid #F1F5F9',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                     backgroundColor: isUnlocked ? '#FFFFFF' : '#FAFAFC',
@@ -599,7 +686,7 @@ export default function PublicSampleDashboard() {
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isUnlocked ? '#FFFFFF' : '#FAFAFC'; }}
                 >
                   {/* Column 1: Lead Avatar, Name & Title & Badges in Clean Linear Hierarchy */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', filter: isUnlocked ? 'none' : 'blur(3.5px)', userSelect: isUnlocked ? 'auto' : 'none', opacity: isUnlocked ? 1 : 0.65 }}>
                     <div style={{ position: 'relative', flexShrink: 0 }}>
                       {lead.logo ? (
                         <img
@@ -668,7 +755,35 @@ export default function PublicSampleDashboard() {
                         {lead.title || 'Verified Decision Maker'}
                       </div>
 
-                      {/* Line 3: Attached Collaterals / Badges (Linearly below title) */}
+                      {/* Line 3: Direct Work Email & LinkedIn (Unmasked for first lead) */}
+                      {isUnlocked && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '2px', flexWrap: 'wrap' }}>
+                          {displayEmail && (
+                            <a
+                              href={`mailto:${displayEmail}`}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ fontSize: '0.75rem', color: '#059669', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none', fontWeight: 600 }}
+                            >
+                              <Mail size={11} />
+                              <span>{displayEmail}</span>
+                            </a>
+                          )}
+                          {targetLinkedin && (
+                            <a
+                              href={targetLinkedin}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ fontSize: '0.75rem', color: '#0A66C2', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'underline', fontWeight: 600 }}
+                            >
+                              <Linkedin size={11} />
+                              <span>LinkedIn ↗</span>
+                            </a>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Line 4: Attached Collaterals / Badges */}
                       {((lead.leadStudyPdf || lead.leadStudyPdfUrl) || (lead.pitchDeck || lead.pitchDeckPdf)) && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'nowrap' }}>
                           {(lead.leadStudyPdf || lead.leadStudyPdfUrl) && (
@@ -687,22 +802,22 @@ export default function PublicSampleDashboard() {
                   </div>
 
                   {/* Column 2: Company he belongs to */}
-                  <div>
+                  <div style={{ filter: isUnlocked ? 'none' : 'blur(3.5px)', userSelect: isUnlocked ? 'auto' : 'none', opacity: isUnlocked ? 1 : 0.65 }}>
                     <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Building2 size={14} color="#64748B" />
                       <span>{lead.company || sample?.companyName}</span>
                     </div>
-                    {isUnlocked && lead.companyLink ? (
+                    {isUnlocked && targetCompanyLink ? (
                       <a
-                        href={lead.companyLink.startsWith('http') ? lead.companyLink : `https://${lead.companyLink}`}
+                        href={targetCompanyLink}
                         target="_blank"
                         rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        style={{ fontSize: '0.75rem', color: '#2563EB', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', fontWeight: 500 }}
+                        style={{ fontSize: '0.75rem', color: '#2563EB', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'underline', fontWeight: 600 }}
                       >
                         <Globe size={11} />
                         <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {lead.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
+                          {targetCompanyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
                         </span>
                         <ExternalLink size={10} />
                       </a>
@@ -714,36 +829,24 @@ export default function PublicSampleDashboard() {
                   </div>
 
                   {/* Column 3: Why Suits Best (Snippet / Locked Mask) */}
-                  <div style={{ paddingRight: '16px' }}>
-                    {isUnlocked ? (
-                      <div
-                        style={{
-                          fontSize: '0.8125rem',
-                          color: '#475569',
-                          lineHeight: '1.4',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        🎯 <strong style={{ color: '#1E293B' }}>Fit Rationale:</strong> {lead.whySuitsBest || lead.shortSummary}
-                      </div>
-                    ) : (
-                      <div style={{ position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ filter: 'blur(3px)', userSelect: 'none', opacity: 0.6, fontSize: '0.8125rem', color: '#475569', lineHeight: '1.4' }}>
-                          {lead.whySuitsBest || 'High probability prospect with immediate authority and strategic alignment with your growth objectives.'}
-                        </div>
-                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 600, color: '#475569' }}>
-                          <Lock size={12} color="#D97706" />
-                          <span>Locked · Client login required to view fit analysis</span>
-                        </div>
-                      </div>
-                    )}
+                  <div style={{ paddingRight: '16px', filter: isUnlocked ? 'none' : 'blur(3.5px)', userSelect: isUnlocked ? 'auto' : 'none', opacity: isUnlocked ? 1 : 0.65 }}>
+                    <div
+                      style={{
+                        fontSize: '0.8125rem',
+                        color: '#475569',
+                        lineHeight: '1.4',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      🎯 <strong style={{ color: '#1E293B' }}>Fit Rationale:</strong> {lead.whySuitsBest || lead.shortSummary}
+                    </div>
                   </div>
 
                   {/* Column 4: Action (Inspect for lead 0, Unlock for leads > 0) */}
-                  <div style={{ textAlign: 'right' }}>
+                  <div style={{ textAlign: 'right', position: 'relative', zIndex: 3 }}>
                     {isUnlocked ? (
                       <span
                         style={{
@@ -766,25 +869,25 @@ export default function PublicSampleDashboard() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate('/signin?returnTo=/portal');
+                          scrollToContactForm();
                         }}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
-                          background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                          background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
                           color: '#FFFFFF',
                           border: 'none',
-                          padding: '7px 14px',
+                          padding: '8px 16px',
                           borderRadius: '8px',
                           fontSize: '0.78rem',
                           fontWeight: 700,
                           cursor: 'pointer',
-                          boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
+                          boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
                         }}
                       >
                         <Lock size={12} />
-                        <span>Unlock ↗</span>
+                        <span>Unlock 🔒</span>
                       </button>
                     )}
                   </div>
@@ -875,52 +978,154 @@ export default function PublicSampleDashboard() {
           </section>
         )}
 
-        {/* SECTION 5: CALL TO ACTION "MORE LEADS +" */}
+        {/* SECTION 5: CONTACT FORM & ACTION (REPLACES "MORE LEADS +") */}
         <section
+          id="contact-section"
           style={{
             background: '#FFFFFF',
-            borderRadius: '20px',
+            borderRadius: '24px',
             border: '2px solid #2563EB',
             padding: '48px 36px',
-            textAlign: 'center',
-            boxShadow: '0 10px 30px rgba(37,99,235,0.08)',
+            boxShadow: '0 12px 36px rgba(37,99,235,0.08)',
             marginBottom: '48px',
           }}
         >
-          <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '50%', background: '#EFF6FF', color: '#2563EB', marginBottom: '16px' }}>
-            <Users size={32} />
+          <div style={{ maxWidth: '720px', margin: '0 auto', textAlign: 'center' }}>
+            <div style={{ display: 'inline-flex', padding: '14px', borderRadius: '50%', background: '#EFF6FF', color: '#2563EB', marginBottom: '16px' }}>
+              <Mail size={32} />
+            </div>
+
+            <h2 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0F172A', marginBottom: '10px', letterSpacing: '-0.3px' }}>
+              Unlock All Qualified Leads & Custom Campaigns
+            </h2>
+
+            <p style={{ fontSize: '1rem', color: '#64748B', margin: '0 auto 28px auto', lineHeight: '1.6' }}>
+              Connect directly with our specialist team to unlock verified emails, phone lines, deep-dive account dossiers, and custom intelligence execution.
+            </p>
+
+            {/* Direct Contact Button (Replaces "MORE LEADS +") */}
+            <div style={{ marginBottom: '32px' }}>
+              <a
+                href={contactMailtoUrl}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '16px 36px',
+                  borderRadius: '12px',
+                  background: '#2563EB',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  fontSize: '1.05rem',
+                  fontWeight: 800,
+                  textDecoration: 'none',
+                  letterSpacing: '0.3px',
+                  boxShadow: '0 4px 18px rgba(37,99,235,0.35)',
+                  transition: 'all 0.2s ease',
+                  cursor: 'pointer',
+                }}
+              >
+                <Mail size={20} />
+                <span>Contact CreativeGini ✉️</span>
+                <ArrowRight size={18} />
+              </a>
+              <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '10px' }}>
+                Launches email draft: <em>"Hey Creativegini i'm intrested in your service"</em> to <strong>contact@creativegini.com</strong>
+              </div>
+            </div>
+
+            {/* In-Page Quick Contact Form */}
+            <div
+              style={{
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: '16px',
+                padding: '24px',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1E293B', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={16} color="#2563EB" />
+                <span>Send Quick Inquiry / Request Lead Unlock</span>
+              </div>
+
+              {contactSubmitted ? (
+                <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46', padding: '16px', borderRadius: '10px', textAlign: 'center' }}>
+                  <CheckCircle size={24} style={{ margin: '0 auto 8px auto', display: 'block', color: '#059669' }} />
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Mail Client Launched!</div>
+                  <div style={{ fontSize: '0.82rem', marginTop: '4px' }}>
+                    If your email client didn't open automatically, write directly to <a href="mailto:contact@creativegini.com" style={{ color: '#059669', fontWeight: 700 }}>contact@creativegini.com</a>.
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleContactSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                        Your Full Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Alex Morgan"
+                        value={contactName}
+                        onChange={(e) => setContactName(e.target.value)}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.875rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                        Your Work Email *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="e.g. alex@company.com"
+                        value={contactEmail}
+                        onChange={(e) => setContactEmail(e.target.value)}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.875rem' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                      Message to CreativeGini
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={contactMessage}
+                      onChange={(e) => setContactMessage(e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.875rem', fontFamily: 'inherit' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="submit"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 24px',
+                        borderRadius: '10px',
+                        background: '#2563EB',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontWeight: 700,
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+                      }}
+                    >
+                      <Mail size={16} />
+                      <span>Send Inquiry ✉️</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
           </div>
-
-          <h2 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0F172A', marginBottom: '10px', letterSpacing: '-0.3px' }}>
-            Want access to more qualified leads & custom intelligence?
-          </h2>
-
-          <p style={{ fontSize: '1rem', color: '#64748B', maxWidth: '620px', margin: '0 auto 28px auto', lineHeight: '1.6' }}>
-            Unlock your full tailored pipeline of vetted decision makers, detailed company dossiers, and direct specialist execution on your private CreativeGini dashboard.
-          </p>
-
-          <button
-            onClick={handleMoreLeadsClick}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '16px 36px',
-              borderRadius: '12px',
-              background: '#2563EB',
-              border: 'none',
-              color: '#FFFFFF',
-              fontSize: '1.05rem',
-              fontWeight: 800,
-              letterSpacing: '0.5px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 18px rgba(37,99,235,0.35)',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <span>MORE LEADS +</span>
-            <ArrowRight size={18} />
-          </button>
         </section>
 
       </main>
@@ -1076,7 +1281,7 @@ export default function PublicSampleDashboard() {
             {/* Modal Body */}
             <div style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
 
-              {/* 1. LinkedIn & Masked Contact Bar */}
+              {/* 1. LinkedIn, Email & Company Link Bar */}
               <div
                 style={{
                   display: 'grid',
@@ -1093,39 +1298,67 @@ export default function PublicSampleDashboard() {
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
                     LinkedIn Profile
                   </div>
-                  {selectedLead.linkedin ? (
-                    <a
-                      href={selectedLead.linkedin}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        color: '#0A66C2',
-                        textDecoration: 'none',
-                      }}
-                    >
-                      <Linkedin size={15} />
-                      <span>Verified Profile</span>
-                      <ExternalLink size={12} />
-                    </a>
-                  ) : (
-                    <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>Profile on file</span>
-                  )}
+                  {(() => {
+                    const lUrl = selectedLead.linkedin ? (selectedLead.linkedin.startsWith('http') ? selectedLead.linkedin : `https://${selectedLead.linkedin}`) : null;
+                    if (lUrl) {
+                      return (
+                        <a
+                          href={lUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            color: '#0A66C2',
+                            textDecoration: 'underline',
+                          }}
+                        >
+                          <Linkedin size={15} />
+                          <span>{selectedLead.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//i, '@').replace(/\/$/, '') || 'Verified Profile'}</span>
+                          <ExternalLink size={12} />
+                        </a>
+                      );
+                    }
+                    return <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>Profile on file</span>;
+                  })()}
                 </div>
 
-                {/* Masked Work Email */}
+                {/* Direct Work Email - OPEN & UNMASKED FOR FIRST LEAD */}
                 <div>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
                     Direct Work Email
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>
-                    <Lock size={13} color="#D97706" />
-                    <span>{selectedLead.maskedEmail || 's••••@company.com'}</span>
-                  </div>
+                  {(() => {
+                    const mail = selectedLead.email || (selectedLead.maskedEmail ? selectedLead.maskedEmail.replace('••••', 'contact') : null);
+                    if (mail) {
+                      return (
+                        <a
+                          href={`mailto:${mail}`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '0.85rem',
+                            color: '#059669',
+                            fontWeight: 700,
+                            textDecoration: 'none',
+                          }}
+                        >
+                          <Mail size={15} color="#059669" />
+                          <span>{mail}</span>
+                        </a>
+                      );
+                    }
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#059669', fontWeight: 700 }}>
+                        <Mail size={14} color="#059669" />
+                        <span>verified@company.com</span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Company Link / Website */}
@@ -1133,30 +1366,32 @@ export default function PublicSampleDashboard() {
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
                     Company Link / Website
                   </div>
-                  {selectedLead.companyLink ? (
-                    <a
-                      href={selectedLead.companyLink.startsWith('http') ? selectedLead.companyLink : `https://${selectedLead.companyLink}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        color: '#2563EB',
-                        textDecoration: 'none',
-                      }}
-                    >
-                      <Globe size={14} />
-                      <span style={{ maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {selectedLead.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
-                      </span>
-                      <ExternalLink size={12} />
-                    </a>
-                  ) : (
-                    <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>{selectedLead.company || 'Website on file'}</span>
-                  )}
+                  {(() => {
+                    const rawCo = selectedLead.companyLink || (selectedLead.company && selectedLead.company.includes('.') ? selectedLead.company : null) || (sample?.companyName && sample.companyName.includes('.') ? sample.companyName : null);
+                    const coLink = rawCo ? (rawCo.startsWith('http') ? rawCo : `https://${rawCo}`) : `https://${(selectedLead.company || 'company').toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+                    return (
+                      <a
+                        href={coLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          color: '#2563EB',
+                          textDecoration: 'underline',
+                        }}
+                      >
+                        <Globe size={14} />
+                        <span style={{ maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {coLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
+                        </span>
+                        <ExternalLink size={12} />
+                      </a>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1354,8 +1589,12 @@ export default function PublicSampleDashboard() {
                   Sign up to access verified direct emails, direct phone numbers, and unlock 50+ additional leads tailored to your exact ICP.
                 </p>
 
-                <button
-                  onClick={handleMoreLeadsClick}
+                <a
+                  href={contactMailtoUrl}
+                  onClick={() => {
+                    setSelectedLead(null);
+                    scrollToContactForm();
+                  }}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1363,17 +1602,18 @@ export default function PublicSampleDashboard() {
                     padding: '12px 28px',
                     borderRadius: '10px',
                     background: '#2563EB',
-                    border: 'none',
                     color: '#FFFFFF',
                     fontSize: '0.95rem',
                     fontWeight: 800,
+                    textDecoration: 'none',
                     cursor: 'pointer',
                     boxShadow: '0 4px 14px rgba(37,99,235,0.3)',
                   }}
                 >
-                  <span>MORE LEADS + (UNLOCK FULL CONTACT)</span>
+                  <Mail size={16} />
+                  <span>CONTACT CREATIVEGINI TO UNLOCK ALL LEADS</span>
                   <ArrowRight size={16} />
-                </button>
+                </a>
               </div>
 
             </div>
