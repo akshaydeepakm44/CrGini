@@ -13,6 +13,7 @@ import {
   uploadCompanyStudyPdf,
   uploadAdminPitchDeck,
   uploadLeadPitchDeck,
+  submitPublicInquiry,
 } from '../controllers/sampleController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -40,6 +41,7 @@ router.use('/manage', manageRouter);
 // PUBLIC SAMPLE SHOWCASE ENDPOINTS (No authentication required)
 // =========================================================================
 router.get('/:slug', getPublicSampleBySlug);
+router.post('/:slug/inquiry', submitPublicInquiry);
 router.get('/:slug/pitch-deck', streamPublicPitchDeck);
 router.get('/:slug/company-study-pdf', streamCompanyStudyPdf);
 router.get('/:slug/leads/:leadId/pitch-deck', streamLeadPitchDeck);

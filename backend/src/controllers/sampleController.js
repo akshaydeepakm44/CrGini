@@ -6,6 +6,7 @@ import {
   updateSampleShowcase,
   deleteSampleShowcase,
 } from '../repositories/sampleRepository.js';
+import { query } from '../config/postgres.js';
 import {
   uploadFile,
   getFileStream,
@@ -843,3 +844,62 @@ export const uploadLeadPitchDeck = async (req, res) => {
     });
   }
 };
+
+/**
+ * @desc    Submit public sample inquiry / lead unlock request directly from prospect dashboard
+ * @route   POST /api/samples/:slug/inquiry
+ * @access  Public (No Auth Required)
+ */
+export const submitPublicInquiry = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { name, email, message } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Your work email is required.',
+      });
+    }
+
+    const sample = await findSampleBySlug(slug, false);
+    const companyName = sample?.companyName || slug;
+
+    // Ensure database table exists for prospect inquiries
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS public_sample_inquiries (
+          id SERIAL PRIMARY KEY,
+          slug VARCHAR(255) NOT NULL,
+          company_name VARCHAR(255),
+          sender_name VARCHAR(255),
+          sender_email VARCHAR(255) NOT NULL,
+          message TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+
+      await query(
+        `
+        INSERT INTO public_sample_inquiries (slug, company_name, sender_name, sender_email, message)
+        VALUES ($1, $2, $3, $4, $5);
+      `,
+        [slug, companyName, (name && name.trim()) || 'Prospect Visitor', email.trim().toLowerCase(), message || "Hey Creativegini i'm intrested in your service"]
+      );
+    } catch (dbErr) {
+      console.warn('[SampleController.submitPublicInquiry] Table/insert warning:', dbErr?.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Inquiry successfully recorded for ${companyName}! Our specialist team will reach out to ${email.trim()} within 2-4 hours.`,
+    });
+  } catch (error) {
+    console.error('[SampleController.submitPublicInquiry] Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to submit inquiry. Please try again or email us directly.',
+    });
+  }
+};
+

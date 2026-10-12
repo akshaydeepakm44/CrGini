@@ -1114,6 +1114,15 @@ export const api = {
     return parseApiResponse(res, 'Failed to load public sample showcase');
   },
 
+  async submitPublicInquiry(slug, data) {
+    const res = await fetch(`${API_BASE}/samples/${encodeURIComponent(slug)}/inquiry`, {
+      method: 'POST',
+      headers: getHeaders(false),
+      body: JSON.stringify(data),
+    });
+    return parseApiResponse(res, 'Failed to submit inquiry');
+  },
+
   // Prospect Sample Showcase Management (Lead Specialists & Admin)
   async getAdminSamples() {
     const token = getStoredToken();
