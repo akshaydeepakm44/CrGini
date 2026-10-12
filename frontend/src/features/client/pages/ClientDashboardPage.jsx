@@ -156,14 +156,7 @@ export default function ClientDashboardPage({
       {/* ============================================================
           SECTION B: ACCOUNT / REQUEST METRICS
           ============================================================ */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
-          gap: '18px',
-          marginBottom: '36px',
-        }}
-      >
+      <div className="cg-dashboard-metrics-grid">
         <MetricCard
           value={liveMetrics.activeRequests}
           label="Active Requests"
@@ -247,11 +240,7 @@ export default function ClientDashboardPage({
           </button>
         </div>
 
-        <div style={{
-          display: 'grid',
-          gap: '20px',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))'
-        }}>
+        <div className="cg-dashboard-services-grid">
           {[
             {
               id: 'lead-research',
@@ -259,8 +248,9 @@ export default function ClientDashboardPage({
               price: '$2 / lead',
               desc: 'Hand-verified prospect contact intelligence tailored to your ideal customer profile.',
               icon: Target,
-              color: '#7C3AED',
-              bg: '#F5F3FF',
+              color: '#4F46E5',
+              bg: '#EEF2FF',
+              border: '#E0E7FF',
               badge: '24–48h Turnaround',
             },
             {
@@ -269,8 +259,9 @@ export default function ClientDashboardPage({
               price: '$1 / study',
               desc: 'Personal company study, tech stack telemetry, and strategic expansion insights for target accounts.',
               icon: Building2,
-              color: '#6366F1',
-              bg: '#EEF2FF',
+              color: '#0284C7',
+              bg: '#F0F9FF',
+              border: '#BAE6FD',
               badge: 'Comprehensive Dossier',
             },
             {
@@ -279,8 +270,9 @@ export default function ClientDashboardPage({
               price: '$2 / profile',
               desc: 'Map the buying committee: direct emails and phone numbers for verified key decision-makers.',
               icon: Users,
-              color: '#0EA5E9',
-              bg: '#F0F9FF',
+              color: '#059669',
+              bg: '#ECFDF5',
+              border: '#A7F3D0',
               badge: 'Executive Profiles',
             },
             {
@@ -289,8 +281,9 @@ export default function ClientDashboardPage({
               price: '$2 / sprint',
               desc: 'Arm your pitch with rock-solid data, competitor battlecards, and tailored narrative slides.',
               icon: Presentation,
-              color: '#10B981',
-              bg: '#ECFDF5',
+              color: '#D97706',
+              bg: '#FFFBEB',
+              border: '#FDE68A',
               badge: 'Slide Deck & Brief',
             },
           ].map((srv) => {
@@ -301,24 +294,24 @@ export default function ClientDashboardPage({
                 style={{
                   backgroundColor: '#FFFFFF',
                   borderRadius: '16px',
-                  border: '1px solid #E5E7EB',
+                  border: `1px solid ${srv.border || '#E5E7EB'}`,
                   padding: '22px',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
                   gap: '16px',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 10px 24px rgba(124, 58, 237, 0.08)';
-                  e.currentTarget.style.borderColor = '#DDD4FA';
+                  e.currentTarget.style.transform = 'translateY(-3px)';
+                  e.currentTarget.style.boxShadow = `0 12px 24px -4px ${srv.color}22`;
+                  e.currentTarget.style.borderColor = srv.color;
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
-                  e.currentTarget.style.borderColor = '#E5E7EB';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                  e.currentTarget.style.borderColor = srv.border || '#E5E7EB';
                 }}
               >
                 <div>
@@ -345,6 +338,7 @@ export default function ClientDashboardPage({
                         backgroundColor: srv.bg,
                         padding: '3px 9px',
                         borderRadius: '999px',
+                        border: `1px solid ${srv.border || 'transparent'}`,
                       }}
                     >
                       {srv.price}
@@ -382,7 +376,7 @@ export default function ClientDashboardPage({
                       padding: '8px 12px',
                       borderRadius: '8px',
                       border: 'none',
-                      backgroundColor: '#7C3AED',
+                      backgroundColor: srv.color,
                       color: '#FFFFFF',
                       fontSize: '0.8125rem',
                       fontWeight: 700,
@@ -391,6 +385,14 @@ export default function ClientDashboardPage({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '5px',
+                      boxShadow: `0 2px 6px -1px ${srv.color}40`,
+                      transition: 'filter 0.2s ease, transform 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.filter = 'brightness(1.08)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.filter = 'none';
                     }}
                   >
                     <Plus size={14} />

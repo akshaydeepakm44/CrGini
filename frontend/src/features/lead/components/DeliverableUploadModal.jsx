@@ -795,7 +795,7 @@ export default function DeliverableUploadModal({
                     </h3>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '12px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
                         Dossier Document Title
@@ -880,7 +880,7 @@ export default function DeliverableUploadModal({
                     </h3>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.8fr 1.4fr 1.4fr', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
                         Lead List Name
@@ -1080,21 +1080,22 @@ export default function DeliverableUploadModal({
                     Provide verified contacts with legitimate company/brand logos (PNG, JPG) for display in the client dashboard.
                   </p>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {keyPeople.map((person, pIdx) => (
-                      <div
-                        key={pIdx}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1.2fr 1.1fr 1.4fr 1.4fr 85px 36px',
-                          gap: '8px',
-                          alignItems: 'center',
-                          backgroundColor: '#FAFAFC',
-                          padding: '10px 12px',
-                          borderRadius: '8px',
-                          border: '1px solid #F1F5F9',
-                        }}
-                      >
+                  <div style={{ width: '100%', overflowX: 'auto', paddingBottom: '6px' }}>
+                    <div style={{ minWidth: '780px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {keyPeople.map((person, pIdx) => (
+                        <div
+                          key={pIdx}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'minmax(130px, 1.2fr) minmax(130px, 1.1fr) minmax(150px, 1.4fr) minmax(140px, 1.4fr) 85px 36px',
+                            gap: '8px',
+                            alignItems: 'center',
+                            backgroundColor: '#FAFAFC',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #F1F5F9',
+                          }}
+                        >
                         <input
                           type="text"
                           placeholder="Full Name"
@@ -1233,6 +1234,7 @@ export default function DeliverableUploadModal({
                         </button>
                       </div>
                     ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1255,7 +1257,7 @@ export default function DeliverableUploadModal({
                     </h3>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '12px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
                         Pitch Deck Proposal Title
@@ -1366,7 +1368,7 @@ export default function DeliverableUploadModal({
                     Upload spreadsheet with 13 columns: Executive Lead Name, Title / Role, Target Company, Company Website, Direct Work Email, LinkedIn Profile, Verification Status, Fit Rationale, Why Relevant, Observed Context, Suggested Approach, Lead Study PDF, Proposal Pitch Deck.
                   </p>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.6fr', gap: '14px', marginBottom: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '10px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
                         Dataset Deliverable Title

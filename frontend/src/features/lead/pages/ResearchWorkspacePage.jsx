@@ -177,6 +177,9 @@ export default function ResearchWorkspacePage({ onNavigate }) {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQueue, setSearchQueue] = useState('');
+  const [isQueueCollapsed, setIsQueueCollapsed] = useState(() => {
+    return typeof window !== 'undefined' && window.innerWidth < 1150;
+  });
 
   // Active ticket dynamic requirements
   const [activeReqs, setActiveReqs] = useState({
@@ -616,7 +619,7 @@ export default function ResearchWorkspacePage({ onNavigate }) {
   });
 
   return (
-    <div style={{ padding: '28px 32px 60px', maxWidth: '1440px', margin: '0 auto' }}>
+    <div style={{ padding: '24px 24px 100px', maxWidth: '1480px', margin: '0 auto' }}>
       {/* 1. Header Banner */}
       <div
         style={{
@@ -668,50 +671,77 @@ export default function ResearchWorkspacePage({ onNavigate }) {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={loadWorkspaceData}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '9px 15px',
-            borderRadius: '10px',
-            border: '1px solid #E5E7EB',
-            backgroundColor: '#FFFFFF',
-            color: '#374151',
-            fontSize: '0.84rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          <RefreshCw size={15} />
-          Refresh
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setIsQueueCollapsed(!isQueueCollapsed)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 15px',
+              borderRadius: '10px',
+              border: isQueueCollapsed ? '1px solid #7C3AED' : '1px solid #E5E7EB',
+              backgroundColor: isQueueCollapsed ? '#F5F3FF' : '#FFFFFF',
+              color: isQueueCollapsed ? '#7C3AED' : '#374151',
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: isQueueCollapsed ? '0 1px 4px rgba(124, 58, 237, 0.15)' : 'none',
+              transition: 'all 0.15s ease',
+            }}
+            title={isQueueCollapsed ? "Show sprint queue sidebar" : "Collapse sprint queue for maximum workbench width"}
+          >
+            <Layers size={15} />
+            <span>{isQueueCollapsed ? "Show Sprints Queue" : "Hide Queue (Expand Space)"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={loadWorkspaceData}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 15px',
+              borderRadius: '10px',
+              border: '1px solid #E5E7EB',
+              backgroundColor: '#FFFFFF',
+              color: '#374151',
+              fontSize: '0.84rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <RefreshCw size={15} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* 2. Main Workspace Layout */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '320px 1fr',
-          gap: '24px',
+          gridTemplateColumns: isQueueCollapsed ? '1fr' : 'minmax(280px, 320px) 1fr',
+          gap: '20px',
           alignItems: 'start',
         }}
       >
         {/* Left Column: Ticket Queue Selector */}
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '14px',
-            border: '1px solid #E5E7EB',
-            padding: '16px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
-            maxHeight: 'calc(100vh - 180px)',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
+        {!isQueueCollapsed && (
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '14px',
+              border: '1px solid #E5E7EB',
+              padding: '16px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+              maxHeight: 'calc(100vh - 180px)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
           <div
             style={{
               fontSize: '0.8125rem',
@@ -822,12 +852,84 @@ export default function ResearchWorkspacePage({ onNavigate }) {
                 </div>
               );
             })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Right Column: Active Ticket Workbench */}
         {selectedTicket ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+            {/* Compact Sprint Selector strip when queue is collapsed */}
+            {isQueueCollapsed && requests.length > 0 && (
+              <div
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  padding: '10px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0, flex: 1 }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Active Sprints:
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', maxWidth: '100%', paddingBottom: '2px' }}>
+                    {requests.map((r) => {
+                      const isSel = r.id === selectedTicket?.id;
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => setSelectedTicket(r)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            border: isSel ? '1px solid #7C3AED' : '1px solid #E5E7EB',
+                            backgroundColor: isSel ? '#F5F3FF' : '#FAFAFC',
+                            color: isSel ? '#7C3AED' : '#4B5563',
+                            fontSize: '0.78rem',
+                            fontWeight: isSel ? 700 : 500,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <span style={{ fontWeight: 800 }}>{r.ticketId}</span>
+                          <span style={{ color: '#9CA3AF' }}>•</span>
+                          <span style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsQueueCollapsed(false)}
+                  style={{
+                    fontSize: '0.75rem',
+                    color: '#7C3AED',
+                    fontWeight: 700,
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    flexShrink: 0,
+                  }}
+                >
+                  Show Sidebar Queue
+                </button>
+              </div>
+            )}
             {/* CARD 1: Ticket Header, Brief & Target Specifications */}
             <div
               style={{
@@ -965,13 +1067,13 @@ export default function ResearchWorkspacePage({ onNavigate }) {
                 </div>
               )}
 
-              {/* TARGET SPECIFICATIONS */}
-              {targetSpecs && (
+              {/* TARGET SPECIFICATIONS (Only render when criteria values exist) */}
+              {targetSpecs && (targetSpecs.leadsCount || targetSpecs.targetMarket || targetSpecs.targetPersonas || targetSpecs.companySize) && (
                 <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #F1F5F9' }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
                     Target Specifications
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
                     {targetSpecs.leadsCount && (
                       <div style={{ padding: '9px 12px', backgroundColor: '#F5F3FF', borderRadius: '8px', border: '1px solid #DDD4FA' }}>
                         <div style={{ fontSize: '0.7rem', color: '#6B7280', fontWeight: 700, textTransform: 'uppercase' }}>Target Leads</div>
@@ -1106,7 +1208,7 @@ export default function ResearchWorkspacePage({ onNavigate }) {
                       </span>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginBottom: '10px' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
                           Deliverable Title
@@ -1245,7 +1347,7 @@ export default function ResearchWorkspacePage({ onNavigate }) {
                       </span>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.8fr 1.4fr 1.4fr', gap: '12px', marginBottom: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '8px' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
                           Deliverable Title
@@ -1479,173 +1581,213 @@ export default function ResearchWorkspacePage({ onNavigate }) {
                       Enter researched decision makers below. Add genuine company/brand logos (PNG, JPG, WebP) for each contact to appear in the client dashboard rows.
                     </p>
 
-                    {/* Contacts Table / Inputs */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-                      {keyPeople.map((person, idx) => (
+                    {/* Contacts Table / Inputs with Responsive Container */}
+                    <div style={{ width: '100%', overflowX: 'auto', paddingBottom: '10px' }}>
+                      <div style={{ minWidth: '820px' }}>
+                        {/* Dedicated Column Headers */}
                         <div
-                          key={idx}
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: '1.1fr 1fr 1.1fr 1.2fr 1.2fr 85px 32px',
+                            gridTemplateColumns: 'minmax(140px, 1.2fr) minmax(130px, 1fr) minmax(140px, 1.1fr) minmax(160px, 1.3fr) minmax(150px, 1.2fr) 90px 36px',
                             gap: '8px',
-                            alignItems: 'center',
-                            backgroundColor: '#FAFAFC',
-                            padding: '8px 10px',
-                            borderRadius: '8px',
-                            border: '1px solid #E5E7EB',
+                            padding: '4px 10px',
+                            marginBottom: '6px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            color: '#6B7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
                           }}
                         >
-                          <input
-                            type="text"
-                            placeholder="Full Name (e.g. Sarah Jenkins)"
-                            value={person.name}
-                            onChange={(e) => handleUpdatePerson(idx, 'name', e.target.value)}
-                            style={{
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid #D1D5DB',
-                              fontSize: '0.8125rem',
-                              backgroundColor: '#FFFFFF',
-                            }}
-                          />
-                          <input
-                            type="text"
-                            placeholder="Company (e.g. Acme Corp)"
-                            value={person.company || ''}
-                            onChange={(e) => handleUpdatePerson(idx, 'company', e.target.value)}
-                            style={{
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid #D1D5DB',
-                              fontSize: '0.8125rem',
-                              backgroundColor: '#FFFFFF',
-                            }}
-                          />
-                          <input
-                            type="text"
-                            placeholder="Designation / Role"
-                            value={person.designation}
-                            onChange={(e) => handleUpdatePerson(idx, 'designation', e.target.value)}
-                            style={{
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid #D1D5DB',
-                              fontSize: '0.8125rem',
-                              backgroundColor: '#FFFFFF',
-                            }}
-                          />
-                          <input
-                            type="email"
-                            placeholder="Corporate Email"
-                            value={person.email}
-                            onChange={(e) => handleUpdatePerson(idx, 'email', e.target.value)}
-                            style={{
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid #D1D5DB',
-                              fontSize: '0.8125rem',
-                              backgroundColor: '#FFFFFF',
-                              fontFamily: 'monospace',
-                            }}
-                          />
-                          <input
-                            type="url"
-                            placeholder="LinkedIn URL"
-                            value={person.linkedin}
-                            onChange={(e) => handleUpdatePerson(idx, 'linkedin', e.target.value)}
-                            style={{
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid #D1D5DB',
-                              fontSize: '0.8125rem',
-                              backgroundColor: '#FFFFFF',
-                            }}
-                          />
+                          <div>Full Name</div>
+                          <div>Company</div>
+                          <div>Designation / Role</div>
+                          <div>Corporate Email</div>
+                          <div>LinkedIn URL</div>
+                          <div>Brand Logo</div>
+                          <div></div>
+                        </div>
 
-                          {/* Individual Logo Upload & Preview */}
-                          {person.logo ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
-                              <img
-                                src={person.logo}
-                                alt="Logo"
-                                style={{
-                                  width: '30px',
-                                  height: '30px',
-                                  borderRadius: '6px',
-                                  objectFit: 'contain',
-                                  backgroundColor: '#FFFFFF',
-                                  border: '1px solid #D1D5DB',
-                                  padding: '1px'
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveLogo(idx)}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: '#EF4444',
-                                  cursor: 'pointer',
-                                  padding: '2px',
-                                  display: 'flex',
-                                  alignItems: 'center'
-                                }}
-                                title="Remove logo"
-                              >
-                                <X size={13} />
-                              </button>
-                            </div>
-                          ) : (
-                            <label
+                        {keyPeople.map((person, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'minmax(140px, 1.2fr) minmax(130px, 1fr) minmax(140px, 1.1fr) minmax(160px, 1.3fr) minmax(150px, 1.2fr) 90px 36px',
+                              gap: '8px',
+                              alignItems: 'center',
+                              backgroundColor: '#FAFAFC',
+                              padding: '8px 10px',
+                              borderRadius: '8px',
+                              border: '1px solid #E5E7EB',
+                              marginBottom: '8px',
+                            }}
+                          >
+                            <input
+                              type="text"
+                              placeholder="Full Name (e.g. Sarah Jenkins)"
+                              value={person.name}
+                              onChange={(e) => handleUpdatePerson(idx, 'name', e.target.value)}
                               style={{
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                padding: '7px 9px',
+                                borderRadius: '6px',
+                                border: '1px solid #D1D5DB',
+                                fontSize: '0.8125rem',
+                                backgroundColor: '#FFFFFF',
+                              }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Company (e.g. Acme Corp)"
+                              value={person.company || ''}
+                              onChange={(e) => handleUpdatePerson(idx, 'company', e.target.value)}
+                              style={{
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                padding: '7px 9px',
+                                borderRadius: '6px',
+                                border: '1px solid #D1D5DB',
+                                fontSize: '0.8125rem',
+                                backgroundColor: '#FFFFFF',
+                              }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Designation / Role"
+                              value={person.designation}
+                              onChange={(e) => handleUpdatePerson(idx, 'designation', e.target.value)}
+                              style={{
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                padding: '7px 9px',
+                                borderRadius: '6px',
+                                border: '1px solid #D1D5DB',
+                                fontSize: '0.8125rem',
+                                backgroundColor: '#FFFFFF',
+                              }}
+                            />
+                            <input
+                              type="email"
+                              placeholder="Corporate Email"
+                              value={person.email}
+                              onChange={(e) => handleUpdatePerson(idx, 'email', e.target.value)}
+                              style={{
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                padding: '7px 9px',
+                                borderRadius: '6px',
+                                border: '1px solid #D1D5DB',
+                                fontSize: '0.8125rem',
+                                backgroundColor: '#FFFFFF',
+                                fontFamily: 'monospace',
+                              }}
+                            />
+                            <input
+                              type="url"
+                              placeholder="LinkedIn URL"
+                              value={person.linkedin}
+                              onChange={(e) => handleUpdatePerson(idx, 'linkedin', e.target.value)}
+                              style={{
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                padding: '7px 9px',
+                                borderRadius: '6px',
+                                border: '1px solid #D1D5DB',
+                                fontSize: '0.8125rem',
+                                backgroundColor: '#FFFFFF',
+                              }}
+                            />
+
+                            {/* Individual Logo Upload & Preview */}
+                            {person.logo ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
+                                <img
+                                  src={person.logo}
+                                  alt="Logo"
+                                  style={{
+                                    width: '30px',
+                                    height: '30px',
+                                    borderRadius: '6px',
+                                    objectFit: 'contain',
+                                    backgroundColor: '#FFFFFF',
+                                    border: '1px solid #D1D5DB',
+                                    padding: '1px'
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveLogo(idx)}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#EF4444',
+                                    cursor: 'pointer',
+                                    padding: '2px',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                  }}
+                                  title="Remove logo"
+                                >
+                                  <X size={13} />
+                                </button>
+                              </div>
+                            ) : (
+                              <label
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '3px',
+                                  padding: '6px 6px',
+                                  borderRadius: '6px',
+                                  border: '1px dashed #D1D5DB',
+                                  backgroundColor: '#FFFFFF',
+                                  color: '#6B7280',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title="Upload Logo (PNG, JPG, WebP)"
+                              >
+                                <Image size={12} color="#7C3AED" />
+                                <span>+ Logo</span>
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => {
+                                    if (e.target.files?.[0]) handleLogoUpload(idx, e.target.files[0]);
+                                  }}
+                                />
+                              </label>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePerson(idx)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#9CA3AF',
+                                cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: '3px',
-                                padding: '6px 6px',
-                                borderRadius: '6px',
-                                border: '1px dashed #D1D5DB',
-                                backgroundColor: '#FFFFFF',
-                                color: '#6B7280',
-                                fontSize: '0.72rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap',
+                                padding: '4px',
+                                borderRadius: '4px',
                               }}
-                              title="Upload Logo (PNG, JPG, WebP)"
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = '#9CA3AF')}
+                              title="Remove person"
                             >
-                              <Image size={12} color="#7C3AED" />
-                              <span>+ Logo</span>
-                              <input
-                                type="file"
-                                accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
-                                style={{ display: 'none' }}
-                                onChange={(e) => {
-                                  if (e.target.files?.[0]) handleLogoUpload(idx, e.target.files[0]);
-                                }}
-                              />
-                            </label>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePerson(idx)}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: '#9CA3AF',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: '4px',
-                            }}
-                            title="Remove Person"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      ))}
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     <button
@@ -1704,7 +1846,7 @@ export default function ResearchWorkspacePage({ onNavigate }) {
                       </span>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginBottom: '10px' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
                           Deck Proposal Title
@@ -1885,7 +2027,7 @@ export default function ResearchWorkspacePage({ onNavigate }) {
                     </div>
 
                     {/* Input Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.8fr 1.6fr', gap: '12px', marginBottom: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px', marginBottom: '8px' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#4B5563', marginBottom: '4px' }}>
                           Deliverable Title

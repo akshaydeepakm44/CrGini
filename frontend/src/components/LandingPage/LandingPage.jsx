@@ -5,7 +5,6 @@ import MetricsSection from './MetricsSection';
 import ServiceChannels from './ServiceChannels';
 import HowItWorks from './HowItWorks';
 import SpecialistSection from './SpecialistSection';
-import FeaturedServices from './FeaturedServices';
 import ClientExperienceJourney from './ClientExperienceJourney';
 import FinalCTA from './FinalCTA';
 import Footer from './Footer';
@@ -112,14 +111,7 @@ export default function LandingPage({
         <SpecialistSection />
       </div>
 
-      {/* Section 6: Featured Core Services */}
-      <div className="cg-reveal-section">
-        <FeaturedServices
-          onExploreService={(srv) => {
-            handleSelectService(srv);
-          }}
-        />
-      </div>
+
 
       {/* Section 7: Client Experience Process Journey (Scroll-Driven Stacking Cards) */}
       <ClientExperienceJourney

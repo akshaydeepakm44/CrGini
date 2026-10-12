@@ -4727,3 +4727,52 @@ body.modal-open .dashboard-content-scroll {
   min-width: 0;
   flex: 1;
 }
+
+/* ==========================================================================
+   EVENLY ALIGNED CLIENT DASHBOARD SERVICE & METRIC GRIDS
+   Guarantees 4-columns on desktop, 2x2 on tablet, 1 on mobile (Never 3+1)
+   ========================================================================== */
+.cg-dashboard-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 36px;
+}
+
+@media (max-width: 1100px) {
+  .cg-dashboard-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+}
+
+@media (max-width: 600px) {
+  .cg-dashboard-metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+}
+
+.cg-dashboard-services-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+  .cg-dashboard-services-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+  }
+}
+
+@media (max-width: 600px) {
+  .cg-dashboard-services-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+
