@@ -5,10 +5,9 @@ import {
   CheckCircle2, 
   Target, 
   Building2, 
-  Rocket, 
-  PenTool, 
-  Code,
-  ShieldCheck,
+  Users, 
+  Presentation, 
+    ShieldCheck,
   Zap,
   Clock
 } from 'lucide-react';
