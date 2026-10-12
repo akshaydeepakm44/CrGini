@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { connectPostgres, getPool } from './config/postgres.js';
 import authRoutes from './routes/authRoutes.js';
@@ -48,10 +49,20 @@ connectPostgres().then(async (ok) => {
   }
 });
 
-// CORS configuration: allow origins from CLIENT_URL or any localhost during dev
-const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174')
+// CORS configuration: allow origins from CLIENT_URL or dizigini.com domain
+const defaultOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://dizigini.com',
+  'https://dizigini.com',
+  'http://www.dizigini.com',
+  'https://www.dizigini.com'
+];
+const envOrigins = (process.env.CLIENT_URL || '')
   .split(',')
-  .map(url => url.trim());
+  .map(url => url.trim())
+  .filter(Boolean);
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -148,6 +159,26 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// Production Static Frontend Serving (SPA support for dizigini.com)
+const frontendDistPath = path.resolve(process.cwd(), '../frontend/dist');
+const localFrontendDistPath = path.resolve(process.cwd(), 'frontend/dist');
+const effectiveDistPath = fs.existsSync(frontendDistPath)
+  ? frontendDistPath
+  : fs.existsSync(localFrontendDistPath)
+  ? localFrontendDistPath
+  : null;
+
+if (effectiveDistPath) {
+  console.log(`[DiziGini API] Serving static frontend from: ${effectiveDistPath}`);
+  app.use(express.static(effectiveDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/storage') || req.path.startsWith('/uploads')) {
+      return next();
+    }
+    res.sendFile(path.join(effectiveDistPath, 'index.html'));
+  });
+}
+
 // Global 404 Handler
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
@@ -163,6 +194,6 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[CreativeGini API] Server running on port ${PORT}`);
+  console.log(`[DiziGini API] Server running on port ${PORT} (mapped for dizigini.com)`);
 });
 

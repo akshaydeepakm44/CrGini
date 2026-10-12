@@ -14,6 +14,7 @@ build/
 *.env
 !.env.example
 !*/.env.example
+!frontend/.env.production
 
 # Temporary test browser profiles and runtime storage
 .chrome-temp*/
