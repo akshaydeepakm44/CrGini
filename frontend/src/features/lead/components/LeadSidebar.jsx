@@ -14,6 +14,7 @@ import {
   Package,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   LogOut,
   Sparkles,
   Search,
@@ -73,14 +74,14 @@ export default function LeadSidebar({
       {/* 1. Portal Brand Header */}
       <div
         style={{
-          padding: '18px 20px',
+          padding: '18px 16px',
           borderBottom: '1px solid #F1F5F9',
           display: 'flex',
           alignItems: 'center',
           justifyContent: isCollapsed ? 'center' : 'space-between',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
           <div
             style={{
               width: '36px',
@@ -93,40 +94,71 @@ export default function LeadSidebar({
               justifyContent: 'center',
               boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
               flexShrink: 0,
+              cursor: isCollapsed ? 'pointer' : 'default',
             }}
+            onClick={isCollapsed ? onToggleCollapse : undefined}
+            title={isCollapsed ? "Expand Sidebar" : undefined}
           >
             <Compass size={20} />
           </div>
           {!isCollapsed && (
-              <div>
-                <div
-                  style={{
-                    fontFamily: 'var(--cg-font-heading, "Plus Jakarta Sans", sans-serif)',
-                    fontSize: '1rem',
-                    fontWeight: 800,
-                    color: '#111827',
-                    letterSpacing: '-0.02em',
-                    lineHeight: 1.2,
-                  }}
-                >
-                  DizitalGini
-                </div>
-                <div
-                  style={{
-                    fontSize: '0.6875rem',
-                    fontWeight: 700,
-                    color: '#7C3AED',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    marginTop: '1px',
-                  }}
-                >
-                  Internal Platform
-                </div>
+            <div style={{ overflow: 'hidden' }}>
+              <div
+                style={{
+                  fontFamily: 'var(--cg-font-heading, "Plus Jakarta Sans", sans-serif)',
+                  fontSize: '0.95rem',
+                  fontWeight: 800,
+                  color: '#111827',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                }}
+              >
+                Lead Workspace
               </div>
-            )}
-          </div>
+              <div
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 700,
+                  color: '#7C3AED',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  marginTop: '1px',
+                }}
+              >
+                Operations Portal
+              </div>
+            </div>
+          )}
         </div>
+
+        {!isCollapsed && onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            title="Collapse Sidebar"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#9CA3AF',
+              cursor: 'pointer',
+              padding: '4px',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease',
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#7C3AED'; e.currentTarget.style.backgroundColor = '#F5F3FF'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#9CA3AF'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+          >
+            <ChevronLeft size={18} />
+          </button>
+        )}
+      </div>
 
         {/* 2. Navigation Items */}
         <div

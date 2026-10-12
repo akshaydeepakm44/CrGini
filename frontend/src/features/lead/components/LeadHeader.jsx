@@ -7,7 +7,8 @@ import {
   AlertCircle,
   ExternalLink,
   ShieldCheck,
-  Check
+  Check,
+  Menu
 } from 'lucide-react';
 
 export default function LeadHeader({
@@ -20,6 +21,8 @@ export default function LeadHeader({
   onRefresh,
   isRefreshing = false,
   user,
+  isSidebarCollapsed = false,
+  onToggleSidebar,
 }) {
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -32,7 +35,7 @@ export default function LeadHeader({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 28px',
+        padding: '0 20px',
         position: 'sticky',
         top: 0,
         zIndex: 30,
@@ -40,45 +43,71 @@ export default function LeadHeader({
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
       }}
     >
-      {/* 1. Global Search Box */}
-      <div style={{ position: 'relative', width: '380px', maxWidth: '100%' }}>
-        <Search
-          size={16}
-          color="#9CA3AF"
-          style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
-        />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
-          placeholder="Search ticket ID, company, lead, or criteria..."
-          style={{
-            width: '100%',
-            height: '38px',
-            padding: '0 14px 0 36px',
-            backgroundColor: '#F9FAFB',
-            border: '1px solid #E5E7EB',
-            borderRadius: '10px',
-            fontSize: '0.84375rem',
-            color: '#111827',
-            outline: 'none',
-            transition: 'all 0.15s ease',
-          }}
-          onFocus={(e) => {
-            e.target.style.backgroundColor = '#FFFFFF';
-            e.target.style.borderColor = '#7C3AED';
-            e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.12)';
-          }}
-          onBlur={(e) => {
-            e.target.style.backgroundColor = '#F9FAFB';
-            e.target.style.borderColor = '#E5E7EB';
-            e.target.style.boxShadow = 'none';
-          }}
-        />
+      {/* 1. Sidebar Toggle & Global Search Box */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0, marginRight: '16px' }}>
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            title={isSidebarCollapsed ? "Expand Navigation Sidebar" : "Collapse Sidebar for Maximum Workspace"}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '38px',
+              height: '38px',
+              borderRadius: '10px',
+              border: '1px solid #E5E7EB',
+              backgroundColor: isSidebarCollapsed ? '#F5F3FF' : '#FFFFFF',
+              color: isSidebarCollapsed ? '#7C3AED' : '#4B5563',
+              cursor: 'pointer',
+              flexShrink: 0,
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Menu size={18} />
+          </button>
+        )}
+
+        <div style={{ position: 'relative', width: '380px', maxWidth: '100%', minWidth: '160px' }}>
+          <Search
+            size={16}
+            color="#9CA3AF"
+            style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
+          />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
+            placeholder="Search ticket ID, company, lead, or criteria..."
+            style={{
+              width: '100%',
+              height: '38px',
+              padding: '0 14px 0 36px',
+              backgroundColor: '#F9FAFB',
+              border: '1px solid #E5E7EB',
+              borderRadius: '10px',
+              fontSize: '0.84375rem',
+              color: '#111827',
+              outline: 'none',
+              transition: 'all 0.15s ease',
+            }}
+            onFocus={(e) => {
+              e.target.style.backgroundColor = '#FFFFFF';
+              e.target.style.borderColor = '#7C3AED';
+              e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.12)';
+            }}
+            onBlur={(e) => {
+              e.target.style.backgroundColor = '#F9FAFB';
+              e.target.style.borderColor = '#E5E7EB';
+              e.target.style.boxShadow = 'none';
+            }}
+          />
+        </div>
       </div>
 
       {/* 2. Operational Status & Quick Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
         {/* Operational Badge */}
         <div
           style={{

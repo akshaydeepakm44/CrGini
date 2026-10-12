@@ -35,7 +35,9 @@ export default function LeadPortal({ user, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState(() => new Date());
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return typeof window !== 'undefined' && window.innerWidth < 1100;
+  });
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
@@ -165,6 +167,8 @@ export default function LeadPortal({ user, onLogout }) {
           onRefresh={loadData}
           isRefreshing={isRefreshing}
           user={user}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
 
         {/* Dynamic Route Content - Dedicated Scrollable Viewport */}
