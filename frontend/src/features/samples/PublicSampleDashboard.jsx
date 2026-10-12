@@ -25,10 +25,99 @@ import {
   Mail,
   Phone,
   CheckCircle,
+  CheckCircle2,
   Globe,
   X
 } from 'lucide-react';
 import { api } from '../../services/api';
+
+/**
+ * Smart formatter for narrative study content
+ * Formats numbered observations or paragraphs into clean structured items.
+ */
+function renderStructuredNarrative(text, defaultFallback, accentColor = '#2563EB') {
+  const content = (text && text.trim()) || defaultFallback;
+  if (!content) return null;
+
+  // Check if content has numbered points like:
+  // "1. Point one 2. Point two" or "1/ Point one 2/ Point two" or "1) Point one"
+  const hasNumberedPoints = /(?:^|\s)(?:[1-9]\d*[\.\/\)])\s+/m.test(content);
+
+  if (hasNumberedPoints) {
+    const chunks = content.split(/(?:^|\s)(?=[1-9]\d*[\.\/\)]\s+)/).map(s => s.trim()).filter(Boolean);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {chunks.map((chunk, cIdx) => {
+          const match = chunk.match(/^([1-9]\d*[\.\/\)])\s*([\s\S]*)$/);
+          if (match) {
+            const rawNum = match[1].replace(/[\.\/\)]/, '').trim();
+            const body = match[2].trim();
+            return (
+              <div
+                key={cIdx}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '8px',
+                  background: '#FFFFFF',
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  border: '1px solid #E2E8F0',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    background: accentColor === '#2563EB' ? '#EFF6FF' : accentColor === '#059669' ? '#ECFDF5' : '#FEF3C7',
+                    color: accentColor,
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    flexShrink: 0,
+                    marginTop: '2px',
+                  }}
+                >
+                  {rawNum}
+                </span>
+                <span style={{ fontSize: '0.84rem', color: '#334155', lineHeight: '1.45', flex: 1 }}>
+                  {body}
+                </span>
+              </div>
+            );
+          }
+          return (
+            <p key={cIdx} style={{ fontSize: '0.86rem', color: '#475569', lineHeight: '1.5', margin: 0 }}>
+              {chunk}
+            </p>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (content.includes('\n')) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {content.split('\n').filter(Boolean).map((para, pIdx) => (
+          <p key={pIdx} style={{ fontSize: '0.86rem', color: '#475569', lineHeight: '1.5', margin: 0 }}>
+            {para.trim()}
+          </p>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <p style={{ fontSize: '0.86rem', color: '#475569', lineHeight: '1.55', margin: 0 }}>
+      {content}
+    </p>
+  );
+}
 
 /**
  * PublicSampleDashboard Component
@@ -68,6 +157,16 @@ export default function PublicSampleDashboard() {
         setLoading(false);
       });
   }, [effectiveSlug]);
+
+  // Enforce single lead preview restriction: only the 1st lead (leads[0]) can be opened
+  useEffect(() => {
+    if (selectedLead && sample?.leads && sample.leads.length > 0) {
+      if (selectedLead.id !== sample.leads[0].id) {
+        setSelectedLead(null);
+        navigate('/signin?returnTo=/portal');
+      }
+    }
+  }, [selectedLead, sample, navigate]);
 
   const handleMoreLeadsClick = () => {
     navigate('/signin?returnTo=/portal');
@@ -297,56 +396,112 @@ export default function PublicSampleDashboard() {
 
             <div style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '28px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
               
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '24px' }}>
-                <div style={{ background: '#F8FAFC', padding: '18px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748B', marginBottom: '6px' }}>
+              {/* Row 1: Target Organization & Industry / Sector as Mini Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px', alignItems: 'stretch' }}>
+                <div style={{ background: '#F8FAFC', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748B', marginBottom: '8px' }}>
                     Target Organization
                   </div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0F172A' }}>
-                    {companyStudy.company || companyName}
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Building2 size={18} color="#2563EB" />
+                    <span>{companyStudy.company || companyName}</span>
                   </div>
                 </div>
 
-                <div style={{ background: '#F8FAFC', padding: '18px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748B', marginBottom: '6px' }}>
+                <div style={{ background: '#F8FAFC', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748B', marginBottom: '8px' }}>
                     Industry / Sector
                   </div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0F172A' }}>
-                    {companyStudy.industry || 'Technology & Professional Services'}
-                  </div>
+                  {(() => {
+                    const rawInd = companyStudy.industry || 'Technology & Professional Services';
+                    const industries = rawInd.split(/[,;]+/).map((s) => s.trim()).filter(Boolean);
+                    if (industries.length === 0) industries.push('Technology & Professional Services');
+                    return (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {industries.map((ind, i) => (
+                          <span
+                            key={i}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '5px 12px',
+                              borderRadius: '8px',
+                              backgroundColor: '#FFFFFF',
+                              border: '1px solid #CBD5E1',
+                              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+                              color: '#0F172A',
+                              fontSize: '0.825rem',
+                              fontWeight: 700,
+                              letterSpacing: '0.01em',
+                            }}
+                          >
+                            {ind}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+              {/* Row 2: Business Overview, Market Position, Key Observations in Balanced Equal Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', alignItems: 'stretch' }}>
                 
-                <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Compass size={16} color="#2563EB" />
-                    Business Overview
-                  </h4>
-                  <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: '1.6', margin: 0 }}>
-                    {companyStudy.businessOverview || 'Comprehensive analysis of product-market fit, enterprise scale, and organizational structure.'}
-                  </p>
+                {/* 1. Business Overview Card */}
+                <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '20px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '12px', marginBottom: '12px', borderBottom: '1px solid #E2E8F0' }}>
+                    <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Compass size={16} />
+                    </div>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                      Business Overview
+                    </h4>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    {renderStructuredNarrative(
+                      companyStudy.businessOverview,
+                      'Comprehensive analysis of product-market fit, enterprise scale, and organizational structure.',
+                      '#2563EB'
+                    )}
+                  </div>
                 </div>
 
-                <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <TrendingUp size={16} color="#059669" />
-                    Market Position
-                  </h4>
-                  <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: '1.6', margin: 0 }}>
-                    {companyStudy.marketPosition || 'Evaluated peer landscape, customer benchmarks, and competitive differentiation vectors.'}
-                  </p>
+                {/* 2. Market Position Card */}
+                <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '20px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '12px', marginBottom: '12px', borderBottom: '1px solid #E2E8F0' }}>
+                    <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: '#ECFDF5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <TrendingUp size={16} />
+                    </div>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                      Market Position
+                    </h4>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    {renderStructuredNarrative(
+                      companyStudy.marketPosition,
+                      'Evaluated peer landscape, customer benchmarks, and competitive differentiation vectors.',
+                      '#059669'
+                    )}
+                  </div>
                 </div>
 
-                <div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Search size={16} color="#D97706" />
-                    Key Observations
-                  </h4>
-                  <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: '1.6', margin: 0 }}>
-                    {companyStudy.keyObservations || 'Observed operational bottlenecks, growth triggers, and leadership priorities.'}
-                  </p>
+                {/* 3. Key Observations Card */}
+                <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '20px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '12px', marginBottom: '12px', borderBottom: '1px solid #E2E8F0' }}>
+                    <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: '#FEF3C7', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Search size={16} />
+                    </div>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                      Key Observations
+                    </h4>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    {renderStructuredNarrative(
+                      companyStudy.keyObservations,
+                      'Observed operational bottlenecks, growth triggers, and leadership priorities.',
+                      '#D97706'
+                    )}
+                  </div>
                 </div>
 
               </div>
@@ -367,13 +522,20 @@ export default function PublicSampleDashboard() {
                   Curated Leads & Stakeholder Intelligence
                 </h2>
                 <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0 }}>
-                  Click any lead row to open the complete Lead Dossier with LinkedIn, "Why Suits Best", Lead Study & Pitch Deck
+                  Single Lead Preview Unlocked · Remaining verified decision-makers require client login
                 </p>
               </div>
             </div>
 
-            <div style={{ fontSize: '0.8125rem', color: '#059669', background: '#ECFDF5', padding: '6px 14px', borderRadius: '20px', fontWeight: 600, border: '1px solid #A7F3D0' }}>
-              Row View · Click row to open Lead Card
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.8125rem', color: '#059669', background: '#ECFDF5', padding: '6px 14px', borderRadius: '20px', fontWeight: 600, border: '1px solid #A7F3D0', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle2 size={13} /> 1 Lead Unlocked
+              </span>
+              {(leads?.length || 0) > 1 && (
+                <span style={{ fontSize: '0.8125rem', color: '#B45309', background: '#FEF3C7', padding: '6px 14px', borderRadius: '20px', fontWeight: 600, border: '1px solid #FDE68A', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <Lock size={12} /> {leads.length - 1} Locked (Client Access)
+                </span>
+              )}
             </div>
           </div>
 
@@ -403,146 +565,232 @@ export default function PublicSampleDashboard() {
               }}
             >
               <div>Executive Lead</div>
-              <div>Company He Belongs To</div>
+              <div>Company Details</div>
               <div>Why This Lead Suits Best</div>
               <div style={{ textAlign: 'right' }}>Dossier</div>
             </div>
 
             {/* Lead Rows */}
-            {(leads || []).map((lead, idx) => (
-              <div
-                key={lead.id || idx}
-                onClick={() => setSelectedLead(lead)}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(240px, 1.3fr) minmax(180px, 1fr) minmax(280px, 1.8fr) 140px',
-                  alignItems: 'center',
-                  padding: '18px 24px',
-                  borderBottom: idx === leads.length - 1 ? 'none' : '1px solid #F1F5F9',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.15s ease',
-                  backgroundColor: '#FFFFFF',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F8FAFC'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
-              >
-                {/* Column 1: Lead Avatar, Name & Title */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  {lead.logo ? (
-                    <img
-                      src={lead.logo}
-                      alt={lead.company}
-                      style={{ width: '42px', height: '42px', borderRadius: '10px', objectFit: 'cover', border: '1px solid #E2E8F0' }}
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: '42px',
-                        height: '42px',
-                        borderRadius: '10px',
-                        background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
-                        color: '#2563EB',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 800,
-                        fontSize: '1rem',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {lead.name?.charAt(0) || 'L'}
-                    </div>
-                  )}
+            {(leads || []).map((lead, idx) => {
+              const isUnlocked = idx === 0;
 
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {lead.name}
-                      </span>
-                      <ShieldCheck size={14} color="#10B981" title="Verified Decision Maker" />
-                      {(lead.pitchDeck || lead.pitchDeckPdf) && (
-                        <span style={{ fontSize: '0.7rem', color: '#7C3AED', background: '#F3E8FF', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          <Presentation size={10} /> Pitch Deck
+              return (
+                <div
+                  key={lead.id || idx}
+                  onClick={() => {
+                    if (isUnlocked) {
+                      setSelectedLead(lead);
+                    } else {
+                      navigate('/signin?returnTo=/portal');
+                    }
+                  }}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(240px, 1.3fr) minmax(180px, 1fr) minmax(280px, 1.8fr) 140px',
+                    alignItems: 'center',
+                    padding: '18px 24px',
+                    borderBottom: idx === leads.length - 1 ? 'none' : '1px solid #F1F5F9',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    backgroundColor: isUnlocked ? '#FFFFFF' : '#FAFAFC',
+                    position: 'relative',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isUnlocked ? '#F8FAFC' : '#F1F5F9'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isUnlocked ? '#FFFFFF' : '#FAFAFC'; }}
+                >
+                  {/* Column 1: Lead Avatar, Name & Title & Badges in Clean Linear Hierarchy */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      {lead.logo ? (
+                        <img
+                          src={lead.logo}
+                          alt={lead.company}
+                          style={{ width: '44px', height: '44px', borderRadius: '10px', objectFit: 'cover', border: '1px solid #E2E8F0' }}
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '10px',
+                            background: isUnlocked ? 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)' : '#E2E8F0',
+                            color: isUnlocked ? '#2563EB' : '#64748B',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 800,
+                            fontSize: '1rem',
+                          }}
+                        >
+                          {lead.name?.charAt(0) || 'L'}
+                        </div>
+                      )}
+                      {!isUnlocked && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            bottom: -4,
+                            right: -4,
+                            background: '#7C3AED',
+                            color: '#FFFFFF',
+                            borderRadius: '50%',
+                            width: '18px',
+                            height: '18px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                          }}
+                        >
+                          <Lock size={10} />
                         </span>
                       )}
-                      {(lead.leadStudyPdf || lead.leadStudyPdfUrl) && (
-                        <span style={{ fontSize: '0.7rem', color: '#2563EB', background: '#DBEAFE', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          <FileText size={10} /> Study PDF
+                    </div>
+
+                    <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      {/* Line 1: Lead / Company Name + Status Check */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {isUnlocked ? lead.name : (lead.name ? `${lead.name.split(' ')[0]} •••••••` : 'Executive Lead')}
                         </span>
+                        {isUnlocked ? (
+                          <ShieldCheck size={14} color="#10B981" title="Verified Decision Maker" />
+                        ) : (
+                          <span style={{ fontSize: '0.68rem', color: '#B45309', background: '#FEF3C7', border: '1px solid #FDE68A', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            <Lock size={9} /> Locked
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Line 2: Title / Role (Linearly below name) */}
+                      <div style={{ fontSize: '0.8125rem', color: isUnlocked ? '#2563EB' : '#64748B', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {lead.title || 'Verified Decision Maker'}
+                      </div>
+
+                      {/* Line 3: Attached Collaterals / Badges (Linearly below title) */}
+                      {((lead.leadStudyPdf || lead.leadStudyPdfUrl) || (lead.pitchDeck || lead.pitchDeckPdf)) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'nowrap' }}>
+                          {(lead.leadStudyPdf || lead.leadStudyPdfUrl) && (
+                            <span style={{ fontSize: '0.7rem', color: isUnlocked ? '#2563EB' : '#64748B', background: isUnlocked ? '#DBEAFE' : '#F1F5F9', border: '1px solid ' + (isUnlocked ? '#BFDBFE' : '#E2E8F0'), padding: '2px 7px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                              <FileText size={10} /> Study PDF {!isUnlocked && '🔒'}
+                            </span>
+                          )}
+                          {(lead.pitchDeck || lead.pitchDeckPdf) && (
+                            <span style={{ fontSize: '0.7rem', color: isUnlocked ? '#7C3AED' : '#64748B', background: isUnlocked ? '#F3E8FF' : '#F1F5F9', border: '1px solid ' + (isUnlocked ? '#DDD4FA' : '#E2E8F0'), padding: '2px 7px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                              <Presentation size={10} /> Pitch Deck {!isUnlocked && '🔒'}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
-                    <div style={{ fontSize: '0.8125rem', color: '#2563EB', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {lead.title}
-                    </div>
                   </div>
-                </div>
 
-                {/* Column 2: Company he belongs to */}
-                <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Building2 size={14} color="#64748B" />
-                    <span>{lead.company || sample?.companyName}</span>
+                  {/* Column 2: Company he belongs to */}
+                  <div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Building2 size={14} color="#64748B" />
+                      <span>{lead.company || sample?.companyName}</span>
+                    </div>
+                    {isUnlocked && lead.companyLink ? (
+                      <a
+                        href={lead.companyLink.startsWith('http') ? lead.companyLink : `https://${lead.companyLink}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ fontSize: '0.75rem', color: '#2563EB', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', fontWeight: 500 }}
+                      >
+                        <Globe size={11} />
+                        <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {lead.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
+                        </span>
+                        <ExternalLink size={10} />
+                      </a>
+                    ) : (
+                      <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '3px' }}>
+                        {lead.location || lead.industry || 'B2B Enterprise Vertical'}
+                      </div>
+                    )}
                   </div>
-                  {lead.companyLink ? (
-                    <a
-                      href={lead.companyLink.startsWith('http') ? lead.companyLink : `https://${lead.companyLink}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ fontSize: '0.75rem', color: '#2563EB', marginTop: '2px', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', fontWeight: 500 }}
-                    >
-                      <Globe size={11} />
-                      <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {lead.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
+
+                  {/* Column 3: Why Suits Best (Snippet / Locked Mask) */}
+                  <div style={{ paddingRight: '16px' }}>
+                    {isUnlocked ? (
+                      <div
+                        style={{
+                          fontSize: '0.8125rem',
+                          color: '#475569',
+                          lineHeight: '1.4',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        🎯 <strong style={{ color: '#1E293B' }}>Fit Rationale:</strong> {lead.whySuitsBest || lead.shortSummary}
+                      </div>
+                    ) : (
+                      <div style={{ position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ filter: 'blur(3px)', userSelect: 'none', opacity: 0.6, fontSize: '0.8125rem', color: '#475569', lineHeight: '1.4' }}>
+                          {lead.whySuitsBest || 'High probability prospect with immediate authority and strategic alignment with your growth objectives.'}
+                        </div>
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 600, color: '#475569' }}>
+                          <Lock size={12} color="#D97706" />
+                          <span>Locked · Client login required to view fit analysis</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Column 4: Action (Inspect for lead 0, Unlock for leads > 0) */}
+                  <div style={{ textAlign: 'right' }}>
+                    {isUnlocked ? (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          background: '#EFF6FF',
+                          color: '#2563EB',
+                          border: '1px solid #BFDBFE',
+                          padding: '7px 14px',
+                          borderRadius: '8px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                        }}
+                      >
+                        Inspect Card ↗
                       </span>
-                      <ExternalLink size={10} />
-                    </a>
-                  ) : (
-                    <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
-                      {lead.location || lead.industry || 'B2B Enterprise'}
-                    </div>
-                  )}
-                </div>
-
-                {/* Column 3: Why Suits Best (Snippet) */}
-                <div style={{ paddingRight: '16px' }}>
-                  <div
-                    style={{
-                      fontSize: '0.8125rem',
-                      color: '#475569',
-                      lineHeight: '1.4',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    🎯 <strong style={{ color: '#1E293B' }}>Fit Rationale:</strong> {lead.whySuitsBest || lead.shortSummary}
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate('/signin?returnTo=/portal');
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          padding: '7px 14px',
+                          borderRadius: '8px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
+                        }}
+                      >
+                        <Lock size={12} />
+                        <span>Unlock ↗</span>
+                      </button>
+                    )}
                   </div>
                 </div>
-
-                {/* Column 4: Action */}
-                <div style={{ textAlign: 'right' }}>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      background: '#EFF6FF',
-                      color: '#2563EB',
-                      border: '1px solid #BFDBFE',
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                    }}
-                  >
-                    Inspect Card ↗
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
@@ -1004,30 +1252,30 @@ export default function PublicSampleDashboard() {
                     Lead Study: What You Should Know About This Prospect
                   </h4>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
-                    <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>
-                        🎯 Why Relevant
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '14px', alignItems: 'stretch' }}>
+                    <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        🎯 <span>Why Relevant</span>
                       </div>
-                      <p style={{ fontSize: '0.8125rem', color: '#475569', margin: 0, lineHeight: '1.4' }}>
+                      <p style={{ fontSize: '0.84rem', color: '#475569', margin: 0, lineHeight: '1.5', flex: 1 }}>
                         {selectedLead.leadStudy.whyRelevant || 'Direct budget decision maker aligned with key pain points.'}
                       </p>
                     </div>
 
-                    <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>
-                        🔍 Observed Context
+                    <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        🔍 <span>Observed Context</span>
                       </div>
-                      <p style={{ fontSize: '0.8125rem', color: '#475569', margin: 0, lineHeight: '1.4' }}>
+                      <p style={{ fontSize: '0.84rem', color: '#475569', margin: 0, lineHeight: '1.5', flex: 1 }}>
                         {selectedLead.leadStudy.observedContext || 'Observed operational growth and procurement signals.'}
                       </p>
                     </div>
 
-                    <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>
-                        🧭 Suggested Approach Angle
+                    <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        🧭 <span>Suggested Approach Angle</span>
                       </div>
-                      <p style={{ fontSize: '0.8125rem', color: '#475569', margin: 0, lineHeight: '1.4' }}>
+                      <p style={{ fontSize: '0.84rem', color: '#475569', margin: 0, lineHeight: '1.5', flex: 1 }}>
                         {selectedLead.leadStudy.suggestedApproach || 'Lead with rapid technical deliverables and measurable SLA proof.'}
                       </p>
                     </div>

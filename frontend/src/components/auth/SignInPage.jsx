@@ -9,9 +9,6 @@ import {
   ChevronRight,
   CheckCircle2,
   AlertCircle,
-  Sparkles,
-  Copy,
-  ExternalLink,
   Zap,
   User,
   Building
@@ -21,7 +18,6 @@ import { BRAND_LOGO } from '../../assets/branding';
 
 export default function SignInPage({ onLogin, onBackHome, showToast, initialView = 'signin' }) {
   const [viewMode, setViewMode] = useState(initialView);
-  const [authMethod, setAuthMethod] = useState('password'); // 'password' | 'magic'
   
   // Sign In state (Password)
   const [email, setEmail] = useState('');
@@ -40,13 +36,6 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [isSignupSubmitting, setIsSignupSubmitting] = useState(false);
   const [signupError, setSignupError] = useState('');
-
-  // Magic Link state
-  const [magicEmail, setMagicEmail] = useState('');
-  const [isMagicSubmitting, setIsMagicSubmitting] = useState(false);
-  const [magicError, setMagicError] = useState('');
-  const [magicResult, setMagicResult] = useState(null);
-  const [isCopied, setIsCopied] = useState(false);
 
   // Forgot Password state
   const [forgotEmail, setForgotEmail] = useState('');
@@ -138,37 +127,6 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
     }
   };
 
-  const handleMagicLinkSubmit = async (e) => {
-    e.preventDefault();
-    setMagicError('');
-    setMagicResult(null);
-
-    const trimmed = magicEmail.trim();
-    if (!trimmed || !trimmed.includes('@')) {
-      setMagicError('Please enter a valid work email address.');
-      return;
-    }
-
-    setIsMagicSubmitting(true);
-
-    try {
-      const res = await api.requestMagicLink(trimmed);
-      setIsMagicSubmitting(false);
-      setMagicResult(res);
-      if (showToast) showToast('Magic access link generated successfully!');
-    } catch (err) {
-      setIsMagicSubmitting(false);
-      setMagicError(err.message || 'Failed to generate magic access link.');
-    }
-  };
-
-  const handleCopyMagicLink = () => {
-    if (!magicResult?.magicUrl) return;
-    navigator.clipboard.writeText(magicResult.magicUrl);
-    setIsCopied(true);
-    if (showToast) showToast('Magic link copied to clipboard!');
-    setTimeout(() => setIsCopied(false), 2500);
-  };
 
   // Quick One-Click Demo Logins
   const handleQuickDemoLogin = async (demoEmail, demoPassword) => {
@@ -331,255 +289,89 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
               {/* ================= VIEW: SIGN IN ================= */}
               {viewMode === 'signin' && (
                 <>
-                  {/* AUTH METHOD SELECTOR TABS */}
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: '6px',
-                      background: '#F1F5F9',
-                      padding: '4px',
-                      borderRadius: '8px',
-                      border: '1px solid #E2E8F0',
-                      marginBottom: '1.5rem',
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setAuthMethod('password')}
-                      style={{
-                        padding: '8px',
-                        fontSize: '0.8125rem',
-                        fontWeight: 600,
-                        borderRadius: '6px',
-                        border: 'none',
-                        cursor: 'pointer',
-                        background: authMethod === 'password' ? '#7C3AED' : 'transparent',
-                        color: authMethod === 'password' ? '#FFFFFF' : '#64748B',
-                        boxShadow: authMethod === 'password' ? '0 1px 3px rgba(124, 58, 237, 0.25)' : 'none',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      Password Login
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAuthMethod('magic')}
-                      style={{
-                        padding: '8px',
-                        fontSize: '0.8125rem',
-                        fontWeight: 600,
-                        borderRadius: '6px',
-                        border: 'none',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        background: authMethod === 'magic' ? '#7C3AED' : 'transparent',
-                        color: authMethod === 'magic' ? '#FFFFFF' : '#64748B',
-                        boxShadow: authMethod === 'magic' ? '0 1px 3px rgba(124, 58, 237, 0.25)' : 'none',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      <Sparkles size={14} color={authMethod === 'magic' ? '#FDE047' : '#8B5CF6'} />
-                      <span>Magic Link (One-Click)</span>
-                    </button>
-                  </div>
-
-                  {/* 1. PASSWORD AUTH METHOD */}
-                  {authMethod === 'password' && (
-                    <>
-                      {errorMessage && (
-                        <div className="auth-error-banner" role="alert" style={{ marginBottom: '1.25rem' }}>
-                          <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                          <span>{errorMessage}</span>
-                        </div>
-                      )}
-
-                      <form onSubmit={handleLoginSubmit} className="auth-credentials-form">
-                        <div className="form-field-group">
-                          <label htmlFor="email-input" className="field-label">Work Email</label>
-                          <div className="input-with-icon">
-                            <Mail size={17} className="field-icon" />
-                            <input
-                              id="email-input"
-                              type="email"
-                              placeholder="testclient@datai2i.com"
-                              value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              className="auth-text-input"
-                              autoComplete="email"
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        <div className="form-field-group">
-                          <div className="field-label-row">
-                            <label htmlFor="password-input" className="field-label">Password</label>
-                            <a href="#forgot" onClick={switchToForgot} className="forgot-password-link">
-                              Forgot password?
-                            </a>
-                          </div>
-                          <div className="input-with-icon">
-                            <Lock size={17} className="field-icon" />
-                            <input
-                              id="password-input"
-                              type={showPassword ? 'text' : 'password'}
-                              placeholder="••••••••"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              className="auth-text-input"
-                              autoComplete="current-password"
-                              required
-                            />
-                            <button
-                              type="button"
-                              className="password-toggle-btn"
-                              onClick={() => setShowPassword(!showPassword)}
-                              aria-label={showPassword ? 'Hide password' : 'Show password'}
-                            >
-                              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="form-options-row" style={{ marginTop: '0.5rem', marginBottom: '1.25rem' }}>
-                          <label className="remember-checkbox-label">
-                            <input
-                              type="checkbox"
-                              checked={rememberMe}
-                              onChange={(e) => setRememberMe(e.target.checked)}
-                              className="custom-checkbox"
-                            />
-                            <span>Remember this device for 30 days</span>
-                          </label>
-                        </div>
-
-                        <button
-                          type="submit"
-                          className="auth-primary-submit-btn"
-                          disabled={isSubmitting}
-                        >
-                          {isSubmitting ? (
-                            <span className="submit-loading-state">Authenticating...</span>
-                          ) : (
-                            <>
-                              <span>Sign In</span>
-                              <ChevronRight size={17} />
-                            </>
-                          )}
-                        </button>
-                      </form>
-                    </>
-                  )}
-
-                  {/* 2. MAGIC LINK AUTH METHOD */}
-                  {authMethod === 'magic' && (
-                    <div>
-                      {magicError && (
-                        <div className="auth-error-banner" role="alert" style={{ marginBottom: '1.25rem' }}>
-                          <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                          <span>{magicError}</span>
-                        </div>
-                      )}
-
-                      {!magicResult ? (
-                        <form onSubmit={handleMagicLinkSubmit} className="auth-credentials-form">
-                          <div className="form-field-group">
-                            <label htmlFor="magic-email-input" className="field-label">Work Email</label>
-                            <div className="input-with-icon">
-                              <Mail size={17} className="field-icon" />
-                              <input
-                                id="magic-email-input"
-                                type="email"
-                                placeholder="testclient@datai2i.com"
-                                value={magicEmail}
-                                onChange={(e) => setMagicEmail(e.target.value)}
-                                className="auth-text-input"
-                                autoComplete="email"
-                                required
-                              />
-                            </div>
-                            <p style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '6px' }}>
-                              We'll send you an instant one-click login link. No password required.
-                            </p>
-                          </div>
-
-                          <button
-                            type="submit"
-                            className="auth-primary-submit-btn"
-                            disabled={isMagicSubmitting}
-                            style={{ marginTop: '1rem' }}
-                          >
-                            {isMagicSubmitting ? (
-                              <span className="submit-loading-state">Generating Magic Link...</span>
-                            ) : (
-                              <>
-                                <Sparkles size={16} />
-                                <span>Get Magic Access Link</span>
-                              </>
-                            )}
-                          </button>
-                        </form>
-                      ) : (
-                        <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', marginBottom: '8px', fontWeight: 600, fontSize: '0.875rem' }}>
-                            <CheckCircle2 size={18} />
-                            <span>Magic Link Ready!</span>
-                          </div>
-                          <p style={{ fontSize: '0.8125rem', color: '#475569', margin: '0 0 12px', lineHeight: 1.5 }}>
-                            Email sent to <strong style={{ color: '#1A1040' }}>{magicResult.email}</strong>. You can also open the link directly below:
-                          </p>
-
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <a
-                              href={magicResult.magicUrl}
-                              className="auth-primary-submit-btn"
-                              style={{ textAlign: 'center', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                            >
-                              <span>🚀 Open Dashboard Immediately</span>
-                              <ExternalLink size={15} />
-                            </a>
-
-                            <button
-                              type="button"
-                              onClick={handleCopyMagicLink}
-                              style={{
-                                background: '#FFFFFF',
-                                border: '1px solid #CBD5E1',
-                                color: isCopied ? '#059669' : '#334155',
-                                padding: '10px 14px',
-                                borderRadius: '6px',
-                                fontSize: '0.8125rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                              }}
-                            >
-                              <Copy size={14} />
-                              <span>{isCopied ? 'Copied to Clipboard! ✓' : 'Copy Magic Link for Other Device'}</span>
-                            </button>
-                          </div>
-
-                          <div style={{ marginTop: '12px', textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={() => { setMagicResult(null); setMagicEmail(''); }}
-                              style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
-                            >
-                              Generate another link
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                  {/* Direct Password Sign-In Form */}
+                  {errorMessage && (
+                    <div className="auth-error-banner" role="alert" style={{ marginBottom: '1.25rem' }}>
+                      <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <span>{errorMessage}</span>
                     </div>
                   )}
+
+                  <form onSubmit={handleLoginSubmit} className="auth-credentials-form">
+                    <div className="form-field-group">
+                      <label htmlFor="email-input" className="field-label">Work Email</label>
+                      <div className="input-with-icon">
+                        <Mail size={17} className="field-icon" />
+                        <input
+                          id="email-input"
+                          type="email"
+                          placeholder="testclient@datai2i.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="auth-text-input"
+                          autoComplete="email"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-field-group">
+                      <div className="field-label-row">
+                        <label htmlFor="password-input" className="field-label">Password</label>
+                        <a href="#forgot" onClick={switchToForgot} className="forgot-password-link">
+                          Forgot password?
+                        </a>
+                      </div>
+                      <div className="input-with-icon">
+                        <Lock size={17} className="field-icon" />
+                        <input
+                          id="password-input"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="auth-text-input"
+                          autoComplete="current-password"
+                          required
+                        />
+                        <button
+                          type="button"
+                          className="password-toggle-btn"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="form-options-row" style={{ marginTop: '0.5rem', marginBottom: '1.25rem' }}>
+                      <label className="remember-checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                          className="custom-checkbox"
+                        />
+                        <span>Remember this device for 30 days</span>
+                      </label>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="auth-primary-submit-btn"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <span className="submit-loading-state">Authenticating...</span>
+                      ) : (
+                        <>
+                          <span>Sign In</span>
+                          <ChevronRight size={17} />
+                        </>
+                      )}
+                    </button>
+                  </form>
 
                   {/* 3. QUICK ONE-CLICK DEMO ACCOUNTS BAR */}
                   <div style={{ marginTop: '1.75rem', borderTop: '1px solid #E5E7EB', paddingTop: '1.25rem' }}>

@@ -1076,26 +1076,35 @@ export default function RequestDetailPage({
                                       </div>
                                     )}
 
-                                    <div style={{ minWidth: 0 }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                    <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                      {/* Line 1: Lead Name + Verified Check */}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                           {lead.name}
                                         </span>
                                         <ShieldCheck size={14} color="#10B981" title="Verified Decision Maker" />
-                                        {(lead.pitchDeck || lead.pitchDeckPdf) && (
-                                          <span style={{ fontSize: '0.7rem', color: '#7C3AED', background: '#F3E8FF', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                            <Presentation size={10} /> Pitch Deck
-                                          </span>
-                                        )}
-                                        {(lead.leadStudyPdf || lead.leadStudyPdfUrl) && (
-                                          <span style={{ fontSize: '0.7rem', color: '#2563EB', background: '#DBEAFE', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                            <FileText size={10} /> Study PDF
-                                          </span>
-                                        )}
                                       </div>
+
+                                      {/* Line 2: Role / Title */}
                                       <div style={{ fontSize: '0.8125rem', color: '#2563EB', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {lead.title}
                                       </div>
+
+                                      {/* Line 3: Attached Badges linearly below title */}
+                                      {((lead.leadStudyPdf || lead.leadStudyPdfUrl) || (lead.pitchDeck || lead.pitchDeckPdf)) && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'nowrap' }}>
+                                          {(lead.leadStudyPdf || lead.leadStudyPdfUrl) && (
+                                            <span style={{ fontSize: '0.7rem', color: '#2563EB', background: '#DBEAFE', padding: '2px 7px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                                              <FileText size={10} /> Study PDF
+                                            </span>
+                                          )}
+                                          {(lead.pitchDeck || lead.pitchDeckPdf) && (
+                                            <span style={{ fontSize: '0.7rem', color: '#7C3AED', background: '#F3E8FF', padding: '2px 7px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                                              <Presentation size={10} /> Pitch Deck
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
 
@@ -1788,30 +1797,30 @@ export default function RequestDetailPage({
                   Lead Study: What You Should Know About This Prospect
                 </h4>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-                  <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>
-                      🎯 Why Relevant
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '14px', alignItems: 'stretch' }}>
+                  <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🎯 <span>Why Relevant</span>
                     </div>
-                    <p style={{ fontSize: '0.8125rem', color: '#475569', margin: 0, lineHeight: '1.4' }}>
+                    <p style={{ fontSize: '0.84rem', color: '#475569', margin: 0, lineHeight: '1.5', flex: 1 }}>
                       {inspectingLead.leadStudy?.whyRelevant || 'Direct budget decision maker aligned with key pain points.'}
                     </p>
                   </div>
 
-                  <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>
-                      🔍 Observed Context
+                  <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🔍 <span>Observed Context</span>
                     </div>
-                    <p style={{ fontSize: '0.8125rem', color: '#475569', margin: 0, lineHeight: '1.4' }}>
+                    <p style={{ fontSize: '0.84rem', color: '#475569', margin: 0, lineHeight: '1.5', flex: 1 }}>
                       {inspectingLead.leadStudy?.observedContext || 'Observed operational growth and procurement signals.'}
                     </p>
                   </div>
 
-                  <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1E293B', marginBottom: '4px' }}>
-                      🧭 Suggested Approach Angle
+                  <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🧭 <span>Suggested Approach Angle</span>
                     </div>
-                    <p style={{ fontSize: '0.8125rem', color: '#475569', margin: 0, lineHeight: '1.4' }}>
+                    <p style={{ fontSize: '0.84rem', color: '#475569', margin: 0, lineHeight: '1.5', flex: 1 }}>
                       {inspectingLead.leadStudy?.suggestedApproach || 'Lead with rapid technical deliverables and measurable SLA proof.'}
                     </p>
                   </div>
