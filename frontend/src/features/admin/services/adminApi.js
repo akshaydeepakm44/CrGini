@@ -200,5 +200,24 @@ export const adminApi = {
 
   async sendMessage(requestId, text) {
     return api.sendMessage(requestId, { text });
+  },
+
+  // 14. Services Channel: Page View Management
+  async getServiceVisibility() {
+    const res = await fetch(`${API_BASE}/admin/service-visibility`, { headers: getHeaders() });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch service visibility');
+    return data.services || [];
+  },
+
+  async updateServiceVisibility(id, isActive) {
+    const res = await fetch(`${API_BASE}/admin/service-visibility/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ isActive })
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update service visibility');
+    return data;
   }
 };

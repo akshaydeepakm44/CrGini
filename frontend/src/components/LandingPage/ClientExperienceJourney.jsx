@@ -24,10 +24,12 @@ import {
   Send,
   Check
 } from 'lucide-react';
+import { useServiceVisibility } from '../../features/client/context/ServiceVisibilityContext';
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function ClientExperienceJourney({ onExplorePlatform, onExploreService }) {
+  const { isChannelActive } = useServiceVisibility();
   const [activeStep, setActiveStep] = useState(0);
   const containerRef = useRef(null);
   const pinTargetRef = useRef(null);
@@ -35,11 +37,11 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
 
   const steps = [
     {
-      id: 'leads',
+      id: 'platform',
       stepNum: '01',
-      badge: '01 // LEAD RESEARCH & DISCOVERY',
-      title: 'The Client Views & Requests Leads',
-      subtitle: 'Request bespoke prospect lists in minutes. Filter by industry, tech stack, and seniority. Every contact is human-verified with direct work emails and LinkedIn profiles.'
+      badge: '01 // SEAMLESS CLIENT WORKSPACE',
+      title: 'Enter Your Private Client Portal',
+      subtitle: 'Instantly access your workspace with custom service requests, live project timelines, transparent pricing, and direct specialist collaboration.'
     },
     {
       id: 'boosting',
@@ -49,11 +51,13 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
       subtitle: 'When you need market traction, our Boosting specialists execute go-to-market playbooks, high-conversion copywriting, paid campaigns, and developer advocacy sprints.'
     },
     {
-      id: 'digitalising',
+      id: isChannelActive('digitalising') ? 'digitalising' : 'design',
       stepNum: '03',
-      badge: '03 // BUSINESS INTELLIGENCE & DIGITALISATION',
-      title: 'Digitalising Market Intelligence & Org Insights',
-      subtitle: 'Deep organizational studies and executive mapping. Understand target company hierarchies, technology vendor footprints, and buying committees before pitching.'
+      badge: isChannelActive('digitalising') ? '03 // BUSINESS INTELLIGENCE & DIGITALISATION' : '03 // HIGH-CONVERTING UI/UX & ARCHITECTURE',
+      title: isChannelActive('digitalising') ? 'Digitalising Market Intelligence & Org Insights' : 'Modern UI/UX & Product Architecture',
+      subtitle: isChannelActive('digitalising')
+        ? 'Deep organizational studies and executive mapping. Understand target company hierarchies, technology vendor footprints, and buying committees before pitching.'
+        : 'World-class conversion architecture, heuristic UI/UX evaluations, interactive clickable prototypes, and production design systems.'
     }
   ];
 

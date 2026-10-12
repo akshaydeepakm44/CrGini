@@ -84,6 +84,9 @@ export const api = {
     });
     const data = await safeJson(res);
     if (!res.ok || !data.success) {
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        throw new Error('Backend server is temporarily unreachable. Please ensure the backend server is running on port 5000.');
+      }
       throw new Error(data.message || 'Registration failed. Please try again.');
     }
     if (data.token) {
@@ -107,6 +110,21 @@ export const api = {
     localStorage.removeItem('cg_auth_token');
     localStorage.removeItem('token');
     sessionStorage.clear();
+  },
+
+  async getServicesVisibility() {
+    try {
+      const res = await fetch(`${API_BASE}/services/visibility`, {
+        headers: getHeaders(false)
+      });
+      const data = await safeJson(res);
+      if (res.ok && data.success && Array.isArray(data.services)) {
+        return data.services;
+      }
+    } catch (err) {
+      console.warn('[api.getServicesVisibility] failed:', err);
+    }
+    return null;
   },
 
   // Passwordless Magic Link Flow

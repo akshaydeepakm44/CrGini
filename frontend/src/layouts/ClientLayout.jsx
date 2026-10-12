@@ -15,6 +15,7 @@ import {
 import Sidebar from '../components/navigation/Sidebar';
 import Header from '../components/navigation/Header';
 import NotificationDrawer from '../components/notifications/NotificationDrawer';
+import { useServiceVisibility } from '../features/client/context/ServiceVisibilityContext';
 import '../styles/light-theme.css';
 
 /**
@@ -154,6 +155,22 @@ export default function ClientLayout({
     },
   ];
 
+  const { isChannelActive, isServiceActive } = useServiceVisibility();
+
+  const filteredNavItems = clientNavItems
+    .map((item) => {
+      if (['boosting', 'digitalising', 'design', 'development'].includes(item.id)) {
+        if (!isChannelActive(item.id)) return null;
+        if (item.children) {
+          const visibleChildren = item.children.filter((ch) => isServiceActive(ch.id));
+          if (visibleChildren.length === 0) return null;
+          return { ...item, children: visibleChildren };
+        }
+      }
+      return item;
+    })
+    .filter(Boolean);
+
   const handleNavigate = (path) => {
     setIsMobileOpen(false);
     if (onNavigate) {
@@ -177,7 +194,7 @@ export default function ClientLayout({
     >
       {/* 1. Left Sidebar - Fixed */}
       <Sidebar
-        navItems={clientNavItems}
+        navItems={filteredNavItems}
         activePath={currentPath}
         onNavigate={handleNavigate}
         isCollapsed={isCollapsed}

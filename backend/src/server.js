@@ -101,6 +101,9 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/samples', sampleRoutes);
 
+import { getServiceVisibility } from './controllers/serviceVisibilityController.js';
+app.get('/api/services/visibility', getServiceVisibility);
+
 import { checkStorageHealth } from './services/storageService.js';
 
 // Health Check with PostgreSQL & Object Storage Diagnostics

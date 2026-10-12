@@ -23,6 +23,7 @@ import {
   Terminal,
   Globe
 } from 'lucide-react';
+import { useServiceVisibility } from '../context/ServiceVisibilityContext';
 
 /**
  * CustomPage Component
@@ -30,6 +31,8 @@ import {
  * Faithfully implements the uploaded Custom Request functionality with dynamic real-time price updates.
  */
 export default function CustomPage({ onRequestService, onNavigate }) {
+  const { isChannelActive, isServiceActive } = useServiceVisibility();
+
   // Service selection state matching all individual services
   const [selectedServices, setSelectedServices] = useState({
     strategicPlan: true,
@@ -239,9 +242,32 @@ export default function CustomPage({ onRequestService, onNavigate }) {
     },
   ];
 
+  const KEY_TO_SERVICE_ID = {
+    strategicPlan: 'strategic-planner',
+    content: 'content-creator',
+    brandIdentity: 'brand-identity',
+    adCreatives: 'ad-creatives',
+    gtm: 'gtm',
+    devrel: 'devrel',
+    leadResearch: 'lead-research',
+    companyStudy: 'company-study',
+    keyPeople: 'key-people',
+    pitchSupport: 'pitch-support',
+    uiUxAudit: 'ui-ux-audit',
+    figmaProject: 'figma-project',
+    redesignRequest: 'redesign-request',
+    apiBackend: 'technical-discovery',
+    clickablePrototype: 'clickable-prototype',
+    webApp: 'web-app',
+  };
+
+  const activeServicesList = servicesList.filter(
+    (s) => isChannelActive(s.category) && isServiceActive(KEY_TO_SERVICE_ID[s.key] || s.key)
+  );
+
   const filteredServices = activeTab === 'all'
-    ? servicesList
-    : servicesList.filter((s) => s.category === activeTab);
+    ? activeServicesList
+    : activeServicesList.filter((s) => s.category === activeTab);
 
   const toggleService = (key) => {
     setSelectedServices((prev) => ({
@@ -507,7 +533,9 @@ export default function CustomPage({ onRequestService, onNavigate }) {
             { id: 'digitalising', label: 'Digitalising Intelligence' },
             { id: 'design', label: 'UI / Design' },
             { id: 'development', label: 'App Development' },
-          ].map((tab) => (
+          ]
+            .filter((tab) => tab.id === 'all' || isChannelActive(tab.id))
+            .map((tab) => (
             <button
               key={tab.id}
               type="button"

@@ -13,6 +13,7 @@ import DesignPortal from './features/design/DesignPortal';
 import SuperAdminPortal from './features/admin/SuperAdminPortal';
 import PublicSampleDashboard from './features/samples/PublicSampleDashboard';
 import { api } from './services/api';
+import { ServiceVisibilityProvider } from './features/client/context/ServiceVisibilityContext';
 
 // Helper component to route /ticket/:ticketId directly to the appropriate dashboard
 function TicketRedirect({ user, isAuthChecking }) {
@@ -109,8 +110,9 @@ export default function App() {
   };
 
   return (
-    <div className="app-root">
-      <Routes>
+    <ServiceVisibilityProvider>
+      <div className="app-root">
+        <Routes>
         {/* 1. Public Light Theme Landing Page */}
         <Route
           path="/"
@@ -347,6 +349,7 @@ export default function App() {
       </Routes>
 
       <Toast message={toastMessage} />
-    </div>
+      </div>
+    </ServiceVisibilityProvider>
   );
 }

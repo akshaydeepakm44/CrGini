@@ -20,6 +20,7 @@ import {
   Trash2,
   Percent
 } from 'lucide-react';
+import { useServiceVisibility } from '../context/ServiceVisibilityContext';
 
 const ALL_BUNDLE_SERVICES = [
   // Boosting
@@ -224,10 +225,11 @@ const ALL_BUNDLE_SERVICES = [
 ];
 
 export default function CustomBundlePage({ onRequestCustomBundle, onNavigate }) {
+  const { isChannelActive, isServiceActive } = useServiceVisibility();
+
   const [selectedServices, setSelectedServices] = useState({
     strategicPlan: true,
     content: true,
-    leadResearch: true,
   });
   const [activeCategory, setActiveCategory] = useState('all');
   const [customRequirements, setCustomRequirements] = useState('');
@@ -239,7 +241,11 @@ export default function CustomBundlePage({ onRequestCustomBundle, onNavigate }) 
     }));
   };
 
-  const selectedList = ALL_BUNDLE_SERVICES.filter((s) => selectedServices[s.id]);
+  const activeBundleServices = ALL_BUNDLE_SERVICES.filter(
+    (s) => isChannelActive(s.category) && isServiceActive(s.serviceSlug || s.id)
+  );
+
+  const selectedList = activeBundleServices.filter((s) => selectedServices[s.id]);
   const subtotal = selectedList.reduce((sum, s) => sum + s.price, 0);
 
   // Dynamic Tiered Volume Discount
@@ -265,7 +271,7 @@ export default function CustomBundlePage({ onRequestCustomBundle, onNavigate }) 
     }
   };
 
-  const visibleServices = ALL_BUNDLE_SERVICES.filter(
+  const visibleServices = activeBundleServices.filter(
     (s) => activeCategory === 'all' || s.category === activeCategory
   );
 
@@ -401,12 +407,14 @@ export default function CustomBundlePage({ onRequestCustomBundle, onNavigate }) 
           {/* Category Tabs */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
             {[
-              { id: 'all', label: `All Services (${ALL_BUNDLE_SERVICES.length})` },
+              { id: 'all', label: `All Services (${activeBundleServices.length})` },
               { id: 'boosting', label: 'Boosting (6)' },
               { id: 'digitalising', label: 'Digitalising (4)' },
               { id: 'design', label: 'UI / Design (3)' },
               { id: 'development', label: 'App Development (3)' },
-            ].map((tab) => (
+            ]
+              .filter((tab) => tab.id === 'all' || isChannelActive(tab.id))
+              .map((tab) => (
               <button
                 key={tab.id}
                 type="button"

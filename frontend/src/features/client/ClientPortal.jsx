@@ -20,6 +20,7 @@ import NewRequestModal from './components/NewRequestModal';
 
 import { api } from '../../services/api';
 import { adaptRequest, computeDashboardMetrics, adaptDeliverables } from './utils/clientAdapters';
+import { useServiceVisibility } from './context/ServiceVisibilityContext';
 
 /**
  * Service Slug Router Helper
@@ -69,6 +70,7 @@ function RequestDetailWrapper({ requests, onBack, onReload }) {
 export default function ClientPortal({ user, onLogout }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isChannelActive, isServiceActive } = useServiceVisibility();
 
   const [company, setCompany] = useState(user?.company || null);
   const [rawRequests, setRawRequests] = useState([]);
@@ -249,32 +251,44 @@ export default function ClientPortal({ user, onLogout }) {
         <Route
           path="digitalising"
           element={
-            <DigitalisingChannelPage
-              onSelectService={(slug) => navigate(`/portal/digitalising/${slug}`)}
-              onRequestService={(serviceId, customData) => handleOpenNewRequest(serviceId, customData)}
-            />
+            isChannelActive('digitalising') ? (
+              <DigitalisingChannelPage
+                onSelectService={(slug) => navigate(`/portal/digitalising/${slug}`)}
+                onRequestService={(serviceId, customData) => handleOpenNewRequest(serviceId, customData)}
+              />
+            ) : (
+              <Navigate to="/portal/dashboard" replace />
+            )
           }
         />
         <Route
           path="digitalising/custom"
           element={
-            <CustomPage
-              onRequestService={(serviceId, customData) => handleOpenNewRequest(serviceId || 'custom', customData)}
-              onNavigate={handleNavigate}
-            />
+            isChannelActive('digitalising') ? (
+              <CustomPage
+                onRequestService={(serviceId, customData) => handleOpenNewRequest(serviceId || 'custom', customData)}
+                onNavigate={handleNavigate}
+              />
+            ) : (
+              <Navigate to="/portal/dashboard" replace />
+            )
           }
         />
         <Route
           path="custom"
-          element={<Navigate to="/portal/digitalising/custom" replace />}
+          element={<Navigate to="/portal/bundles/custom" replace />}
         />
         <Route
           path="digitalising/:serviceSlug"
           element={
-            <ServiceDetailWrapper
-              onOpenNewRequest={handleOpenNewRequest}
-              channel="digitalising"
-            />
+            isChannelActive('digitalising') ? (
+              <ServiceDetailWrapper
+                onOpenNewRequest={handleOpenNewRequest}
+                channel="digitalising"
+              />
+            ) : (
+              <Navigate to="/portal/dashboard" replace />
+            )
           }
         />
 

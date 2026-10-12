@@ -21,6 +21,7 @@ import StatusBadge from '../../../components/tickets/StatusBadge';
 import Badge from '../../../components/common/Badge';
 import Button from '../../../components/common/Button';
 import SyncQueueButton from '../../../components/common/SyncQueueButton';
+import { useServiceVisibility } from '../context/ServiceVisibilityContext';
 
 export default function ClientDashboardPage({
   user,
@@ -38,6 +39,7 @@ export default function ClientDashboardPage({
 }) {
   const userName = user?.name || 'Partner';
   const companyName = company?.name || user?.companyName || 'Your Organization';
+  const { isChannelActive, isServiceActive } = useServiceVisibility();
 
   // Live accurate metrics calculated directly from in-memory requests and deliverables
   const activeRequestsList = requests.filter(
@@ -241,37 +243,54 @@ export default function ClientDashboardPage({
           }
         `}</style>
         <div className="cg-service-channels-grid">
-          <ServiceChannelCard
-            channel="boosting"
-            title="BOOSTING"
-            description="Grow your brand, content and market presence with specialist campaigns."
-            servicesList={['Strategic Planner', 'Content Creator', 'DevRel', 'GTM Strategy', 'Ad Creatives']}
-            onExplore={() => onNavigate && onNavigate('/portal/boosting')}
-          />
+          {isChannelActive('boosting') && (
+            <ServiceChannelCard
+              channel="boosting"
+              title="BOOSTING"
+              description="Grow your brand, content and market presence with specialist campaigns."
+              servicesList={['Strategic Planner', 'Content Creator', 'DevRel', 'GTM Strategy', 'Ad Creatives'].filter((_, i) => {
+                const ids = ['strategic-planner', 'content-creator', 'devrel', 'gtm', 'ad-creatives'];
+                return isServiceActive(ids[i]);
+              })}
+              onExplore={() => onNavigate && onNavigate('/portal/boosting')}
+            />
+          )}
 
-          <ServiceChannelCard
-            channel="digitalising"
-            title="DIGITALISING"
-            description="Research, insights and business intelligence prepared by the specialist team."
-            servicesList={['Lead Research', 'Company Study', 'Key People Research', 'Pitch Support']}
-            onExplore={() => onNavigate && onNavigate('/portal/digitalising')}
-          />
+          {isChannelActive('digitalising') && (
+            <ServiceChannelCard
+              channel="digitalising"
+              title="DIGITALISING"
+              description="Research, insights and business intelligence prepared by the specialist team."
+              servicesList={['Lead Research', 'Company Study', 'Key People Research', 'Pitch Support'].filter((_, i) => {
+                const ids = ['lead-research', 'company-study', 'key-people', 'pitch-support'];
+                return isServiceActive(ids[i]);
+              })}
+              onExplore={() => onNavigate && onNavigate('/portal/digitalising')}
+            />
+          )}
 
-          <ServiceChannelCard
-            channel="design"
-            title="UI / DESIGN"
-            description="Professional interface design, heuristic audits, and design system engineering."
-            servicesList={['UI/UX Audit', 'Figma Project', 'Redesign Request', 'Design Systems']}
-            onExplore={() => onNavigate && onNavigate('/portal/design')}
-          />
+          {isChannelActive('design') && (
+            <ServiceChannelCard
+              channel="design"
+              title="UI / DESIGN"
+              description="Professional interface design, heuristic audits, and design system engineering."
+              servicesList={['UI/UX Audit', 'Figma Project', 'Redesign Request', 'Design Systems'].filter((_, i) => {
+                const ids = ['ui-ux-audit', 'figma-project', 'redesign-request'];
+                return ids[i] ? isServiceActive(ids[i]) : true;
+              })}
+              onExplore={() => onNavigate && onNavigate('/portal/design')}
+            />
+          )}
 
-          <ServiceChannelCard
-            channel="development"
-            title="APP DEVELOPMENT"
-            description="Turnkey full-stack web applications, mobile apps, and scalable API systems."
-            servicesList={['Web Application MVP', 'Mobile App Development', 'API & Backend Systems']}
-            onExplore={() => onNavigate && onNavigate('/portal/development')}
-          />
+          {isChannelActive('development') && (
+            <ServiceChannelCard
+              channel="development"
+              title="APP DEVELOPMENT"
+              description="Turnkey full-stack web applications, mobile apps, and scalable API systems."
+              servicesList={['Web Application MVP', 'Mobile App Development', 'API & Backend Systems']}
+              onExplore={() => onNavigate && onNavigate('/portal/development')}
+            />
+          )}
         </div>
 
         {/* Turnkey Bundles Discovery Banner */}

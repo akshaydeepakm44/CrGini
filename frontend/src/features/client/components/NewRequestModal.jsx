@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { SERVICES_CATALOG } from '../data/servicesData';
 import { api } from '../../../services/api';
+import { useServiceVisibility } from '../context/ServiceVisibilityContext';
 
 /**
  * Service Configuration Registry
@@ -302,6 +303,7 @@ export default function NewRequestModal({
 }) {
   const [step, setStep] = useState(1); // 1: Scope, 2: Review, 3: Price
   const [activeServiceId, setActiveServiceId] = useState('strategic-planner');
+  const { isChannelActive, isServiceActive } = useServiceVisibility();
   const [errors, setErrors] = useState({});
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1556,12 +1558,14 @@ export default function NewRequestModal({
                     {/* Filter Tabs */}
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
                       {[
-                        { id: 'all', label: 'All Services (16)' },
+                        { id: 'all', label: 'All Services' },
                         { id: 'boosting', label: 'Boosting (6)' },
                         { id: 'digitalising', label: 'Digitalising (4)' },
                         { id: 'design', label: 'UI / Design (3)' },
                         { id: 'development', label: 'App Development (3)' },
-                      ].map((tab) => {
+                      ]
+                        .filter((tab) => tab.id === 'all' || isChannelActive(tab.id))
+                        .map((tab) => {
                         const isActive = customModalTab === tab.id;
                         return (
                           <button
@@ -1586,7 +1590,7 @@ export default function NewRequestModal({
                       })}
                     </div>
 
-                    {/* All 16 Services Grid */}
+                    {/* Active Services Grid */}
                     <div
                       style={{
                         display: 'grid',
@@ -1596,27 +1600,32 @@ export default function NewRequestModal({
                     >
                       {[
                         // Boosting
-                        { key: 'strategicPlan', category: 'boosting', label: 'Strategic Planner', sub: '3 months plan', price: 19, color: '#EC4899', bg: '#FDF2F8' },
-                        { key: 'content', category: 'boosting', label: 'Content Creator', sub: '2 posters + 3 reels + 1 branding', price: 29, color: '#F43F5E', bg: '#FFF1F2' },
-                        { key: 'brandIdentity', category: 'boosting', label: 'Brand Identity', sub: 'Meta + Insta + FB platforms access', price: 5, color: '#3B82F6', bg: '#EFF6FF' },
-                        { key: 'adCreatives', category: 'boosting', label: 'Ad Creatives', sub: '4 posters + boosting angles', price: 10, color: '#EF4444', bg: '#FEF2F2' },
-                        { key: 'gtm', category: 'boosting', label: 'GTM Strategy', sub: '2 months reach plan', price: 19, color: '#10B981', bg: '#ECFDF5' },
-                        { key: 'devrel', category: 'boosting', label: 'DevRel', sub: 'Community + content + feedback', price: 49, color: '#8B5CF6', bg: '#F5F3FF' },
+                        { key: 'strategicPlan', serviceId: 'strategic-planner', category: 'boosting', label: 'Strategic Planner', sub: '3 months plan', price: 19, color: '#EC4899', bg: '#FDF2F8' },
+                        { key: 'content', serviceId: 'content-creator', category: 'boosting', label: 'Content Creator', sub: '2 posters + 3 reels + 1 branding', price: 29, color: '#F43F5E', bg: '#FFF1F2' },
+                        { key: 'brandIdentity', serviceId: 'brand-identity', category: 'boosting', label: 'Brand Identity', sub: 'Meta + Insta + FB platforms access', price: 5, color: '#3B82F6', bg: '#EFF6FF' },
+                        { key: 'adCreatives', serviceId: 'ad-creatives', category: 'boosting', label: 'Ad Creatives', sub: '4 posters + boosting angles', price: 10, color: '#EF4444', bg: '#FEF2F2' },
+                        { key: 'gtm', serviceId: 'gtm', category: 'boosting', label: 'GTM Strategy', sub: '2 months reach plan', price: 19, color: '#10B981', bg: '#ECFDF5' },
+                        { key: 'devrel', serviceId: 'devrel', category: 'boosting', label: 'DevRel', sub: 'Community + content + feedback', price: 49, color: '#8B5CF6', bg: '#F5F3FF' },
                         // Digitalising
-                        { key: 'leadResearch', category: 'digitalising', label: 'Lead Research', sub: 'Lead study + pitch deck ($2 per lead)', price: 2, color: '#7C3AED', bg: '#EDE9FE' },
-                        { key: 'companyStudy', category: 'digitalising', label: 'Company Study', sub: 'Personal company study', price: 1, color: '#6366F1', bg: '#EEF2FF' },
-                        { key: 'keyPeople', category: 'digitalising', label: 'Key People Research', sub: 'Key profile + direct mail', price: 2, color: '#0EA5E9', bg: '#F0F9FF' },
-                        { key: 'pitchSupport', category: 'digitalising', label: 'Pitch Support', sub: 'Pitch + competitor analysis', price: 2, color: '#10B981', bg: '#ECFDF5' },
+                        { key: 'leadResearch', serviceId: 'lead-research', category: 'digitalising', label: 'Lead Research', sub: 'Lead study + pitch deck ($2 per lead)', price: 2, color: '#7C3AED', bg: '#EDE9FE' },
+                        { key: 'companyStudy', serviceId: 'company-study', category: 'digitalising', label: 'Company Study', sub: 'Personal company study', price: 1, color: '#6366F1', bg: '#EEF2FF' },
+                        { key: 'keyPeople', serviceId: 'key-people', category: 'digitalising', label: 'Key People Research', sub: 'Key profile + direct mail', price: 2, color: '#0EA5E9', bg: '#F0F9FF' },
+                        { key: 'pitchSupport', serviceId: 'pitch-support', category: 'digitalising', label: 'Pitch Support', sub: 'Pitch + competitor analysis', price: 2, color: '#10B981', bg: '#ECFDF5' },
                         // UI / Design
-                        { key: 'uiUxAudit', category: 'design', label: 'UI/UX Audit', sub: 'Mock screens + prototype review', price: 19, color: '#0284C7', bg: '#F0F9FF' },
-                        { key: 'figmaProject', category: 'design', label: 'Figma Project', sub: 'Mock screens + prototype UI kit', price: 9, color: '#7C3AED', bg: '#FAF5FF' },
-                        { key: 'redesignRequest', category: 'design', label: 'Landing Page Redesign', sub: 'Full page redesign & conversion overhaul', price: 59, color: '#EC4899', bg: '#FDF2F8' },
+                        { key: 'uiUxAudit', serviceId: 'ui-ux-audit', category: 'design', label: 'UI/UX Audit', sub: 'Mock screens + prototype review', price: 19, color: '#0284C7', bg: '#F0F9FF' },
+                        { key: 'figmaProject', serviceId: 'figma-project', category: 'design', label: 'Figma Project', sub: 'Mock screens + prototype UI kit', price: 9, color: '#7C3AED', bg: '#FAF5FF' },
+                        { key: 'redesignRequest', serviceId: 'redesign-request', category: 'design', label: 'Landing Page Redesign', sub: 'Full page redesign & conversion overhaul', price: 59, color: '#EC4899', bg: '#FDF2F8' },
                         // App Development
-                        { key: 'apiBackend', category: 'development', label: 'Technical Discovery', sub: 'Architecture & schema planning', price: 49, color: '#6366F1', bg: '#EEF2FF' },
-                        { key: 'mobileApp', category: 'development', label: 'Clickable App Prototype', sub: 'Interactive clickable prototype', price: 199, color: '#0D9488', bg: '#F0FDFA' },
-                        { key: 'webApp', category: 'development', label: 'MVP Development', sub: 'POC + V1 turnkey application', price: 1500, color: '#059669', bg: '#ECFDF5' },
+                        { key: 'apiBackend', serviceId: 'technical-discovery', category: 'development', label: 'Technical Discovery', sub: 'Architecture & schema planning', price: 49, color: '#6366F1', bg: '#EEF2FF' },
+                        { key: 'mobileApp', serviceId: 'clickable-prototype', category: 'development', label: 'Clickable App Prototype', sub: 'Interactive clickable prototype', price: 199, color: '#0D9488', bg: '#F0FDFA' },
+                        { key: 'webApp', serviceId: 'web-app', category: 'development', label: 'MVP Development', sub: 'POC + V1 turnkey application', price: 1500, color: '#059669', bg: '#ECFDF5' },
                       ]
-                        .filter((s) => customModalTab === 'all' || s.category === customModalTab)
+                        .filter((s) => {
+                          if (!isChannelActive(s.category)) return false;
+                          if (!isServiceActive(s.serviceId || s.key)) return false;
+                          if (customModalTab !== 'all' && s.category !== customModalTab) return false;
+                          return true;
+                        })
                         .map((srv) => {
                           const isChecked = !!customForm.selectedServices[srv.key];
                           return (

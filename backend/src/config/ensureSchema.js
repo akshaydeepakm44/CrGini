@@ -83,6 +83,62 @@ export async function ensureSchemaIntegrity() {
       CREATE INDEX IF NOT EXISTS idx_company_leads_company_id ON company_leads (company_id);
     `);
 
+    // 5. Ensure service_channel_settings table exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS service_channel_settings (
+        id VARCHAR(100) PRIMARY KEY,
+        channel VARCHAR(100) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        is_channel BOOLEAN NOT NULL DEFAULT FALSE,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    // Seed default settings if empty
+    const countRes = await query('SELECT COUNT(*) AS count FROM service_channel_settings');
+    if (parseInt(countRes.rows[0].count, 10) === 0) {
+      const defaults = [
+        // Channels
+        ['channel:boosting', 'boosting', 'BOOSTING Channel', 'Growth, GTM & Content', true, true],
+        ['channel:digitalising', 'digitalising', 'DIGITALISING Channel', 'Research, insights and business intelligence', false, true],
+        ['channel:design', 'design', 'UI / DESIGN Channel', 'Interface design & UX heuristics', true, true],
+        ['channel:development', 'development', 'APP DEVELOPMENT Channel', 'Full-stack web & mobile apps', true, true],
+        
+        // Boosting services
+        ['strategic-planner', 'boosting', 'Strategic Planner', 'Build a focused growth and marketing plan', true, false],
+        ['content-creator', 'boosting', 'Content Creator', 'High-impact narrative copy & creative assets', true, false],
+        ['devrel', 'boosting', 'DevRel & Technical Advocacy', 'Developer advocacy & community positioning', true, false],
+        ['gtm', 'boosting', 'GTM Strategy', 'Launch execution blueprints & traction models', true, false],
+        ['ad-creatives', 'boosting', 'Ad Creatives', 'High-converting ad banners & copy angles', true, false],
+        ['brand-identity', 'boosting', 'Brand Identity & Positioning', 'Distinctive brand voice & visual guidelines', true, false],
+
+        // Digitalising services (deactivated by default as requested)
+        ['lead-research', 'digitalising', 'Lead Research', 'Find relevant companies and verified prospect contact intelligence', false, false],
+        ['company-study', 'digitalising', 'Company Study', 'Get a structured personal company study & account dossier', false, false],
+        ['key-people', 'digitalising', 'Key People Research', 'Identify relevant decision-makers & leadership contacts', false, false],
+        ['pitch-support', 'digitalising', 'Pitch Support', 'Pitch support and competitor analysis to win presentations', false, false],
+
+        // Design services
+        ['ui-ux-audit', 'design', 'UI/UX Audit', 'Comprehensive usability evaluation & UX heuristics', true, false],
+        ['figma-project', 'design', 'Figma Project', 'Figma component systems, mock screens & prototypes', true, false],
+        ['redesign-request', 'design', 'Landing Page Redesign', 'Full-page interface transformations & overhauls', true, false],
+
+        // Development services
+        ['technical-discovery', 'development', 'Technical Discovery', 'Technical discovery & architecture planning', true, false],
+        ['clickable-prototype', 'development', 'Clickable App Prototype', 'Clickable interactive web & mobile prototypes', true, false],
+        ['web-app', 'development', 'MVP Development', 'Production-ready web application MVP (POC + V1)', true, false]
+      ];
+
+      for (const [id, channel, name, desc, isActive, isChannel] of defaults) {
+        await query(
+          'INSERT INTO service_channel_settings (id, channel, name, description, is_active, is_channel) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING',
+          [id, channel, name, desc, isActive, isChannel]
+        );
+      }
+    }
+
     console.log('[Schema] Database schema integrity verified & updated successfully.');
     return true;
   } catch (err) {
