@@ -19,6 +19,11 @@ import {
   streamGeneratedLeadStudyPdf,
   streamGeneratedPitchDeckPdf,
 } from '../services/pdfService.js';
+import {
+  sendSampleInquiryAlertEmail,
+  sendSampleInquiryConfirmationEmail,
+} from '../services/emailService.js';
+import { createNotification } from '../repositories/notificationRepository.js';
 
 /**
  * Public Sample Controller
@@ -847,58 +852,190 @@ export const uploadLeadPitchDeck = async (req, res) => {
 
 /**
  * @desc    Submit public sample inquiry / lead unlock request directly from prospect dashboard
- * @route   POST /api/samples/:slug/inquiry
+ * @route   POST /api/samples/:slug/inquiry or POST /api/samples/inquiry
  * @access  Public (No Auth Required)
  */
 export const submitPublicInquiry = async (req, res) => {
   try {
-    const { slug } = req.params;
+    const slug = (req.params.slug || req.body.slug || req.query.slug || 'general').trim();
     const { name, email, message } = req.body;
 
-    if (!email || !email.trim()) {
+    if (!email || !email.trim() || !email.includes('@')) {
       return res.status(400).json({
         success: false,
-        message: 'Your work email is required.',
+        message: 'A valid work email is required.',
       });
     }
 
-    const sample = await findSampleBySlug(slug, false);
-    const companyName = sample?.companyName || slug;
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = (name && name.trim()) || 'Prospect Visitor';
+    const cleanMessage = (message && message.trim()) || "Hey Creativegini i'm intrested in your service";
 
-    // Ensure database table exists for prospect inquiries
+    // 1. Resolve sample company details
+    let sample = null;
+    let companyName = req.body.companyName || slug;
     try {
-      await query(`
-        CREATE TABLE IF NOT EXISTS public_sample_inquiries (
-          id SERIAL PRIMARY KEY,
-          slug VARCHAR(255) NOT NULL,
-          company_name VARCHAR(255),
-          sender_name VARCHAR(255),
-          sender_email VARCHAR(255) NOT NULL,
-          message TEXT,
-          created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-      `);
+      sample = await findSampleBySlug(slug, false);
+      if (sample?.companyName) {
+        companyName = sample.companyName;
+      }
+    } catch (_) {
+      // Fallback to slug if sample not found
+    }
 
-      await query(
-        `
-        INSERT INTO public_sample_inquiries (slug, company_name, sender_name, sender_email, message)
-        VALUES ($1, $2, $3, $4, $5);
-      `,
-        [slug, companyName, (name && name.trim()) || 'Prospect Visitor', email.trim().toLowerCase(), message || "Hey Creativegini i'm intrested in your service"]
+    // 2. Self-healing database table check
+    await query(`
+      CREATE TABLE IF NOT EXISTS public_sample_inquiries (
+        id SERIAL PRIMARY KEY,
+        slug VARCHAR(255) NOT NULL,
+        company_name VARCHAR(255),
+        sender_name VARCHAR(255),
+        sender_email VARCHAR(255) NOT NULL,
+        message TEXT,
+        status VARCHAR(50) DEFAULT 'NEW',
+        super_admin_notified BOOLEAN DEFAULT FALSE,
+        app_email_notified BOOLEAN DEFAULT FALSE,
+        sender_notified BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
       );
-    } catch (dbErr) {
-      console.warn('[SampleController.submitPublicInquiry] Table/insert warning:', dbErr?.message);
+    `);
+
+    // 3. Record the inquiry in the database
+    const insertRes = await query(
+      `
+        INSERT INTO public_sample_inquiries (
+          slug, 
+          company_name, 
+          sender_name, 
+          sender_email, 
+          message,
+          status
+        )
+        VALUES ($1, $2, $3, $4, $5, 'NEW')
+        RETURNING id, slug, company_name, sender_name, sender_email, message, created_at;
+      `,
+      [slug, companyName, cleanName, cleanEmail, cleanMessage]
+    );
+
+    const inquiryRecord = insertRes.rows[0];
+    const inquiryId = inquiryRecord?.id;
+
+    // 4. Retrieve Super Admins from database
+    let adminUsers = [];
+    try {
+      const adminUsersRes = await query(`
+        SELECT id, name, email, role FROM users 
+        WHERE role IN ('SUPER_ADMIN', 'ADMIN') AND email IS NOT NULL AND email != ''
+      `);
+      adminUsers = adminUsersRes.rows;
+    } catch (eUsers) {
+      console.warn('[SampleController.submitPublicInquiry] Admin user query note:', eUsers.message);
+    }
+
+    const adminEmails = adminUsers.map((u) => u.email.trim().toLowerCase());
+
+    // 5. Retrieve Application Emails tied to the platform
+    const appEmails = [
+      process.env.EMAIL_USER,
+      process.env.ADMIN_EMAIL,
+      process.env.SUPPORT_EMAIL,
+      'contact@creativegini.com',
+      'contact@dizigini.com',
+      'team@dizigini.com',
+    ]
+      .filter(Boolean)
+      .map((e) => e.trim().toLowerCase());
+
+    // Combined unique recipients for super admin & application alert
+    const alertRecipients = Array.from(new Set([...adminEmails, ...appEmails]));
+
+    console.log(`[INQUIRY RECORDED] ID: ${inquiryId} from ${cleanName} (${cleanEmail}) for ${companyName}`);
+    console.log(`[INQUIRY ALERT] Dispatching to ${alertRecipients.length} recipients:`, alertRecipients);
+
+    // 6. Send Alert Email to Super Admin & Application Email
+    let superAdminNotified = false;
+    let appEmailNotified = false;
+    try {
+      const alertResult = await sendSampleInquiryAlertEmail({
+        recipients: alertRecipients,
+        sample: sample || { companyName, slug },
+        inquiry: {
+          id: inquiryId,
+          slug,
+          companyName,
+          senderName: cleanName,
+          senderEmail: cleanEmail,
+          message: cleanMessage,
+        },
+      });
+      if (alertResult?.success) {
+        superAdminNotified = true;
+        appEmailNotified = true;
+      }
+    } catch (emailErr) {
+      console.error('[SampleController.submitPublicInquiry] Super admin/app email error:', emailErr.message);
+    }
+
+    // 7. Send Confirmation Email to the Prospect who provided their email
+    let senderNotified = false;
+    try {
+      const confirmResult = await sendSampleInquiryConfirmationEmail({
+        recipient: cleanEmail,
+        sample: sample || { companyName, slug },
+        inquiry: {
+          id: inquiryId,
+          slug,
+          companyName,
+          senderName: cleanName,
+          senderEmail: cleanEmail,
+          message: cleanMessage,
+        },
+      });
+      if (confirmResult?.success) {
+        senderNotified = true;
+      }
+    } catch (confirmErr) {
+      console.error('[SampleController.submitPublicInquiry] Sender confirmation email error:', confirmErr.message);
+    }
+
+    // 8. Update notification delivery status in database
+    if (inquiryId && (superAdminNotified || appEmailNotified || senderNotified)) {
+      try {
+        await query(
+          `
+            UPDATE public_sample_inquiries 
+            SET super_admin_notified = $1, app_email_notified = $2, sender_notified = $3
+            WHERE id = $4
+          `,
+          [superAdminNotified, appEmailNotified, senderNotified, inquiryId]
+        );
+      } catch (_) {}
+    }
+
+    // 9. Create In-App Notifications for all Super Admins
+    for (const admin of adminUsers) {
+      try {
+        await createNotification({
+          userId: admin.id,
+          type: 'INQUIRY_CREATED',
+          title: `New Lead Unlock Request: ${companyName}`,
+          message: `${cleanName} (${cleanEmail}) requested lead unlock & intelligence briefing for ${companyName}`,
+        });
+      } catch (notifErr) {
+        console.warn(`[SampleController.submitPublicInquiry] Notification for admin ${admin.id} warning:`, notifErr.message);
+      }
     }
 
     return res.status(200).json({
       success: true,
-      message: `Inquiry successfully recorded for ${companyName}! Our specialist team will reach out to ${email.trim()} within 2-4 hours.`,
+      message: `Inquiry successfully recorded for ${companyName}! Our specialist team will reach out to ${cleanEmail} within 2-4 hours.`,
+      inquiryId,
     });
   } catch (error) {
     console.error('[SampleController.submitPublicInquiry] Error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to submit inquiry. Please try again or email us directly.',
+      message: 'Failed to submit inquiry. Please try again or email us directly at contact@creativegini.com.',
     });
   }
 };

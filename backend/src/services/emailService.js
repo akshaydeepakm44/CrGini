@@ -56,10 +56,13 @@ export const clearEmailDedupeCache = () => {
  */
 export const isPlaceholderPassword = (pwd) => {
   if (!pwd) return true;
-  const trimmed = String(pwd).trim();
+  const trimmed = String(pwd).trim().toLowerCase();
   return (
-    trimmed === '<GOOGLE_APP_PASSWORD>' ||
+    trimmed === '<google_app_password>' ||
     trimmed === 'your-app-password-here' ||
+    trimmed === 'disabled_in_dev' ||
+    trimmed === 'placeholder' ||
+    trimmed.includes('disabled') ||
     (trimmed.startsWith('<') && trimmed.endsWith('>'))
   );
 };
@@ -2320,6 +2323,130 @@ export const sendInternalNewClientNotification = async ({
     dashboardUrl: base
   });
 };
+
+/**
+ * Send inquiry notification alert to super admin & application contact emails.
+ */
+export const sendSampleInquiryAlertEmail = async ({
+  recipients = [],
+  sample = {},
+  inquiry = {}
+}) => {
+  const results = [];
+  const companyName = sample?.companyName || inquiry?.companyName || inquiry?.slug || 'Target Account';
+  const slug = sample?.slug || inquiry?.slug || 'general';
+  const senderName = inquiry?.senderName || 'Prospect Visitor';
+  const senderEmail = inquiry?.senderEmail || '';
+  const message = inquiry?.message || "Hey Creativegini i'm intrested in your service";
+  const portalBase = (process.env.PORTAL_BASE_URL || 'http://dizigini.com').replace(/\/$/, '');
+  const showcaseUrl = `${portalBase}/samples/${encodeURIComponent(slug)}`;
+
+  const subject = `[New Lead Inquiry] ${companyName} unlock request from ${senderName}`;
+  const preheader = `New inquiry received from ${senderName} (${senderEmail}) regarding ${companyName}`;
+
+  const html = buildHtmlTemplate({
+    preheader,
+    headerBadge: 'NEW PROSPECT INQUIRY',
+    statusColor: '#00E5FF',
+    ticketCode: `INQ-${inquiry?.id || Date.now().toString().slice(-6)}`,
+    serviceName: 'Market Intelligence & Lead Unlock',
+    title: `Inquiry Received for ${companyName}`,
+    subtitle: `${senderName} submitted a direct inquiry on the public sample showcase.`,
+    details: [
+      { label: 'Prospect Company', value: companyName },
+      { label: 'Sender Name', value: senderName },
+      { label: 'Sender Email', value: `<a href="mailto:${senderEmail}" style="color: #00E5FF; text-decoration: underline;">${senderEmail}</a>` },
+      { label: 'Showcase Link', value: `<a href="${showcaseUrl}" style="color: #00E5FF; text-decoration: underline;">${showcaseUrl}</a>` },
+      { label: 'Received At', value: new Date().toLocaleString() }
+    ],
+    highlightBox: {
+      title: 'Message / Unlock Scope',
+      content: message,
+      color: '#00E5FF'
+    },
+    actionText: 'Open Prospect Showcase',
+    actionUrl: showcaseUrl,
+    note: `You can reply directly to the prospect at ${senderEmail}.`
+  });
+
+  const text = `NEW PROSPECT INQUIRY\n\nCompany: ${companyName}\nSender: ${senderName} (${senderEmail})\nShowcase: ${showcaseUrl}\n\nMessage:\n${message}\n\nReply to: ${senderEmail}`;
+
+  for (const to of recipients) {
+    if (!to || !to.includes('@')) continue;
+    try {
+      const res = await sendEmail({
+        to,
+        subject,
+        html,
+        text,
+        event: 'SAMPLE_INQUIRY_ALERT',
+        dedupeKey: `INQUIRY_ALERT:${inquiry?.id || slug}:${to}`
+      });
+      results.push({ to, success: res.success });
+    } catch (err) {
+      results.push({ to, success: false, error: err.message });
+    }
+  }
+
+  return { success: true, results };
+};
+
+/**
+ * Send inquiry confirmation receipt to the prospect who submitted their email.
+ */
+export const sendSampleInquiryConfirmationEmail = async ({
+  recipient,
+  sample = {},
+  inquiry = {}
+}) => {
+  if (!recipient || !recipient.includes('@')) return { success: false, reason: 'invalid_recipient' };
+
+  const companyName = sample?.companyName || inquiry?.companyName || inquiry?.slug || 'Target Account';
+  const slug = sample?.slug || inquiry?.slug || 'general';
+  const senderName = inquiry?.senderName || 'there';
+  const message = inquiry?.message || "Hey Creativegini i'm intrested in your service";
+  const portalBase = (process.env.PORTAL_BASE_URL || 'http://dizigini.com').replace(/\/$/, '');
+  const showcaseUrl = `${portalBase}/samples/${encodeURIComponent(slug)}`;
+
+  const subject = `We received your intelligence request for ${companyName} - DiziGini`;
+  const preheader = `Thank you for reaching out regarding ${companyName}. Our specialist team will be in touch shortly.`;
+
+  const html = buildHtmlTemplate({
+    preheader,
+    headerBadge: 'INQUIRY CONFIRMED',
+    statusColor: '#10B981',
+    ticketCode: `INQ-${inquiry?.id || Date.now().toString().slice(-6)}`,
+    serviceName: 'B2B Intelligence & Lead Sprints',
+    title: 'Thank You for Your Inquiry',
+    subtitle: `Hi ${senderName}, our enterprise intelligence team has received your request regarding ${companyName}.`,
+    details: [
+      { label: 'Target Account', value: companyName },
+      { label: 'Your Email', value: recipient },
+      { label: 'Review Status', value: 'Queued for Specialist Review' },
+      { label: 'Expected Response', value: 'Within 2–4 business hours' }
+    ],
+    highlightBox: {
+      title: 'Your Submitted Message',
+      content: message,
+      color: '#10B981'
+    },
+    actionText: 'Review Prospect Showcase',
+    actionUrl: showcaseUrl,
+    note: 'Our team will contact you directly with full email validation results, phone lines, and customized ICP data.'
+  });
+
+  const text = `Hi ${senderName},\n\nThank you for reaching out regarding ${companyName}.\n\nOur team has received your message:\n"${message}"\n\nWe will review your inquiry and follow up within 2–4 business hours.\n\nShowcase URL: ${showcaseUrl}\n\nBest regards,\nDiziGini Intelligence Team`;
+
+  return await sendEmail({
+    to: recipient,
+    subject,
+    html,
+    text,
+    event: 'SAMPLE_INQUIRY_CONFIRMATION',
+    dedupeKey: `INQUIRY_CONFIRM:${inquiry?.id || slug}:${recipient}`
+  });
+};
+
 
 
 

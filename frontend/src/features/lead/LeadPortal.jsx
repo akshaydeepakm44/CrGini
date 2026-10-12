@@ -82,9 +82,17 @@ export default function LeadPortal({ user, onLogout }) {
     const onFocus = () => loadData();
     window.addEventListener('focus', onFocus);
 
+    const onResize = () => {
+      if (window.innerWidth < 1100) {
+        setIsSidebarCollapsed(true);
+      }
+    };
+    window.addEventListener('resize', onResize);
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('resize', onResize);
     };
   }, []);
 

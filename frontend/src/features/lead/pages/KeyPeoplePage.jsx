@@ -324,7 +324,8 @@ export default function KeyPeoplePage({ onNavigate }) {
             </button>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: '760px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr
                 style={{
@@ -513,6 +514,7 @@ export default function KeyPeoplePage({ onNavigate }) {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

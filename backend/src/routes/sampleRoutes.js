@@ -72,6 +72,7 @@ router.use('/manage', manageRouter);
 // =========================================================================
 // PUBLIC SAMPLE SHOWCASE ENDPOINTS (No authentication required)
 // =========================================================================
+router.post('/inquiry', submitPublicInquiry);
 router.get('/:slug', getPublicSampleBySlug);
 router.post('/:slug/inquiry', submitPublicInquiry);
 router.get('/:slug/pitch-deck', streamPublicPitchDeck);

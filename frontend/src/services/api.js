@@ -1115,11 +1115,19 @@ export const api = {
   },
 
   async submitPublicInquiry(slug, data) {
-    const res = await fetch(`${API_BASE}/samples/${encodeURIComponent(slug)}/inquiry`, {
+    const payload = { ...data, slug };
+    let res = await fetch(`${API_BASE}/samples/${encodeURIComponent(slug)}/inquiry`, {
       method: 'POST',
       headers: getHeaders(false),
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
+    if (res.status === 404) {
+      res = await fetch(`${API_BASE}/samples/inquiry`, {
+        method: 'POST',
+        headers: getHeaders(false),
+        body: JSON.stringify(payload),
+      });
+    }
     return parseApiResponse(res, 'Failed to submit inquiry');
   },
 

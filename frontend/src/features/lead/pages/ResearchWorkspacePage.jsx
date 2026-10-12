@@ -335,6 +335,16 @@ export default function ResearchWorkspacePage({ onNavigate }) {
     loadWorkspaceData();
   }, [routeTicketId]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1150) {
+        setIsQueueCollapsed(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Live polling for client messages in research workspace
   useEffect(() => {
     if (!selectedTicket) return;

@@ -165,6 +165,45 @@ export async function ensureSchemaIntegrity() {
     // 5. Ensure service_channel_settings table exists
     await ensureServiceSettingsTable();
 
+    // 6. Ensure public_sample_inquiries table exists for lead unlock requests
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS public_sample_inquiries (
+          id SERIAL PRIMARY KEY,
+          slug VARCHAR(255) NOT NULL,
+          company_name VARCHAR(255),
+          sender_name VARCHAR(255),
+          sender_email VARCHAR(255) NOT NULL,
+          message TEXT,
+          status VARCHAR(50) DEFAULT 'NEW',
+          super_admin_notified BOOLEAN DEFAULT FALSE,
+          app_email_notified BOOLEAN DEFAULT FALSE,
+          sender_notified BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+      await query(`
+        ALTER TABLE public_sample_inquiries 
+        ADD COLUMN IF NOT EXISTS super_admin_notified BOOLEAN DEFAULT FALSE;
+      `);
+      await query(`
+        ALTER TABLE public_sample_inquiries 
+        ADD COLUMN IF NOT EXISTS app_email_notified BOOLEAN DEFAULT FALSE;
+      `);
+      await query(`
+        ALTER TABLE public_sample_inquiries 
+        ADD COLUMN IF NOT EXISTS sender_notified BOOLEAN DEFAULT FALSE;
+      `);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_public_sample_inquiries_slug ON public_sample_inquiries (slug);
+      `);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_public_sample_inquiries_created_at ON public_sample_inquiries (created_at DESC);
+      `);
+    } catch (e5) {
+      console.warn('[Schema] public_sample_inquiries step note:', e5.message);
+    }
+
     console.log('[Schema] Database schema integrity verified & updated successfully.');
     return true;
   } catch (err) {
