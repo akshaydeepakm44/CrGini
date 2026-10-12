@@ -543,7 +543,7 @@ export default function ResearchWorkspacePage({ onNavigate }) {
           bulkLeads: bulkLeads.length > 0 ? bulkLeads : undefined,
           leads: leadsToDeliver.length > 0 ? leadsToDeliver : undefined,
           keyPeople: activeReqs.keyPeople && validPeople.length > 0 ? validPeople : leadsToDeliver,
-          pitchDeck: activeReqs.pitchDeck ? { title: pitchDeckTitle, fileName: pitchDeckFile?.name || 'dizitalgini brochure (1).pdf', notes: pitchDeckNotes } : null,
+          pitchDeck: activeReqs.pitchDeck ? { title: pitchDeckTitle, fileName: pitchDeckFile?.name || 'creativegini brochure.pdf', notes: pitchDeckNotes } : null,
           verification: {
             method: 'Specialist Quality Verification',
             status: 'COMPLIANT_100_PERCENT',
