@@ -687,7 +687,7 @@ export function generateLeadImportTemplate(format = 'xlsx') {
     return {
       buffer: Buffer.from(csvStr, 'utf-8'),
       mimeType: 'text/csv',
-      fileName: 'creativegini_leads_import_template.csv',
+      fileName: 'dizigini_leads_import_template.csv',
     };
   }
 
@@ -695,6 +695,6 @@ export function generateLeadImportTemplate(format = 'xlsx') {
   return {
     buffer: xlsxBuffer,
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    fileName: 'creativegini_leads_import_template.xlsx',
+    fileName: 'dizigini_leads_import_template.xlsx',
   };
 }

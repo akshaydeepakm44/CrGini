@@ -19,193 +19,84 @@ import { useServiceVisibility } from '../../features/client/context/ServiceVisib
 
 export default function ServiceChannels({ onSelectChannel }) {
   const { isChannelActive } = useServiceVisibility();
-  const boostingFeatures = [
-    { name: 'Strategic Planner', icon: Compass },
-    { name: 'Content Creator', icon: PenTool },
-    { name: 'DevRel Advocacy', icon: Code },
-    { name: 'GTM Strategy', icon: Rocket },
-    { name: 'Creative Design', icon: Palette },
-    { name: 'High-Impact Ads', icon: Megaphone }
-  ];
 
-  const digitalisingFeatures = [
-    { name: 'Lead Research', icon: Target },
-    { name: 'Company Study', icon: Building2 },
-    { name: 'Key People Research', icon: Users },
-    { name: 'Pitch & Deck Support', icon: Presentation }
-  ];
-
-  const designFeatures = [
-    { name: 'UI/UX Audit', icon: Palette },
-    { name: 'Figma Project', icon: PenTool },
-    { name: 'Landing Redesign', icon: Sparkles },
-    { name: 'Design Systems', icon: Layers }
-  ];
-
-  const devFeatures = [
-    { name: 'Technical Discovery', icon: Code },
-    { name: 'Clickable Prototype', icon: Rocket },
-    { name: 'MVP Development', icon: Layers },
-    { name: 'Full-Stack Apps', icon: ArrowRight }
+  const digitalisingModules = [
+    {
+      id: 'lead-research',
+      title: 'Lead Research & ICP Sprints',
+      icon: Target,
+      desc: 'B2B prospect discovery matching your ICP criteria with 100% human-verified business emails and direct phone numbers.',
+      features: ['Boolean & ICP Filtering', '100% SMTP Ping Validated', 'Direct Phone Dials', 'LinkedIn Profiles']
+    },
+    {
+      id: 'company-study',
+      title: 'Company Study & Account Dossiers',
+      icon: Building2,
+      desc: 'Deep-dive account dossiers uncovering internal org charts, vendor footprints, recent funding triggers, and pain points.',
+      features: ['Tech Stack Telemetry', 'Competitor Analysis', 'Hiring Signals', 'Revenue & Size Tiering']
+    },
+    {
+      id: 'key-people',
+      title: 'Key People & Buying Committee',
+      icon: Users,
+      desc: 'Targeted intelligence on VP and C-level decision-makers, direct executive emails, verified social profiles, and background notes.',
+      features: ['Org Hierarchy Trees', 'C-Suite & VP Contacts', 'Procurement Champions', 'Pain Point Mapping']
+    },
+    {
+      id: 'pitch-support',
+      title: 'Pitch & Presentation Support',
+      icon: Presentation,
+      desc: 'Market intelligence, win-loss competitive teardowns, and data-backed proof points to empower high-stakes sales pitches.',
+      features: ['Competitive Battlecards', 'Executive Slide Summaries', 'Deal Intelligence Briefs', 'Objection Teardowns']
+    }
   ];
 
   return (
-    <section id="services" className="cg-section" aria-label="CreativeGini Service Channels">
+    <section id="services" className="cg-section" aria-label="DiziGini Digitalising Platform Modules">
       <div className="cg-container">
         <div className="cg-section-header">
-          <span className="cg-section-badge">Service Channels</span>
-          <h2 className="cg-section-title">Dedicated Specialist Channels to Scale Your Business</h2>
+          <span className="cg-section-badge">DizitalGini Intelligence Platform</span>
+          <h2 className="cg-section-title">Dedicated Intelligence Modules for B2B Growth</h2>
           <p className="cg-section-subtitle">
-            Whether you need strategic momentum, high-converting product design, or full-stack software development, CreativeGini provides scoped execution.
+            Equip your sales and executive teams with verified prospect databases, deep company dossiers, key people intelligence, and bespoke pitch research.
           </p>
         </div>
 
-        <div className="cg-channels-grid">
-          {/* Channel 1: BOOSTING */}
-          {isChannelActive('boosting') && (
-            <div className="cg-channel-card boosting">
-              <span className="cg-channel-badge">
-                <Sparkles size={14} />
-                <span>Channel 01 // Brand &amp; Outreach</span>
-              </span>
+        <div className="cg-channels-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+          {digitalisingModules.map((module) => {
+            const Icon = module.icon;
+            return (
+              <div key={module.id} className="cg-channel-card digitalising">
+                <span className="cg-channel-badge">
+                  <Icon size={14} />
+                  <span>Digitalising Module</span>
+                </span>
 
-              <h3 className="cg-channel-title">BOOSTING</h3>
-              <p className="cg-channel-desc">
-                Build your brand, content and growth strategy. Accelerate market presence with high-conversion creative sprints, technical advocacy, and omnichannel narratives.
-              </p>
+                <h3 className="cg-channel-title" style={{ fontSize: '1.25rem', marginTop: '12px' }}>{module.title}</h3>
+                <p className="cg-channel-desc" style={{ minHeight: '60px' }}>
+                  {module.desc}
+                </p>
 
-              <div className="cg-channel-features-list">
-                {boostingFeatures.map((feat) => {
-                  const Icon = feat.icon;
-                  return (
-                    <div key={feat.name} className="cg-channel-feature-item">
-                      <Icon size={16} className="cg-channel-feature-icon" />
-                      <span>{feat.name}</span>
+                <div className="cg-channel-features-list">
+                  {module.features.map((feat) => (
+                    <div key={feat} className="cg-channel-feature-item">
+                      <Search size={14} className="cg-channel-feature-icon" />
+                      <span>{feat}</span>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className="cg-channel-btn"
+                  onClick={() => onSelectChannel && onSelectChannel('DIGITALISING')}
+                >
+                  <span>Request Deliverable</span>
+                  <ArrowRight size={16} />
+                </button>
               </div>
-
-              <button
-                type="button"
-                className="cg-channel-btn"
-                onClick={() => onSelectChannel && onSelectChannel('BOOSTING')}
-              >
-                <span>Explore Boosting</span>
-                <ArrowRight size={16} />
-              </button>
-            </div>
-          )}
-
-          {/* Channel 2: DIGITALISING */}
-          {isChannelActive('digitalising') && (
-            <div className="cg-channel-card digitalising">
-              <span className="cg-channel-badge">
-                <Search size={14} />
-                <span>Channel 02 // Market Intelligence</span>
-              </span>
-
-              <h3 className="cg-channel-title">DIGITALISING</h3>
-              <p className="cg-channel-desc">
-                Research, insights and business intelligence. Equip your sales and executive team with verified prospect databases, company dossiers, and org intelligence.
-              </p>
-
-              <div className="cg-channel-features-list">
-                {digitalisingFeatures.map((feat) => {
-                  const Icon = feat.icon;
-                  return (
-                    <div key={feat.name} className="cg-channel-feature-item">
-                      <Icon size={16} className="cg-channel-feature-icon" />
-                      <span>{feat.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <button
-                type="button"
-                className="cg-channel-btn"
-                onClick={() => onSelectChannel && onSelectChannel('DIGITALISING')}
-              >
-                <span>Explore Digitalising</span>
-                <ArrowRight size={16} />
-              </button>
-            </div>
-          )}
-
-          {/* Channel 3: UI / DESIGN */}
-          {isChannelActive('design') && (
-            <div className="cg-channel-card" style={{ borderColor: '#E0F2FE' }}>
-              <span className="cg-channel-badge" style={{ background: '#F0F9FF', color: '#0284C7' }}>
-                <Palette size={14} />
-                <span>Channel 03 // UI &amp; Design</span>
-              </span>
-
-              <h3 className="cg-channel-title" style={{ color: '#0284C7' }}>UI / DESIGN</h3>
-              <p className="cg-channel-desc">
-                High-converting product interfaces, heuristic UX audits, production Figma systems, and end-to-end design sprints engineered for conversion.
-              </p>
-
-              <div className="cg-channel-features-list">
-                {designFeatures.map((feat) => {
-                  const Icon = feat.icon;
-                  return (
-                    <div key={feat.name} className="cg-channel-feature-item">
-                      <Icon size={16} className="cg-channel-feature-icon" style={{ color: '#0284C7' }} />
-                      <span>{feat.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <button
-                type="button"
-                className="cg-channel-btn"
-                style={{ background: '#0284C7', color: '#FFFFFF' }}
-                onClick={() => onSelectChannel && onSelectChannel('DESIGN')}
-              >
-                <span>Explore UI / Design</span>
-                <ArrowRight size={16} />
-              </button>
-            </div>
-          )}
-
-          {/* Channel 4: APP DEVELOPMENT */}
-          {isChannelActive('development') && (
-            <div className="cg-channel-card" style={{ borderColor: '#D1FAE5' }}>
-              <span className="cg-channel-badge" style={{ background: '#ECFDF5', color: '#059669' }}>
-                <Code size={14} />
-                <span>Channel 04 // App Development</span>
-              </span>
-
-              <h3 className="cg-channel-title" style={{ color: '#059669' }}>APP DEVELOPMENT</h3>
-              <p className="cg-channel-desc">
-                Turnkey web applications, clickable interactive prototypes, and production software MVP engineering built by senior specialists.
-              </p>
-
-              <div className="cg-channel-features-list">
-                {devFeatures.map((feat) => {
-                  const Icon = feat.icon;
-                  return (
-                    <div key={feat.name} className="cg-channel-feature-item">
-                      <Icon size={16} className="cg-channel-feature-icon" style={{ color: '#059669' }} />
-                      <span>{feat.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <button
-                type="button"
-                className="cg-channel-btn"
-                style={{ background: '#059669', color: '#FFFFFF' }}
-                onClick={() => onSelectChannel && onSelectChannel('DEVELOPMENT')}
-              >
-                <span>Explore App Dev</span>
-                <ArrowRight size={16} />
-              </button>
-            </div>
-          )}
+            );
+          })}
         </div>
       </div>
     </section>

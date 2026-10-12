@@ -39,25 +39,23 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
     {
       id: 'platform',
       stepNum: '01',
-      badge: '01 // SEAMLESS CLIENT WORKSPACE',
-      title: 'Enter Your Private Client Portal',
-      subtitle: 'Instantly access your workspace with custom service requests, live project timelines, transparent pricing, and direct specialist collaboration.'
+      badge: '01 // DIZIGINI CLIENT PORTAL',
+      title: 'Client Submits B2B Intelligence Requests',
+      subtitle: 'Submit targeted ICP criteria, account dossiers, key people research, and pitch briefs through your dedicated DiziGini portal.'
     },
     {
-      id: 'boosting',
+      id: 'workflow',
       stepNum: '02',
-      badge: '02 // BRAND & GROWTH BOOSTING',
-      title: 'When the Client Requires Boosting',
-      subtitle: 'When you need market traction, our Boosting specialists execute go-to-market playbooks, high-conversion copywriting, paid campaigns, and developer advocacy sprints.'
+      badge: '02 // REQUEST & ASSIGNMENT WORKFLOW',
+      title: 'Automated Routing to Authorised Specialists',
+      subtitle: 'Every request is validated, securely stored, and instantly routed to authorised Lead Specialists and research teams on the internal DizitalGini platform.'
     },
     {
-      id: isChannelActive('digitalising') ? 'digitalising' : 'design',
+      id: 'digitalising',
       stepNum: '03',
-      badge: isChannelActive('digitalising') ? '03 // BUSINESS INTELLIGENCE & DIGITALISATION' : '03 // HIGH-CONVERTING UI/UX & ARCHITECTURE',
-      title: isChannelActive('digitalising') ? 'Digitalising Market Intelligence & Org Insights' : 'Modern UI/UX & Product Architecture',
-      subtitle: isChannelActive('digitalising')
-        ? 'Deep organizational studies and executive mapping. Understand target company hierarchies, technology vendor footprints, and buying committees before pitching.'
-        : 'World-class conversion architecture, heuristic UI/UX evaluations, interactive clickable prototypes, and production design systems.'
+      badge: '03 // VERIFIED RESEARCH & DOSSIERS',
+      title: 'Account Studies & Deliverables Vault',
+      subtitle: 'Access human-verified spreadsheets, deep account dossiers, organizational charts, and executive pitch collateral directly inside your client portal.'
     }
   ];
 
@@ -156,9 +154,9 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
                 >
                   <span className="cg-tab-num">{st.stepNum}</span>
                   <span className="cg-tab-label">
-                    {idx === 0 && 'Request Leads'}
-                    {idx === 1 && 'Boosting Services'}
-                    {idx === 2 && 'Digitalising Intel'}
+                    {idx === 0 && 'Client Portal'}
+                    {idx === 1 && 'Specialist Workflow'}
+                    {idx === 2 && 'Deliverables Vault'}
                   </span>
                   {activeStep === idx && <span className="cg-tab-indicator" />}
                 </button>
@@ -178,7 +176,7 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
                 </div>
                 <div className="cg-window-address">
                   <Search size={13} color="#2563EB" />
-                  <span>app.creativegini.com/leads &mdash; Verified ICP Database</span>
+                  <span>app.dizigini.com/portal/leads &mdash; Verified ICP Database</span>
                 </div>
                 <div className="cg-window-status">100% Human Verified</div>
               </div>
@@ -204,7 +202,7 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
                 <div className="cg-card-panel" style={{ marginTop: '12px' }}>
                   <div className="cg-panel-header">
                     <div>
-                      <span className="cg-panel-title">Delivered Prospects &mdash; Ticket CG-1024</span>
+                      <span className="cg-panel-title">Delivered Prospects &mdash; Ticket DG-1024</span>
                       <span className="cg-panel-meta">50 Accounts verified by Lead Specialist &bull; European Expansion</span>
                     </div>
                     <button type="button" className="cg-export-btn">
@@ -299,21 +297,21 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
                 </div>
                 <div className="cg-window-address">
                   <Sparkles size={13} color="#DB2777" />
-                  <span>app.creativegini.com/boosting &mdash; Brand, Copy &amp; GTM Sprints</span>
+                  <span>app.dizigini.com/lead/requests &mdash; Internal DizitalGini Workspace</span>
                 </div>
-                <div className="cg-window-status">Human Marketing Specialists</div>
+                <div className="cg-window-status">Authorised Lead Specialists</div>
               </div>
 
               <div className="cg-mockup-canvas">
                 {/* Channel Header Banner */}
                 <div className="cg-boosting-header-banner">
                   <div>
-                    <span className="cg-boosting-pill">BOOSTING CHANNEL</span>
-                    <h3 className="cg-boosting-title">Active Sprints &amp; Deliverables</h3>
-                    <p className="cg-boosting-desc">Strategic messaging, technical thought leadership, DevRel advocacy, and high-conversion assets.</p>
+                    <span className="cg-boosting-pill">INTERNAL DIZITALGINI PLATFORM</span>
+                    <h3 className="cg-boosting-title">Request Triage &amp; Specialist Assignment</h3>
+                    <p className="cg-boosting-desc">Incoming client intelligence requests mapped to domain analysts, research workspaces, and QA.</p>
                   </div>
                   <button type="button" className="cg-boost-action-btn">
-                    <span>+ New Boosting Request</span>
+                    <span>+ Route New Request</span>
                     <ArrowRight size={13} />
                   </button>
                 </div>
@@ -322,15 +320,15 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
                 <div className="cg-boosting-grid">
                   <div className="cg-boost-item-card">
                     <div className="cg-boost-card-top">
-                      <span className="cg-boost-ticket">CG-1018</span>
+                      <span className="cg-boost-ticket">DG-1018</span>
                       <span className="cg-status-pill completed">Deliverable Ready</span>
                     </div>
-                    <h4 className="cg-boost-card-heading">Enterprise GTM Positioning &amp; Outbound Playbook</h4>
-                    <p className="cg-boost-card-summary">Complete messaging audit, ICP value proposition matrix, and high-conversion outbound sequence templates.</p>
+                    <h4 className="cg-boost-card-heading">B2B ICP Lead Discovery: FinTech Series B+</h4>
+                    <p className="cg-boost-card-summary">Boolean query filters, 50 high-intent accounts, direct VP/CTO corporate emails, and validation.</p>
                     <div className="cg-boost-card-footer">
                       <div className="cg-specialist-chip">
-                        <div className="cg-chip-avatar">BS</div>
-                        <span>Growth Strategist</span>
+                        <div className="cg-chip-avatar">LS</div>
+                        <span>Lead Specialist</span>
                       </div>
                       <a href="#download" onClick={(e) => e.preventDefault()} className="cg-card-action-link">
                         <DownloadCloud size={13} />
@@ -341,15 +339,15 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
 
                   <div className="cg-boost-item-card">
                     <div className="cg-boost-card-top">
-                      <span className="cg-boost-ticket">CG-1022</span>
+                      <span className="cg-boost-ticket">DG-1022</span>
                       <span className="cg-status-pill in-progress">In Production</span>
                     </div>
-                    <h4 className="cg-boost-card-heading">Product Narrative &amp; Video Script (2 mins)</h4>
-                    <p className="cg-boost-card-summary">Storyboard breakdown, voiceover script, and conversion hook designed for LinkedIn organic video marketing.</p>
+                    <h4 className="cg-boost-card-heading">Enterprise Company Study: Cloud Security Tier-1</h4>
+                    <p className="cg-boost-card-summary">Comprehensive account study, revenue tiering, tech stack telemetry, and vendor footprints.</p>
                     <div className="cg-boost-card-footer">
                       <div className="cg-specialist-chip">
-                        <div className="cg-chip-avatar" style={{ background: '#EC4899' }}>CC</div>
-                        <span>Content Creator</span>
+                        <div className="cg-chip-avatar" style={{ background: '#EC4899' }}>CA</div>
+                        <span>Study Analyst</span>
                       </div>
                       <span className="cg-delivery-eta">Delivery in 24 hrs</span>
                     </div>
@@ -357,15 +355,15 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
 
                   <div className="cg-boost-item-card">
                     <div className="cg-boost-card-top">
-                      <span className="cg-boost-ticket">CG-1027</span>
+                      <span className="cg-boost-ticket">DG-1027</span>
                       <span className="cg-status-pill review">Client Review</span>
                     </div>
-                    <h4 className="cg-boost-card-heading">DevRel Technical Tutorial &amp; Quickstart Guide</h4>
-                    <p className="cg-boost-card-summary">Hands-on developer walkthrough for cloud engineers, SDK setup examples, and open-source GitHub starter template.</p>
+                    <h4 className="cg-boost-card-heading">Buying Committee Mapping: European HealthTech</h4>
+                    <p className="cg-boost-card-summary">VP &amp; C-Suite decision tree, procurement gatekeeper identification, and verified phone dials.</p>
                     <div className="cg-boost-card-footer">
                       <div className="cg-specialist-chip">
-                        <div className="cg-chip-avatar" style={{ background: '#0EA5E9' }}>DA</div>
-                        <span>Developer Advocate</span>
+                        <div className="cg-chip-avatar" style={{ background: '#0EA5E9' }}>OI</div>
+                        <span>Org Intel Pod</span>
                       </div>
                       <a href="#review" onClick={(e) => e.preventDefault()} className="cg-card-action-link">
                         <Eye size={13} />
@@ -376,15 +374,15 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
 
                   <div className="cg-boost-item-card">
                     <div className="cg-boost-card-top">
-                      <span className="cg-boost-ticket">CG-1031</span>
+                      <span className="cg-boost-ticket">DG-1031</span>
                       <span className="cg-status-pill completed">Completed</span>
                     </div>
-                    <h4 className="cg-boost-card-heading">Landing Page UI &amp; Interactive Capability Calculator</h4>
-                    <p className="cg-boost-card-summary">Interactive component mockup, modern light lavender aesthetic, and conversion-optimized hero layouts.</p>
+                    <h4 className="cg-boost-card-heading">Pitch Support &amp; Executive Battlecard</h4>
+                    <p className="cg-boost-card-summary">Win-loss competitive teardowns, objection responses, and executive presentation slides.</p>
                     <div className="cg-boost-card-footer">
                       <div className="cg-specialist-chip">
-                        <div className="cg-chip-avatar" style={{ background: '#8B5CF6' }}>UX</div>
-                        <span>UI/UX Designer</span>
+                        <div className="cg-chip-avatar" style={{ background: '#8B5CF6' }}>PS</div>
+                        <span>Pitch Specialist</span>
                       </div>
                       <a href="#figma" onClick={(e) => e.preventDefault()} className="cg-card-action-link">
                         <ExternalLink size={13} />
@@ -406,7 +404,7 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
                 </div>
                 <div className="cg-window-address">
                   <Building2 size={13} color="#7C3AED" />
-                  <span>app.creativegini.com/digitalising &mdash; Account Dossiers &amp; Org Mapping</span>
+                  <span>app.dizigini.com/portal/deliverables &mdash; Account Dossiers &amp; Org Mapping</span>
                 </div>
                 <div className="cg-window-status">Company Intelligence</div>
               </div>
@@ -447,7 +445,7 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
                       <div className="cg-file-item">
                         <FileText size={14} color="#7C3AED" />
                         <div className="cg-file-info">
-                          <span className="cg-file-name">nexascale-dossier-v2.pdf</span>
+                          <span className="cg-file-name">dizigini-dossier-nexascale.pdf</span>
                           <span className="cg-file-sz">1.8 MB &bull; Verified</span>
                         </div>
                         <DownloadCloud size={13} className="cg-file-dl" />
@@ -508,7 +506,7 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
                     <div className="cg-recommendation-box">
                       <Sparkles size={15} color="#7C3AED" />
                       <div>
-                        <strong>CreativeGini Strategic Recommendation:</strong>
+                        <strong>DiziGini Strategic Recommendation:</strong>
                         <span> Focus outreach on European data sovereignty and automated pipeline orchestration. Contact Dr. Weber directly on Tuesday mornings.</span>
                       </div>
                     </div>

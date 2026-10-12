@@ -1,4 +1,4 @@
-// CreativeGini API Client Service
+// DiziGini API Client Service
 
 const getApiBase = () => {
   if (import.meta.env.VITE_API_URL) {

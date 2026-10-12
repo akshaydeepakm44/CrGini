@@ -238,6 +238,10 @@ export default function LeadPortal({ user, onLogout }) {
               element={<CompanyStudiesPage onNavigate={handleNavigate} />}
             />
             <Route
+              path="companies"
+              element={<CompanyStudiesPage onNavigate={handleNavigate} />}
+            />
+            <Route
               path="key-people"
               element={<KeyPeoplePage onNavigate={handleNavigate} />}
             />
@@ -246,7 +250,15 @@ export default function LeadPortal({ user, onLogout }) {
               element={<ResearchWorkspacePage onNavigate={handleNavigate} />}
             />
             <Route
+              path="workspace"
+              element={<ResearchWorkspacePage onNavigate={handleNavigate} />}
+            />
+            <Route
               path="research/:ticketId"
+              element={<ResearchWorkspacePage onNavigate={handleNavigate} />}
+            />
+            <Route
+              path="workspace/:ticketId"
               element={<ResearchWorkspacePage onNavigate={handleNavigate} />}
             />
             <Route

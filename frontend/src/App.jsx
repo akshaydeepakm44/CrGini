@@ -45,12 +45,6 @@ function TicketRedirect({ user, isAuthChecking }) {
   if (user.role === 'COMPANY_LEAD' || user.dashboardAccess?.companyLead) {
     return <Navigate to={`/lead/requests/${encodeURIComponent(ticketId)}`} replace />;
   }
-  if (user.role === 'COMPANY_BOOST' || user.dashboardAccess?.companyBoost) {
-    return <Navigate to={`/boost/requests/${encodeURIComponent(ticketId)}`} replace />;
-  }
-  if (user.role === 'LANDING_PAGE' || user.dashboardAccess?.companyUI) {
-    return <Navigate to={`/design/requests/${encodeURIComponent(ticketId)}`} replace />;
-  }
 
   const targetUrl = `${roleHome}?ticket=${encodeURIComponent(ticketId)}${tab ? `&tab=${encodeURIComponent(tab)}` : ''}`;
   return <Navigate to={targetUrl} replace />;
@@ -115,7 +109,7 @@ export default function App() {
     const redirectParam = searchParams.get('redirect') || searchParams.get('returnTo');
     const targetRoute = redirectParam || getRoleHome(userData);
     navigate(targetRoute, { replace: true });
-    showToast(`Welcome to CreativeGini, ${userData.name}!`);
+    showToast(`Welcome to DiziGini, ${userData.name}!`);
   };
 
   const handleLogout = () => {
@@ -302,57 +296,16 @@ export default function App() {
           element={<Navigate to="/lead" replace />}
         />
 
-        {/* 6. Modern Boost Service Portal Routes */}
-        <Route
-          path="/boost/*"
-          element={
-            <ProtectedRoute user={user} allowedRoles={['COMPANY_BOOST', 'ADMIN', 'SUPER_ADMIN']} requiredPermission="companyBoost" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
-              <BoostPortal user={user} onLogout={handleLogout} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/boost"
-          element={
-            <ProtectedRoute user={user} allowedRoles={['COMPANY_BOOST', 'ADMIN', 'SUPER_ADMIN']} requiredPermission="companyBoost" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
-              <BoostPortal user={user} onLogout={handleLogout} />
-            </ProtectedRoute>
-          }
-        />
+        {/* 6. Deactivated Portals - Redirect to Lead Specialist / DizitalGini Platform */}
+        <Route path="/boost/*" element={<Navigate to="/lead" replace />} />
+        <Route path="/boost" element={<Navigate to="/lead" replace />} />
+        <Route path="/company-boost/*" element={<Navigate to="/lead" replace />} />
+        <Route path="/company-boost" element={<Navigate to="/lead" replace />} />
 
-        {/* Legacy Boost route redirects */}
-        <Route
-          path="/company-boost/*"
-          element={<Navigate to="/boost" replace />}
-        />
-        <Route
-          path="/company-boost"
-          element={<Navigate to="/boost" replace />}
-        />
-
-        {/* 7. Modern UI/Design Service Portal Routes */}
-        <Route
-          path="/design/*"
-          element={
-            <ProtectedRoute user={user} allowedRoles={['LANDING_PAGE', 'ADMIN', 'SUPER_ADMIN']} requiredPermission="companyUI" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
-              <DesignPortal user={user} onLogout={handleLogout} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/design"
-          element={
-            <ProtectedRoute user={user} allowedRoles={['LANDING_PAGE', 'ADMIN', 'SUPER_ADMIN']} requiredPermission="companyUI" isAuthChecking={isAuthChecking} onLogout={handleLogout}>
-              <DesignPortal user={user} onLogout={handleLogout} />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* 8. Legacy Landing Page Enhancement Dashboard Route (Redirected to modern Design portal) */}
-        <Route
-          path="/landing-page-enhancement"
-          element={<Navigate to="/design" replace />}
-        />
+        {/* 7. Deactivated UI/Design Portal - Redirect to Lead Specialist / DizitalGini Platform */}
+        <Route path="/design/*" element={<Navigate to="/lead" replace />} />
+        <Route path="/design" element={<Navigate to="/lead" replace />} />
+        <Route path="/landing-page-enhancement" element={<Navigate to="/lead" replace />} />
 
         {/* 9. Direct Ticket Deep Link Helper Route */}
         <Route

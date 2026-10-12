@@ -289,7 +289,7 @@ export async function fetchLogoImage(
         parsed,
         {
           headers: {
-            'User-Agent': 'CreativeGini-LogoFetcher/1.0 (+https://creativegini.com)',
+            'User-Agent': 'DiziGini-LogoFetcher/1.0 (+https://dizigini.com)',
             'Accept': 'image/png, image/jpeg, image/webp, image/svg+xml, image/gif, image/*;q=0.8',
           },
           timeout: timeoutMs,

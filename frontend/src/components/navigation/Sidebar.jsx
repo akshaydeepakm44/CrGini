@@ -94,7 +94,7 @@ export default function Sidebar({
           {isCollapsed ? (
             <img
               src={BRAND_ICON}
-              alt="CreativeGini"
+              alt="DiziGini"
               style={{ width: '32px', height: '32px', objectFit: 'contain' }}
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
@@ -104,7 +104,7 @@ export default function Sidebar({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
               <img
                 src={BRAND_LOGO}
-                alt="CreativeGini"
+                alt="DiziGini"
                 style={{ height: '34px', width: 'auto', objectFit: 'contain' }}
               />
               {roleBadge && (

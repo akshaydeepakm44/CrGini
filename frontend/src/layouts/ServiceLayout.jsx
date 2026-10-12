@@ -29,7 +29,7 @@ export default function ServiceLayout({
   domain = 'lead', // 'lead' | 'boost' | 'ui'
   currentPath = '/internal/lead/dashboard',
   onNavigate,
-  user = { name: 'Lead Specialist', email: 'lead@creativegini.com', role: 'COMPANY_LEAD' },
+  user = { name: 'Lead Specialist', email: 'lead@dizigini.com', role: 'COMPANY_LEAD' },
   unreadNotifications = 1,
   notifications = [],
   onLogout,

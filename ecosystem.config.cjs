@@ -3,7 +3,7 @@ const path = require('path');
 module.exports = {
   apps: [
     {
-      name: 'creativegini-backend',
+      name: 'dizigini-backend',
       script: 'src/server.js',
       cwd: path.resolve(__dirname, 'backend'),
       interpreter: 'node',

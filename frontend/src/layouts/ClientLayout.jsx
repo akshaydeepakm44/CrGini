@@ -53,7 +53,7 @@ export default function ClientLayout({
     };
   }, []);
 
-  // Client Portal Navigation Architecture (Strict Hierarchy)
+  // DiziGini Client Portal Navigation Architecture (Clean Single-Platform Focus)
   const clientNavItems = [
     {
       id: 'dashboard',
@@ -62,23 +62,9 @@ export default function ClientLayout({
       icon: LayoutDashboard,
     },
     {
-      sectionTitle: 'SERVICES',
-      id: 'boosting',
-      label: 'Boosting',
-      path: '/portal/boosting',
-      icon: Rocket,
-      children: [
-        { id: 'strategic-planner', label: 'Strategic Planner', path: '/portal/boosting/strategic-planner' },
-        { id: 'content-creator', label: 'Content Creator', path: '/portal/boosting/content-creator' },
-        { id: 'devrel', label: 'DevRel', path: '/portal/boosting/devrel' },
-        { id: 'gtm', label: 'GTM Strategy', path: '/portal/boosting/gtm' },
-        { id: 'ad-creatives', label: 'Ad Creatives', path: '/portal/boosting/ad-creatives' },
-        { id: 'brand-identity', label: 'Brand & Identity', path: '/portal/boosting/brand-identity' },
-      ],
-    },
-    {
+      sectionTitle: 'DIGITALISING PLATFORM',
       id: 'digitalising',
-      label: 'Digitalising',
+      label: 'Digitalising Requests',
       path: '/portal/digitalising',
       icon: Search,
       children: [
@@ -89,43 +75,18 @@ export default function ClientLayout({
       ],
     },
     {
-      id: 'design',
-      label: 'UI / Design',
-      path: '/portal/design',
-      icon: Palette,
-      children: [
-        { id: 'ui-ux-audit', label: 'UI/UX Audit', path: '/portal/design/ui-ux-audit' },
-        { id: 'figma-project', label: 'Figma Project', path: '/portal/design/figma-project' },
-        { id: 'redesign-request', label: 'Redesign Request', path: '/portal/design/redesign-request' },
-      ],
-    },
-    {
-      id: 'development',
-      label: 'App Development',
-      path: '/portal/development',
-      icon: Code2,
-      children: [
-        { id: 'web-app', label: 'Web Application', path: '/portal/development/web-app' },
-        { id: 'mobile-app', label: 'Mobile App', path: '/portal/development/mobile-app' },
-        { id: 'api-backend', label: 'API & Backend', path: '/portal/development/api-backend' },
-      ],
-    },
-    {
-      id: 'bundles',
-      label: 'Bundles',
-      path: '/portal/bundles',
-      icon: Boxes,
-      children: [
-        { id: 'offer-bundle', label: 'Offer Bundle', path: '/portal/bundles/offer' },
-        { id: 'custom-bundle', label: 'Custom Bundle', path: '/portal/bundles/custom' },
-      ],
-    },
-    {
-      sectionTitle: 'WORK',
       id: 'requests',
       label: 'My Requests',
       path: '/portal/requests',
       icon: FileText,
+    },
+    {
+      sectionTitle: 'COLLABORATION & ASSETS',
+      id: 'messages',
+      label: 'Messages',
+      path: '/portal/messages',
+      icon: MessageSquare,
+      badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined,
     },
     {
       id: 'deliverables',
@@ -134,20 +95,7 @@ export default function ClientLayout({
       icon: Package,
     },
     {
-      id: 'messages',
-      label: 'Messages',
-      path: '/portal/messages',
-      icon: MessageSquare,
-      badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined,
-    },
-    {
       sectionTitle: 'ACCOUNT',
-      id: 'billing',
-      label: 'Billing',
-      path: '/portal/billing',
-      icon: CreditCard,
-    },
-    {
       id: 'profile',
       label: 'Profile',
       path: '/portal/profile',
@@ -159,7 +107,7 @@ export default function ClientLayout({
 
   const filteredNavItems = clientNavItems
     .map((item) => {
-      if (['boosting', 'digitalising', 'design', 'development'].includes(item.id)) {
+      if (['boosting', 'digitalising', 'design', 'development', 'bundles'].includes(item.id)) {
         if (!isChannelActive(item.id)) return null;
         if (item.children) {
           const visibleChildren = item.children.filter((ch) => isServiceActive(ch.id));
@@ -199,8 +147,8 @@ export default function ClientLayout({
         onNavigate={handleNavigate}
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed((prev) => !prev)}
-        roleBadge="Client Portal"
-        onExploreServices={onExploreServices || (() => handleNavigate('/portal/boosting'))}
+        roleBadge="DiziGini Client"
+        onExploreServices={onExploreServices || (() => handleNavigate('/portal/digitalising'))}
         isMobileOpen={isMobileOpen}
         onCloseMobile={() => setIsMobileOpen(false)}
       />

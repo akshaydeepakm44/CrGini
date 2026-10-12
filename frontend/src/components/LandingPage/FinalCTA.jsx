@@ -5,10 +5,9 @@ import {
   CheckCircle2, 
   Target, 
   Building2, 
-  Rocket, 
-  PenTool, 
-  Code,
-  ShieldCheck,
+  Users, 
+  Presentation, 
+    ShieldCheck,
   Zap,
   Clock
 } from 'lucide-react';
@@ -33,31 +32,22 @@ const SPRINT_PREVIEWS = [
     desc: 'Comprehensive org mapping, key decision-maker pain points, and vendor footprints.'
   },
   {
-    id: 'gtm-strategy',
-    label: 'GTM Strategy',
-    icon: Rocket,
-    highlight: 'Outbound Playbook & Messaging Matrix',
-    eta: '5–7 Days',
-    channel: 'Boosting',
-    desc: 'Actionable positioning framework and high-conversion sequence templates.'
+    id: 'key-people',
+    label: 'Key People Research',
+    icon: Users,
+    highlight: 'Buying Committee & C-Level Decision Map',
+    eta: '48–72 Hours',
+    channel: 'Digitalising',
+    desc: 'Targeted intelligence on VP and C-level decision-makers with direct emails and mobile dials.'
   },
   {
-    id: 'content-copy',
-    label: 'Content & Narrative',
-    icon: PenTool,
-    highlight: 'High-Converting Sales Collateral & Copy',
-    eta: '48 Hours',
-    channel: 'Boosting',
-    desc: 'Technical thought leadership, sales one-pagers, and executive copy sprints.'
-  },
-  {
-    id: 'devrel',
-    label: 'DevRel Sprint',
-    icon: Code,
-    highlight: 'Developer Quickstart & Technical Tutorial',
+    id: 'pitch-support',
+    label: 'Pitch & Deck Support',
+    icon: Presentation,
+    highlight: 'Competitive Battlecard & Deal Brief',
     eta: '3–5 Days',
-    channel: 'Boosting',
-    desc: 'Hands-on developer walkthroughs and engineering community outreach.'
+    channel: 'Digitalising',
+    desc: 'Data-backed market research, objection teardowns, and win-loss intelligence for critical pitches.'
   }
 ];
 
@@ -78,7 +68,7 @@ export default function FinalCTA({ onGetStarted, onExploreServices }) {
   };
 
   return (
-    <section className="cg-final-cta-section" aria-label="Ready to Grow with CreativeGini">
+    <section className="cg-final-cta-section" aria-label="Ready to Scale with DiziGini">
       <div className="cg-container">
         <div className="cg-launchpad-card">
           {/* Subtle Ambient Glow Elements */}
@@ -90,13 +80,13 @@ export default function FinalCTA({ onGetStarted, onExploreServices }) {
           <div className="cg-launchpad-tag">
             <span className="cg-launchpad-dot" />
             <Zap size={14} />
-            <span>YOUR ON-DEMAND MARKETING &amp; RESEARCH SPRINT ENGINE</span>
+            <span>YOUR ON-DEMAND B2B INTELLIGENCE &amp; RESEARCH SPRINT ENGINE</span>
           </div>
 
           {/* Main Headline */}
           <h2 className="cg-launchpad-title">
             Ready to scale your pipeline with <br />
-            <span className="cg-launchpad-gradient-title">CreativeGini?</span>
+            <span className="cg-launchpad-gradient-title">DiziGini?</span>
           </h2>
 
           <p className="cg-launchpad-subtitle">
@@ -151,7 +141,7 @@ export default function FinalCTA({ onGetStarted, onExploreServices }) {
               className="cg-launchpad-btn-primary"
               onClick={onGetStarted}
             >
-              <span>Get Started with CreativeGini</span>
+              <span>Get Started with DiziGini</span>
               <ArrowRight size={17} />
             </button>
 
@@ -160,7 +150,7 @@ export default function FinalCTA({ onGetStarted, onExploreServices }) {
               className="cg-launchpad-btn-secondary"
               onClick={handleScrollToServices}
             >
-              <span>Explore All Services</span>
+              <span>Explore All Deliverables</span>
             </button>
           </div>
 

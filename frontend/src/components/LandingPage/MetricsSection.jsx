@@ -23,7 +23,7 @@ const DEFAULT_METRICS = [
     id: 'services',
     value: '10+',
     label: 'Growth Services',
-    subtext: 'Boosting & Digitalising Channels'
+    subtext: 'DizitalGini Intelligence Platform'
   }
 ];
 
