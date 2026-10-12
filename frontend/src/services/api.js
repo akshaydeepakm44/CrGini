@@ -44,6 +44,50 @@ const parseApiResponse = async (res, defaultErrorMessage = 'Request failed') => 
   return data;
 };
 
+export const getStoredToken = () => {
+  try {
+    const candidates = [
+      localStorage.getItem('cg_auth_token'),
+      sessionStorage.getItem('cg_auth_token'),
+      localStorage.getItem('token'),
+      sessionStorage.getItem('token'),
+      localStorage.getItem('adminToken'),
+      sessionStorage.getItem('adminToken')
+    ];
+    for (const t of candidates) {
+      if (t && typeof t === 'string') {
+        const clean = t.trim();
+        if (clean && clean !== 'undefined' && clean !== 'null' && clean.length > 10) {
+          return clean;
+        }
+      }
+    }
+  } catch (e) {}
+  return '';
+};
+
+export const setStoredToken = (token) => {
+  if (!token || typeof token !== 'string') return;
+  const clean = token.trim();
+  if (!clean || clean === 'undefined' || clean === 'null') return;
+  try {
+    localStorage.setItem('cg_auth_token', clean);
+    localStorage.setItem('token', clean);
+    sessionStorage.setItem('cg_auth_token', clean);
+    sessionStorage.setItem('token', clean);
+  } catch (e) {}
+};
+
+export const clearStoredToken = () => {
+  try {
+    localStorage.removeItem('cg_auth_token');
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('cg_auth_token');
+    sessionStorage.removeItem('token');
+    sessionStorage.clear();
+  } catch (e) {}
+};
+
 const getHeaders = (includeAuth = true) => {
   const headers = {
     'Content-Type': 'application/json',
@@ -52,9 +96,11 @@ const getHeaders = (includeAuth = true) => {
     'Pragma': 'no-cache'
   };
   if (includeAuth) {
-    const token = localStorage.getItem('cg_auth_token');
+    const token = getStoredToken();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+      headers['x-auth-token'] = token;
+      headers['x-access-token'] = token;
     }
   }
   return headers;
@@ -72,7 +118,9 @@ export const api = {
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Login failed. Please check credentials.');
     }
-    localStorage.setItem('cg_auth_token', data.token);
+    if (data.token) {
+      setStoredToken(data.token);
+    }
     return data;
   },
 
@@ -90,7 +138,7 @@ export const api = {
       throw new Error(data.message || 'Registration failed. Please try again.');
     }
     if (data.token) {
-      localStorage.setItem('cg_auth_token', data.token);
+      setStoredToken(data.token);
     }
     return data;
   },
@@ -101,15 +149,15 @@ export const api = {
     });
     const data = await safeJson(res);
     if (!res.ok || !data.success) {
-      throw new Error(data.message || 'Session expired');
+      const err = new Error(data.message || 'Session expired');
+      err.status = res.status;
+      throw err;
     }
     return data;
   },
 
   logout() {
-    localStorage.removeItem('cg_auth_token');
-    localStorage.removeItem('token');
-    sessionStorage.clear();
+    clearStoredToken();
   },
 
   async getServicesVisibility() {
@@ -1068,39 +1116,53 @@ export const api = {
 
   // Prospect Sample Showcase Management (Lead Specialists & Admin)
   async getAdminSamples() {
-    const res = await fetch(`${API_BASE}/samples/manage`, {
+    const token = getStoredToken();
+    const url = `${API_BASE}/samples/manage${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    const res = await fetch(url, {
       headers: getHeaders(true)
     });
     return parseApiResponse(res, 'Failed to load sample showcases');
   },
 
   async getAdminSampleById(id) {
-    const res = await fetch(`${API_BASE}/samples/manage/${id}`, {
+    const token = getStoredToken();
+    const url = `${API_BASE}/samples/manage/${encodeURIComponent(id)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    const res = await fetch(url, {
       headers: getHeaders(true)
     });
     return parseApiResponse(res, 'Failed to load sample showcase');
   },
 
   async createAdminSample(sampleData) {
-    const res = await fetch(`${API_BASE}/samples/manage`, {
+    const token = getStoredToken();
+    const payload = { ...sampleData };
+    if (token) payload._token = token;
+    const url = `${API_BASE}/samples/manage${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: getHeaders(true),
-      body: JSON.stringify(sampleData)
+      body: JSON.stringify(payload)
     });
     return parseApiResponse(res, 'Failed to create sample showcase');
   },
 
   async updateAdminSample(id, sampleData) {
-    const res = await fetch(`${API_BASE}/samples/manage/${id}`, {
+    const token = getStoredToken();
+    const payload = { ...sampleData };
+    if (token) payload._token = token;
+    const url = `${API_BASE}/samples/manage/${encodeURIComponent(id)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    const res = await fetch(url, {
       method: 'PUT',
       headers: getHeaders(true),
-      body: JSON.stringify(sampleData)
+      body: JSON.stringify(payload)
     });
     return parseApiResponse(res, 'Failed to update sample showcase');
   },
 
   async deleteAdminSample(id) {
-    const res = await fetch(`${API_BASE}/samples/manage/${id}`, {
+    const token = getStoredToken();
+    const url = `${API_BASE}/samples/manage/${encodeURIComponent(id)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    const res = await fetch(url, {
       method: 'DELETE',
       headers: getHeaders(true)
     });

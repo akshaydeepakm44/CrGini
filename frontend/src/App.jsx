@@ -12,7 +12,7 @@ import BoostPortal from './features/boost/BoostPortal';
 import DesignPortal from './features/design/DesignPortal';
 import SuperAdminPortal from './features/admin/SuperAdminPortal';
 import PublicSampleDashboard from './features/samples/PublicSampleDashboard';
-import { api } from './services/api';
+import { api, getStoredToken, setStoredToken } from './services/api';
 import { ServiceVisibilityProvider } from './features/client/context/ServiceVisibilityContext';
 
 // Helper component to route /ticket/:ticketId directly to the appropriate dashboard
@@ -66,17 +66,27 @@ export default function App() {
 
   // Check existing session on initial load
   useEffect(() => {
-    const token = localStorage.getItem('cg_auth_token');
+    const token = getStoredToken();
     if (token) {
       api.getMe()
         .then((data) => {
           if (data?.user) {
             setUser(data.user);
+            if (data.user.email) {
+              localStorage.setItem('cg_user_email', data.user.email);
+            }
           }
         })
-        .catch(() => {
-          api.logout();
-          setUser(null);
+        .catch((err) => {
+          // Only clear session if token is truly unauthorized/invalid (401), NOT on 502 or network blip
+          const isExplicitUnauthorized = err?.status === 401 || 
+                                          err?.message?.includes('401') || 
+                                          err?.message?.includes('Token verification failed') || 
+                                          err?.message?.includes('no longer exists');
+          if (isExplicitUnauthorized) {
+            api.logout();
+            setUser(null);
+          }
         })
         .finally(() => {
           setIsAuthChecking(false);
@@ -93,7 +103,13 @@ export default function App() {
     }, 3500);
   };
 
-  const handleLogin = (userData) => {
+  const handleLogin = (userData, authToken = null) => {
+    if (authToken) {
+      setStoredToken(authToken);
+    }
+    if (userData?.email) {
+      localStorage.setItem('cg_user_email', userData.email);
+    }
     setUser(userData);
     const searchParams = new URLSearchParams(location.search);
     const redirectParam = searchParams.get('redirect') || searchParams.get('returnTo');

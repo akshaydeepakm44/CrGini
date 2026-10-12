@@ -234,9 +234,59 @@ export default function LeadShowcasesPage({ onNavigate }) {
         await api.createAdminSample(payload);
       }
 
+      try {
+        localStorage.removeItem('cg_showcase_backup_draft');
+      } catch (_) {}
+
       setIsModalOpen(false);
       await loadShowcases();
+      alert('Showcase saved successfully!');
     } catch (err) {
+      console.error('[LeadShowcasesPage] Save error:', err);
+      // Auto-save draft so work is never lost
+      try {
+        localStorage.setItem('cg_showcase_backup_draft', JSON.stringify({
+          editingId: editingShowcase?.id,
+          payload,
+          timestamp: Date.now()
+        }));
+      } catch (_) {}
+
+      const isAuthErr = err.message?.includes('token') || 
+                        err.message?.includes('Access denied') || 
+                        err.message?.includes('expired') || 
+                        err.message?.includes('401') ||
+                        err.message?.includes('Forbidden');
+
+      if (isAuthErr) {
+        const userEmail = localStorage.getItem('cg_user_email') || 'team@creativegini.com';
+        const password = window.prompt(
+          `Authentication Required:\nYour session token is missing or expired.\n\nEnter the password for "${userEmail}" to re-authenticate and save this showcase immediately:`
+        );
+        if (password) {
+          try {
+            const loginRes = await api.login(userEmail, password);
+            if (loginRes?.token) {
+              if (editingShowcase) {
+                await api.updateAdminSample(editingShowcase.id, payload);
+              } else {
+                await api.createAdminSample(payload);
+              }
+              try {
+                localStorage.removeItem('cg_showcase_backup_draft');
+              } catch (_) {}
+              setIsModalOpen(false);
+              await loadShowcases();
+              alert('Showcase saved successfully!');
+              return;
+            }
+          } catch (retryErr) {
+            alert(`Re-authentication failed: ${retryErr.message}. Your showcase data has been safely preserved.`);
+            return;
+          }
+        }
+      }
+
       alert(`Failed to save showcase: ${err.message}`);
     }
   };
