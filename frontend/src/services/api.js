@@ -985,7 +985,7 @@ export const api = {
       throw new Error('Failed to download lead import template');
     }
     const blob = await res.blob();
-    const filename = format === 'csv' ? 'dizigini_leads_import_template.csv' : 'dizigini_leads_import_template.xlsx';
+    const filename = format === 'csv' ? 'creativegini_leads_import_template.csv' : 'creativegini_leads_import_template.xlsx';
     const blobUrl = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = blobUrl;
@@ -1112,6 +1112,15 @@ export const api = {
       headers: getHeaders(false)
     });
     return parseApiResponse(res, 'Failed to load public sample showcase');
+  },
+
+  async submitPublicInquiry(slug, data) {
+    const res = await fetch(`${API_BASE}/samples/${encodeURIComponent(slug)}/inquiry`, {
+      method: 'POST',
+      headers: getHeaders(false),
+      body: JSON.stringify(data),
+    });
+    return parseApiResponse(res, 'Failed to submit inquiry');
   },
 
   // Prospect Sample Showcase Management (Lead Specialists & Admin)
