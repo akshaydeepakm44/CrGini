@@ -254,7 +254,7 @@ export default function PublicSampleDashboard() {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-              <img src={BRAND_LOGO} alt="CreativeGini" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
+              <img src={BRAND_LOGO} alt="DiziGini" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
             </Link>
             <span style={{ height: '18px', width: '1px', background: '#CBD5E1' }} />
             <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#475569', background: '#F1F5F9', padding: '4px 10px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
@@ -320,7 +320,7 @@ export default function PublicSampleDashboard() {
           </div>
 
           <h1 style={{ fontSize: '2.25rem', fontWeight: 800, color: '#0F172A', lineHeight: '1.2', letterSpacing: '-0.5px', marginBottom: '12px' }}>
-            See the kind of intelligence CreativeGini can prepare for your team.
+            See the kind of intelligence DiziGini can prepare for your team.
           </h1>
 
           <p style={{ fontSize: '1.05rem', color: '#475569', maxWidth: '780px', lineHeight: '1.6', marginBottom: '24px' }}>
@@ -896,7 +896,7 @@ export default function PublicSampleDashboard() {
           </h2>
 
           <p style={{ fontSize: '1rem', color: '#64748B', maxWidth: '620px', margin: '0 auto 28px auto', lineHeight: '1.6' }}>
-            Unlock your full tailored pipeline of vetted decision makers, detailed company dossiers, and direct specialist execution on your private CreativeGini dashboard.
+            Unlock your full tailored pipeline of vetted decision makers, detailed company dossiers, and direct specialist execution on your private DiziGini dashboard.
           </p>
 
           <button
@@ -955,7 +955,7 @@ export default function PublicSampleDashboard() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#94A3B8' }}>
             <ShieldCheck size={14} color="#10B981" />
-            <span>CreativeGini Protected Intelligence Showcase · Enterprise SLA & Tenant Isolation</span>
+            <span>DiziGini Protected Intelligence Showcase · Enterprise SLA & Tenant Isolation</span>
           </div>
 
         </div>

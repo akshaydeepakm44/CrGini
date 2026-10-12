@@ -5,7 +5,7 @@ const STEPS = [
   {
     number: '01',
     title: 'Choose a service',
-    desc: 'Select from our curated menu of Boosting or Digitalising services based on your immediate growth goals.',
+    desc: 'Select from our curated menu of Digitalising intelligence services based on your immediate growth goals.',
     icon: MousePointerClick
   },
   {
@@ -23,14 +23,14 @@ const STEPS = [
   {
     number: '04',
     title: 'Review and receive deliverables',
-    desc: 'Access verified spreadsheets, dossiers, or creative files directly in your portal. Request revisions or scale up with 1-click.',
+    desc: 'Access verified spreadsheets, dossiers, or research reports directly in your DiziGini portal. Request revisions or scale up with 1-click.',
     icon: CheckCircle
   }
 ];
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="cg-section" aria-label="How CreativeGini Works">
+    <section id="how-it-works" className="cg-section" aria-label="How DiziGini Works">
       <div className="cg-container">
         <div className="cg-section-header">
           <span className="cg-section-badge">Simple 4-Step Process</span>

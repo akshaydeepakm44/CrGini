@@ -45,7 +45,7 @@ export default function DigitalisingChannelPage({
         </h1>
 
         <p style={{ margin: 0, fontSize: '1rem', color: 'var(--cg-text-secondary, #4B5563)', maxWidth: '680px', lineHeight: 1.6 }}>
-          Research and business intelligence services prepared by the CreativeGini specialist team. Verified lead telemetry, comprehensive account dossiers, and market research.
+          Research and business intelligence services prepared by the DiziGini specialist team. Verified lead telemetry, comprehensive account dossiers, and market research.
         </p>
       </div>
 

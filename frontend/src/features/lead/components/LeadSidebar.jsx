@@ -98,148 +98,209 @@ export default function LeadSidebar({
             <Compass size={20} />
           </div>
           {!isCollapsed && (
-            <div>
-              <div
-                style={{
-                  fontFamily: 'var(--cg-font-heading, "Plus Jakarta Sans", sans-serif)',
-                  fontSize: '0.9375rem',
-                  fontWeight: 800,
-                  color: '#111827',
-                  letterSpacing: '-0.02em',
-                  lineHeight: 1.2,
-                }}
-              >
-                Lead Workspace
+              <div>
+                <div
+                  style={{
+                    fontFamily: 'var(--cg-font-heading, "Plus Jakarta Sans", sans-serif)',
+                    fontSize: '1rem',
+                    fontWeight: 800,
+                    color: '#111827',
+                    letterSpacing: '-0.02em',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  DizitalGini
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.6875rem',
+                    fontWeight: 700,
+                    color: '#7C3AED',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    marginTop: '1px',
+                  }}
+                >
+                  Internal Platform
+                </div>
               </div>
-              <div
+            )}
+          </div>
+        </div>
+
+        {/* 2. Navigation Items */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '16px 12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          {/* Section: COMMAND */}
+          {!isCollapsed && (
+            <div style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#9CA3AF', letterSpacing: '0.06em', textTransform: 'uppercase', padding: '6px 12px 2px' }}>
+              Command
+            </div>
+          )}
+
+          {/* Dashboard */}
+          <div
+            onClick={() => onNavigate('/lead/dashboard')}
+            style={itemStyle(isExactActive('/lead') || isExactActive('/lead/dashboard'))}
+            title="Dashboard"
+          >
+            <LayoutDashboard size={18} color={isExactActive('/lead') || isExactActive('/lead/dashboard') ? '#7C3AED' : '#6B7280'} />
+            {!isCollapsed && <span style={{ flex: 1 }}>Dashboard</span>}
+          </div>
+
+          {/* Requests Queue */}
+          <div
+            onClick={() => onNavigate('/lead/requests')}
+            style={{
+              ...itemStyle(isActive('/lead/requests')),
+              marginTop: '2px',
+              justifyContent: 'space-between',
+            }}
+            title="Operations Queue"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Inbox size={18} color={isActive('/lead/requests') ? '#7C3AED' : '#6B7280'} />
+              {!isCollapsed && <span>Requests Queue</span>}
+            </div>
+            {!isCollapsed && metrics.newRequests > 0 && (
+              <span
                 style={{
                   fontSize: '0.6875rem',
                   fontWeight: 700,
-                  color: '#7C3AED',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginTop: '1px',
+                  backgroundColor: '#EFF6FF',
+                  color: '#2563EB',
+                  padding: '1px 6px',
+                  borderRadius: '9999px',
+                  border: '1px solid #BFDBFE',
                 }}
               >
-                Operations Portal
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 2. Navigation Items */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '16px 12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '4px',
-        }}
-      >
-        {/* Dashboard */}
-        <div
-          onClick={() => onNavigate('/lead/dashboard')}
-          style={itemStyle(isExactActive('/lead') || isExactActive('/lead/dashboard'))}
-          title="Dashboard"
-        >
-          <LayoutDashboard size={18} color={isExactActive('/lead') || isExactActive('/lead/dashboard') ? '#7C3AED' : '#6B7280'} />
-          {!isCollapsed && <span style={{ flex: 1 }}>Dashboard</span>}
-        </div>
-
-        {/* Requests (Single Page - No dropdown sub-channels) */}
-        <div
-          onClick={() => onNavigate('/lead/requests')}
-          style={{
-            ...itemStyle(isActive('/lead/requests')),
-            marginTop: '4px',
-            justifyContent: 'space-between',
-          }}
-          title="Requests"
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Inbox size={18} color={isActive('/lead/requests') ? '#7C3AED' : '#6B7280'} />
-            {!isCollapsed && <span>Requests</span>}
-          </div>
-          {!isCollapsed && metrics.newRequests > 0 && (
-            <span
-              style={{
-                fontSize: '0.6875rem',
-                fontWeight: 700,
-                backgroundColor: '#EFF6FF',
-                color: '#2563EB',
-                padding: '1px 6px',
-                borderRadius: '9999px',
-                border: '1px solid #BFDBFE',
-              }}
-            >
-              {metrics.newRequests}
-            </span>
-          )}
-        </div>
-
-        {/* Research Workspace (Active workbench with all tickets) */}
-        <div
-          onClick={() => onNavigate('/lead/research')}
-          style={{ ...itemStyle(isActive('/lead/research')), marginTop: '4px' }}
-          title="Research Workspace"
-        >
-          <Briefcase size={18} color={isActive('/lead/research') ? '#7C3AED' : '#6B7280'} />
-          {!isCollapsed && <span style={{ flex: 1 }}>Research Workspace</span>}
-        </div>
-
-        {/* Prospect Showcases (Cold Outreach / No Ticket Showcases) */}
-        <div
-          onClick={() => onNavigate('/lead/showcases')}
-          style={{ ...itemStyle(isActive('/lead/showcases')), marginTop: '4px' }}
-          title="Prospect Showcases"
-        >
-          <Sparkles size={18} color={isActive('/lead/showcases') ? '#7C3AED' : '#6B7280'} />
-          {!isCollapsed && <span style={{ flex: 1 }}>Prospect Showcases</span>}
-        </div>
-
-        {/* Messages (Client conversations) */}
-        <div
-          onClick={() => onNavigate('/lead/messages')}
-          style={{ ...itemStyle(isActive('/lead/messages')), marginTop: '4px' }}
-          title={isCollapsed ? `Messages ${metrics?.clientInquiries ? `(${metrics.clientInquiries} new)` : ''}` : undefined}
-        >
-          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-            <MessageSquare size={18} color={isActive('/lead/messages') ? '#7C3AED' : '#6B7280'} />
-            {isCollapsed && metrics?.clientInquiries > 0 && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: '-2px',
-                  right: '-3px',
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: '#7C3AED',
-                }}
-              />
+                {metrics.newRequests}
+              </span>
             )}
           </div>
-          {!isCollapsed && <span style={{ flex: 1 }}>Messages</span>}
-          {!isCollapsed && metrics?.clientInquiries > 0 && (
-            <span
-              style={{
-                fontSize: '0.72rem',
-                fontWeight: 800,
-                color: '#7C3AED',
-                backgroundColor: '#F5F3FF',
-                border: '1px solid #DDD4FA',
-                padding: '1px 6px',
-                borderRadius: '999px',
-              }}
-            >
-              {metrics.clientInquiries}
-            </span>
+
+          {/* Section: DIZITALGINI PLATFORM */}
+          {!isCollapsed && (
+            <div style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#9CA3AF', letterSpacing: '0.06em', textTransform: 'uppercase', padding: '14px 12px 2px' }}>
+              Platform Modules
+            </div>
           )}
+
+          {/* Lead Discovery */}
+          <div
+            onClick={() => onNavigate('/lead/leads')}
+            style={{ ...itemStyle(isActive('/lead/leads')), marginTop: '2px' }}
+            title="Lead Discovery"
+          >
+            <Search size={18} color={isActive('/lead/leads') ? '#7C3AED' : '#6B7280'} />
+            {!isCollapsed && <span style={{ flex: 1 }}>Lead Discovery</span>}
+          </div>
+
+          {/* Company Studies */}
+          <div
+            onClick={() => onNavigate('/lead/studies')}
+            style={{ ...itemStyle(isActive('/lead/studies') || isActive('/lead/companies')), marginTop: '2px' }}
+            title="Company Studies"
+          >
+            <Building2 size={18} color={isActive('/lead/studies') || isActive('/lead/companies') ? '#7C3AED' : '#6B7280'} />
+            {!isCollapsed && <span style={{ flex: 1 }}>Company Studies</span>}
+          </div>
+
+          {/* Key People Research */}
+          <div
+            onClick={() => onNavigate('/lead/key-people')}
+            style={{ ...itemStyle(isActive('/lead/key-people')), marginTop: '2px' }}
+            title="Key People Research"
+          >
+            <Users size={18} color={isActive('/lead/key-people') ? '#7C3AED' : '#6B7280'} />
+            {!isCollapsed && <span style={{ flex: 1 }}>Key People Research</span>}
+          </div>
+
+          {/* Research Workspace */}
+          <div
+            onClick={() => onNavigate('/lead/research')}
+            style={{ ...itemStyle(isActive('/lead/research')), marginTop: '2px' }}
+            title="Research Workspace"
+          >
+            <Briefcase size={18} color={isActive('/lead/research') ? '#7C3AED' : '#6B7280'} />
+            {!isCollapsed && <span style={{ flex: 1 }}>Research Workspace</span>}
+          </div>
+
+          {/* Deliverables */}
+          <div
+            onClick={() => onNavigate('/lead/deliverables')}
+            style={{ ...itemStyle(isActive('/lead/deliverables')), marginTop: '2px' }}
+            title="Deliverables"
+          >
+            <Package size={18} color={isActive('/lead/deliverables') ? '#7C3AED' : '#6B7280'} />
+            {!isCollapsed && <span style={{ flex: 1 }}>Deliverables</span>}
+          </div>
+
+          {/* Section: COLLABORATION */}
+          {!isCollapsed && (
+            <div style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#9CA3AF', letterSpacing: '0.06em', textTransform: 'uppercase', padding: '14px 12px 2px' }}>
+              Collaboration
+            </div>
+          )}
+
+          {/* Messages */}
+          <div
+            onClick={() => onNavigate('/lead/messages')}
+            style={{ ...itemStyle(isActive('/lead/messages')), marginTop: '2px' }}
+            title={isCollapsed ? `Messages ${metrics?.clientInquiries ? `(${metrics.clientInquiries} new)` : ''}` : undefined}
+          >
+            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+              <MessageSquare size={18} color={isActive('/lead/messages') ? '#7C3AED' : '#6B7280'} />
+              {isCollapsed && metrics?.clientInquiries > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-2px',
+                    right: '-3px',
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: '#7C3AED',
+                  }}
+                />
+              )}
+            </div>
+            {!isCollapsed && <span style={{ flex: 1 }}>Messages</span>}
+            {!isCollapsed && metrics?.clientInquiries > 0 && (
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  color: '#7C3AED',
+                  backgroundColor: '#F5F3FF',
+                  border: '1px solid #DDD4FA',
+                  padding: '1px 6px',
+                  borderRadius: '999px',
+                }}
+              >
+                {metrics.clientInquiries}
+              </span>
+            )}
+          </div>
+
+          {/* Prospect Showcases */}
+          <div
+            onClick={() => onNavigate('/lead/showcases')}
+            style={{ ...itemStyle(isActive('/lead/showcases')), marginTop: '2px' }}
+            title="Prospect Showcases"
+          >
+            <Sparkles size={18} color={isActive('/lead/showcases') ? '#7C3AED' : '#6B7280'} />
+            {!isCollapsed && <span style={{ flex: 1 }}>Prospect Showcases</span>}
+          </div>
         </div>
-      </div>
 
       {/* 3. Bottom Specialist Profile & Logout */}
       <div

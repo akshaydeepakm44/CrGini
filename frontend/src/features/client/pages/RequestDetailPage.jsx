@@ -338,7 +338,7 @@ export default function RequestDetailPage({
               <span>•</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#4B5563' }}>
                 <User size={14} color="#7C3AED" />
-                <span>Specialist: <strong>{ticket.assignedSpecialist || 'CreativeGini Specialist Pod'}</strong></span>
+                <span>Specialist: <strong>{ticket.assignedSpecialist || 'DiziGini Specialist Pod'}</strong></span>
               </span>
             </div>
           </div>

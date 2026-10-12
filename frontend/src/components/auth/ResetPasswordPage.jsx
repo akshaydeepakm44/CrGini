@@ -133,7 +133,7 @@ export default function ResetPasswordPage({ onBackHome, showToast }) {
         </button>
 
         <div className="signin-nav-brand" onClick={onBackHome || (() => navigate('/'))} style={{ cursor: 'pointer' }}>
-          <img src={BRAND_LOGO} alt="CreativeGini" className="signin-nav-logo" />
+          <img src={BRAND_LOGO} alt="DiziGini" className="signin-nav-logo" />
         </div>
       </header>
 
@@ -147,7 +147,7 @@ export default function ResetPasswordPage({ onBackHome, showToast }) {
               {/* Header inside Card */}
               <div className="signin-card-header" style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
-                  <img src={BRAND_LOGO} alt="CreativeGini" style={{ height: '42px', width: 'auto' }} />
+                  <img src={BRAND_LOGO} alt="DiziGini" style={{ height: '42px', width: 'auto' }} />
                 </div>
                 <h1 className="signin-title" style={{ fontSize: '1.65rem', marginBottom: '0.4rem' }}>
                   {isSuccess ? 'Password Updated' : 'Create New Password'}
@@ -155,7 +155,7 @@ export default function ResetPasswordPage({ onBackHome, showToast }) {
                 <p className="signin-subtitle" style={{ fontSize: '0.9rem', color: '#5B527E' }}>
                   {isSuccess
                     ? 'Your account security credentials have been updated.'
-                    : 'Set a strong, secure password for your CreativeGini account.'}
+                    : 'Set a strong, secure password for your DiziGini account.'}
                 </p>
               </div>
 

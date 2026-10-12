@@ -14,9 +14,9 @@ export const streamGeneratedCompanyStudyPdf = (sample, res, download = false) =>
     margin: 48,
     info: {
       Title: `${companyName} - Executive Company Study`,
-      Author: 'CreativeGini Autonomous Intelligence',
+      Author: 'DiziGini Autonomous Intelligence',
       Subject: 'Enterprise Commercial & Account Intelligence',
-      Keywords: 'CreativeGini, Intelligence, B2B, Lead Study',
+      Keywords: 'DiziGini, Intelligence, B2B, Lead Study',
     },
   });
 
@@ -33,7 +33,7 @@ export const streamGeneratedCompanyStudyPdf = (sample, res, download = false) =>
   doc.rect(0, 0, doc.page.width, 6).fill('#2563EB');
 
   // Header
-  doc.fontSize(9).font('Helvetica-Bold').fillColor('#2563EB').text('CREATIVEGINI EXECUTIVE INTELLIGENCE', 48, 36);
+  doc.fontSize(9).font('Helvetica-Bold').fillColor('#2563EB').text('DIZIGINI EXECUTIVE INTELLIGENCE', 48, 36);
   doc.fontSize(8).font('Helvetica').fillColor('#64748B').text(`CONFIDENTIAL ACCOUNT BRIEF • GENERATED ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, 48, 48);
 
   doc.moveDown(1.5);
@@ -121,7 +121,7 @@ export const streamGeneratedCompanyStudyPdf = (sample, res, download = false) =>
   // Footer on bottom
   const bottomY = doc.page.height - 40;
   doc.fontSize(7.5).font('Helvetica').fillColor('#94A3B8').text(
-    'Prepared by CreativeGini Autonomous Pod • https://creativegini.com • All rights reserved.',
+    'Prepared by DiziGini Autonomous Pod • https://dizigini.com • All rights reserved.',
     48,
     bottomY,
     { width: doc.page.width - 96, align: 'center' }
@@ -144,7 +144,7 @@ export const streamGeneratedLeadStudyPdf = (lead, sample, res, download = false)
     margin: 48,
     info: {
       Title: `${leadName} - Deep-Dive Lead Study`,
-      Author: 'CreativeGini Autonomous Intelligence',
+      Author: 'DiziGini Autonomous Intelligence',
       Subject: 'Executive Prospect Qualification Brief',
     },
   });
@@ -162,7 +162,7 @@ export const streamGeneratedLeadStudyPdf = (lead, sample, res, download = false)
   doc.rect(0, 0, doc.page.width, 6).fill('#7C3AED');
 
   // Header
-  doc.fontSize(9).font('Helvetica-Bold').fillColor('#7C3AED').text('CREATIVEGINI PROSPECT RESEARCH DOSSIER', 48, 36);
+  doc.fontSize(9).font('Helvetica-Bold').fillColor('#7C3AED').text('DIZIGINI PROSPECT RESEARCH DOSSIER', 48, 36);
   doc.fontSize(8).font('Helvetica').fillColor('#64748B').text(`VERIFIED EXECUTIVE PROFILE • ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, 48, 48);
 
   doc.moveDown(1.5);
@@ -220,7 +220,7 @@ export const streamGeneratedLeadStudyPdf = (lead, sample, res, download = false)
   // Footer
   const bottomY = doc.page.height - 40;
   doc.fontSize(7.5).font('Helvetica').fillColor('#94A3B8').text(
-    'CreativeGini Executive Research • Confidential Intelligence Report • All rights reserved.',
+    'DiziGini Executive Research • Confidential Intelligence Report • All rights reserved.',
     48,
     bottomY,
     { width: doc.page.width - 96, align: 'center' }
@@ -243,7 +243,7 @@ export const streamGeneratedPitchDeckPdf = (sample, lead, res, download = false)
     margin: 48,
     info: {
       Title: title,
-      Author: 'CreativeGini Autonomous Pod',
+      Author: 'DiziGini Autonomous Pod',
       Subject: 'Tailored Value Proposition Pitch Deck',
     },
   });
@@ -259,7 +259,7 @@ export const streamGeneratedPitchDeckPdf = (sample, lead, res, download = false)
 
   // Deck Cover
   doc.rect(0, 0, doc.page.width, 10).fill('#4F46E5');
-  doc.fontSize(10).font('Helvetica-Bold').fillColor('#4F46E5').text('CREATIVEGINI EXECUTIVE PROPOSAL', 48, 48);
+  doc.fontSize(10).font('Helvetica-Bold').fillColor('#4F46E5').text('DIZIGINI EXECUTIVE PROPOSAL', 48, 48);
   doc.moveDown(1);
   doc.fontSize(24).font('Helvetica-Bold').fillColor('#0F172A').text(title, { lineGap: 6 });
   doc.fontSize(11).font('Helvetica').fillColor('#475569').text(`Tailored Commercial Proposal Prepared for ${targetName} at ${companyName}.`, { lineGap: 16 });
@@ -268,7 +268,7 @@ export const streamGeneratedPitchDeckPdf = (sample, lead, res, download = false)
   renderSectionCard(
     doc,
     'Executive Value Narrative',
-    sample?.pitchDeck?.summary || `CreativeGini equips ${companyName} with autonomous specialist pods covering brand positioning, verified outbound research, and turnkey digital sprint executions.`,
+    sample?.pitchDeck?.summary || `DiziGini equips ${companyName} with autonomous specialist pods covering brand positioning, verified outbound research, and turnkey digital sprint executions.`,
     '#4F46E5'
   );
 
@@ -281,7 +281,7 @@ export const streamGeneratedPitchDeckPdf = (sample, lead, res, download = false)
 
   const bottomY = doc.page.height - 40;
   doc.fontSize(7.5).font('Helvetica').fillColor('#94A3B8').text(
-    'CreativeGini Proposal Presentation • https://creativegini.com',
+    'DiziGini Proposal Presentation • https://dizigini.com',
     48,
     bottomY,
     { width: doc.page.width - 96, align: 'center' }

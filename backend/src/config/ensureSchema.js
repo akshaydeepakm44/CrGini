@@ -23,34 +23,34 @@ export async function ensureServiceSettingsTable() {
     if (parseInt(countRes.rows[0].count, 10) === 0) {
       const defaults = [
         // Channels
-        ['channel:boosting', 'boosting', 'BOOSTING Channel', 'Growth, GTM & Content', true, true],
-        ['channel:digitalising', 'digitalising', 'DIGITALISING Channel', 'Research, insights and business intelligence', false, true],
-        ['channel:design', 'design', 'UI / DESIGN Channel', 'Interface design & UX heuristics', true, true],
-        ['channel:development', 'development', 'APP DEVELOPMENT Channel', 'Full-stack web & mobile apps', true, true],
+        ['channel:boosting', 'boosting', 'BOOSTING Channel', 'Growth, GTM & Content', false, true],
+        ['channel:digitalising', 'digitalising', 'DIGITALISING Channel', 'Research, insights and business intelligence', true, true],
+        ['channel:design', 'design', 'UI / DESIGN Channel', 'Interface design & UX heuristics', false, true],
+        ['channel:development', 'development', 'APP DEVELOPMENT Channel', 'Full-stack web & mobile apps', false, true],
         
-        // Boosting services
-        ['strategic-planner', 'boosting', 'Strategic Planner', 'Build a focused growth and marketing plan', true, false],
-        ['content-creator', 'boosting', 'Content Creator', 'High-impact narrative copy & creative assets', true, false],
-        ['devrel', 'boosting', 'DevRel & Technical Advocacy', 'Developer advocacy & community positioning', true, false],
-        ['gtm', 'boosting', 'GTM Strategy', 'Launch execution blueprints & traction models', true, false],
-        ['ad-creatives', 'boosting', 'Ad Creatives', 'High-converting ad banners & copy angles', true, false],
-        ['brand-identity', 'boosting', 'Brand Identity & Positioning', 'Distinctive brand voice & visual guidelines', true, false],
+        // Boosting services (deactivated in DiziGini architecture)
+        ['strategic-planner', 'boosting', 'Strategic Planner', 'Build a focused growth and marketing plan', false, false],
+        ['content-creator', 'boosting', 'Content Creator', 'High-impact narrative copy & creative assets', false, false],
+        ['devrel', 'boosting', 'DevRel & Technical Advocacy', 'Developer advocacy & community positioning', false, false],
+        ['gtm', 'boosting', 'GTM Strategy', 'Launch execution blueprints & traction models', false, false],
+        ['ad-creatives', 'boosting', 'Ad Creatives', 'High-converting ad banners & copy angles', false, false],
+        ['brand-identity', 'boosting', 'Brand Identity & Positioning', 'Distinctive brand voice & visual guidelines', false, false],
 
-        // Digitalising services (deactivated by default as requested)
-        ['lead-research', 'digitalising', 'Lead Research', 'Find relevant companies and verified prospect contact intelligence', false, false],
-        ['company-study', 'digitalising', 'Company Study', 'Get a structured personal company study & account dossier', false, false],
-        ['key-people', 'digitalising', 'Key People Research', 'Identify relevant decision-makers & leadership contacts', false, false],
-        ['pitch-support', 'digitalising', 'Pitch Support', 'Pitch support and competitor analysis to win presentations', false, false],
+        // Digitalising services (ACTIVE - Core DiziGini Platform)
+        ['lead-research', 'digitalising', 'Lead Research', 'Find relevant companies and verified prospect contact intelligence', true, false],
+        ['company-study', 'digitalising', 'Company Study', 'Get a structured personal company study & account dossier', true, false],
+        ['key-people', 'digitalising', 'Key People Research', 'Identify relevant decision-makers & leadership contacts', true, false],
+        ['pitch-support', 'digitalising', 'Pitch Support', 'Pitch support and competitor analysis to win presentations', true, false],
 
-        // Design services
-        ['ui-ux-audit', 'design', 'UI/UX Audit', 'Comprehensive usability evaluation & UX heuristics', true, false],
-        ['figma-project', 'design', 'Figma Project', 'Figma component systems, mock screens & prototypes', true, false],
-        ['redesign-request', 'design', 'Landing Page Redesign', 'Full-page interface transformations & overhauls', true, false],
+        // Design services (deactivated in DiziGini architecture)
+        ['ui-ux-audit', 'design', 'UI/UX Audit', 'Comprehensive usability evaluation & UX heuristics', false, false],
+        ['figma-project', 'design', 'Figma Project', 'Figma component systems, mock screens & prototypes', false, false],
+        ['redesign-request', 'design', 'Landing Page Redesign', 'Full-page interface transformations & overhauls', false, false],
 
-        // Development services
-        ['technical-discovery', 'development', 'Technical Discovery', 'Technical discovery & architecture planning', true, false],
-        ['clickable-prototype', 'development', 'Clickable App Prototype', 'Clickable interactive web & mobile prototypes', true, false],
-        ['web-app', 'development', 'MVP Development', 'Production-ready web application MVP (POC + V1)', true, false]
+        // Development services (deactivated in DiziGini architecture)
+        ['technical-discovery', 'development', 'Technical Discovery', 'Technical discovery & architecture planning', false, false],
+        ['clickable-prototype', 'development', 'Clickable App Prototype', 'Clickable interactive web & mobile prototypes', false, false],
+        ['web-app', 'development', 'MVP Development', 'Production-ready web application MVP (POC + V1)', false, false]
       ];
 
       for (const [id, channel, name, desc, isActive, isChannel] of defaults) {
@@ -60,6 +60,10 @@ export async function ensureServiceSettingsTable() {
         );
       }
     }
+
+    // Enforce DiziGini single-focus platform in database: digitalising active, others deactivated
+    await query("UPDATE service_channel_settings SET is_active = true WHERE channel = 'digitalising'");
+    await query("UPDATE service_channel_settings SET is_active = false WHERE channel IN ('boosting', 'design', 'development')");
     return true;
   } catch (err) {
     console.error('[Schema Warning] ensureServiceSettingsTable error:', err.message);

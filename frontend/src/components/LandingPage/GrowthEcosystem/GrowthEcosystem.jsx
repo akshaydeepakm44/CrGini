@@ -3,11 +3,9 @@ import {
   Target, 
   Building2, 
   Users, 
-  Compass, 
-  PenTool, 
-  Code, 
-  Rocket, 
-  Palette,
+  Presentation,
+  ShieldCheck,
+  Code,
   Sparkles
 } from 'lucide-react';
 import OrbitRing from './OrbitRing';
@@ -17,7 +15,7 @@ import { BRAND_ICON } from '../../../assets/branding';
 
 const RINGS = [
   { id: 0, radius: 135, stroke: 'rgba(196, 181, 253, 0.45)', strokeDasharray: '4 6', strokeWidth: 1.2, rotationClass: 'cg-ring-rotation-1' },
-  { id: 1, radius: 195, stroke: 'rgba(244, 114, 182, 0.35)', strokeDasharray: '6 8', strokeWidth: 1.2, rotationClass: 'cg-ring-rotation-2' },
+  { id: 1, radius: 195, stroke: 'rgba(124, 58, 237, 0.35)', strokeDasharray: '6 8', strokeWidth: 1.2, rotationClass: 'cg-ring-rotation-2' },
   { id: 2, radius: 250, stroke: 'rgba(147, 197, 253, 0.38)', strokeDasharray: '5 9', strokeWidth: 1.2, rotationClass: 'cg-ring-rotation-3' }
 ];
 
@@ -28,10 +26,10 @@ const SERVICE_NODES = [
     category: 'Digitalising',
     ringIndex: 0,
     ringRadius: 135,
-    angleDeg: 35,
+    angleDeg: 30,
     color: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
     icon: Target,
-    desc: 'Find high-intent accounts and verified prospect contact intelligence tailored to your ideal customer profile.',
+    desc: 'Find high-intent accounts and verified prospect contact intelligence tailored to your ideal customer profile ($2 per lead).',
     floatDelay: 0
   },
   {
@@ -40,10 +38,10 @@ const SERVICE_NODES = [
     category: 'Digitalising',
     ringIndex: 1,
     ringRadius: 195,
-    angleDeg: 80,
+    angleDeg: 90,
     color: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
     icon: Building2,
-    desc: 'Deep organizational dossiers, tech stack telemetry, and strategic expansion insights for target accounts.',
+    desc: 'Deep organizational dossiers, tech stack telemetry, and strategic expansion insights for target accounts ($1 per study).',
     floatDelay: 0.4
   },
   {
@@ -52,71 +50,47 @@ const SERVICE_NODES = [
     category: 'Digitalising',
     ringIndex: 2,
     ringRadius: 250,
-    angleDeg: 135,
+    angleDeg: 150,
     color: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)',
     icon: Users,
-    desc: 'Direct access to verified decision-makers, direct emails, and key leadership reporting structures.',
+    desc: 'Direct access to verified decision-makers, direct executive emails, and key leadership reporting structures ($2 per contact).',
     floatDelay: 0.8
   },
   {
-    id: 'creative',
-    name: 'Creative',
-    category: 'Boosting',
+    id: 'pitch-support',
+    name: 'Pitch Support',
+    category: 'Digitalising',
     ringIndex: 0,
     ringRadius: 135,
-    angleDeg: 175,
-    color: 'linear-gradient(135deg, #A855F7 0%, #9333EA 100%)',
-    icon: Palette,
-    desc: 'Bespoke UI/UX landing mockups, brand assets, and interactive product presentation materials.',
+    angleDeg: 210,
+    color: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+    icon: Presentation,
+    desc: 'Arm your pitch with rock-solid data, competitor battlecards, and tailored slide decks ($2 per sprint).',
     floatDelay: 1.2
   },
   {
-    id: 'strategy',
-    name: 'Strategy',
-    category: 'Boosting',
-    ringIndex: 0,
-    ringRadius: 135,
-    angleDeg: 220,
-    color: 'linear-gradient(135deg, #EC4899 0%, #DB2777 100%)',
-    icon: Compass,
-    desc: 'Comprehensive growth positioning, ICP narrative frameworks, and quarterly multi-channel execution plans.',
+    id: 'tech-stack',
+    name: 'Tech Telemetry',
+    category: 'Digitalising',
+    ringIndex: 1,
+    ringRadius: 195,
+    angleDeg: 270,
+    color: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+    icon: Code,
+    desc: 'Deep cloud infrastructure footprint, vendor mapping, and internal stack intelligence on prospective accounts.',
     floatDelay: 1.6
   },
   {
-    id: 'content',
-    name: 'Content',
-    category: 'Boosting',
-    ringIndex: 1,
-    ringRadius: 195,
-    angleDeg: 265,
-    color: 'linear-gradient(135deg, #F43F5E 0%, #E11D48 100%)',
-    icon: PenTool,
-    desc: 'High-conversion sales collateral, technical thought leadership essays, and engaging executive copy.',
-    floatDelay: 2.0
-  },
-  {
-    id: 'devrel',
-    name: 'DevRel',
-    category: 'Boosting',
+    id: 'buying-committee',
+    name: 'Org Mapping',
+    category: 'Digitalising',
     ringIndex: 2,
     ringRadius: 250,
-    angleDeg: 310,
-    color: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
-    icon: Code,
-    desc: 'Developer advocacy, technical community engagement, and developer-first product positioning.',
-    floatDelay: 2.4
-  },
-  {
-    id: 'gtm',
-    name: 'GTM',
-    category: 'Boosting',
-    ringIndex: 1,
-    ringRadius: 195,
-    angleDeg: 355,
-    color: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-    icon: Rocket,
-    desc: 'Go-to-market outbound playbooks, sequence templates, and targeted expansion strategies.',
-    floatDelay: 2.8
+    angleDeg: 330,
+    color: 'linear-gradient(135deg, #06B6D4 0%, #0284C7 100%)',
+    icon: ShieldCheck,
+    desc: 'Full buying committee org-charts mapping economic decision-makers, champions, and technical stakeholders.',
+    floatDelay: 2.0
   }
 ];
 
@@ -193,7 +167,7 @@ export default function GrowthEcosystem({ onSelectService, onExploreService }) {
     : (activeNode ? activeNode.ringIndex : null);
 
   return (
-    <div className="cg-ecosystem-wrapper" aria-label="CreativeGini Growth Ecosystem Visualization">
+    <div className="cg-ecosystem-wrapper" aria-label="DiziGini Intelligence Ecosystem Visualization">
       <div className="cg-orbit-canvas">
         {/* Orbital SVG Rings */}
         <svg
@@ -217,7 +191,7 @@ export default function GrowthEcosystem({ onSelectService, onExploreService }) {
         {/* Central Core Hub: CreativeGini */}
         <div 
           className="cg-center-hub"
-          title="CreativeGini Growth Core"
+          title="DiziGini Intelligence Core"
           onMouseEnter={() => handleNodeMouseEnter(SERVICE_NODES[0])}
           onMouseLeave={handleNodeMouseLeave}
           onClick={() => handleNodeClick(SERVICE_NODES[0])}
@@ -225,14 +199,14 @@ export default function GrowthEcosystem({ onSelectService, onExploreService }) {
           <div className="cg-center-pulse-ring" />
           <img
             src={BRAND_ICON}
-            alt="CreativeGini Core"
+            alt="DiziGini Core"
             className="cg-center-logo-img"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
             }}
           />
-          <span className="cg-center-title">CreativeGini</span>
-          <span className="cg-center-subtitle">Ecosystem</span>
+          <span className="cg-center-title">DiziGini</span>
+          <span className="cg-center-subtitle">Platform</span>
         </div>
 
         {/* Service Nodes: Desktop Polar Layout */}

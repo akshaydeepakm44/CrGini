@@ -3,7 +3,8 @@ import { api } from '../../../services/api';
 
 const ServiceVisibilityContext = createContext(null);
 
-const DEFAULT_DEACTIVATED = [
+// DiziGini: Digitalising is the primary active platform. Other channels are deactivated.
+const DEFAULT_ACTIVE_SERVICES = [
   'channel:digitalising',
   'digitalising',
   'lead-research',
@@ -11,6 +12,27 @@ const DEFAULT_DEACTIVATED = [
   'key-people',
   'pitch-support',
   'custom-digitalising'
+];
+
+const DEFAULT_DEACTIVATED = [
+  'channel:boosting',
+  'boosting',
+  'channel:design',
+  'design',
+  'channel:development',
+  'development',
+  'strategic-planner',
+  'content-creator',
+  'devrel',
+  'gtm',
+  'ad-creatives',
+  'brand-identity',
+  'ui-ux-audit',
+  'figma-project',
+  'redesign-request',
+  'technical-discovery',
+  'clickable-prototype',
+  'web-app'
 ];
 
 export function ServiceVisibilityProvider({ children }) {
@@ -49,7 +71,6 @@ export function ServiceVisibilityProvider({ children }) {
   const isChannelActive = useCallback((channelSlug) => {
     if (!channelSlug) return false;
     const clean = channelSlug.toLowerCase().trim();
-    if (clean === 'digitalising' && !servicesList) return false; // Default hidden
 
     if (servicesList) {
       const channelItem = servicesList.find(
@@ -58,33 +79,29 @@ export function ServiceVisibilityProvider({ children }) {
       if (channelItem) return Boolean(channelItem.is_active);
     }
 
-    // Default fallback check
-    if (clean === 'digitalising') return false;
-    return true;
+    // DiziGini default: Only digitalising is active
+    if (clean === 'digitalising') return true;
+    return false;
   }, [servicesList]);
 
   const isServiceActive = useCallback((serviceId) => {
     if (!serviceId) return false;
     const clean = serviceId.toLowerCase().trim();
     
-    // Default hidden list check if no remote data
-    if (!servicesList) {
-      if (DEFAULT_DEACTIVATED.includes(clean)) return false;
-      return true;
+    // Check in remote services list if present
+    if (servicesList) {
+      const item = servicesList.find((s) => s.id.toLowerCase() === clean);
+      if (item) {
+        if (!item.is_active) return false;
+        if (item.channel && !isChannelActive(item.channel)) return false;
+        return true;
+      }
     }
 
-    const item = servicesList.find((s) => s.id.toLowerCase() === clean);
-    if (item) {
-      // If service is inactive, false
-      if (!item.is_active) return false;
-      // Also check parent channel
-      if (item.channel && !isChannelActive(item.channel)) return false;
-      return true;
-    }
-
-    // Fallback if not found in db table
+    // Default fallback: Digitalising services active, others deactivated
+    if (DEFAULT_ACTIVE_SERVICES.includes(clean)) return true;
     if (DEFAULT_DEACTIVATED.includes(clean)) return false;
-    return true;
+    return false;
   }, [servicesList, isChannelActive]);
 
   return (

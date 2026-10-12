@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 /**
- * CreativeGini Services Catalog
+ * DiziGini Services Catalog
  * Authoritative registry of all services across BOOSTING & DIGITALISING channels.
  */
 export const SERVICES_CATALOG = [

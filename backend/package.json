@@ -1,7 +1,7 @@
 {
-  "name": "creativegini-backend",
+  "name": "dizigini-backend",
   "version": "1.0.0",
-  "description": "CreativeGini Portal Backend API",
+  "description": "DiziGini Portal Backend API",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
