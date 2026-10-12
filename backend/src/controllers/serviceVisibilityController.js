@@ -1,13 +1,30 @@
 import { query } from '../config/postgres.js';
+import { ensureServiceSettingsTable } from '../config/ensureSchema.js';
 
 /**
  * Get all service channel & sub-service visibility settings
  */
 export async function getServiceVisibility(req, res) {
   try {
-    const result = await query(
-      'SELECT id, channel, name, description, is_active, is_channel, updated_at FROM service_channel_settings ORDER BY is_channel DESC, channel ASC, name ASC'
-    );
+    let result;
+    try {
+      result = await query(
+        'SELECT id, channel, name, description, is_active, is_channel, updated_at FROM service_channel_settings ORDER BY is_channel DESC, channel ASC, name ASC'
+      );
+      if (!result.rows || result.rows.length === 0) {
+        await ensureServiceSettingsTable();
+        result = await query(
+          'SELECT id, channel, name, description, is_active, is_channel, updated_at FROM service_channel_settings ORDER BY is_channel DESC, channel ASC, name ASC'
+        );
+      }
+    } catch (dbErr) {
+      console.warn('[getServiceVisibility] table missing or query failed, initializing table:', dbErr.message);
+      await ensureServiceSettingsTable();
+      result = await query(
+        'SELECT id, channel, name, description, is_active, is_channel, updated_at FROM service_channel_settings ORDER BY is_channel DESC, channel ASC, name ASC'
+      );
+    }
+
     return res.json({
       success: true,
       services: result.rows,
@@ -36,6 +53,9 @@ export async function updateServiceVisibility(req, res) {
         message: 'isActive boolean flag is required.',
       });
     }
+
+    // Ensure table exists
+    await ensureServiceSettingsTable();
 
     const checkRes = await query('SELECT * FROM service_channel_settings WHERE id = $1', [id]);
     if (checkRes.rows.length === 0) {

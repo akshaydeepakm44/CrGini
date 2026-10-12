@@ -49,6 +49,7 @@ router.get('/overview', getAdminOverview);
 router.get('/operations', getAdminOperations);
 router.get('/service-visibility', getServiceVisibility);
 router.patch('/service-visibility/:id', updateServiceVisibility);
+router.put('/service-visibility/:id', updateServiceVisibility);
 router.get('/clients-overview', getAdminClientsOverview);
 router.get('/team-overview', getAdminTeamOverview);
 router.get('/deliverables-overview', getAdminDeliverablesOverview);
