@@ -202,9 +202,13 @@ export const registerUser = async (req, res) => {
     });
   } catch (error) {
     console.error('[AuthController.registerUser] Error:', error);
+    const userMessage = error.code === '23505'
+      ? 'An account with this email address already exists. Please sign in.'
+      : (error.message || 'Registration failed. Please try again.');
     return res.status(500).json({
       success: false,
-      message: 'Registration failed. Please try again.',
+      message: userMessage,
+      error: error.message,
     });
   }
 };

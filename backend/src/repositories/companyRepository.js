@@ -205,16 +205,25 @@ const companySelect = `
 `;
 
 export const findCompanyById = async (id) => {
-  const result = await query(
-    `
-    ${companySelect}
-    WHERE c.id = $1
-    LIMIT 1
-    `,
-    [id]
-  );
+  try {
+    const result = await query(
+      `
+      ${companySelect}
+      WHERE c.id = $1
+      LIMIT 1
+      `,
+      [id]
+    );
 
-  return mapCompany(result.rows[0]);
+    return mapCompany(result.rows[0]);
+  } catch (err) {
+    console.warn('[CompanyRepository.findCompanyById] complex select query failed, falling back to basic select:', err.message);
+    const basicResult = await query(
+      `SELECT * FROM companies WHERE id = $1 LIMIT 1`,
+      [id]
+    );
+    return mapCompany(basicResult.rows[0]);
+  }
 };
 
 export const findCompanyByEmail = async (email) => {
