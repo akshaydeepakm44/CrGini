@@ -234,7 +234,19 @@ export default function LeadShowcasesPage({ onNavigate }) {
         if (editingShowcase) {
           await api.updateAdminSample(editingShowcase.id, payload);
         } else {
-          await api.createAdminSample(payload);
+          const res = await api.createAdminSample(payload);
+          // If PDF was attached, ensure it's uploaded to storage
+          if (res?.sample?.id && formData.companyStudy?.pdfFileDataUrl && !res?.sample?.companyStudy?.pdfAssetKey) {
+            try {
+              await api.uploadCompanyStudyPdf(res.sample.id, {
+                fileDataUrl: formData.companyStudy.pdfFileDataUrl,
+                fileName: formData.companyStudy.pdfFileName,
+                mimeType: formData.companyStudy.pdfMimeType || 'application/pdf',
+              });
+            } catch (upErr) {
+              console.warn('[LeadShowcasesPage] Secondary PDF upload warning:', upErr?.message);
+            }
+          }
         }
         saved = true;
       } catch (saveErr) {
@@ -252,7 +264,16 @@ export default function LeadShowcasesPage({ onNavigate }) {
               if (editingShowcase) {
                 await api.updateAdminSample(editingShowcase.id, payload);
               } else {
-                await api.createAdminSample(payload);
+                const res = await api.createAdminSample(payload);
+                if (res?.sample?.id && formData.companyStudy?.pdfFileDataUrl && !res?.sample?.companyStudy?.pdfAssetKey) {
+                  try {
+                    await api.uploadCompanyStudyPdf(res.sample.id, {
+                      fileDataUrl: formData.companyStudy.pdfFileDataUrl,
+                      fileName: formData.companyStudy.pdfFileName,
+                      mimeType: formData.companyStudy.pdfMimeType || 'application/pdf',
+                    });
+                  } catch (_) {}
+                }
               }
               saved = true;
               break;

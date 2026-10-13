@@ -1473,13 +1473,16 @@ export default function PublicSampleDashboard() {
                 }}
               >
                 {/* LinkedIn Profile */}
-                <div>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
                     LinkedIn Profile
                   </div>
                   {(() => {
                     const lUrl = selectedLead.linkedin ? (selectedLead.linkedin.startsWith('http') ? selectedLead.linkedin : `https://${selectedLead.linkedin}`) : null;
                     if (lUrl) {
+                      const displayLabel = selectedLead.linkedin
+                        .replace(/^https?:\/\/(www\.)?linkedin\.com\/(in|company)\//i, '@')
+                        .replace(/\/$/, '') || 'Verified Profile';
                       return (
                         <a
                           href={lUrl}
@@ -1493,11 +1496,23 @@ export default function PublicSampleDashboard() {
                             fontWeight: 600,
                             color: '#0A66C2',
                             textDecoration: 'underline',
+                            maxWidth: '100%',
                           }}
                         >
-                          <Linkedin size={15} />
-                          <span>{selectedLead.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//i, '@').replace(/\/$/, '') || 'Verified Profile'}</span>
-                          <ExternalLink size={12} />
+                          <Linkedin size={15} style={{ flexShrink: 0 }} />
+                          <span
+                            style={{
+                              maxWidth: '150px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              display: 'inline-block',
+                            }}
+                            title={selectedLead.linkedin}
+                          >
+                            {displayLabel}
+                          </span>
+                          <ExternalLink size={12} style={{ flexShrink: 0 }} />
                         </a>
                       );
                     }
@@ -1506,7 +1521,7 @@ export default function PublicSampleDashboard() {
                 </div>
 
                 {/* Direct Work Email - OPEN & UNMASKED FOR FIRST LEAD */}
-                <div>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
                     Direct Work Email
                   </div>
@@ -1524,24 +1539,36 @@ export default function PublicSampleDashboard() {
                             color: '#059669',
                             fontWeight: 700,
                             textDecoration: 'none',
+                            maxWidth: '100%',
                           }}
                         >
-                          <Mail size={15} color="#059669" />
-                          <span>{mail}</span>
+                          <Mail size={15} color="#059669" style={{ flexShrink: 0 }} />
+                          <span
+                            style={{
+                              maxWidth: '160px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              display: 'inline-block',
+                            }}
+                            title={mail}
+                          >
+                            {mail}
+                          </span>
                         </a>
                       );
                     }
                     return (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#059669', fontWeight: 700 }}>
-                        <Mail size={14} color="#059669" />
-                        <span>verified@company.com</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#059669', fontWeight: 700, minWidth: 0 }}>
+                        <Mail size={14} color="#059669" style={{ flexShrink: 0 }} />
+                        <span style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>verified@company.com</span>
                       </div>
                     );
                   })()}
                 </div>
 
                 {/* Company Link / Website */}
-                <div>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
                     Company Link / Website
                   </div>
@@ -1561,13 +1588,14 @@ export default function PublicSampleDashboard() {
                           fontWeight: 600,
                           color: '#2563EB',
                           textDecoration: 'underline',
+                          maxWidth: '100%',
                         }}
                       >
-                        <Globe size={14} />
-                        <span style={{ maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <Globe size={14} style={{ flexShrink: 0 }} />
+                        <span style={{ maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>
                           {coLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
                         </span>
-                        <ExternalLink size={12} />
+                        <ExternalLink size={12} style={{ flexShrink: 0 }} />
                       </a>
                     );
                   })()}

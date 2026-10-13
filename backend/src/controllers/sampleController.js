@@ -328,8 +328,23 @@ export const streamCompanyStudyPdf = async (req, res) => {
         res.writeHead(200, headers);
         return stream.pipe(res);
       } catch (streamErr) {
-        console.warn('[SampleController.streamCompanyStudyPdf] MinIO stream failed, generating document on the fly:', streamErr?.message);
+        console.warn('[SampleController.streamCompanyStudyPdf] MinIO stream failed, checking data URL fallback:', streamErr?.message);
       }
+    }
+
+    // Direct fallback: if PDF was saved as base64 data URL
+    if (sample.companyStudy?.pdfFileDataUrl && sample.companyStudy.pdfFileDataUrl.startsWith('data:application/pdf;base64,')) {
+      const base64Data = sample.companyStudy.pdfFileDataUrl.replace(/^data:application\/pdf;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      const fname = (sample.companyStudy.pdfFileName || `${sample.companyName}_Company_Study.pdf`).replace(/["\r\n]/g, '_');
+      const disposition = download === 'true' ? `attachment; filename="${fname}"` : `inline; filename="${fname}"`;
+      res.writeHead(200, {
+        'Content-Type': sample.companyStudy.pdfMimeType || 'application/pdf',
+        'Content-Length': buffer.length,
+        'Content-Disposition': disposition,
+        'Cache-Control': 'public, max-age=3600',
+      });
+      return res.end(buffer);
     }
 
     // Dynamic on-the-fly generation: Executive Company Study PDF
@@ -582,6 +597,36 @@ export const createAdminSample = async (req, res) => {
       return res.status(409).json({ success: false, message: `A showcase with slug "${effectiveSlug}" already exists.` });
     }
 
+    let finalCompanyStudy = companyStudy || {
+      company: companyName.trim(),
+      industry: 'Enterprise Technology & Services',
+      businessOverview: `Overview for ${companyName.trim()}.`,
+      marketPosition: 'Key player in vertical sector.',
+      keyObservations: 'Opportunity for strategic acceleration.',
+    };
+
+    // If PDF was attached during creation, upload immediately to storage
+    if (finalCompanyStudy.pdfFileDataUrl && isDataUrl(finalCompanyStudy.pdfFileDataUrl)) {
+      try {
+        const originalName = finalCompanyStudy.pdfFileName || `${companyName.trim()}_Company_Study.pdf`;
+        const uploadRes = await uploadFile({
+          dataUrl: finalCompanyStudy.pdfFileDataUrl,
+          originalName,
+          mimeType: finalCompanyStudy.pdfMimeType || 'application/pdf',
+          prefix: `public-samples/${effectiveSlug}/company-study`,
+        });
+        finalCompanyStudy = {
+          ...finalCompanyStudy,
+          pdfAssetKey: uploadRes.objectKey,
+          pdfFileName: originalName,
+          pdfFileSize: uploadRes.size,
+          pdfMimeType: uploadRes.mimeType,
+        };
+      } catch (uploadErr) {
+        console.warn('[SampleController.createAdminSample] PDF upload to storage failed, retaining data URL fallback:', uploadErr.message);
+      }
+    }
+
     const created = await createSampleShowcase({
       slug: effectiveSlug,
       title: effectiveTitle,
@@ -589,13 +634,7 @@ export const createAdminSample = async (req, res) => {
       description: description || `Curated account intelligence and sales acceleration brief prepared for ${companyName.trim()}.`,
       logoUrl: logoUrl || '/logo.png',
       status: status || 'PUBLISHED',
-      companyStudy: companyStudy || {
-        company: companyName.trim(),
-        industry: 'Enterprise Technology & Services',
-        businessOverview: `Overview for ${companyName.trim()}.`,
-        marketPosition: 'Key player in vertical sector.',
-        keyObservations: 'Opportunity for strategic acceleration.',
-      },
+      companyStudy: finalCompanyStudy,
       leads: Array.isArray(leads) ? leads : [],
       leadStudies: Array.isArray(leadStudies) ? leadStudies : [],
       pitchDeck: pitchDeck || {},
@@ -631,6 +670,28 @@ export const updateAdminSample = async (req, res) => {
     const body = { ...req.body };
     if (body.slug) {
       body.slug = cleanSlug(body.slug);
+    }
+
+    // If PDF was updated via data URL in body
+    if (body.companyStudy?.pdfFileDataUrl && isDataUrl(body.companyStudy.pdfFileDataUrl)) {
+      try {
+        const originalName = body.companyStudy.pdfFileName || `${sample.companyName}_Company_Study.pdf`;
+        const uploadRes = await uploadFile({
+          dataUrl: body.companyStudy.pdfFileDataUrl,
+          originalName,
+          mimeType: body.companyStudy.pdfMimeType || 'application/pdf',
+          prefix: `public-samples/${sample.slug}/company-study`,
+        });
+        body.companyStudy = {
+          ...body.companyStudy,
+          pdfAssetKey: uploadRes.objectKey,
+          pdfFileName: originalName,
+          pdfFileSize: uploadRes.size,
+          pdfMimeType: uploadRes.mimeType,
+        };
+      } catch (uploadErr) {
+        console.warn('[SampleController.updateAdminSample] PDF upload to storage failed, retaining data URL fallback:', uploadErr.message);
+      }
     }
 
     const updated = await updateSampleShowcase(id, body);

@@ -47,13 +47,13 @@ export const streamGeneratedCompanyStudyPdf = (sample, res, download = false) =>
   doc.roundedRect(48, metaY, doc.page.width - 96, 52, 6).fillAndStroke('#F8FAFC', '#E2E8F0');
 
   doc.fontSize(8).font('Helvetica-Bold').fillColor('#64748B').text('TARGET ORGANIZATION', 62, metaY + 12);
-  doc.fontSize(11).font('Helvetica-Bold').fillColor('#0F172A').text(companyName, 62, metaY + 24);
+  doc.fontSize(11).font('Helvetica-Bold').fillColor('#0F172A').text(companyName, 62, metaY + 24, { width: 185, height: 26, ellipsis: true });
 
   doc.fontSize(8).font('Helvetica-Bold').fillColor('#64748B').text('INDUSTRY / SECTOR', 260, metaY + 12);
-  doc.fontSize(11).font('Helvetica-Bold').fillColor('#0F172A').text(industry, 260, metaY + 24);
+  doc.fontSize(10).font('Helvetica-Bold').fillColor('#0F172A').text(industry, 260, metaY + 24, { width: 170, height: 26, ellipsis: true });
 
   doc.fontSize(8).font('Helvetica-Bold').fillColor('#64748B').text('RESEARCH STATUS', 440, metaY + 12);
-  doc.fontSize(10).font('Helvetica-Bold').fillColor('#059669').text('VERIFIED & AUDITED', 440, metaY + 25);
+  doc.fontSize(10).font('Helvetica-Bold').fillColor('#059669').text('VERIFIED & AUDITED', 440, metaY + 25, { width: 105 });
 
   doc.y = metaY + 68;
 
