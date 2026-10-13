@@ -18,16 +18,17 @@ This guide outlines how to deploy the repository onto your production server so 
              Static / SPA│       │ /api/ Reverse Proxy
                          │       │
              ┌───────────▼─┐   ┌─▼─────────────┐
-             │frontend/dist│   │ Node.js (5000)│
+             │frontend/dist│   │ Node.js (5001)│
              └─────────────┘   └───────┬───────┘
                                        │
                                ┌───────▼───────┐
                                │  PostgreSQL   │
+                               │ (dizigini_db) │
                                └───────────────┘
 ```
 
 > **Dual Serving Fallback:**  
-> The Node.js Express server (`backend/src/server.js`) also automatically serves `frontend/dist` as a fallback. Even if Nginx proxies all traffic to port 5000, both frontend (`/`) and backend (`/api`) work out of the box!
+> The Node.js Express server (`backend/src/server.js`) also automatically serves `frontend/dist` as a fallback. Even if Nginx proxies all traffic to port 5001, both frontend (`/`) and backend (`/api`) work out of the box!
 
 ---
 

@@ -89,7 +89,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
     } catch (err) {
       setIsSignupSubmitting(false);
       if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
-        setSignupError('Unable to connect to the server. Please verify backend server is running on port 5000.');
+        setSignupError('Unable to connect to the server. Please verify backend server is running on port 5001.');
       } else {
         setSignupError(err.message || 'Registration failed. Please try again.');
       }

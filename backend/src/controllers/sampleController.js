@@ -582,6 +582,62 @@ export const createAdminSample = async (req, res) => {
       return res.status(409).json({ success: false, message: `A showcase with slug "${effectiveSlug}" already exists.` });
     }
 
+    let initialCompanyStudy = companyStudy ? { ...companyStudy } : {
+      company: companyName.trim(),
+      industry: 'Enterprise Technology & Services',
+      businessOverview: `Overview for ${companyName.trim()}.`,
+      marketPosition: 'Key player in vertical sector.',
+      keyObservations: 'Opportunity for strategic acceleration.',
+    };
+
+    // Auto-upload company study PDF if provided as a Data URL during creation
+    if (initialCompanyStudy.pdfFileDataUrl && isDataUrl(initialCompanyStudy.pdfFileDataUrl)) {
+      try {
+        const originalName = initialCompanyStudy.pdfFileName || `${companyName.trim()}_Company_Study.pdf`;
+        const uploadRes = await uploadFile({
+          dataUrl: initialCompanyStudy.pdfFileDataUrl,
+          originalName,
+          mimeType: initialCompanyStudy.pdfMimeType || 'application/pdf',
+          prefix: `public-samples/${effectiveSlug}/company-study`,
+        });
+        initialCompanyStudy = {
+          ...initialCompanyStudy,
+          pdfAssetKey: uploadRes.objectKey,
+          pdfFileName: originalName,
+          pdfFileSize: uploadRes.size,
+          pdfMimeType: uploadRes.mimeType,
+        };
+        delete initialCompanyStudy.pdfFileDataUrl;
+      } catch (uploadErr) {
+        console.error('[createAdminSample] Failed to upload company study PDF:', uploadErr.message);
+      }
+    }
+
+    let initialPitchDeck = pitchDeck ? { ...pitchDeck } : {};
+    if (initialPitchDeck.fileDataUrl && isDataUrl(initialPitchDeck.fileDataUrl)) {
+      try {
+        const originalName = initialPitchDeck.fileName || `${companyName.trim()}_Growth_Playbook.pdf`;
+        const uploadRes = await uploadFile({
+          dataUrl: initialPitchDeck.fileDataUrl,
+          originalName,
+          mimeType: initialPitchDeck.mimeType || 'application/pdf',
+          prefix: `public-samples/${effectiveSlug}/pitch-deck`,
+        });
+        initialPitchDeck = {
+          ...initialPitchDeck,
+          id: initialPitchDeck.id || `pitch-${Date.now()}`,
+          fileName: originalName,
+          assetKey: uploadRes.objectKey,
+          mimeType: uploadRes.mimeType,
+          fileSize: uploadRes.size,
+          previewAvailable: true,
+        };
+        delete initialPitchDeck.fileDataUrl;
+      } catch (uploadErr) {
+        console.error('[createAdminSample] Failed to upload pitch deck:', uploadErr.message);
+      }
+    }
+
     const created = await createSampleShowcase({
       slug: effectiveSlug,
       title: effectiveTitle,
@@ -589,16 +645,10 @@ export const createAdminSample = async (req, res) => {
       description: description || `Curated account intelligence and sales acceleration brief prepared for ${companyName.trim()}.`,
       logoUrl: logoUrl || '/logo.png',
       status: status || 'PUBLISHED',
-      companyStudy: companyStudy || {
-        company: companyName.trim(),
-        industry: 'Enterprise Technology & Services',
-        businessOverview: `Overview for ${companyName.trim()}.`,
-        marketPosition: 'Key player in vertical sector.',
-        keyObservations: 'Opportunity for strategic acceleration.',
-      },
+      companyStudy: initialCompanyStudy,
       leads: Array.isArray(leads) ? leads : [],
       leadStudies: Array.isArray(leadStudies) ? leadStudies : [],
-      pitchDeck: pitchDeck || {},
+      pitchDeck: initialPitchDeck,
     });
 
     return res.status(201).json({
@@ -631,6 +681,52 @@ export const updateAdminSample = async (req, res) => {
     const body = { ...req.body };
     if (body.slug) {
       body.slug = cleanSlug(body.slug);
+    }
+
+    if (body.companyStudy?.pdfFileDataUrl && isDataUrl(body.companyStudy.pdfFileDataUrl)) {
+      try {
+        const originalName = body.companyStudy.pdfFileName || `${sample.companyName}_Company_Study.pdf`;
+        const uploadRes = await uploadFile({
+          dataUrl: body.companyStudy.pdfFileDataUrl,
+          originalName,
+          mimeType: body.companyStudy.pdfMimeType || 'application/pdf',
+          prefix: `public-samples/${sample.slug}/company-study`,
+        });
+        body.companyStudy = {
+          ...body.companyStudy,
+          pdfAssetKey: uploadRes.objectKey,
+          pdfFileName: originalName,
+          pdfFileSize: uploadRes.size,
+          pdfMimeType: uploadRes.mimeType,
+        };
+        delete body.companyStudy.pdfFileDataUrl;
+      } catch (uploadErr) {
+        console.error('[updateAdminSample] Failed to upload company study PDF:', uploadErr.message);
+      }
+    }
+
+    if (body.pitchDeck?.fileDataUrl && isDataUrl(body.pitchDeck.fileDataUrl)) {
+      try {
+        const originalName = body.pitchDeck.fileName || `${sample.companyName}_Growth_Playbook.pdf`;
+        const uploadRes = await uploadFile({
+          dataUrl: body.pitchDeck.fileDataUrl,
+          originalName,
+          mimeType: body.pitchDeck.mimeType || 'application/pdf',
+          prefix: `public-samples/${sample.slug}/pitch-deck`,
+        });
+        body.pitchDeck = {
+          ...body.pitchDeck,
+          id: body.pitchDeck.id || `pitch-${Date.now()}`,
+          fileName: originalName,
+          assetKey: uploadRes.objectKey,
+          mimeType: uploadRes.mimeType,
+          fileSize: uploadRes.size,
+          previewAvailable: true,
+        };
+        delete body.pitchDeck.fileDataUrl;
+      } catch (uploadErr) {
+        console.error('[updateAdminSample] Failed to upload pitch deck:', uploadErr.message);
+      }
     }
 
     const updated = await updateSampleShowcase(id, body);

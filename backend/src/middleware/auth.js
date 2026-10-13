@@ -40,12 +40,13 @@ export const protect = async (req, res, next) => {
 
   try {
     let decoded;
-    const primarySecret = process.env.JWT_SECRET || 'creativegini_secret_2026';
+    const primarySecret = process.env.JWT_SECRET || 'dizigini_secure_jwt_secret_key_2026';
     try {
       decoded = jwt.verify(token, primarySecret);
     } catch (primaryErr) {
       // Check fallback secrets in case of environment restart or secret rotation
       const fallbackSecrets = [
+        'dizigini_secure_jwt_secret_key_2026',
         'creativegini_secret_2026',
         'cg_jwt_dev_secret_key_2024_do_not_use_in_production',
         'creativegini_jwt_secret',
@@ -135,11 +136,12 @@ export const optionalProtect = async (req, res, next) => {
 
   try {
     let decoded;
-    const primarySecret = process.env.JWT_SECRET || 'creativegini_secret_2026';
+    const primarySecret = process.env.JWT_SECRET || 'dizigini_secure_jwt_secret_key_2026';
     try {
       decoded = jwt.verify(token, primarySecret);
     } catch (_) {
       const fallbackSecrets = [
+        'dizigini_secure_jwt_secret_key_2026',
         'creativegini_secret_2026',
         'cg_jwt_dev_secret_key_2024_do_not_use_in_production',
         'creativegini_jwt_secret',
