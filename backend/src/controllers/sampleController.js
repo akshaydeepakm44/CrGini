@@ -1050,8 +1050,7 @@ export const submitPublicInquiry = async (req, res) => {
       process.env.ADMIN_EMAIL,
       process.env.SUPPORT_EMAIL,
       'contact@creativegini.com',
-      'contact@dizigini.com',
-      'team@dizigini.com',
+      'team@creativegini.com',
     ]
       .filter(Boolean)
       .map((e) => e.trim().toLowerCase());

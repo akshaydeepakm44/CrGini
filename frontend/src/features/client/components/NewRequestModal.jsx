@@ -302,7 +302,7 @@ export default function NewRequestModal({
   onSuccess,
 }) {
   const [step, setStep] = useState(1); // 1: Scope, 2: Review, 3: Price
-  const [activeServiceId, setActiveServiceId] = useState('lead-research');
+  const [activeServiceId, setActiveServiceId] = useState('strategic-planner');
   const { isChannelActive, isServiceActive } = useServiceVisibility();
   const [errors, setErrors] = useState({});
   const [isCalculating, setIsCalculating] = useState(false);
@@ -521,7 +521,7 @@ export default function NewRequestModal({
         setStep(1);
       }
 
-      let serviceToUse = initialServiceId || 'lead-research';
+      let serviceToUse = initialServiceId || 'custom';
       if (
         initialServiceId === 'custom' ||
         initialServiceId === 'custom-boosting' ||
@@ -571,7 +571,7 @@ export default function NewRequestModal({
 
   if (!isOpen) return null;
 
-  const currentConfig = SERVICE_CONFIGS[activeServiceId] || SERVICE_CONFIGS['lead-research'];
+  const currentConfig = SERVICE_CONFIGS[activeServiceId] || SERVICE_CONFIGS['strategic-planner'];
 
   // --- VALIDATION FOR STEP 1 ---
   const validateStep1 = () => {
@@ -595,7 +595,7 @@ export default function NewRequestModal({
     } else if (activeServiceId === 'custom' || activeServiceId === 'custom-boosting' || activeServiceId === 'custom-digitalising') {
       const hasSelectedService = Object.values(customForm.selectedServices).some(Boolean);
       if (!hasSelectedService) errs.selectedServices = 'Please select at least one service area';
-      if (!customForm.requirements.trim()) errs.requirements = 'Please describe what you would like DiziGini to prepare';
+      if (!customForm.requirements.trim()) errs.requirements = 'Please describe what you would like CreativeGini to prepare';
     } else if (activeServiceId === 'lead-research') {
       if (!leadForm.leadsCount || Number(leadForm.leadsCount) <= 0) errs.leadsCount = 'Number of leads must be greater than 0';
       if (!leadForm.targetMarket.trim()) errs.targetMarket = 'Target Market & Industry is required';
@@ -1066,44 +1066,9 @@ export default function NewRequestModal({
               ========================================================== */}
           {step === 1 && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '1rem' }}>
-                <p style={{ color: '#4B5563', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
-                  Provide your requirements below. Required fields are marked with an asterisk (<span style={{ color: '#EF4444' }}>*</span>).
-                </p>
-                
-                {/* DiziGini Platform Service Selector Pills */}
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {[
-                    { id: 'lead-research', label: 'Lead Research ($2)' },
-                    { id: 'company-study', label: 'Company Study ($1)' },
-                    { id: 'key-people', label: 'Key People ($2)' },
-                    { id: 'pitch-support', label: 'Pitch Support ($2)' },
-                    { id: 'custom', label: 'Custom Digitalising' },
-                  ].map((s) => {
-                    const isActive = activeServiceId === s.id || (s.id === 'custom' && activeServiceId.startsWith('custom'));
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => setActiveServiceId(s.id)}
-                        style={{
-                          padding: '5px 12px',
-                          borderRadius: '16px',
-                          fontSize: '0.75rem',
-                          fontWeight: isActive ? 700 : 500,
-                          backgroundColor: isActive ? '#7C3AED' : '#FFFFFF',
-                          color: isActive ? '#FFFFFF' : '#4B5563',
-                          border: isActive ? '1px solid #7C3AED' : '1px solid #D1D5DB',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        {s.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <p style={{ color: '#4B5563', fontSize: '0.875rem', marginTop: 0, marginBottom: '1.25rem', lineHeight: 1.5 }}>
+                Provide your requirements below. Required fields are marked with an asterisk (<span style={{ color: '#EF4444' }}>*</span>).
+              </p>
 
               {/* ------------------------------------------------------
                   CASE A: STRATEGIC PLAN SPRINT (Image 1 in Light Theme)
@@ -1138,7 +1103,7 @@ export default function NewRequestModal({
                     </div>
 
                     <div>
-                      <label style={labelStyle}>What Should DiziGini Focus On?</label>
+                      <label style={labelStyle}>What Should CreativeGini Focus On?</label>
                       <input
                         style={inputStyle()}
                         placeholder="e.g. Ideal customer profile definition, positioning copy, cc"
@@ -1416,7 +1381,7 @@ export default function NewRequestModal({
                       </label>
                       <input
                         style={inputStyle(errors.productApiSdk)}
-                        placeholder="e.g. DiziGini TypeScript SDK, GraphQL Data API"
+                        placeholder="e.g. CreativeGini TypeScript SDK, GraphQL Data API"
                         value={devrelForm.productApiSdk}
                         onChange={(e) => setDevrelForm({ ...devrelForm, productApiSdk: e.target.value })}
                       />
@@ -2179,7 +2144,7 @@ export default function NewRequestModal({
                   {/* General Brief & Overall Scope */}
                   <div>
                     <label style={labelStyle}>
-                      What would you like DiziGini to prepare for you? <span style={{ color: '#EF4444' }}>*</span>
+                      What would you like CreativeGini to prepare for you? <span style={{ color: '#EF4444' }}>*</span>
                     </label>
                     <textarea
                       rows={4}

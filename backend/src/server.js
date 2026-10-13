@@ -16,7 +16,7 @@ dotenv.config();
 
 const app = express();
 app.set('trust proxy', 1);
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5000;
 
 // Direct static media fallbacks
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
@@ -25,27 +25,27 @@ app.use('/storage', express.static(path.resolve(process.cwd(), 'storage')));
 // Connect to PostgreSQL
 connectPostgres().then(async (ok) => {
   if (ok) {
-    console.log('[DiziGini API] PostgreSQL connected successfully.');
+    console.log('[CreativeGini API] PostgreSQL connected successfully.');
     try {
       const { ensureSchemaIntegrity } = await import('./config/ensureSchema.js');
       await ensureSchemaIntegrity();
     } catch (err) {
-      console.error('[DiziGini API] ensureSchemaIntegrity error:', err.message);
+      console.error('[CreativeGini API] ensureSchemaIntegrity error:', err.message);
     }
     try {
       const { ensureDataI2IAccount } = await import('./controllers/authController.js');
       await ensureDataI2IAccount();
     } catch (err) {
-      console.error('[DiziGini API] ensureDataI2IAccount error:', err.message);
+      console.error('[CreativeGini API] ensureDataI2IAccount error:', err.message);
     }
     try {
       const { ensureSampleTable } = await import('./repositories/sampleRepository.js');
       await ensureSampleTable();
     } catch (err) {
-      console.error('[DiziGini API] ensureSampleTable error:', err.message);
+      console.error('[CreativeGini API] ensureSampleTable error:', err.message);
     }
   } else {
-    console.error('[DiziGini API] PostgreSQL connection failed. Check credentials.');
+    console.error('[CreativeGini API] PostgreSQL connection failed. Check credentials.');
   }
 });
 
@@ -136,7 +136,7 @@ app.get('/api/health', async (req, res) => {
 
     res.status(200).json({
       status: 'online',
-      service: 'DiziGini Portal API',
+      service: 'CreativeGini Portal API',
       timestamp: new Date().toISOString(),
       database: {
         type: 'PostgreSQL',
@@ -148,7 +148,7 @@ app.get('/api/health', async (req, res) => {
   } catch (err) {
     res.status(503).json({
       status: 'degraded',
-      service: 'DiziGini Portal API',
+      service: 'CreativeGini Portal API',
       timestamp: new Date().toISOString(),
       database: {
         type: 'PostgreSQL',
@@ -159,7 +159,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Production Static Frontend Serving (SPA support for dizigini.com)
+// Production Static Frontend Serving (SPA support)
 const frontendDistPath = path.resolve(process.cwd(), '../frontend/dist');
 const localFrontendDistPath = path.resolve(process.cwd(), 'frontend/dist');
 const effectiveDistPath = fs.existsSync(frontendDistPath)
@@ -169,7 +169,7 @@ const effectiveDistPath = fs.existsSync(frontendDistPath)
   : null;
 
 if (effectiveDistPath) {
-  console.log(`[DiziGini API] Serving static frontend from: ${effectiveDistPath}`);
+  console.log(`[CreativeGini API] Serving static frontend from: ${effectiveDistPath}`);
   app.use(express.static(effectiveDistPath));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/storage') || req.path.startsWith('/uploads')) {
@@ -194,6 +194,6 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[DiziGini API] Server running on port ${PORT} (mapped for dizigini.com)`);
+  console.log(`[CreativeGini API] Server running on port ${PORT}`);
 });
 

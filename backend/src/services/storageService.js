@@ -266,7 +266,7 @@ export const resetStorageDriver = () => {
  * Get the configured bucket name from environment variables.
  */
 export const getBucketName = () => {
-  return process.env.MINIO_BUCKET || 'dizigini-assets';
+  return process.env.MINIO_BUCKET || 'creativegini-assets';
 };
 
 /**

@@ -26,13 +26,13 @@ const VALUE_PROPS = [
 
 export default function WhyCreativeGini() {
   return (
-    <section id="why-us" className="cg-section" aria-label="Why Choose DiziGini">
+    <section id="why-us" className="cg-section" aria-label="Why Choose CreativeGini">
       <div className="cg-container">
         <div className="cg-section-header">
-          <span className="cg-section-badge">Why DiziGini</span>
+          <span className="cg-section-badge">Why CreativeGini</span>
           <h2 className="cg-section-title">Built for Founders and Growth Leaders Who Value Precision</h2>
           <p className="cg-section-subtitle">
-            We replaced bloated retainer agencies and chaotic freelance boards with a transparent, sprint-based B2B intelligence delivery platform.
+            We replaced bloated retainer agencies and chaotic freelance boards with a transparent, sprint-based service delivery platform.
           </p>
         </div>
 

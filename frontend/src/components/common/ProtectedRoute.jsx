@@ -6,6 +6,7 @@ import { BRAND_LOGO } from '../../assets/branding';
 export const getRoleHome = (userOrRole) => {
   if (!userOrRole) return '/portal';
   const role = typeof userOrRole === 'string' ? userOrRole : userOrRole.role;
+  const da = typeof userOrRole === 'object' ? userOrRole.dashboardAccess : null;
 
   if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
     return '/admin';
@@ -14,8 +15,24 @@ export const getRoleHome = (userOrRole) => {
     return '/portal';
   }
 
-  // All active internal specialists map to Lead Specialist / DizitalGini Platform
-  return '/lead';
+  // Check granular dashboard permissions for team members
+  if (da) {
+    if (da.companyLead) return '/lead';
+    if (da.companyBoost) return '/boost';
+    if (da.companyUI) return '/design';
+  }
+
+  // Fallback by legacy role
+  switch (role) {
+    case 'COMPANY_LEAD':
+      return '/lead';
+    case 'COMPANY_BOOST':
+      return '/boost';
+    case 'LANDING_PAGE':
+      return '/design';
+    default:
+      return '/access-denied';
+  }
 };
 
 export const hasDashboardAccess = (user, permissionKey) => {
@@ -50,7 +67,7 @@ export default function ProtectedRoute({
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#030712', color: '#fff' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-          <img src={BRAND_LOGO} alt="DiziGini" style={{ height: '36px' }} />
+          <img src={BRAND_LOGO} alt="CreativeGini" style={{ height: '36px' }} />
           <div style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Verifying secure session...</div>
         </div>
       </div>

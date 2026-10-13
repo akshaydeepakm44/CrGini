@@ -16,7 +16,7 @@ export default function PlatformPreview({ onExplorePlatform }) {
   const [activeTab, setActiveTab] = useState('requests');
 
   return (
-    <section id="platform" className="cg-section" aria-label="DiziGini Authenticated Platform Preview">
+    <section id="platform" className="cg-section" aria-label="CreativeGini Authenticated Platform Preview">
       <div className="cg-container">
         <div className="cg-section-header">
           <span className="cg-section-badge">Client Experience</span>
@@ -37,7 +37,7 @@ export default function PlatformPreview({ onExplorePlatform }) {
             </div>
             <div className="cg-window-title-badge">
               <ShieldCheck size={14} color="#7C3AED" />
-              <span>app.dizigini.com — Verified Client Portal</span>
+              <span>app.creativegini.com — Verified Client Workspace</span>
             </div>
             <div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>256-Bit Encrypted</div>
           </div>
@@ -58,7 +58,7 @@ export default function PlatformPreview({ onExplorePlatform }) {
                 onClick={() => setActiveTab('requests')}
               >
                 <FolderGit2 size={16} />
-                <span>Digitalising Requests</span>
+                <span>Active Requests</span>
               </div>
               <div 
                 className={`cg-mockup-nav-item ${activeTab === 'deliverables' ? 'active' : ''}`}
@@ -66,6 +66,13 @@ export default function PlatformPreview({ onExplorePlatform }) {
               >
                 <DownloadCloud size={16} />
                 <span>Deliverables</span>
+              </div>
+              <div 
+                className={`cg-mockup-nav-item ${activeTab === 'services' ? 'active' : ''}`}
+                onClick={() => setActiveTab('services')}
+              >
+                <Layers size={16} />
+                <span>Services Catalog</span>
               </div>
               <div 
                 className={`cg-mockup-nav-item ${activeTab === 'messages' ? 'active' : ''}`}
@@ -105,7 +112,7 @@ export default function PlatformPreview({ onExplorePlatform }) {
               {/* Active Requests Table */}
               <div className="cg-mockup-table-card">
                 <div className="cg-mockup-table-header">
-                  <span className="cg-mockup-table-title">Live Intelligence Requests</span>
+                  <span className="cg-mockup-table-title">Live Service Requests</span>
                   <span style={{ fontSize: '0.78rem', color: '#7C3AED', fontWeight: 600 }}>Real-time sync</span>
                 </div>
 
@@ -122,32 +129,32 @@ export default function PlatformPreview({ onExplorePlatform }) {
                     </thead>
                     <tbody>
                       <tr>
-                        <td style={{ fontWeight: 700, color: '#7C3AED' }}>DG-1025</td>
+                        <td style={{ fontWeight: 700, color: '#7C3AED' }}>CG-1025</td>
                         <td>Lead Research</td>
                         <td>50 Verified CTOs &amp; VPs - EU Market</td>
                         <td><span className="cg-mockup-status-badge in-progress">In Progress</span></td>
-                        <td>Lead Specialist Pod</td>
+                        <td>Company Lead Team</td>
                       </tr>
                       <tr>
-                        <td style={{ fontWeight: 700, color: '#7C3AED' }}>DG-1024</td>
+                        <td style={{ fontWeight: 700, color: '#7C3AED' }}>CG-1024</td>
+                        <td>Strategic Planner</td>
+                        <td>Enterprise Outbound Positioning Playbook</td>
+                        <td><span className="cg-mockup-status-badge review">Client Review</span></td>
+                        <td>Company Boost Team</td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 700, color: '#7C3AED' }}>CG-1023</td>
                         <td>Company Study</td>
                         <td>Tier-1 Cloud Competitor Intelligence Dossier</td>
-                        <td><span className="cg-mockup-status-badge review">Client Review</span></td>
-                        <td>Research Analysts</td>
-                      </tr>
-                      <tr>
-                        <td style={{ fontWeight: 700, color: '#7C3AED' }}>DG-1023</td>
-                        <td>Key People Research</td>
-                        <td>VP &amp; C-Suite Buying Committee (Fintech)</td>
                         <td><span className="cg-mockup-status-badge completed">Completed</span></td>
-                        <td>Org Intelligence Pod</td>
+                        <td>Research Specialists</td>
                       </tr>
                       <tr>
-                        <td style={{ fontWeight: 700, color: '#7C3AED' }}>DG-1022</td>
-                        <td>Pitch Support</td>
-                        <td>Enterprise Deal Brief &amp; Proof Battlecard</td>
+                        <td style={{ fontWeight: 700, color: '#7C3AED' }}>CG-1022</td>
+                        <td>Landing Page UI</td>
+                        <td>High-Conversion SaaS Hero Redesign</td>
                         <td><span className="cg-mockup-status-badge in-progress">In Progress</span></td>
-                        <td>Pitch Strategists</td>
+                        <td>Landing Page UX Team</td>
                       </tr>
                     </tbody>
                   </table>

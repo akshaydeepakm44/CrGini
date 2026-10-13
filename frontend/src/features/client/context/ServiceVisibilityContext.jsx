@@ -3,8 +3,8 @@ import { api } from '../../../services/api';
 
 const ServiceVisibilityContext = createContext(null);
 
-// DiziGini: Digitalising is the primary active platform. Other channels are deactivated.
-const DEFAULT_ACTIVE_SERVICES = [
+// CreativeGini: Boosting, Design, and Development are active by default. Digitalising is deactivated.
+const DEFAULT_DEACTIVATED = [
   'channel:digitalising',
   'digitalising',
   'lead-research',
@@ -12,27 +12,6 @@ const DEFAULT_ACTIVE_SERVICES = [
   'key-people',
   'pitch-support',
   'custom-digitalising'
-];
-
-const DEFAULT_DEACTIVATED = [
-  'channel:boosting',
-  'boosting',
-  'channel:design',
-  'design',
-  'channel:development',
-  'development',
-  'strategic-planner',
-  'content-creator',
-  'devrel',
-  'gtm',
-  'ad-creatives',
-  'brand-identity',
-  'ui-ux-audit',
-  'figma-project',
-  'redesign-request',
-  'technical-discovery',
-  'clickable-prototype',
-  'web-app'
 ];
 
 export function ServiceVisibilityProvider({ children }) {
@@ -79,9 +58,9 @@ export function ServiceVisibilityProvider({ children }) {
       if (channelItem) return Boolean(channelItem.is_active);
     }
 
-    // DiziGini default: Only digitalising is active
-    if (clean === 'digitalising') return true;
-    return false;
+    // CreativeGini default: Boosting, Design, Development active; Digitalising deactivated
+    if (clean === 'digitalising') return false;
+    return true;
   }, [servicesList]);
 
   const isServiceActive = useCallback((serviceId) => {
@@ -98,10 +77,9 @@ export function ServiceVisibilityProvider({ children }) {
       }
     }
 
-    // Default fallback: Digitalising services active, others deactivated
-    if (DEFAULT_ACTIVE_SERVICES.includes(clean)) return true;
+    // Default fallback: Digitalising services deactivated, others active
     if (DEFAULT_DEACTIVATED.includes(clean)) return false;
-    return false;
+    return true;
   }, [servicesList, isChannelActive]);
 
   return (

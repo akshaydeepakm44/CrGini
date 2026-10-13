@@ -57,11 +57,11 @@ export default function Navbar({ onSignIn, onGetStarted }) {
             href="/"
             className="cg-nav-brand"
             onClick={(e) => scrollToSection(e, 'home')}
-            aria-label="DiziGini Home"
+            aria-label="CreativeGini Home"
           >
             <img
               src={BRAND_LOGO}
-              alt="DiziGini Logo"
+              alt="CreativeGini Logo"
               className="cg-nav-logo"
             />
           </a>

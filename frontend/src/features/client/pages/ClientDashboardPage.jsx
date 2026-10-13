@@ -199,10 +199,10 @@ export default function ClientDashboardPage({
       </div>
 
       {/* ============================================================
-          SECTION E: DIGITALISING PLATFORM SERVICES (CORE CAPABILITIES)
+          SECTION E: QUICK SERVICE CHANNELS (PROMINENT CARDS)
           ============================================================ */}
       <div style={{ marginBottom: '36px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <div>
             <h2
               style={{
@@ -214,210 +214,177 @@ export default function ClientDashboardPage({
                 letterSpacing: '-0.01em',
               }}
             >
-              Digitalising Services
+              Service Channels
             </h2>
             <p style={{ margin: '2px 0 0', fontSize: '0.84375rem', color: 'var(--cg-text-secondary, #6B7280)' }}>
-              Dedicated market intelligence, verified prospect discovery &amp; executive research capabilities
+              Turnkey specialist capabilities aligned to your business growth objectives
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => onNavigate && onNavigate('/portal/digitalising')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'none',
-              border: 'none',
-              color: '#7C3AED',
-              fontSize: '0.84375rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            <span>Explore All Digitalising Requests</span>
-            <ArrowRight size={15} />
-          </button>
         </div>
 
-        <div className="cg-dashboard-services-grid">
-          {[
-            {
-              id: 'lead-research',
-              title: 'Lead Research',
-              price: '$2 / lead',
-              desc: 'Hand-verified prospect contact intelligence tailored to your ideal customer profile.',
-              icon: Target,
-              color: '#4F46E5',
-              bg: '#EEF2FF',
-              border: '#E0E7FF',
-              badge: '24–48h Turnaround',
-            },
-            {
-              id: 'company-study',
-              title: 'Company Study',
-              price: '$1 / study',
-              desc: 'Personal company study, tech stack telemetry, and strategic expansion insights for target accounts.',
-              icon: Building2,
-              color: '#0284C7',
-              bg: '#F0F9FF',
-              border: '#BAE6FD',
-              badge: 'Comprehensive Dossier',
-            },
-            {
-              id: 'key-people',
-              title: 'Key People Research',
-              price: '$2 / profile',
-              desc: 'Map the buying committee: direct emails and phone numbers for verified key decision-makers.',
-              icon: Users,
-              color: '#059669',
-              bg: '#ECFDF5',
-              border: '#A7F3D0',
-              badge: 'Executive Profiles',
-            },
-            {
-              id: 'pitch-support',
-              title: 'Pitch Support',
-              price: '$2 / sprint',
-              desc: 'Arm your pitch with rock-solid data, competitor battlecards, and tailored narrative slides.',
-              icon: Presentation,
-              color: '#D97706',
-              bg: '#FFFBEB',
-              border: '#FDE68A',
-              badge: 'Slide Deck & Brief',
-            },
-          ].map((srv) => {
-            const Icon = srv.icon;
-            return (
-              <div
-                key={srv.id}
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '16px',
-                  border: `1px solid ${srv.border || '#E5E7EB'}`,
-                  padding: '22px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  gap: '16px',
-                  transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-3px)';
-                  e.currentTarget.style.boxShadow = `0 12px 24px -4px ${srv.color}22`;
-                  e.currentTarget.style.borderColor = srv.color;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
-                  e.currentTarget.style.borderColor = srv.border || '#E5E7EB';
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                    <div
-                      style={{
-                        width: '42px',
-                        height: '42px',
-                        borderRadius: '12px',
-                        backgroundColor: srv.bg,
-                        color: srv.color,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Icon size={22} />
-                    </div>
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        color: srv.color,
-                        backgroundColor: srv.bg,
-                        padding: '3px 9px',
-                        borderRadius: '999px',
-                        border: `1px solid ${srv.border || 'transparent'}`,
-                      }}
-                    >
-                      {srv.price}
-                    </span>
-                  </div>
+        <style>{`
+          .cg-service-channels-grid {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+          }
+          @media (max-width: 1180px) {
+            .cg-service-channels-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+          }
+          @media (max-width: 640px) {
+            .cg-service-channels-grid {
+              grid-template-columns: 1fr;
+            }
+          }
+        `}</style>
+        <div className="cg-service-channels-grid">
+          {isChannelActive('boosting') && (
+            <ServiceChannelCard
+              channel="boosting"
+              title="BOOSTING"
+              description="Grow your brand, content and market presence with specialist campaigns."
+              servicesList={['Strategic Planner', 'Content Creator', 'DevRel', 'GTM Strategy', 'Ad Creatives'].filter((_, i) => {
+                const ids = ['strategic-planner', 'content-creator', 'devrel', 'gtm', 'ad-creatives'];
+                return isServiceActive(ids[i]);
+              })}
+              onExplore={() => onNavigate && onNavigate('/portal/boosting')}
+            />
+          )}
 
-                  <h3
-                    style={{
-                      fontSize: '1.05rem',
-                      fontWeight: 800,
-                      color: '#111827',
-                      margin: '0 0 6px',
-                    }}
-                  >
-                    {srv.title}
-                  </h3>
-                  <p
-                    style={{
-                      fontSize: '0.8125rem',
-                      color: '#6B7280',
-                      lineHeight: 1.5,
-                      margin: 0,
-                    }}
-                  >
-                    {srv.desc}
-                  </p>
-                </div>
+          {isChannelActive('digitalising') && (
+            <ServiceChannelCard
+              channel="digitalising"
+              title="DIGITALISING"
+              description="Research, insights and business intelligence prepared by the specialist team."
+              servicesList={['Lead Research', 'Company Study', 'Key People Research', 'Pitch Support'].filter((_, i) => {
+                const ids = ['lead-research', 'company-study', 'key-people', 'pitch-support'];
+                return isServiceActive(ids[i]);
+              })}
+              onExplore={() => onNavigate && onNavigate('/portal/digitalising')}
+            />
+          )}
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '10px', borderTop: '1px solid #F3F4F6' }}>
-                  <button
-                    type="button"
-                    onClick={() => onOpenNewRequest && onOpenNewRequest(srv.id)}
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      backgroundColor: srv.color,
-                      color: '#FFFFFF',
-                      fontSize: '0.8125rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      boxShadow: `0 2px 6px -1px ${srv.color}40`,
-                      transition: 'filter 0.2s ease, transform 0.2s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.filter = 'brightness(1.08)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.filter = 'none';
-                    }}
-                  >
-                    <Plus size={14} />
-                    <span>Request</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate && onNavigate(`/portal/digitalising/${srv.id}`)}
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #E5E7EB',
-                      backgroundColor: '#FFFFFF',
-                      color: '#374151',
-                      fontSize: '0.8125rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Details
-                  </button>
-                </div>
+          {isChannelActive('design') && (
+            <ServiceChannelCard
+              channel="design"
+              title="UI / DESIGN"
+              description="Professional interface design, heuristic audits, and design system engineering."
+              servicesList={['UI/UX Audit', 'Figma Project', 'Redesign Request', 'Design Systems'].filter((_, i) => {
+                const ids = ['ui-ux-audit', 'figma-project', 'redesign-request'];
+                return ids[i] ? isServiceActive(ids[i]) : true;
+              })}
+              onExplore={() => onNavigate && onNavigate('/portal/design')}
+            />
+          )}
+
+          {isChannelActive('development') && (
+            <ServiceChannelCard
+              channel="development"
+              title="APP DEVELOPMENT"
+              description="Turnkey full-stack web applications, mobile apps, and scalable API systems."
+              servicesList={['Web Application MVP', 'Mobile App Development', 'API & Backend Systems']}
+              onExplore={() => onNavigate && onNavigate('/portal/development')}
+            />
+          )}
+        </div>
+
+        {/* Turnkey Bundles Discovery Banner */}
+        <div
+          style={{
+            marginTop: '20px',
+            background: 'linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 50%, #EDE9FE 100%)',
+            borderRadius: '16px',
+            border: '1px solid #DDD4FA',
+            padding: '18px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '14px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                backgroundColor: '#7C3AED',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(124, 58, 237, 0.25)',
+                flexShrink: 0,
+              }}
+            >
+              <Boxes size={22} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#111827' }}>
+                  Looking for Multi-Capability Bundles?
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    color: '#059669',
+                    backgroundColor: '#ECFDF5',
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                  }}
+                >
+                  SAVE UP TO 25%
+                </span>
               </div>
-            );
-          })}
+              <p style={{ margin: 0, fontSize: '0.8125rem', color: '#6B7280' }}>
+                Explore curated Offer Bundles or build your own Custom Bundle across growth, intelligence & engineering.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => onNavigate && onNavigate('/portal/bundles/offer')}
+              style={{
+                padding: '9px 18px',
+                borderRadius: '10px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                color: '#FFFFFF',
+                fontSize: '0.84375rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
+              }}
+            >
+              <span>Explore Offer Bundles</span>
+              <ArrowRight size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate && onNavigate('/portal/bundles/custom')}
+              style={{
+                padding: '9px 16px',
+                borderRadius: '10px',
+                border: '1px solid #DDD4FA',
+                backgroundColor: '#FFFFFF',
+                color: '#6D28D9',
+                fontSize: '0.84375rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Custom Bundle
+            </button>
+          </div>
         </div>
       </div>
 
@@ -565,8 +532,8 @@ export default function ClientDashboardPage({
                           {req.title}
                         </div>
                         <div style={{ fontSize: '0.72rem', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
-                          <span style={{ color: '#7C3AED', fontWeight: 600 }}>
-                            {req.channel || 'Digitalising'}
+                          <span style={{ color: req.channel === 'Boosting' ? '#BE185D' : req.channel === 'UI / Design' ? '#9333EA' : req.channel === 'App Development' ? '#059669' : '#0369A1', fontWeight: 600 }}>
+                            {req.channel || 'Service'}
                           </span>
                           <span>•</span>
                           <span>{req.updatedDate}</span>

@@ -83,7 +83,7 @@ export default function MyRequestsPage({
             My Requests
           </h1>
           <p style={{ margin: 0, fontSize: '0.90625rem', color: 'var(--cg-text-secondary, #4B5563)' }}>
-            Track and manage all your DiziGini specialist tickets, reviews, and deliverables.
+            Track and manage all your CreativeGini specialist tickets, reviews, and deliverables.
           </p>
         </div>
 

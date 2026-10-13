@@ -426,7 +426,7 @@ export function exportLeadsToCsv(leads = [], fileName = 'Verified_Leads.csv') {
 /**
  * Generates and downloads a pre-formatted Bulk Leads spreadsheet template matching the exact 13 required columns
  */
-export function downloadBulkLeadsTemplate(fileName = 'DiziGini_Bulk_Leads_Template.csv') {
+export function downloadBulkLeadsTemplate(fileName = 'CreativeGini_Bulk_Leads_Template.csv') {
   const headers = [
     'Executive Lead Name',
     'Title / Role',

@@ -84,12 +84,12 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
         phone: signupPhone.trim() || undefined,
       });
       setIsSignupSubmitting(false);
-      if (showToast) showToast('Account created successfully! Welcome to DiziGini.');
+      if (showToast) showToast('Account created successfully! Welcome to CreativeGini.');
       onLogin(response.user);
     } catch (err) {
       setIsSignupSubmitting(false);
       if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
-        setSignupError('Unable to connect to the server. Please verify backend server is running on port 5001.');
+        setSignupError('Unable to connect to the server. Please verify backend server is running on port 5000.');
       } else {
         setSignupError(err.message || 'Registration failed. Please try again.');
       }
@@ -197,14 +197,14 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
           type="button" 
           className="signin-back-btn" 
           onClick={viewMode === 'forgot' ? switchToSignIn : onBackHome}
-          title={viewMode === 'forgot' ? 'Return to Sign In' : 'Return to DiziGini Homepage'}
+          title={viewMode === 'forgot' ? 'Return to Sign In' : 'Return to CreativeGini Homepage'}
         >
           <ArrowLeft size={16} />
           <span>{viewMode === 'forgot' ? 'Back to Sign In' : 'Back to Home'}</span>
         </button>
 
         <div className="signin-nav-brand" onClick={onBackHome} style={{ cursor: 'pointer' }}>
-          <img src={BRAND_LOGO} alt="DiziGini" className="signin-nav-logo" />
+          <img src={BRAND_LOGO} alt="CreativeGini" className="signin-nav-logo" />
         </div>
       </header>
 
@@ -219,10 +219,10 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
               {/* Header inside Card */}
               <div className="signin-card-header" style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-                  <img src={BRAND_LOGO} alt="DiziGini" style={{ height: '38px', width: 'auto' }} />
+                  <img src={BRAND_LOGO} alt="CreativeGini" style={{ height: '38px', width: 'auto' }} />
                 </div>
                 <h1 className="signin-title" style={{ fontSize: '1.5rem', marginBottom: '0.35rem' }}>
-                  {viewMode === 'signin' ? 'Sign In to DiziGini' : viewMode === 'signup' ? 'Create Your Account' : 'Reset Your Password'}
+                  {viewMode === 'signin' ? 'Sign In to CreativeGini' : viewMode === 'signup' ? 'Create Your Account' : 'Reset Your Password'}
                 </h1>
                 <p className="signin-subtitle" style={{ fontSize: '0.875rem', color: '#5B527E' }}>
                   {viewMode === 'signin'
@@ -451,7 +451,39 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
                         🔍 Lead Specialist
                       </button>
 
-                      
+                      <button
+                        type="button"
+                        onClick={() => handleQuickDemoLogin('boost@creativegini.com', 'Boost@123')}
+                        style={{
+                          background: '#F0FDFA',
+                          border: '1px solid #99F6E4',
+                          color: '#0F766E',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        📈 Boost Strategist
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleQuickDemoLogin('ui@creativegini.com', 'UI@123')}
+                        style={{
+                          background: '#FAF5FF',
+                          border: '1px solid #DDD6FE',
+                          color: '#6D28D9',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        🎨 UI Architect
+                      </button>
                     </div>
                   </div>
 

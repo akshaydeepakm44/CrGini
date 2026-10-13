@@ -104,7 +104,7 @@ backend/
 ## 🚀 Running the Backend
 
 ```bash
-# Start development server with auto-reload (Port 5001)
+# Start development server with auto-reload (Port 5000)
 npm run dev
 
 # Seed database with default accounts and tickets

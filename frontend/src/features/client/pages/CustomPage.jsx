@@ -715,7 +715,7 @@ export default function CustomPage({ onRequestService, onNavigate }) {
               marginBottom: '8px',
             }}
           >
-            What would you like DiziGini to prepare for you?
+            What would you like CreativeGini to prepare for you?
           </label>
           <textarea
             rows={5}

@@ -390,7 +390,7 @@ export default function DeliverablesPage({
           status: del.status || 'CLIENT_REVIEW',
           date: del.date || 'Oct 6, 2026',
           summary: del.summary || 'Sprint research package containing verified target accounts, individualized lead studies, and commercial pitch decks.',
-          companyStudyPdf: 'DiziGini_Sprint_Company_Study_Dossier.pdf',
+          companyStudyPdf: 'CreativeGini_Sprint_Company_Study_Dossier.pdf',
           leadsCount: leadSlice.length > 0 ? leadSlice.length : 5,
           leads: leadSlice.length > 0 ? leadSlice : ALL_RESEARCHED_LEADS.slice(0, 5),
           raw: del.raw,

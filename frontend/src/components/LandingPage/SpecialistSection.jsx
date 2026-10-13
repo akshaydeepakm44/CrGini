@@ -3,70 +3,70 @@ import { Search, Compass, PenTool, TrendingUp, Palette, Terminal, Award } from '
 
 const SPECIALISTS = [
   {
-    role: 'Lead Discovery Specialists',
-    category: 'Lead Discovery',
-    initials: 'LD',
+    role: 'Lead & ICP Researchers',
+    category: 'Research',
+    initials: 'LR',
     gradient: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
     textColor: '#FFFFFF',
-    desc: 'B2B domain researchers specializing in boolean queries, ICP filtering, and verified executive contact discovery.',
-    tags: ['Verified Emails', 'ICP Mapping', 'Domain Telemetry']
+    desc: 'B2B domain researchers specializing in boolean search, org chart mapping, and high-intent prospect verification.',
+    tags: ['Verified Emails', 'ICP Mapping', 'Org Intelligence']
   },
   {
-    role: 'Company Intelligence Analysts',
-    category: 'Company Studies',
-    initials: 'CA',
-    gradient: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
-    textColor: '#FFFFFF',
-    desc: 'Deep account researchers analyzing revenue profiles, org structures, technology vendor stacks, and growth initiatives.',
-    tags: ['Account Dossiers', 'Tech Stack Audit', 'Competitive Matrix']
-  },
-  {
-    role: 'Key People & Committee Mappers',
-    category: 'Org Intelligence',
-    initials: 'KP',
-    gradient: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)',
-    textColor: '#FFFFFF',
-    desc: 'Specialists mapping internal enterprise decision trees, procurement champions, and VP/C-level stakeholders.',
-    tags: ['Buying Committees', 'C-Suite Profiles', 'Direct Dial Verification']
-  },
-  {
-    role: 'Pitch & Presentation Strategists',
-    category: 'Pitch Support',
-    initials: 'PS',
-    gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-    textColor: '#FFFFFF',
-    desc: 'Strategic analysts crafting data-backed competitive battlecards, executive decks, and bespoke pitch research.',
-    tags: ['Pitch Dossiers', 'Win-Loss Analysis', 'Sales Decks']
-  },
-  {
-    role: 'Executive Contact Verification Ops',
-    category: 'Data Quality',
-    initials: 'VQ',
+    role: 'Strategic Growth Planners',
+    category: 'Strategy',
+    initials: 'SP',
     gradient: 'linear-gradient(135deg, #EC4899 0%, #BE185D 100%)',
     textColor: '#FFFFFF',
-    desc: 'Data hygiene specialists conducting dual-layer SMTP ping validation, domain MX records checks, and phone verification.',
-    tags: ['Zero Bounce Rate', 'SMTP Validation', 'Phone Screening']
+    desc: 'Senior GTM operators and positioning strategists crafting actionable outbound narratives and quarterly plans.',
+    tags: ['GTM Playbooks', 'Competitive Audit', 'Outbound Sequences']
   },
   {
-    role: 'Research Workspace Directors',
-    category: 'Delivery',
-    initials: 'RD',
+    role: 'Technical & Narrative Writers',
+    category: 'Content',
+    initials: 'CW',
     gradient: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
     textColor: '#FFFFFF',
-    desc: 'Senior project leads coordinating live research sprints, client revisions, and on-time portal deliverable releases.',
-    tags: ['Sprint Coordination', 'SLA Guarantee', 'QA Review']
+    desc: 'Expert tech copywriters translating complex software value into high-converting sales collateral and thought leadership.',
+    tags: ['Whitepapers', 'Case Studies', 'Executive Copy']
+  },
+  {
+    role: 'Multi-Channel Marketers',
+    category: 'Growth',
+    initials: 'GM',
+    gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+    textColor: '#FFFFFF',
+    desc: 'Growth marketers optimizing multi-touch demand gen channels, paid acquisition pilots, and email deliverability.',
+    tags: ['Demand Gen', 'Paid Pilots', 'Conversion Audits']
+  },
+  {
+    role: 'Product & Brand Designers',
+    category: 'Design',
+    initials: 'PD',
+    gradient: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+    textColor: '#FFFFFF',
+    desc: 'UI/UX and brand artisans crafting pixel-perfect landing page mockups, visual assets, and investor pitch decks.',
+    tags: ['Landing UI', 'Pitch Decks', 'Design Systems']
+  },
+  {
+    role: 'Developer Advocates',
+    category: 'DevRel',
+    initials: 'DR',
+    gradient: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)',
+    textColor: '#FFFFFF',
+    desc: 'Engineers who build community traction, documentation reviews, technical tutorials, and developer outreach.',
+    tags: ['API Docs', 'Technical Demos', 'Open Source Outreach']
   }
 ];
 
 export default function SpecialistSection() {
   return (
-    <section id="specialists" className="cg-section" aria-label="Human Specialists Behind DizitalGini">
+    <section id="specialists" className="cg-section" aria-label="Human Specialists Behind CreativeGini">
       <div className="cg-container">
         <div className="cg-section-header">
           <span className="cg-section-badge">Human Specialist Network</span>
           <h2 className="cg-section-title">Specialists behind every project</h2>
           <p className="cg-section-subtitle">
-            Behind every DiziGini deliverable is a dedicated team of human domain experts, research analysts, and company intelligence specialists — zero synthetic hallucinations.
+            Behind every CreativeGini deliverable is a dedicated team of human domain experts, research analysts, and creative directors — zero synthetic hallucinations.
           </p>
         </div>
 

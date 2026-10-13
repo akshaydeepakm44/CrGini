@@ -10,6 +10,7 @@ import {
   X,
   Lock,
   Layers,
+  Sparkles,
   Users,
   Briefcase,
   Sliders,
@@ -20,6 +21,8 @@ import { adminApi } from '../services/adminApi';
 
 const ROLES = [
   { value: 'COMPANY_LEAD', label: 'Lead Specialist (COMPANY_LEAD)' },
+  { value: 'COMPANY_BOOST', label: 'Boost Strategist (COMPANY_BOOST)' },
+  { value: 'LANDING_PAGE', label: 'UI Architect (LANDING_PAGE)' },
   { value: 'ADMIN', label: 'Administrative Lead (ADMIN)' },
   { value: 'SUPER_ADMIN', label: 'Super Administrator (SUPER_ADMIN)' },
 ];
@@ -65,18 +68,22 @@ export default function AdminPermissionsPage() {
   // Telemetry counts for internal specialists
   const telemetry = useMemo(() => {
     let leadCount = 0;
+    let boostCount = 0;
+    let uiCount = 0;
     let adminCount = 0;
 
     users.forEach((u) => {
       const da = u.dashboardAccess || {};
       if (da.companyLead || u.role === 'COMPANY_LEAD') leadCount++;
+      if (da.companyBoost || u.role === 'COMPANY_BOOST') boostCount++;
+      if (da.companyUI || u.role === 'LANDING_PAGE') uiCount++;
       if (u.role === 'ADMIN' || u.role === 'SUPER_ADMIN') adminCount++;
     });
 
-    return { leadCount, adminCount, totalCount: users.length };
+    return { leadCount, boostCount, uiCount, adminCount };
   }, [users]);
 
-  // Handle portal access toggle (companyLead)
+  // Handle portal access toggle (companyLead, companyBoost, companyUI)
   const handleTogglePortal = async (user, portalKey) => {
     if (user.role === 'SUPER_ADMIN') {
       alert('Root Super Administrator automatically has access across all modules and portals.');
@@ -111,7 +118,8 @@ export default function AdminPermissionsPage() {
         });
       }, 2000);
 
-      const portalLabel = portalKey === 'companyLead' ? 'Lead' : 'Specialist';
+      const portalLabel =
+        portalKey === 'companyLead' ? 'Lead' : portalKey === 'companyBoost' ? 'Boost' : 'UI/Design';
       const action = updatedAccess[portalKey] ? 'Granted' : 'Revoked';
       showToast(`${action} ${portalLabel} Portal access for ${user.name}`);
     } catch (err) {
@@ -134,8 +142,12 @@ export default function AdminPermissionsPage() {
       const updatedAccess = { ...currentAccess };
 
       if (newRole === 'COMPANY_LEAD') updatedAccess.companyLead = true;
+      if (newRole === 'COMPANY_BOOST') updatedAccess.companyBoost = true;
+      if (newRole === 'LANDING_PAGE') updatedAccess.companyUI = true;
       if (newRole === 'ADMIN' || newRole === 'SUPER_ADMIN') {
         updatedAccess.companyLead = true;
+        updatedAccess.companyBoost = true;
+        updatedAccess.companyUI = true;
       }
 
       await adminApi.updateUserPermissions(user.id, updatedAccess, newRole);
@@ -165,11 +177,12 @@ export default function AdminPermissionsPage() {
     }
   };
 
-  // Grant Lead Specialist Portal Access
-  const handleGrantLead = async (user) => {
+  // Grant All Specialist Portals
+  const handleGrantAll = async (user) => {
     const allAccess = {
-      ...user.dashboardAccess,
       companyLead: true,
+      companyBoost: true,
+      companyUI: true,
     };
     try {
       setSavingUserId(user.id);
@@ -177,7 +190,7 @@ export default function AdminPermissionsPage() {
       setUsers((prev) =>
         prev.map((u) => (u.id === user.id ? { ...u, dashboardAccess: allAccess } : u))
       );
-      showToast(`Granted Lead Portal access to ${user.name}`);
+      showToast(`Granted all specialist portals to ${user.name}`);
     } catch (err) {
       alert(`Failed: ${err.message}`);
     } finally {
@@ -192,7 +205,9 @@ export default function AdminPermissionsPage() {
       return;
     }
     const defaultAccess = {
-      companyLead: user.role === 'COMPANY_LEAD' || user.role === 'ADMIN',
+      companyLead: user.role === 'COMPANY_LEAD',
+      companyBoost: user.role === 'COMPANY_BOOST',
+      companyUI: user.role === 'LANDING_PAGE',
     };
     try {
       setSavingUserId(user.id);
@@ -225,6 +240,8 @@ export default function AdminPermissionsPage() {
 
       const da = u.dashboardAccess || {};
       if (activeTab === 'LEAD') return Boolean(da.companyLead || u.role === 'COMPANY_LEAD');
+      if (activeTab === 'BOOST') return Boolean(da.companyBoost || u.role === 'COMPANY_BOOST');
+      if (activeTab === 'UI') return Boolean(da.companyUI || u.role === 'LANDING_PAGE');
       if (activeTab === 'ADMIN') return u.role === 'ADMIN' || u.role === 'SUPER_ADMIN';
       return true;
     });
@@ -241,7 +258,7 @@ export default function AdminPermissionsPage() {
           </button>
           <h1 className="cg-page-title">Team Specialist Portal Access & Roles</h1>
           <p className="cg-page-subtitle">
-            Configure direct specialist portal authorizations (Lead Specialist) and assign operational roles across internal staff. (Client accounts access only their client portal).
+            Configure direct specialist portal authorizations (Lead, Boost, UI/Design) and assign operational roles across internal staff. (Client accounts access only their client portal).
           </p>
         </div>
 
@@ -254,7 +271,7 @@ export default function AdminPermissionsPage() {
       </div>
 
       {/* 2. TELEMETRY STATS GRID */}
-      <div className="cg-access-stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div className="cg-access-stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className="cg-access-stat-card">
           <div className="cg-access-stat-icon" style={{ background: '#ecfdf5', color: '#059669' }}>
             <Users size={18} />
@@ -266,22 +283,32 @@ export default function AdminPermissionsPage() {
         </div>
 
         <div className="cg-access-stat-card">
+          <div className="cg-access-stat-icon" style={{ background: '#f0fdfa', color: '#0d9488' }}>
+            <Sparkles size={18} />
+          </div>
+          <div className="cg-access-stat-meta">
+            <span className="cg-access-stat-count">{telemetry.boostCount}</span>
+            <span className="cg-access-stat-label">Boost Strategists</span>
+          </div>
+        </div>
+
+        <div className="cg-access-stat-card">
+          <div className="cg-access-stat-icon" style={{ background: '#f5f3ff', color: '#7c3aed' }}>
+            <Layers size={18} />
+          </div>
+          <div className="cg-access-stat-meta">
+            <span className="cg-access-stat-count">{telemetry.uiCount}</span>
+            <span className="cg-access-stat-label">UI/Design Team</span>
+          </div>
+        </div>
+
+        <div className="cg-access-stat-card">
           <div className="cg-access-stat-icon" style={{ background: '#fef2f2', color: '#dc2626' }}>
             <ShieldCheck size={18} />
           </div>
           <div className="cg-access-stat-meta">
             <span className="cg-access-stat-count">{telemetry.adminCount}</span>
             <span className="cg-access-stat-label">Administrators</span>
-          </div>
-        </div>
-
-        <div className="cg-access-stat-card">
-          <div className="cg-access-stat-icon" style={{ background: '#eff6ff', color: '#2563eb' }}>
-            <Layers size={18} />
-          </div>
-          <div className="cg-access-stat-meta">
-            <span className="cg-access-stat-count">{telemetry.totalCount}</span>
-            <span className="cg-access-stat-label">Total Staff Accounts</span>
           </div>
         </div>
       </div>
@@ -301,8 +328,10 @@ export default function AdminPermissionsPage() {
         <div className="cg-tab-row" style={{ margin: 0 }}>
           {[
             { key: 'ALL', label: `All Staff (${users.length})` },
-            { key: 'LEAD', label: `Lead Specialists (${telemetry.leadCount})` },
-            { key: 'ADMIN', label: `Administrators (${telemetry.adminCount})` },
+            { key: 'LEAD', label: `Lead (${telemetry.leadCount})` },
+            { key: 'BOOST', label: `Boost (${telemetry.boostCount})` },
+            { key: 'UI', label: `UI/Design (${telemetry.uiCount})` },
+            { key: 'ADMIN', label: `Admin (${telemetry.adminCount})` },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -432,6 +461,50 @@ export default function AdminPermissionsPage() {
                           )}
                           <span>Lead Portal</span>
                         </button>
+
+                        {/* BOOST PORTAL TOGGLE */}
+                        <button
+                          type="button"
+                          className={`cg-portal-toggle-pill ${
+                            da.companyBoost || isSuperAdmin ? 'boost-on' : 'boost-off'
+                          }`}
+                          onClick={() => handleTogglePortal(u, 'companyBoost')}
+                          disabled={isSuperAdmin || isSaving}
+                          title={
+                            da.companyBoost
+                              ? 'Boost Portal: Active (Click to revoke)'
+                              : 'Boost Portal: Restricted (Click to grant access)'
+                          }
+                        >
+                          {da.companyBoost || isSuperAdmin ? (
+                            <Check size={12} />
+                          ) : (
+                            <X size={12} />
+                          )}
+                          <span>Boost Portal</span>
+                        </button>
+
+                        {/* UI/DESIGN PORTAL TOGGLE */}
+                        <button
+                          type="button"
+                          className={`cg-portal-toggle-pill ${
+                            da.companyUI || isSuperAdmin ? 'ui-on' : 'ui-off'
+                          }`}
+                          onClick={() => handleTogglePortal(u, 'companyUI')}
+                          disabled={isSuperAdmin || isSaving}
+                          title={
+                            da.companyUI
+                              ? 'UI/Design Portal: Active (Click to revoke)'
+                              : 'UI/Design Portal: Restricted (Click to grant access)'
+                          }
+                        >
+                          {da.companyUI || isSuperAdmin ? (
+                            <Check size={12} />
+                          ) : (
+                            <X size={12} />
+                          )}
+                          <span>UI / Design</span>
+                        </button>
                       </div>
                     </td>
 
@@ -442,11 +515,11 @@ export default function AdminPermissionsPage() {
                           type="button"
                           className="cg-btn-secondary"
                           style={{ padding: '0.25rem 0.55rem', fontSize: '0.6875rem' }}
-                          onClick={() => handleGrantLead(u)}
-                          disabled={isSuperAdmin || isSaving || da.companyLead}
-                          title="Grant Lead Specialist Portal access"
+                          onClick={() => handleGrantAll(u)}
+                          disabled={isSuperAdmin || isSaving}
+                          title="Grant access to all 3 specialist portals"
                         >
-                          Enable Lead
+                          All Workspaces
                         </button>
                         <button
                           type="button"

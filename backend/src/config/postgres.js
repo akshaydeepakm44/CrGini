@@ -23,7 +23,7 @@ const pgPassword = sanitizeEnv(process.env.POSTGRES_PASSWORD);
 const pgUser = sanitizeEnv(process.env.POSTGRES_USER) || 'postgres';
 const pgHost = sanitizeEnv(process.env.POSTGRES_HOST) || '127.0.0.1';
 const pgPort = Number(process.env.POSTGRES_PORT || 5432);
-const pgDatabase = sanitizeEnv(process.env.POSTGRES_DB) || 'dizigini_db';
+const pgDatabase = sanitizeEnv(process.env.POSTGRES_DB) || 'creativegini';
 const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
 
 const poolConfig = databaseUrl

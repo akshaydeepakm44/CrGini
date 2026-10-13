@@ -1,15 +1,15 @@
 {
-  "name": "dizigini-react",
+  "name": "creativegini-react",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 5174",
+    "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
     "preview": "vite preview",
-    "tunnel": "ngrok http 5174",
-    "tunnel:backend": "ngrok http 5001",
-    "tunnel:cf": "cloudflared tunnel --url http://localhost:5174"
+    "tunnel": "ngrok http 5173",
+    "tunnel:backend": "ngrok http 5000",
+    "tunnel:cf": "cloudflared tunnel --url http://localhost:5173"
   },
   "dependencies": {
     "gsap": "^3.15.0",

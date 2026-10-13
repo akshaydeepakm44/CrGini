@@ -1,4 +1,4 @@
-// DiziGini API Client Service
+// CreativeGini API Client Service
 
 const getApiBase = () => {
   if (import.meta.env.VITE_API_URL) {
@@ -133,7 +133,7 @@ export const api = {
     const data = await safeJson(res);
     if (!res.ok || !data.success) {
       if (res.status === 502 || res.status === 503 || res.status === 504) {
-        throw new Error('Backend server is temporarily unreachable. Please ensure the backend server is running on port 5001.');
+        throw new Error('Backend server is temporarily unreachable. Please ensure the backend server is running on port 5000.');
       }
       throw new Error(data.message || 'Registration failed. Please try again.');
     }

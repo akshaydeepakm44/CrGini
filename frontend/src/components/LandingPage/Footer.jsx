@@ -31,10 +31,10 @@ export default function Footer({ onSignIn, onGetStarted }) {
   };
 
   return (
-    <footer className="cg-footer-creative" aria-label="DiziGini End Credits and Directory">
+    <footer className="cg-footer-creative" aria-label="CreativeGini End Credits and Directory">
       {/* Background Typographic Watermark */}
       <div className="cg-footer-watermark" aria-hidden="true">
-        DIZIGINI
+        CREATIVEGINI
       </div>
 
       <div className="cg-container">
@@ -43,7 +43,7 @@ export default function Footer({ onSignIn, onGetStarted }) {
           <div className="cg-footer-status">
             <span className="cg-status-dot-pulse" />
             <span className="cg-status-text">
-              DizitalGini Operational &bull; Live Sprint Turnaround: 48&ndash;72h &bull; Verified B2B Intelligence Active
+              Platform Operational &bull; Live Sprint Turnaround: 48&ndash;72h &bull; Verified Research Active
             </span>
           </div>
 
@@ -76,13 +76,13 @@ export default function Footer({ onSignIn, onGetStarted }) {
             <a href="/" className="cg-footer-brand-lockup" onClick={scrollTo('top')}>
               <img
                 src={BRAND_LOGO}
-                alt="DiziGini"
+                alt="CreativeGini"
                 className="cg-footer-logo-img"
               />
             </a>
 
             <p className="cg-footer-manifesto-text">
-              DiziGini connects ambitious businesses with dedicated human researchers, deep account dossiers, and verified B2B intelligence through the DizitalGini platform.
+              CreativeGini connects ambitious businesses with dedicated human researchers, strategic growth planners, and creative specialists through a single transparent platform.
             </p>
 
             <div className="cg-footer-social-strip">
@@ -94,8 +94,8 @@ export default function Footer({ onSignIn, onGetStarted }) {
                 <span>X / Twitter</span>
                 <ExternalLink size={11} />
               </a>
-              <a href="https://dizigini.com" target="_blank" rel="noopener noreferrer" className="cg-social-pill" aria-label="dizigini.com">
-                <span>dizigini.com</span>
+              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="cg-social-pill" aria-label="DevRel GitHub">
+                <span>GitHub DevRel</span>
                 <ExternalLink size={11} />
               </a>
             </div>
@@ -106,36 +106,54 @@ export default function Footer({ onSignIn, onGetStarted }) {
             </div>
           </div>
 
-          {/* Column 1: Digitalising Platform */}
-          <div className="cg-footer-col">
-            <h4 className="cg-footer-col-header">
-              <span className="cg-col-indicator purple" />
-              <span>Digitalising Platform</span>
-            </h4>
-            <ul className="cg-footer-links-list">
-              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>B2B Lead Research (ICP Sprints)</a></li>
-              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Company Study &amp; Account Dossiers</a></li>
-              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Key People &amp; Buying Committee</a></li>
-              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Pitch &amp; Presentation Support</a></li>
-              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Executive Contact Telemetry</a></li>
-              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Custom Digitalising Requests</a></li>
-            </ul>
-          </div>
-
-          {/* Column 2: Platform Architecture */}
+          {/* Column 1: Boosting Services */}
           <div className="cg-footer-col">
             <h4 className="cg-footer-col-header">
               <span className="cg-col-indicator pink" />
-              <span>DizitalGini Ecosystem</span>
+              <span>Boosting Services</span>
             </h4>
             <ul className="cg-footer-links-list">
-              <li><a href="/portal" className="cg-footer-link">DiziGini Client Portal</a></li>
-              <li><a href="/lead" className="cg-footer-link">Internal Lead Specialist Hub</a></li>
-              <li><a href="/admin" className="cg-footer-link">Super Admin Control Center</a></li>
-              <li><a href="/portal/deliverables" className="cg-footer-link">Verified Deliverables Vault</a></li>
-              <li><a href="/portal/messages" className="cg-footer-link">Direct Specialist Chat</a></li>
+              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Strategic Outbound Planner</a></li>
+              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Content &amp; Narrative Creator</a></li>
+              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>DevRel &amp; Technical Advocacy</a></li>
+              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Go-To-Market Playbooks</a></li>
+              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Landing Page UI &amp; UX Sprints</a></li>
+              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Performance Acquisition Ads</a></li>
             </ul>
           </div>
+
+          {/* Column 2: Active Services */}
+          {isChannelActive('digitalising') ? (
+            <div className="cg-footer-col">
+              <h4 className="cg-footer-col-header">
+                <span className="cg-col-indicator purple" />
+                <span>Digitalising Services</span>
+              </h4>
+              <ul className="cg-footer-links-list">
+                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>B2B Lead Research (ICP Sprints)</a></li>
+                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Company Study &amp; Account Dossiers</a></li>
+                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Key People &amp; Buying Committee</a></li>
+                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Executive Contact Telemetry</a></li>
+                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Market Intelligence Reports</a></li>
+                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Pitch &amp; Deck Research</a></li>
+              </ul>
+            </div>
+          ) : (
+            <div className="cg-footer-col">
+              <h4 className="cg-footer-col-header">
+                <span className="cg-col-indicator purple" />
+                <span>UI &amp; App Development</span>
+              </h4>
+              <ul className="cg-footer-links-list">
+                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>UI/UX Heuristic Audits</a></li>
+                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Production Figma Design Kits</a></li>
+                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Landing Page Redesigns</a></li>
+                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Clickable Interactive Prototypes</a></li>
+                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Full-Stack MVP Application Core</a></li>
+                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>API &amp; Backend Architecture</a></li>
+              </ul>
+            </div>
+          )}
 
           {/* Column 3: Legal & Support */}
           <div className="cg-footer-col">
@@ -145,8 +163,7 @@ export default function Footer({ onSignIn, onGetStarted }) {
             </h4>
             <ul className="cg-footer-links-list">
               <li><a href="#terms" className="cg-footer-link" onClick={(e) => e.preventDefault()}>Terms of Service</a></li>
-              <li><a href="mailto:contact@dizigini.com" className="cg-footer-link">contact@dizigini.com</a></li>
-              <li><span className="cg-footer-link" style={{ cursor: 'default', color: '#9CA3AF' }}>dizigini.com</span></li>
+              <li><a href="mailto:contact@creativegini.com" className="cg-footer-link">Contact Support</a></li>
             </ul>
           </div>
         </div>
@@ -154,7 +171,7 @@ export default function Footer({ onSignIn, onGetStarted }) {
         {/* End Credits Bottom Bar */}
         <div className="cg-footer-end-credits">
           <div className="cg-credits-left">
-            <span>&copy; {new Date().getFullYear()} DiziGini Technologies (dizigini.com). Built for modern B2B growth teams.</span>
+            <span>&copy; {new Date().getFullYear()} CreativeGini Technologies. Built for ambitious founders and modern growth leaders.</span>
           </div>
 
           <div className="cg-credits-badges">

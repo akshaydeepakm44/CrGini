@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 /**
- * DiziGini Email Service
+ * CreativeGini Email Service
  * Handles transactional emails for ticket assignment, progress updates,
  * reviews, approvals, and completions with rich branded HTML templates,
  * non-blocking error handling, and multi-layered duplicate protection.
@@ -56,13 +56,10 @@ export const clearEmailDedupeCache = () => {
  */
 export const isPlaceholderPassword = (pwd) => {
   if (!pwd) return true;
-  const trimmed = String(pwd).trim().toLowerCase();
+  const trimmed = String(pwd).trim();
   return (
-    trimmed === '<google_app_password>' ||
+    trimmed === '<GOOGLE_APP_PASSWORD>' ||
     trimmed === 'your-app-password-here' ||
-    trimmed === 'disabled_in_dev' ||
-    trimmed === 'placeholder' ||
-    trimmed.includes('disabled') ||
     (trimmed.startsWith('<') && trimmed.endsWith('>'))
   );
 };
@@ -218,7 +215,7 @@ export const getTicketUrl = (ticketId, tab = '') => {
 };
 
 /**
- * Generate rich responsive HTML email template for DiziGini.
+ * Generate rich responsive HTML email template for CreativeGini.
  */
 const buildHtmlTemplate = ({
   preheader,
@@ -389,10 +386,10 @@ const buildHtmlTemplate = ({
           <tr>
             <td style="padding: 24px 12px 12px 12px; text-align: center;">
               <p style="margin: 0 0 6px 0; font-size: 12px; color: #64748B;">
-                DiziGini &middot; Performance Marketing & Digital Growth Engine
+                CreativeGini &middot; Performance Marketing & Digital Growth Engine
               </p>
               <p style="margin: 0; font-size: 11px; color: #475569;">
-                This is an automated notification from the DiziGini client portal. Please do not reply directly to this email.
+                This is an automated notification from the CreativeGini client portal. Please do not reply directly to this email.
               </p>
             </td>
           </tr>
@@ -442,7 +439,7 @@ const sendEmail = async ({ to, subject, html, text, event, dedupeKey, attachment
     attachmentsCount: (attachments || []).length
   });
 
-  const from = process.env.EMAIL_FROM || 'DiziGini <team@dizigini.com>';
+  const from = process.env.EMAIL_FROM || 'CreativeGini <team@creativegini.com>';
   const transporter = getTransporter();
 
   // If destination is a simulated or test domain (*.test, *.invalid, *.example), record and return simulated delivery safely
@@ -600,7 +597,7 @@ export const sendTicketAssignedEmail = async ({ specialist, ticket, assignedBy }
         { label: 'Request Title', value: ticket.title },
         { label: 'Current Status', value: ticket.status || 'ASSIGNED' },
         { label: 'Priority', value: ticket.priority || 'MEDIUM' },
-        { label: 'Assigned By', value: assignedBy?.name || 'DiziGini Team' },
+        { label: 'Assigned By', value: assignedBy?.name || 'CreativeGini Team' },
         { label: 'Due Date', value: ticket.dueDate ? new Date(ticket.dueDate).toLocaleDateString() : 'Standard Sprint' }
       ],
       highlightBox: ticket.description ? {
@@ -612,7 +609,7 @@ export const sendTicketAssignedEmail = async ({ specialist, ticket, assignedBy }
       actionUrl
     });
 
-    const text = `You Have Been Assigned a New Ticket: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nClient: ${clientDisplay}\nService: ${serviceName}\nStatus: ${ticket.status || 'ASSIGNED'}\nAssigned By: ${assignedBy?.name || 'DiziGini'}\n\nView Ticket: ${actionUrl}`;
+    const text = `You Have Been Assigned a New Ticket: ${ticket.ticketId}\n\nTitle: ${ticket.title}\nClient: ${clientDisplay}\nService: ${serviceName}\nStatus: ${ticket.status || 'ASSIGNED'}\nAssigned By: ${assignedBy?.name || 'CreativeGini'}\n\nView Ticket: ${actionUrl}`;
 
     return await sendEmail({
       to: specialist.email,
@@ -640,7 +637,7 @@ export const sendWorkStartedEmail = async ({ client, ticket, specialist }) => {
     const dedupeKey = `WORK_STARTED:${ticket.ticketId}:${recipientEmail}`;
     const actionUrl = getTicketUrl(ticket.ticketId);
 
-    const specialistName = specialist?.name || ticket.assignedTo?.name || 'DiziGini Specialist';
+    const specialistName = specialist?.name || ticket.assignedTo?.name || 'CreativeGini Specialist';
     const teamName = ticket.assignedTeam || `${serviceName} Team`;
 
     const subject = `Work Started: ${ticket.ticketId} - ${ticket.title}`;
@@ -702,7 +699,7 @@ export const sendTicketProgressEmail = async ({ client, ticket, specialist, upda
     const dedupeKey = `TICKET_PROGRESS:${ticket.ticketId}:${recipientEmail}:${contentHash}`;
     const actionUrl = getTicketUrl(ticket.ticketId, 'chat');
 
-    const specialistName = specialist?.name || ticket.assignedTo?.name || 'DiziGini Specialist';
+    const specialistName = specialist?.name || ticket.assignedTo?.name || 'CreativeGini Specialist';
 
     const subject = `Ticket Update: ${ticket.ticketId} - ${ticket.title}`;
     const subtitle = `A new progress update has been posted to your ticket by ${specialistName}.`;
@@ -760,7 +757,7 @@ export const sendWorkSubmittedEmail = async ({ client, ticket, submission, speci
     const dedupeKey = `WORK_SUBMITTED:${ticket.ticketId}:${version}:${recipientEmail}`;
     const actionUrl = getTicketUrl(ticket.ticketId, 'review');
 
-    const specialistName = specialist?.name || ticket.assignedTo?.name || 'DiziGini Specialist';
+    const specialistName = specialist?.name || ticket.assignedTo?.name || 'CreativeGini Specialist';
 
     const subject = `Action Required: Work Submitted for ${ticket.ticketId}`;
     const subtitle = `Your completed deliverables for ticket ${ticket.ticketId} are now ready for your review and approval.`;
@@ -898,7 +895,7 @@ export const sendWorkResubmittedEmail = async ({ client, ticket, submission, spe
     const dedupeKey = `WORK_RESUBMITTED:${ticket.ticketId}:${version}:${recipientEmail}`;
     const actionUrl = getTicketUrl(ticket.ticketId, 'review');
 
-    const specialistName = specialist?.name || ticket.assignedTo?.name || 'DiziGini Specialist';
+    const specialistName = specialist?.name || ticket.assignedTo?.name || 'CreativeGini Specialist';
 
     const subject = `Revised Work Submitted: ${ticket.ticketId} (V${version})`;
     const subtitle = `The specialist has addressed your revision feedback and submitted a revised version (V${version}) for your review.`;
@@ -1035,7 +1032,7 @@ export const sendTicketCompletedEmail = async ({ client, ticket, completedBy, re
     const actionUrl = getTicketUrl(ticket.ticketId);
 
     const subject = `Ticket Completed: ${ticket.ticketId} - ${ticket.title}`;
-    const subtitle = `Your request ${ticket.ticketId} has been successfully completed. Thank you for partnering with DiziGini!`;
+    const subtitle = `Your request ${ticket.ticketId} has been successfully completed. Thank you for partnering with CreativeGini!`;
 
     const details = [
       { label: 'Ticket ID', value: ticket.ticketId },
@@ -1046,7 +1043,7 @@ export const sendTicketCompletedEmail = async ({ client, ticket, completedBy, re
     ];
 
     if (completedBy) {
-      details.push({ label: 'Closed By', value: completedBy.name || 'DiziGini Team' });
+      details.push({ label: 'Closed By', value: completedBy.name || 'CreativeGini Team' });
     }
 
     const html = buildHtmlTemplate({
@@ -1100,14 +1097,14 @@ export const buildWelcomeEmailTemplate = ({
   companyName = 'Client Workspace',
   email = '',
   temporaryPassword = '',
-  subject = 'Welcome to DiziGini - Your Account & Workspace Access',
+  subject = 'Welcome to CreativeGini - Your Account & Workspace Access',
   greeting = '',
   customBody = '',
-  portalUrl = 'https://dizigini.com/signin',
+  portalUrl = 'https://creativegini.com/signin',
   attachments = []
 }) => {
   const displayGreeting = greeting?.trim() || `Dear ${clientName},`;
-  const defaultBody = `We are pleased to welcome you to DiziGini. Your dedicated client workspace has been provisioned and is ready for use. Below are your account credentials and access instructions to review your performance dashboards, prospect intelligence, and active deliverables.`;
+  const defaultBody = `We are pleased to welcome you to CreativeGini. Your dedicated client workspace has been provisioned and is ready for use. Below are your account credentials and access instructions to review your performance dashboards, prospect intelligence, and active deliverables.`;
   const mainContent = customBody?.trim() ? customBody.trim().replace(/\n/g, '<br>') : defaultBody;
 
   const escapeHtml = (str) =>
@@ -1167,7 +1164,7 @@ export const buildWelcomeEmailTemplate = ({
 <body style="margin: 0; padding: 0; background-color: #060B13; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
   <!-- Preheader text for inbox preview -->
   <div style="display: none; max-height: 0; overflow: hidden; font-size: 1px; line-height: 1px; color: #060B13;">
-    Welcome to DiziGini. Your client workspace and login credentials are ready.
+    Welcome to CreativeGini. Your client workspace and login credentials are ready.
   </div>
 
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #060B13; min-height: 100vh; padding: 32px 12px;">
@@ -1282,15 +1279,15 @@ export const buildWelcomeEmailTemplate = ({
 
                 ${attachmentsHtml}
 
-                <!-- SECTION 5: DIZIGINI ACCESS / SEARCH INSTRUCTIONS -->
+                <!-- SECTION 5: CREATIVEGINI ACCESS / SEARCH INSTRUCTIONS -->
                 <tr>
                   <td style="padding: 8px 0 16px 0;">
                     <div style="background: rgba(14, 27, 46, 0.85); border-left: 3px solid #00E5FF; border-radius: 6px; padding: 14px 16px;">
                       <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #00E5FF; font-weight: 700; margin-bottom: 4px;">
-                        How to Access DiziGini
+                        How to Access CreativeGini
                       </div>
                       <div style="font-size: 13px; line-height: 1.5; color: #CBD5E1;">
-                        To access your client workspace at any time, search for <strong>DiziGini.com</strong> in your browser or visit the secure sign-in portal directly.
+                        To access your client workspace at any time, search for <strong>CreativeGini.com</strong> in your browser or visit the secure sign-in portal directly.
                       </div>
                     </div>
                   </td>
@@ -1309,7 +1306,7 @@ export const buildWelcomeEmailTemplate = ({
                 <tr>
                   <td style="padding: 12px 0 16px 0; text-align: center;">
                     <span style="font-size: 11px; color: #64748B;">
-                      Portal URL: <a href="${portalUrl}" style="color: #00E5FF; text-decoration: underline;">DiziGini.com</a>
+                      Portal URL: <a href="${portalUrl}" style="color: #00E5FF; text-decoration: underline;">CreativeGini.com</a>
                     </span>
                   </td>
                 </tr>
@@ -1318,7 +1315,7 @@ export const buildWelcomeEmailTemplate = ({
                 <tr>
                   <td style="padding-top: 10px;">
                     <div style="background: rgba(255, 255, 255, 0.02); border: 1px dashed rgba(148, 163, 184, 0.2); border-radius: 6px; padding: 12px 16px; font-size: 12px; line-height: 1.5; color: #94A3B8;">
-                      <strong style="color: #F1F5F9;">Security Notice:</strong> For your security, please update your temporary password immediately upon your first sign-in. DiziGini team members will never ask you for your password.
+                      <strong style="color: #F1F5F9;">Security Notice:</strong> For your security, please update your temporary password immediately upon your first sign-in. CreativeGini team members will never ask you for your password.
                     </div>
                   </td>
                 </tr>
@@ -1331,10 +1328,10 @@ export const buildWelcomeEmailTemplate = ({
           <tr>
             <td style="padding: 24px 12px 12px 12px; text-align: center;">
               <p style="margin: 0 0 6px 0; font-size: 12px; color: #64748B;">
-                DiziGini &middot; Performance Marketing & Digital Growth Engine
+                CreativeGini &middot; Performance Marketing & Digital Growth Engine
               </p>
               <p style="margin: 0; font-size: 11px; color: #475569;">
-                You received this email because an account was provisioned for you at DiziGini. If you believe this was in error, please contact support@dizigini.com.
+                You received this email because an account was provisioned for you at CreativeGini. If you believe this was in error, please contact support@creativegini.com.
               </p>
             </td>
           </tr>
@@ -1367,8 +1364,8 @@ export const sendWelcomeEmail = async ({
 
     const clientName = client.name || client.contactPerson || 'Client';
     const companyName = company?.name || client.company?.name || client.company || 'Client Workspace';
-    const emailSubject = subject?.trim() || `Welcome to DiziGini - Your Account & Workspace Access`;
-    const portalUrl = 'https://dizigini.com/signin';
+    const emailSubject = subject?.trim() || `Welcome to CreativeGini - Your Account & Workspace Access`;
+    const portalUrl = 'https://creativegini.com/signin';
 
     const html = buildWelcomeEmailTemplate({
       clientName,
@@ -1381,7 +1378,7 @@ export const sendWelcomeEmail = async ({
       attachments
     });
 
-    const text = `Welcome to DiziGini\n\nDear ${clientName},\n\nYour account has been created for ${companyName}.\n\nLogin Email: ${client.email}\nTemporary Password: ${temporaryPassword || '—'}\n\nAccess your workspace: Search for DiziGini.com or visit https://dizigini.com/signin\n\nPlease change your temporary password upon your first sign-in.\n\n- DiziGini Team`;
+    const text = `Welcome to CreativeGini\n\nDear ${clientName},\n\nYour account has been created for ${companyName}.\n\nLogin Email: ${client.email}\nTemporary Password: ${temporaryPassword || '—'}\n\nAccess your workspace: Search for CreativeGini.com or visit https://creativegini.com/signin\n\nPlease change your temporary password upon your first sign-in.\n\n- CreativeGini Team`;
 
     // Securely prepare attachments for Nodemailer
     const formattedAttachments = (attachments || []).map((att) => {
@@ -1439,7 +1436,7 @@ const buildPasswordResetEmailTemplate = ({
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reset Your Password - DiziGini</title>
+  <title>Reset Your Password - CreativeGini</title>
   <style>
     body { margin: 0; padding: 0; background-color: #060B13; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
     table { border-collapse: collapse; }
@@ -1451,7 +1448,7 @@ const buildPasswordResetEmailTemplate = ({
 </head>
 <body style="margin: 0; padding: 0; background-color: #060B13; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
   <div style="display: none; max-height: 0; overflow: hidden; font-size: 1px; line-height: 1px; color: #060B13;">
-    Password recovery request for your DiziGini account. This link will expire in ${expiresMinutes} minutes.
+    Password recovery request for your CreativeGini account. This link will expire in ${expiresMinutes} minutes.
   </div>
 
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #060B13; min-height: 100vh; padding: 32px 12px;">
@@ -1463,7 +1460,7 @@ const buildPasswordResetEmailTemplate = ({
           <!-- BRAND HEADER -->
           <tr>
             <td style="padding: 0 0 20px 0; text-align: center;">
-              <a href="https://dizigini.com" target="_blank" style="text-decoration: none; display: inline-block;">
+              <a href="https://creativegini.com" target="_blank" style="text-decoration: none; display: inline-block;">
                 <span style="font-size: 20px; font-weight: 800; letter-spacing: 2px; color: #FFFFFF;">
                   CREATIVE<span style="color: #00E5FF;">GINI</span>
                 </span>
@@ -1504,7 +1501,7 @@ const buildPasswordResetEmailTemplate = ({
                       Dear ${recipientName},
                     </p>
                     <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #CBD5E1;">
-                      We received a request to reset the password for your DiziGini account. Click the button below to create a new password.
+                      We received a request to reset the password for your CreativeGini account. Click the button below to create a new password.
                     </p>
                   </td>
                 </tr>
@@ -1559,10 +1556,10 @@ const buildPasswordResetEmailTemplate = ({
           <tr>
             <td style="padding: 24px 12px 12px 12px; text-align: center;">
               <p style="margin: 0 0 6px 0; font-size: 12px; color: #64748B;">
-                DiziGini &middot; Performance Marketing & Digital Growth Engine
+                CreativeGini &middot; Performance Marketing & Digital Growth Engine
               </p>
               <p style="margin: 0; font-size: 11px; color: #475569;">
-                This is an automated security notification from the DiziGini portal. Please do not reply directly to this email.
+                This is an automated security notification from the CreativeGini portal. Please do not reply directly to this email.
               </p>
             </td>
           </tr>
@@ -1592,7 +1589,7 @@ export const sendPasswordResetEmail = async ({
     }
 
     const recipientName = name || 'User';
-    const subject = `Reset Your DiziGini Password`;
+    const subject = `Reset Your CreativeGini Password`;
 
     const html = buildPasswordResetEmailTemplate({
       recipientName,
@@ -1600,7 +1597,7 @@ export const sendPasswordResetEmail = async ({
       expiresMinutes
     });
 
-    const text = `Reset Your DiziGini Password\n\nDear ${recipientName},\n\nWe received a request to reset your password for your DiziGini account.\n\nPlease visit the following secure link to reset your password:\n${resetUrl}\n\nThis single-use link is valid for ${expiresMinutes} minutes.\n\nIf you did not make this request, you can safely ignore this email. Your password will remain unchanged.\n\n- DiziGini Security Team`;
+    const text = `Reset Your CreativeGini Password\n\nDear ${recipientName},\n\nWe received a request to reset your password for your CreativeGini account.\n\nPlease visit the following secure link to reset your password:\n${resetUrl}\n\nThis single-use link is valid for ${expiresMinutes} minutes.\n\nIf you did not make this request, you can safely ignore this email. Your password will remain unchanged.\n\n- CreativeGini Security Team`;
 
     return await sendEmail({
       to,
@@ -1627,7 +1624,7 @@ export const sendMagicLinkEmail = async ({
     }
 
     const recipientName = name || 'Valued Client';
-    const subject = `Your DiziGini Magic Access Link (One-Click Sign In)`;
+    const subject = `Your CreativeGini Magic Access Link (One-Click Sign In)`;
 
     const html = `
       <!DOCTYPE html>
@@ -1651,13 +1648,13 @@ export const sendMagicLinkEmail = async ({
       <body>
         <div class="wrapper">
           <div class="header">
-            <h1>DiziGini</h1>
+            <h1>CreativeGini</h1>
             <p>Instant Secure Passwordless Access</p>
           </div>
           <div class="content">
             <p style="font-size: 15px; margin-top: 0;">Hello <strong>${recipientName}</strong>,</p>
             <p style="font-size: 14px; line-height: 1.6; color: #334155;">
-              Click the button below to instantly sign in to your DiziGini Portal without entering your password:
+              Click the button below to instantly sign in to your CreativeGini Portal without entering your password:
             </p>
             <div class="btn-box">
               <a href="${magicUrl}" class="btn" target="_blank">Sign In to Dashboard &rarr;</a>
@@ -1671,14 +1668,14 @@ export const sendMagicLinkEmail = async ({
             </div>
           </div>
           <div class="footer">
-            &copy; ${new Date().getFullYear()} DiziGini Platform. All rights reserved.
+            &copy; ${new Date().getFullYear()} CreativeGini Platform. All rights reserved.
           </div>
         </div>
       </body>
       </html>
     `.trim();
 
-    const text = `Sign in to DiziGini: ${magicUrl}\n\nThis magic link expires in ${Math.round(expiresMinutes / 60)} hours.`;
+    const text = `Sign in to CreativeGini: ${magicUrl}\n\nThis magic link expires in ${Math.round(expiresMinutes / 60)} hours.`;
 
     return await sendEmail({
       to,
@@ -1702,7 +1699,7 @@ export const sendMagicLinkEmail = async ({
  *   1. Company Boost
  *   2. Company Lead
  *   3. UI team
- * - "A new client has been created in DiziGini and the team needs to prepare the initial company samples/workspace."
+ * - "A new client has been created in CreativeGini and the team needs to prepare the initial company samples/workspace."
  * - Include:
  *   - Client/company name
  *   - Contact person
@@ -1711,7 +1708,7 @@ export const sendMagicLinkEmail = async ({
  *   - Client email
  *   - Link to relevant internal dashboard / client profile
  * - Do NOT send this email to the client!
- * - Sender: DiziGini <team@dizigini.com>
+ * - Sender: CreativeGini <team@creativegini.com>
  // ============================================================================
 // 10. NEW CLIENT ONBOARDING TEAM EMAILS (Company Lead, Boost, UI)
 // ============================================================================
@@ -1789,7 +1786,7 @@ export const buildInternalLeadOnboardingEmailTemplate = ({
                 New Client Onboarded: ${companyName}
               </h1>
               <p style="margin: 0; font-size: 13px; color: #94A3B8; line-height: 1.5;">
-                A new client has been onboarded into DiziGini. The <strong>Company Lead team</strong> needs to start and submit the required onboarding sample work.
+                A new client has been onboarded into CreativeGini. The <strong>Company Lead team</strong> needs to start and submit the required onboarding sample work.
               </p>
             </td>
           </tr>
@@ -1830,7 +1827,7 @@ export const buildInternalLeadOnboardingEmailTemplate = ({
           <tr>
             <td style="padding: 20px 32px; background: #040914; border-top: 1px solid #1E293B; text-align: center;">
               <p style="margin: 0; font-size: 11px; color: #64748B;">
-                DiziGini &middot; Internal Operations Dispatch &middot; team@dizigini.com
+                CreativeGini &middot; Internal Operations Dispatch &middot; team@creativegini.com
               </p>
             </td>
           </tr>
@@ -1878,7 +1875,7 @@ export const buildInternalBoostOnboardingEmailTemplate = ({
                 New Client Onboarded: ${companyName}
               </h1>
               <p style="margin: 0; font-size: 13px; color: #94A3B8; line-height: 1.5;">
-                A new client has been onboarded into DiziGini. The <strong>Company Boost team</strong> needs to start and submit the required onboarding sample work.
+                A new client has been onboarded into CreativeGini. The <strong>Company Boost team</strong> needs to start and submit the required onboarding sample work.
               </p>
             </td>
           </tr>
@@ -1918,7 +1915,7 @@ export const buildInternalBoostOnboardingEmailTemplate = ({
           <tr>
             <td style="padding: 20px 32px; background: #040914; border-top: 1px solid #1E293B; text-align: center;">
               <p style="margin: 0; font-size: 11px; color: #64748B;">
-                DiziGini &middot; Internal Operations Dispatch &middot; team@dizigini.com
+                CreativeGini &middot; Internal Operations Dispatch &middot; team@creativegini.com
               </p>
             </td>
           </tr>
@@ -1966,7 +1963,7 @@ export const buildInternalUiOnboardingEmailTemplate = ({
                 New Client Onboarded: ${companyName}
               </h1>
               <p style="margin: 0; font-size: 13px; color: #94A3B8; line-height: 1.5;">
-                A new client has been onboarded into DiziGini. The <strong>Company UI / Landing Page team</strong> needs to start and submit the required onboarding sample work.
+                A new client has been onboarded into CreativeGini. The <strong>Company UI / Landing Page team</strong> needs to start and submit the required onboarding sample work.
               </p>
             </td>
           </tr>
@@ -2004,7 +2001,7 @@ export const buildInternalUiOnboardingEmailTemplate = ({
           <tr>
             <td style="padding: 20px 32px; background: #040914; border-top: 1px solid #1E293B; text-align: center;">
               <p style="margin: 0; font-size: 11px; color: #64748B;">
-                DiziGini &middot; Internal Operations Dispatch &middot; team@dizigini.com
+                CreativeGini &middot; Internal Operations Dispatch &middot; team@creativegini.com
               </p>
             </td>
           </tr>
@@ -2073,7 +2070,7 @@ Required Deliverables:
 
 Open Company Lead Workspace: ${resolvedUrl}
 
-- DiziGini Internal Ops <team@dizigini.com>`;
+- CreativeGini Internal Ops <team@creativegini.com>`;
 
     const results = [];
     for (const recipient of validRecipients) {
@@ -2153,7 +2150,7 @@ Required Deliverables:
 
 Open Company Boost Workspace: ${resolvedUrl}
 
-- DiziGini Internal Ops <team@dizigini.com>`;
+- CreativeGini Internal Ops <team@creativegini.com>`;
 
     const results = [];
     for (const recipient of validRecipients) {
@@ -2231,7 +2228,7 @@ Required Deliverables:
 
 Open Landing Page Workspace: ${resolvedUrl}
 
-- DiziGini Internal Ops <team@dizigini.com>`;
+- CreativeGini Internal Ops <team@creativegini.com>`;
 
     const results = [];
     for (const recipient of validRecipients) {
@@ -2315,7 +2312,7 @@ export const sendInternalNewClientNotification = async ({
   company,
   dashboardUrl
 }) => {
-  const base = (dashboardUrl || process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/$/, '');
+  const base = (dashboardUrl || process.env.PORTAL_BASE_URL || 'http://localhost:5173').replace(/\/$/, '');
   return sendInternalLeadOnboardingNotification({
     recipients,
     client,
@@ -2338,7 +2335,7 @@ export const sendSampleInquiryAlertEmail = async ({
   const senderName = inquiry?.senderName || 'Prospect Visitor';
   const senderEmail = inquiry?.senderEmail || '';
   const message = inquiry?.message || "Hey Creativegini i'm intrested in your service";
-  const portalBase = (process.env.PORTAL_BASE_URL || 'http://dizigini.com').replace(/\/$/, '');
+  const portalBase = (process.env.PORTAL_BASE_URL || 'http://localhost:5173').replace(/\/$/, '');
   const showcaseUrl = `${portalBase}/samples/${encodeURIComponent(slug)}`;
 
   const subject = `[New Lead Inquiry] ${companyName} unlock request from ${senderName}`;
@@ -2405,10 +2402,10 @@ export const sendSampleInquiryConfirmationEmail = async ({
   const slug = sample?.slug || inquiry?.slug || 'general';
   const senderName = inquiry?.senderName || 'there';
   const message = inquiry?.message || "Hey Creativegini i'm intrested in your service";
-  const portalBase = (process.env.PORTAL_BASE_URL || 'http://dizigini.com').replace(/\/$/, '');
+  const portalBase = (process.env.PORTAL_BASE_URL || 'http://localhost:5173').replace(/\/$/, '');
   const showcaseUrl = `${portalBase}/samples/${encodeURIComponent(slug)}`;
 
-  const subject = `We received your intelligence request for ${companyName} - DiziGini`;
+  const subject = `We received your intelligence request for ${companyName} - CreativeGini`;
   const preheader = `Thank you for reaching out regarding ${companyName}. Our specialist team will be in touch shortly.`;
 
   const html = buildHtmlTemplate({
@@ -2435,7 +2432,7 @@ export const sendSampleInquiryConfirmationEmail = async ({
     note: 'Our team will contact you directly with full email validation results, phone lines, and customized ICP data.'
   });
 
-  const text = `Hi ${senderName},\n\nThank you for reaching out regarding ${companyName}.\n\nOur team has received your message:\n"${message}"\n\nWe will review your inquiry and follow up within 2–4 business hours.\n\nShowcase URL: ${showcaseUrl}\n\nBest regards,\nDiziGini Intelligence Team`;
+  const text = `Hi ${senderName},\n\nThank you for reaching out regarding ${companyName}.\n\nOur team has received your message:\n"${message}"\n\nWe will review your inquiry and follow up within 2–4 business hours.\n\nShowcase URL: ${showcaseUrl}\n\nBest regards,\nCreativeGini Intelligence Team`;
 
   return await sendEmail({
     to: recipient,
@@ -2446,7 +2443,6 @@ export const sendSampleInquiryConfirmationEmail = async ({
     dedupeKey: `INQUIRY_CONFIRM:${inquiry?.id || slug}:${recipient}`
   });
 };
-
 
 
 

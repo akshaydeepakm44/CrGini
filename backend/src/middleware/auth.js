@@ -40,7 +40,7 @@ export const protect = async (req, res, next) => {
 
   try {
     let decoded;
-    const primarySecret = process.env.JWT_SECRET || 'dizigini_secure_jwt_secret_key_2026';
+    const primarySecret = process.env.JWT_SECRET || 'creativegini_secret_2026';
     try {
       decoded = jwt.verify(token, primarySecret);
     } catch (primaryErr) {
@@ -136,7 +136,7 @@ export const optionalProtect = async (req, res, next) => {
 
   try {
     let decoded;
-    const primarySecret = process.env.JWT_SECRET || 'dizigini_secure_jwt_secret_key_2026';
+    const primarySecret = process.env.JWT_SECRET || 'creativegini_secret_2026';
     try {
       decoded = jwt.verify(token, primarySecret);
     } catch (_) {

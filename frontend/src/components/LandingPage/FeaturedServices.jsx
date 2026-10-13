@@ -3,7 +3,6 @@ import {
   Target, 
   Building2, 
   Users, 
-  Presentation,
   Compass, 
   PenTool, 
   Code, 
@@ -15,8 +14,58 @@ import { useServiceVisibility } from '../../features/client/context/ServiceVisib
 
 const FEATURED_SERVICES = [
   {
+    id: 'strategic-planner',
+    title: 'Strategic Planner',
+    category: 'Boosting',
+    icon: Compass,
+    bgIcon: 'linear-gradient(135deg, #EC4899 0%, #DB2777 100%)',
+    desc: 'Actionable go-to-market roadmaps, competitor messaging audits, and high-conversion positioning frameworks for B2B expansion.',
+    badgeBg: '#FCE7F3',
+    badgeColor: '#BE185D'
+  },
+  {
+    id: 'content-creator',
+    title: 'Content Creator',
+    category: 'Boosting',
+    icon: PenTool,
+    bgIcon: 'linear-gradient(135deg, #F43F5E 0%, #E11D48 100%)',
+    desc: 'Compelling thought leadership articles, sales one-pagers, outbound email sequences, and high-converting landing page copy.',
+    badgeBg: '#FCE7F3',
+    badgeColor: '#BE185D'
+  },
+  {
+    id: 'devrel',
+    title: 'DevRel & Technical Advocacy',
+    category: 'Boosting',
+    icon: Code,
+    bgIcon: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+    desc: 'Developer marketing playbooks, hands-on tutorials, API quickstarts, and engineering community engagement strategies.',
+    badgeBg: '#FCE7F3',
+    badgeColor: '#BE185D'
+  },
+  {
+    id: 'ui-ux-audit',
+    title: 'UI/UX Audit',
+    category: 'Design',
+    icon: Palette,
+    bgIcon: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+    desc: 'Comprehensive usability evaluation, user-flow diagnostics and heuristic interface review to eliminate UX friction.',
+    badgeBg: '#E0F2FE',
+    badgeColor: '#0369A1'
+  },
+  {
+    id: 'redesign-request',
+    title: 'Landing Page Redesign',
+    category: 'Design',
+    icon: Sparkles,
+    bgIcon: 'linear-gradient(135deg, #EC4899 0%, #DB2777 100%)',
+    desc: 'Modern aesthetic standards, striking hero sections, intuitive layouts, and compelling visual storytelling for high conversion.',
+    badgeBg: '#FDF2F8',
+    badgeColor: '#BE185D'
+  },
+  {
     id: 'lead-research',
-    title: 'Lead Research & ICP Discovery',
+    title: 'Lead Research',
     category: 'Digitalising',
     icon: Target,
     bgIcon: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
@@ -26,7 +75,7 @@ const FEATURED_SERVICES = [
   },
   {
     id: 'company-study',
-    title: 'Company Study & Account Dossiers',
+    title: 'Company Study',
     category: 'Digitalising',
     icon: Building2,
     bgIcon: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
@@ -43,16 +92,6 @@ const FEATURED_SERVICES = [
     desc: 'Targeted intelligence on VP and C-level decision-makers, direct executive emails, verified social profiles, and background notes.',
     badgeBg: '#EDE9FE',
     badgeColor: '#6D28D9'
-  },
-  {
-    id: 'pitch-support',
-    title: 'Pitch & Presentation Support',
-    category: 'Digitalising',
-    icon: Presentation,
-    bgIcon: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-    desc: 'Market intelligence, win-loss competitive teardowns, and data-backed proof points to empower high-stakes sales pitches.',
-    badgeBg: '#D1FAE5',
-    badgeColor: '#059669'
   }
 ];
 
@@ -67,10 +106,10 @@ export default function FeaturedServices({ onExploreService }) {
     <section className="cg-section" aria-label="Featured Services">
       <div className="cg-container">
         <div className="cg-section-header">
-          <span className="cg-section-badge">DizitalGini Deliverables</span>
-          <h2 className="cg-section-title">Featured Intelligence Services</h2>
+          <span className="cg-section-badge">Core Deliverables</span>
+          <h2 className="cg-section-title">Featured Growth Services</h2>
           <p className="cg-section-subtitle">
-            Explore our verified B2B intelligence deliverables, requested directly by venture-backed startups and modern enterprise teams.
+            Explore our most requested deliverables, requested directly by venture-backed startups and modern enterprise teams.
           </p>
         </div>
 

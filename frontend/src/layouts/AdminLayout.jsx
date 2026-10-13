@@ -23,7 +23,7 @@ export default function AdminLayout({
   children,
   currentPath = '/admin/dashboard',
   onNavigate,
-  user = { name: 'Platform Admin', email: 'admin@dizigini.com', role: 'ADMIN' },
+  user = { name: 'Platform Admin', email: 'admin@creativegini.com', role: 'ADMIN' },
   unreadNotifications = 2,
   notifications = [],
   onLogout,

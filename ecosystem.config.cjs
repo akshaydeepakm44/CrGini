@@ -3,13 +3,13 @@ const path = require('path');
 module.exports = {
   apps: [
     {
-      name: 'dizigini-backend',
+      name: 'creativegini-backend',
       script: 'src/server.js',
       cwd: path.resolve(__dirname, 'backend'),
       interpreter: 'node',
       env: {
         NODE_ENV: 'production',
-        PORT: 5001,
+        PORT: 5000,
       },
       watch: false,
       max_memory_restart: '512M',

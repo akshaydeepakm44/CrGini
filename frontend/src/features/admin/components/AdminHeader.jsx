@@ -33,7 +33,7 @@ export default function AdminHeader({
             <ShieldAlert size={20} />
           </div>
           <div className="cg-admin-brand-text">
-            <span className="cg-admin-brand-title">DIZIGINI</span>
+            <span className="cg-admin-brand-title">CREATIVEGINI</span>
             <span className="cg-admin-brand-subtitle">CONTROL CENTER</span>
           </div>
         </div>

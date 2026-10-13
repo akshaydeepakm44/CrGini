@@ -330,7 +330,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
 
 Hi team at ${showcase.companyName},
 
-Our research specialists at DiziGini have put together a dedicated intelligence showcase specifically for ${showcase.companyName}.
+Our research specialists at CreativeGini have put together a dedicated intelligence showcase specifically for ${showcase.companyName}.
 
 We analyzed your current market position, prepared a deep-dive Company Study, mapped key high-fit prospect accounts with strategic fit analyses, and formulated an actionable outreach proposal:
 
@@ -345,8 +345,8 @@ Key deliverables included inside your showcase:
 Feel free to inspect the sample data. Whenever you are ready to unlock direct contact details and scale with our specialist team, click "More Leads" on the dashboard.
 
 Best regards,
-DiziGini Lead Intelligence Team
-support@dizigini.com`;
+CreativeGini Lead Intelligence Team
+support@creativegini.com`;
 
     navigator.clipboard.writeText(emailTemplate);
     setCopiedEmailSlug(showcase.slug);
@@ -1156,7 +1156,7 @@ support@dizigini.com`;
                     </label>
                     <textarea
                       rows={3}
-                      placeholder="Brief introductory context explaining what DiziGini discovered regarding this client..."
+                      placeholder="Brief introductory context explaining what CreativeGini discovered regarding this client..."
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       style={{

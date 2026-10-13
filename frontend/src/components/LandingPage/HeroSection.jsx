@@ -24,17 +24,17 @@ export default function HeroSection({ onGetStarted, onExploreServices }) {
           <div className="cg-hero-content">
             <div className="cg-eyebrow-pill">
               <span className="cg-eyebrow-dot" />
-              <span>B2B INTELLIGENCE &amp; DIGITALISATION PLATFORM</span>
+              <span>DIGITAL MARKETING &amp; BUSINESS GROWTH</span>
             </div>
 
             <h1 className="cg-hero-headline">
-              Discover leads.<br />
-              Study accounts.<br />
-              <span className="cg-headline-gradient">Close deals faster.</span>
+              Grow smarter.<br />
+              Build faster.<br />
+              <span className="cg-headline-gradient">Market better.</span>
             </h1>
 
             <p className="cg-hero-subtext">
-              DiziGini (dizigini.com) connects your revenue teams with hand-verified prospect discovery, in-depth company dossiers, key decision-maker research, and executive pitch assets.
+              CreativeGini connects your business with the research, strategy, content and growth services you need to move forward.
             </p>
 
             <div className="cg-hero-ctas">

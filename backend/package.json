@@ -1,7 +1,7 @@
 {
-  "name": "dizigini-backend",
+  "name": "creativegini-backend",
   "version": "1.0.0",
-  "description": "DiziGini Portal Backend API",
+  "description": "CreativeGini Portal Backend API",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "dev": "node --watch-path=src src/server.js",
     "seed": "node src/seed-pg.js",
     "clean": "node src/clean-fake-data.js",
-    "tunnel": "ngrok http 5001",
+    "tunnel": "ngrok http 5000",
     "test": "node tests/unit/email-system.test.js",
     "test:unit": "node tests/unit/email-system.test.js",
     "test:email": "node tests/unit/email-system.test.js",

@@ -184,7 +184,7 @@ export default function ClientPortal({ user, onLogout }) {
       notifications={notifications}
       onLogout={onLogout}
       onOpenProfile={() => navigate('/portal/profile')}
-      onExploreServices={() => navigate('/portal/digitalising')}
+      onExploreServices={() => navigate('/portal/boosting')}
     >
       <Routes>
         {/* 1. Dashboard Root */}
@@ -227,9 +227,25 @@ export default function ClientPortal({ user, onLogout }) {
           }
         />
 
-        {/* 2. Deactivated Channels - Smoothly redirect to Digitalising */}
-        <Route path="boosting/*" element={<Navigate to="/portal/digitalising" replace />} />
-        <Route path="boosting" element={<Navigate to="/portal/digitalising" replace />} />
+        {/* 2. Boosting Channel & Services */}
+        <Route
+          path="boosting"
+          element={
+            <BoostingChannelPage
+              onSelectService={(slug) => navigate(`/portal/boosting/${slug}`)}
+              onRequestService={(serviceId, customData) => handleOpenNewRequest(serviceId, customData)}
+            />
+          }
+        />
+        <Route
+          path="boosting/:serviceSlug"
+          element={
+            <ServiceDetailWrapper
+              onOpenNewRequest={handleOpenNewRequest}
+              channel="boosting"
+            />
+          }
+        />
 
         {/* 3. Digitalising Channel & Services */}
         <Route
@@ -276,13 +292,69 @@ export default function ClientPortal({ user, onLogout }) {
           }
         />
 
-        {/* 3b. Deactivated Channels - Redirect to Digitalising */}
-        <Route path="design/*" element={<Navigate to="/portal/digitalising" replace />} />
-        <Route path="design" element={<Navigate to="/portal/digitalising" replace />} />
-        <Route path="development/*" element={<Navigate to="/portal/digitalising" replace />} />
-        <Route path="development" element={<Navigate to="/portal/digitalising" replace />} />
-        <Route path="bundles/*" element={<Navigate to="/portal/digitalising" replace />} />
-        <Route path="bundles" element={<Navigate to="/portal/digitalising" replace />} />
+        {/* 3b. UI / Design Channel & Services */}
+        <Route
+          path="design"
+          element={
+            <DesignChannelPage
+              onSelectService={(slug) => navigate(`/portal/design/${slug}`)}
+              onRequestService={(serviceId, customData) => handleOpenNewRequest(serviceId, customData)}
+            />
+          }
+        />
+        <Route
+          path="design/:serviceSlug"
+          element={
+            <ServiceDetailWrapper
+              onOpenNewRequest={handleOpenNewRequest}
+              channel="design"
+            />
+          }
+        />
+
+        {/* 3c. App Development Channel & Services */}
+        <Route
+          path="development"
+          element={
+            <DevelopmentChannelPage
+              onSelectService={(slug) => navigate(`/portal/development/${slug}`)}
+              onRequestService={(serviceId, customData) => handleOpenNewRequest(serviceId, customData)}
+            />
+          }
+        />
+        <Route
+          path="development/:serviceSlug"
+          element={
+            <ServiceDetailWrapper
+              onOpenNewRequest={handleOpenNewRequest}
+              channel="development"
+            />
+          }
+        />
+
+        {/* 3d. Bundles Channel & Sub Pages */}
+        <Route
+          path="bundles"
+          element={<Navigate to="/portal/bundles/offer" replace />}
+        />
+        <Route
+          path="bundles/offer"
+          element={
+            <OfferBundlePage
+              onRequestBundle={handleOpenNewRequest}
+              onNavigate={handleNavigate}
+            />
+          }
+        />
+        <Route
+          path="bundles/custom"
+          element={
+            <CustomBundlePage
+              onRequestCustomBundle={handleOpenNewRequest}
+              onNavigate={handleNavigate}
+            />
+          }
+        />
 
         {/* 4. My Requests */}
         <Route
