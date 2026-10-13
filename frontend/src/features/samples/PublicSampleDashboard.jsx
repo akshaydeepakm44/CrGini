@@ -25,13 +25,8 @@ import {
   Mail,
   Phone,
   CheckCircle,
-  CheckCircle2,
   Globe,
-  X,
-  Send,
-  Copy,
-  Check,
-  Loader2
+  X
 } from 'lucide-react';
 import { api } from '../../services/api';
 
@@ -139,16 +134,6 @@ export default function PublicSampleDashboard() {
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'company' | 'leads' | 'study' | 'pitch'
   const [selectedLead, setSelectedLead] = useState(null);
 
-  // In-page contact form state
-  const [contactName, setContactName] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
-  const [contactMessage, setContactMessage] = useState("Hey Creativegini i'm intrested in your service");
-  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
-  const [contactSubmitted, setContactSubmitted] = useState(false);
-  const [contactSuccessMessage, setContactSuccessMessage] = useState('');
-  const [contactError, setContactError] = useState('');
-  const [copiedEmail, setCopiedEmail] = useState(false);
-
   const effectiveSlug = slug || 'data-i2i';
 
   useEffect(() => {
@@ -225,83 +210,6 @@ export default function PublicSampleDashboard() {
     return rawLeads;
   }, [sample]);
 
-  const scrollToContactForm = () => {
-    const el = document.getElementById('contact-section');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-      setTimeout(() => {
-        const input = document.getElementById('contact-email-input');
-        if (input) input.focus();
-      }, 350);
-    }
-  };
-
-  const defaultDraftSubject = "Hey Creativegini i'm intrested in your service";
-  const defaultDraftBody = `Hey Creativegini i'm intrested in your service\n\nProspect Company: ${sample?.companyName || 'Lead Inquiry'}`;
-
-  const gmailWebUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=contact@creativegini.com&su=${encodeURIComponent(defaultDraftSubject)}&body=${encodeURIComponent(defaultDraftBody)}`;
-  const outlookWebUrl = `https://outlook.office.com/mail/deeplink/compose?to=contact@creativegini.com&subject=${encodeURIComponent(defaultDraftSubject)}&body=${encodeURIComponent(defaultDraftBody)}`;
-  const contactMailtoUrl = `mailto:contact@creativegini.com?subject=${encodeURIComponent(defaultDraftSubject)}&body=${encodeURIComponent(defaultDraftBody)}`;
-
-  const handleCopyEmail = (e) => {
-    if (e) e.preventDefault();
-    const textToCopy = `To: contact@creativegini.com\nSubject: ${defaultDraftSubject}\n\n${defaultDraftBody}`;
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(textToCopy)
-        .then(() => {
-          setCopiedEmail(true);
-          setTimeout(() => setCopiedEmail(false), 3000);
-        })
-        .catch(() => {
-          setCopiedEmail(true);
-          setTimeout(() => setCopiedEmail(false), 3000);
-        });
-    } else {
-      setCopiedEmail(true);
-      setTimeout(() => setCopiedEmail(false), 3000);
-    }
-  };
-
-  const handleContactSubmit = async (e) => {
-    e.preventDefault();
-    if (!contactEmail || !contactEmail.includes('@')) {
-      setContactError('Please enter a valid work email address.');
-      return;
-    }
-
-    setIsSubmittingContact(true);
-    setContactError('');
-
-    try {
-      const res = await api.submitPublicInquiry(effectiveSlug, {
-        name: contactName.trim() || 'Prospect Visitor',
-        email: contactEmail.trim(),
-        message: contactMessage.trim() || "Hey Creativegini i'm intrested in your service",
-      });
-
-      setContactSuccessMessage(
-        res?.message ||
-        `Inquiry recorded successfully! Our lead specialist team will reach out to ${contactEmail.trim()} within 2-4 hours.`
-      );
-      setContactSubmitted(true);
-    } catch (err) {
-      console.error('[PublicSampleDashboard] Contact submit error:', err);
-      setContactError(err.message || 'Unable to submit directly. Please use the instant Gmail or Outlook buttons below.');
-    } finally {
-      setIsSubmittingContact(false);
-    }
-  };
-
-  // Enforce single lead preview restriction: only the 1st lead can be opened
-  useEffect(() => {
-    if (selectedLead && displayLeads.length > 0) {
-      if (selectedLead.id !== displayLeads[0].id) {
-        setSelectedLead(null);
-        scrollToContactForm();
-      }
-    }
-  }, [selectedLead, displayLeads]);
-
   const handleSignUpClick = () => {
     navigate('/signin?view=signup&returnTo=/portal');
   };
@@ -309,6 +217,16 @@ export default function PublicSampleDashboard() {
   const handleLoginClick = () => {
     navigate('/signin?returnTo=/portal');
   };
+
+  // Enforce single lead preview restriction: only the 1st lead can be opened
+  useEffect(() => {
+    if (selectedLead && displayLeads.length > 0) {
+      if (selectedLead.id !== displayLeads[0].id) {
+        setSelectedLead(null);
+        handleSignUpClick();
+      }
+    }
+  }, [selectedLead, displayLeads]);
 
   if (loading) {
     return (
@@ -720,7 +638,7 @@ export default function PublicSampleDashboard() {
                     if (isUnlocked) {
                       setSelectedLead(lead);
                     } else {
-                      scrollToContactForm();
+                      handleSignUpClick();
                     }
                   }}
                   style={{
@@ -921,7 +839,7 @@ export default function PublicSampleDashboard() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          scrollToContactForm();
+                          handleSignUpClick();
                         }}
                         style={{
                           display: 'inline-flex',
@@ -1030,282 +948,7 @@ export default function PublicSampleDashboard() {
           </section>
         )}
 
-        {/* SECTION 5: CONTACT FORM & ACTION (REPLACES "MORE LEADS +") */}
-        <section
-          id="contact-section"
-          style={{
-            background: '#FFFFFF',
-            borderRadius: '24px',
-            border: '2px solid #2563EB',
-            padding: '48px 36px',
-            boxShadow: '0 12px 36px rgba(37,99,235,0.08)',
-            marginBottom: '48px',
-          }}
-        >
-          <div style={{ maxWidth: '780px', margin: '0 auto', textAlign: 'center' }}>
-            <div style={{ display: 'inline-flex', padding: '14px', borderRadius: '50%', background: '#EFF6FF', color: '#2563EB', marginBottom: '16px' }}>
-              <Mail size={32} />
-            </div>
 
-            <h2 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0F172A', marginBottom: '10px', letterSpacing: '-0.3px' }}>
-              Unlock All Qualified Leads & Custom Campaigns
-            </h2>
-
-            <p style={{ fontSize: '1rem', color: '#64748B', margin: '0 auto 28px auto', lineHeight: '1.6', maxWidth: '640px' }}>
-              Connect directly with our specialist team to unlock verified emails, phone lines, deep-dive account dossiers, and custom intelligence execution.
-            </p>
-
-            {/* Quick 1-Click Launchers Grid */}
-            <div style={{ marginBottom: '32px' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
-                Instant 1-Click Contact Options
-              </div>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
-                {/* 1. Gmail Web (Works 100% across all devices without desktop mail apps) */}
-                <a
-                  href={gmailWebUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '12px 20px',
-                    borderRadius: '10px',
-                    background: '#EA4335',
-                    color: '#FFFFFF',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    boxShadow: '0 3px 10px rgba(234,67,53,0.25)',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <Mail size={16} />
-                  <span>Open in Gmail (Web)</span>
-                  <ExternalLink size={14} />
-                </a>
-
-                {/* 2. Outlook 365 Web */}
-                <a
-                  href={outlookWebUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '12px 20px',
-                    borderRadius: '10px',
-                    background: '#0078D4',
-                    color: '#FFFFFF',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    boxShadow: '0 3px 10px rgba(0,120,212,0.25)',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <Mail size={16} />
-                  <span>Open in Outlook 365</span>
-                  <ExternalLink size={14} />
-                </a>
-
-                {/* 3. Default Mail App */}
-                <a
-                  href={contactMailtoUrl}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '12px 20px',
-                    borderRadius: '10px',
-                    background: '#2563EB',
-                    color: '#FFFFFF',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    boxShadow: '0 3px 10px rgba(37,99,235,0.25)',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <Mail size={16} />
-                  <span>Default Mail App</span>
-                  <ArrowRight size={14} />
-                </a>
-
-                {/* 4. Copy Email & Draft */}
-                <button
-                  type="button"
-                  onClick={handleCopyEmail}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '12px 20px',
-                    borderRadius: '10px',
-                    background: copiedEmail ? '#ECFDF5' : '#F1F5F9',
-                    border: copiedEmail ? '1px solid #10B981' : '1px solid #CBD5E1',
-                    color: copiedEmail ? '#059669' : '#334155',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {copiedEmail ? <Check size={16} color="#059669" /> : <Copy size={16} />}
-                  <span>{copiedEmail ? 'Copied to Clipboard! ✓' : 'Copy Email & Draft'}</span>
-                </button>
-              </div>
-
-              <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '12px' }}>
-                Launches pre-filled draft: <em>"Hey Creativegini i'm intrested in your service"</em> to <strong>contact@creativegini.com</strong>
-              </div>
-            </div>
-
-            {/* In-Page Quick Contact Form */}
-            <div
-              style={{
-                background: '#F8FAFC',
-                border: '1px solid #E2E8F0',
-                borderRadius: '16px',
-                padding: '28px',
-                textAlign: 'left',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Sparkles size={16} color="#2563EB" />
-                  <span>Direct In-Page Inquiry / Request Lead Unlock</span>
-                </div>
-                <span style={{ fontSize: '0.75rem', color: '#059669', background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '3px 10px', borderRadius: '12px', fontWeight: 600 }}>
-                  ⚡ Sent directly to CreativeGini team
-                </span>
-              </div>
-
-              {contactSubmitted ? (
-                <div style={{ background: '#ECFDF5', border: '1.5px solid #10B981', color: '#065F46', padding: '28px 24px', borderRadius: '12px', textAlign: 'center' }}>
-                  <CheckCircle2 size={38} style={{ margin: '0 auto 12px auto', display: 'block', color: '#059669' }} />
-                  <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#065F46', marginBottom: '6px' }}>
-                    Inquiry Received Successfully!
-                  </div>
-                  <p style={{ fontSize: '0.875rem', color: '#047857', margin: '0 auto 16px auto', maxWidth: '520px', lineHeight: '1.55' }}>
-                    {contactSuccessMessage || `Thank you! Your inquiry regarding ${sample?.companyName || 'Lead Intelligence'} has been recorded. Our enterprise specialist will reach back out to ${contactEmail} shortly.`}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setContactSubmitted(false);
-                      setContactEmail('');
-                    }}
-                    style={{
-                      background: '#059669',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      padding: '8px 20px',
-                      borderRadius: '8px',
-                      fontSize: '0.825rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Send Another Inquiry
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleContactSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {contactError && (
-                    <div style={{ background: '#FEF2F2', border: '1px solid #F87171', color: '#991B1B', padding: '10px 14px', borderRadius: '8px', fontSize: '0.825rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <X size={16} />
-                      <span>{contactError}</span>
-                    </div>
-                  )}
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                        Your Full Name
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Alex Morgan"
-                        value={contactName}
-                        onChange={(e) => setContactName(e.target.value)}
-                        style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.875rem', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                        Your Work Email *
-                      </label>
-                      <input
-                        id="contact-email-input"
-                        type="email"
-                        required
-                        placeholder="e.g. alex@company.com"
-                        value={contactEmail}
-                        onChange={(e) => setContactEmail(e.target.value)}
-                        style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.875rem', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                      Message to CreativeGini
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={contactMessage}
-                      onChange={(e) => setContactMessage(e.target.value)}
-                      style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.875rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                    <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
-                      Recipient: <strong style={{ color: '#0F172A' }}>contact@creativegini.com</strong>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isSubmittingContact}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '12px 28px',
-                        borderRadius: '10px',
-                        background: '#2563EB',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        fontWeight: 700,
-                        fontSize: '0.925rem',
-                        cursor: isSubmittingContact ? 'not-allowed' : 'pointer',
-                        boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
-                        opacity: isSubmittingContact ? 0.7 : 1,
-                      }}
-                    >
-                      {isSubmittingContact ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          <span>Sending Inquiry...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send size={16} />
-                          <span>Send Inquiry to Team</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-
-          </div>
-        </section>
 
       </main>
 
@@ -1802,7 +1445,7 @@ export default function PublicSampleDashboard() {
                   type="button"
                   onClick={() => {
                     setSelectedLead(null);
-                    scrollToContactForm();
+                    handleSignUpClick();
                   }}
                   style={{
                     display: 'inline-flex',
@@ -1819,8 +1462,8 @@ export default function PublicSampleDashboard() {
                     boxShadow: '0 4px 14px rgba(37,99,235,0.3)',
                   }}
                 >
-                  <Mail size={16} />
-                  <span>CONTACT CREATIVEGINI TO UNLOCK ALL LEADS</span>
+                  <UserPlus size={16} />
+                  <span>SIGN UP TO UNLOCK ALL LEADS</span>
                   <ArrowRight size={16} />
                 </button>
               </div>
