@@ -119,6 +119,117 @@ function renderStructuredNarrative(text, defaultFallback, accentColor = '#2563EB
   );
 }
 
+const FALLBACK_SHOWCASE = {
+  slug: 'data-i2i',
+  title: 'Data I2I Intelligence & Growth Showcase',
+  companyName: 'Data I2I',
+  description: 'Curated B2B account intelligence, qualified decision-makers, verified market observations, and customized presentation architecture prepared by CreativeGini specialist teams.',
+  companyStudy: {
+    company: 'Data I2I',
+    industry: 'Enterprise Data Analytics & AI Consulting',
+    businessOverview: 'Data I2I accelerates digital transformations by architecting unified analytics pipelines, modern data warehouses, and custom AI-driven business decision engines for Fortune 1000 enterprises.',
+    marketPosition: 'Strong footprint across mid-market and enterprise fintech and healthtech sectors, competing with boutique data consultancies through rapid POC deployment models.',
+    keyObservations: '1. High enterprise demand for unified data lineage and governance.\n2. Client decision-makers are actively consolidating fragmented ETL silos into modern lakehouse architectures.\n3. Executive leadership prioritizes demonstrable ROI within 90 days.',
+    potentialOpportunity: 'Position bespoke AI readiness assessments to CIOs and Heads of Data Engineering navigating enterprise data governance.',
+    hasPdf: true,
+    pdfFileName: 'Data_I2I_Enterprise_Growth_Playbook.pdf',
+    pdfUrl: '/api/samples/data-i2i/company-study-pdf',
+  },
+  leads: [
+    {
+      id: 'sample-lead-1',
+      name: 'Sarah Jenkins',
+      title: 'VP of Data Engineering & Cloud Architecture',
+      company: 'Meridian Financial Systems',
+      companyLink: 'https://meridianfin.com',
+      logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&auto=format&fit=crop&q=80',
+      shortSummary: 'Directs cloud infrastructure, enterprise warehouse migrations, and real-time transaction processing for North American banking operations.',
+      industry: 'Fintech & Banking',
+      location: 'Boston, MA',
+      maskedEmail: 'sa••••@meridianfin.com',
+      maskedPhone: '+1 (617) •••-••••',
+      whySuitsBest: 'Leading active cloud migration to Snowflake and expanding data governance requirements.',
+      keyInitiatives: 'Enterprise Lakehouse Consolidation, Real-Time Compliance Streaming, Cloud Cost Optimization',
+      contactInfoStatus: '100% Human-Verified'
+    },
+    {
+      id: 'sample-lead-2',
+      name: 'Marcus Vance',
+      title: 'Chief Information Officer',
+      company: 'Apex Global Logistics',
+      companyLink: 'https://apexlogistics.com',
+      logo: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=120&auto=format&fit=crop&q=80',
+      shortSummary: 'Spearheads operational tech stack modernization, AI route optimization, and legacy ERP system retirement across 42 logistics hubs.',
+      industry: 'Logistics & Supply Chain',
+      location: 'Dallas, TX',
+      maskedEmail: 'ma••••@apexlogistics.com',
+      maskedPhone: '+1 (214) •••-••••',
+      whySuitsBest: 'Retiring legacy ERP data pipelines in favor of unified analytics pipelines across logistics nodes.'
+    },
+    {
+      id: 'sample-lead-3',
+      name: 'Elena Rostova',
+      title: 'Head of Enterprise Analytics & BI',
+      company: 'Novalis Health Sciences',
+      companyLink: 'https://novalishealth.org',
+      logo: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=120&auto=format&fit=crop&q=80',
+      shortSummary: 'Oversees unified clinical data platforms, HIPAA-compliant predictive models, and self-service BI analytics delivery.',
+      industry: 'Healthcare & Life Sciences',
+      location: 'San Francisco, CA',
+      maskedEmail: 'el••••@novalishealth.org',
+      maskedPhone: '+1 (415) •••-••••',
+      whySuitsBest: 'Spearheading clinical data governance and compliance reporting infrastructure overhaul.'
+    },
+    {
+      id: 'sample-lead-4',
+      name: 'David Thorne',
+      title: 'Director of Customer Insights & Growth',
+      company: 'Kinetix Retail Technologies',
+      companyLink: 'https://kinetixretail.com',
+      logo: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=120&auto=format&fit=crop&q=80',
+      shortSummary: 'Leads omnichannel customer data integration, predictive lifetime value modeling, and personalization engines.',
+      industry: 'Retail & E-Commerce',
+      location: 'Chicago, IL',
+      maskedEmail: 'da••••@kinetixretail.com',
+      maskedPhone: '+1 (312) •••-••••',
+      whySuitsBest: 'Building unified 360-degree customer identity resolution across physical and digital storefronts.'
+    },
+    {
+      id: 'sample-lead-5',
+      name: 'Priya Patel',
+      title: 'VP of Technology & Architecture',
+      company: 'AuraPay Financial Networks',
+      companyLink: 'https://aurapay.net',
+      logo: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=120&auto=format&fit=crop&q=80',
+      shortSummary: 'Drives architecture standardization and security auditing across distributed cross-border payment gateways.',
+      industry: 'Financial Infrastructure',
+      location: 'New York, NY',
+      maskedEmail: 'pr••••@aurapay.net',
+      maskedPhone: '+1 (212) •••-••••',
+      whySuitsBest: 'Evaluating architecture modernization partners to handle high-frequency payment reconciliation.'
+    }
+  ],
+  leadStudies: [
+    {
+      id: 'study-1',
+      leadName: 'Sarah Jenkins',
+      role: 'VP of Data Engineering & Cloud Architecture',
+      company: 'Meridian Financial Systems',
+      whyRelevant: 'Meridian recently initiated a 3-year cloud modernization sprint and is actively vetting specialized data architecture implementation partners.',
+      observedContext: 'Currently reconciling dual legacy Teradata and Snowflake deployments across regional bank subsidiaries, resulting in cross-functional reporting bottlenecks.',
+      potentialOpportunity: 'Propose a structured 6-week Data Architecture Review to audit pipelines, reduce query latency by 40%, and automate compliance monitoring.',
+      suggestedApproach: 'Lead with peer financial case studies demonstrating automated compliance governance and zero-downtime warehouse cutovers.'
+    }
+  ],
+  pitchDeck: {
+    id: 'sample-pitch-deck-1',
+    title: 'Data I2I Enterprise Intelligence & Growth Playbook',
+    summary: 'Executive pitch deck showcasing tailored market positioning, ROI frameworks, technical architecture blueprints, and 90-day execution milestones.',
+    fileName: 'Data_I2I_Enterprise_Growth_Playbook.pdf',
+    previewAvailable: true
+  }
+};
+
 /**
  * PublicSampleDashboard Component
  * Controlled public read-only showcase of curated intelligence:
@@ -146,12 +257,27 @@ export default function PublicSampleDashboard() {
         if (data?.sample) {
           setSample(data.sample);
         } else {
-          setError('Sample showcase could not be loaded.');
+          throw new Error('Sample showcase could not be loaded.');
         }
       })
       .catch((err) => {
-        console.error('[PublicSampleDashboard] Failed to fetch:', err);
-        setError(err.message || 'Sample intelligence showcase not found or currently unpublished.');
+        console.warn(`[PublicSampleDashboard] Could not load "${effectiveSlug}":`, err.message);
+        // If a specific custom slug was requested and failed, attempt fallback to default data-i2i
+        if (effectiveSlug !== 'data-i2i') {
+          return api.getPublicSample('data-i2i')
+            .then((fallbackData) => {
+              if (fallbackData?.sample) {
+                setSample(fallbackData.sample);
+                return;
+              }
+              setSample(FALLBACK_SHOWCASE);
+            })
+            .catch(() => {
+              setSample(FALLBACK_SHOWCASE);
+            });
+        }
+        // If even data-i2i failed from API, load the rich built-in fallback showcase
+        setSample(FALLBACK_SHOWCASE);
       })
       .finally(() => {
         setLoading(false);

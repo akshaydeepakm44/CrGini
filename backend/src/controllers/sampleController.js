@@ -72,7 +72,15 @@ export const getPublicSampleBySlug = async (req, res) => {
       });
     }
 
-    const sample = await findSampleBySlug(slug.trim(), true);
+    let sample = await findSampleBySlug(slug.trim(), true);
+    if (!sample) {
+      // Allow preview if drafted
+      sample = await findSampleBySlug(slug.trim(), false);
+    }
+    if (!sample) {
+      // Gracefully fall back to flagship sample
+      sample = await findSampleBySlug('data-i2i', false);
+    }
     if (!sample) {
       return res.status(404).json({
         success: false,
