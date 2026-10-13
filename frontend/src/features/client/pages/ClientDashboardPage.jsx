@@ -26,6 +26,7 @@ import Badge from '../../../components/common/Badge';
 import Button from '../../../components/common/Button';
 import SyncQueueButton from '../../../components/common/SyncQueueButton';
 import { useServiceVisibility } from '../context/ServiceVisibilityContext';
+import { getServicesByChannel } from '../data/servicesData';
 
 export default function ClientDashboardPage({
   user,
@@ -199,225 +200,207 @@ export default function ClientDashboardPage({
       </div>
 
       {/* ============================================================
-          SECTION E: DIGITALISING PLATFORM SERVICES (CORE CAPABILITIES)
+          SECTION E: DIGITALISING PLATFORM SERVICES (IMAGE 1 CHANNEL SHOWCASE)
           ============================================================ */}
-      <div style={{ marginBottom: '36px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
-          <div>
-            <h2
+      <div style={{ marginBottom: '40px' }}>
+        {/* Channel Header (Image 1) */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <span
               style={{
-                fontFamily: 'var(--cg-font-heading, "Plus Jakarta Sans", sans-serif)',
-                fontSize: '1.25rem',
-                fontWeight: 800,
-                color: 'var(--cg-text-primary, #111827)',
-                margin: 0,
-                letterSpacing: '-0.01em',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: '#0369A1',
+                backgroundColor: '#E0F2FE',
+                padding: '3px 10px',
+                borderRadius: '9999px',
               }}
             >
-              Digitalising Services
-            </h2>
-            <p style={{ margin: '2px 0 0', fontSize: '0.84375rem', color: 'var(--cg-text-secondary, #6B7280)' }}>
-              Dedicated market intelligence, verified prospect discovery &amp; executive research capabilities
-            </p>
+              Service Channel
+            </span>
+            <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>•</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6B7280' }}>24–72h Turnaround</span>
           </div>
-          <button
-            type="button"
-            onClick={() => onNavigate && onNavigate('/portal/digitalising')}
+
+          <h2
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'none',
-              border: 'none',
-              color: '#7C3AED',
-              fontSize: '0.84375rem',
-              fontWeight: 700,
-              cursor: 'pointer',
+              fontFamily: 'var(--cg-font-heading, "Plus Jakarta Sans", sans-serif)',
+              fontSize: '1.85rem',
+              fontWeight: 800,
+              color: 'var(--cg-text-primary, #111827)',
+              margin: '0 0 8px 0',
+              letterSpacing: '-0.02em',
             }}
           >
-            <span>Explore All Digitalising Requests</span>
-            <ArrowRight size={15} />
-          </button>
+            Digitalising
+          </h2>
+
+          <p style={{ margin: 0, fontSize: '0.9375rem', color: 'var(--cg-text-secondary, #4B5563)', maxWidth: '780px', lineHeight: 1.6 }}>
+            Research and business intelligence services prepared by the DiziGini specialist team. Verified lead telemetry, comprehensive account dossiers, and market research.
+          </p>
         </div>
 
-        <div className="cg-dashboard-services-grid">
-          {[
-            {
-              id: 'lead-research',
-              title: 'Lead Research',
-              price: '$2 / lead',
-              desc: 'Hand-verified prospect contact intelligence tailored to your ideal customer profile.',
-              icon: Target,
-              color: '#4F46E5',
-              bg: '#EEF2FF',
-              border: '#E0E7FF',
-              badge: '24–48h Turnaround',
-            },
-            {
-              id: 'company-study',
-              title: 'Company Study',
-              price: '$1 / study',
-              desc: 'Personal company study, tech stack telemetry, and strategic expansion insights for target accounts.',
-              icon: Building2,
-              color: '#0284C7',
-              bg: '#F0F9FF',
-              border: '#BAE6FD',
-              badge: 'Comprehensive Dossier',
-            },
-            {
-              id: 'key-people',
-              title: 'Key People Research',
-              price: '$2 / profile',
-              desc: 'Map the buying committee: direct emails and phone numbers for verified key decision-makers.',
-              icon: Users,
-              color: '#059669',
-              bg: '#ECFDF5',
-              border: '#A7F3D0',
-              badge: 'Executive Profiles',
-            },
-            {
-              id: 'pitch-support',
-              title: 'Pitch Support',
-              price: '$2 / sprint',
-              desc: 'Arm your pitch with rock-solid data, competitor battlecards, and tailored narrative slides.',
-              icon: Presentation,
-              color: '#D97706',
-              bg: '#FFFBEB',
-              border: '#FDE68A',
-              badge: 'Slide Deck & Brief',
-            },
-          ].map((srv) => {
-            const Icon = srv.icon;
-            return (
-              <div
-                key={srv.id}
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '16px',
-                  border: `1px solid ${srv.border || '#E5E7EB'}`,
-                  padding: '22px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  gap: '16px',
-                  transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-3px)';
-                  e.currentTarget.style.boxShadow = `0 12px 24px -4px ${srv.color}22`;
-                  e.currentTarget.style.borderColor = srv.color;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
-                  e.currentTarget.style.borderColor = srv.border || '#E5E7EB';
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                    <div
-                      style={{
-                        width: '42px',
-                        height: '42px',
-                        borderRadius: '12px',
-                        backgroundColor: srv.bg,
-                        color: srv.color,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Icon size={22} />
-                    </div>
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        color: srv.color,
-                        backgroundColor: srv.bg,
-                        padding: '3px 9px',
-                        borderRadius: '999px',
-                        border: `1px solid ${srv.border || 'transparent'}`,
-                      }}
-                    >
-                      {srv.price}
-                    </span>
+        {/* Services Grid (Image 1: 4 Cards) */}
+        <style>{`
+          .cg-digitalising-services-grid {
+            display: grid;
+            gap: 24px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-bottom: 20px;
+          }
+          @media (min-width: 1360px) {
+            .cg-digitalising-services-grid {
+              grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+          }
+          @media (max-width: 640px) {
+            .cg-digitalising-services-grid {
+              grid-template-columns: 1fr;
+            }
+          }
+        `}</style>
+        <div className="cg-digitalising-services-grid">
+          {getServicesByChannel('digitalising').filter((s) => s.id !== 'custom').map((svc) => (
+            <div
+              key={svc.id}
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 'var(--cg-radius-xl, 20px)',
+                border: '1px solid var(--cg-border-light, #E5E7EB)',
+                padding: '24px',
+                boxShadow: 'var(--cg-shadow-card, 0 4px 20px rgba(0, 0, 0, 0.04))',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 12px 28px rgba(14, 165, 233, 0.12)';
+                e.currentTarget.style.borderColor = '#BAE6FD';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'none';
+                e.currentTarget.style.boxShadow = 'var(--cg-shadow-card, 0 4px 20px rgba(0, 0, 0, 0.04))';
+                e.currentTarget.style.borderColor = 'var(--cg-border-light, #E5E7EB)';
+              }}
+            >
+              <div>
+                {/* Top Bar */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div
+                    style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '12px',
+                      backgroundColor: svc.iconBg,
+                      color: svc.iconColor,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <svc.icon size={22} />
                   </div>
 
-                  <h3
+                  <span
                     style={{
-                      fontSize: '1.05rem',
-                      fontWeight: 800,
-                      color: '#111827',
-                      margin: '0 0 6px',
-                    }}
-                  >
-                    {srv.title}
-                  </h3>
-                  <p
-                    style={{
-                      fontSize: '0.8125rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
                       color: '#6B7280',
-                      lineHeight: 1.5,
-                      margin: 0,
+                      backgroundColor: '#F3F4F6',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
                     }}
                   >
-                    {srv.desc}
-                  </p>
+                    {svc.turnaround}
+                  </span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '10px', borderTop: '1px solid #F3F4F6' }}>
+                {/* Title & Description */}
+                <h3
+                  style={{
+                    fontFamily: 'var(--cg-font-heading, "Plus Jakarta Sans", sans-serif)',
+                    fontSize: '1.2rem',
+                    fontWeight: 800,
+                    color: '#111827',
+                    margin: '0 0 6px 0',
+                  }}
+                >
+                  {svc.name}
+                </h3>
+
+                <p style={{ fontSize: '0.875rem', color: '#4B5563', lineHeight: 1.5, margin: '0 0 16px 0' }}>
+                  {svc.shortDesc}
+                </p>
+
+                {/* What You Get Checklist */}
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6B7280', marginBottom: '8px' }}>
+                    What you get:
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {svc.whatYouGet.slice(0, 3).map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.8125rem', color: '#374151' }}>
+                        <CheckCircle2 size={14} color="#10B981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div>
+                <div style={{ display: 'flex', gap: '10px' }}>
                   <button
                     type="button"
-                    onClick={() => onOpenNewRequest && onOpenNewRequest(srv.id)}
+                    onClick={() => onOpenNewRequest && onOpenNewRequest(svc.id)}
                     style={{
                       flex: 1,
-                      padding: '8px 12px',
-                      borderRadius: '8px',
+                      padding: '10px 16px',
+                      borderRadius: '10px',
                       border: 'none',
-                      backgroundColor: srv.color,
+                      background: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)',
                       color: '#FFFFFF',
-                      fontSize: '0.8125rem',
-                      fontWeight: 700,
+                      fontSize: '0.84375rem',
+                      fontWeight: 600,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '5px',
-                      boxShadow: `0 2px 6px -1px ${srv.color}40`,
-                      transition: 'filter 0.2s ease, transform 0.2s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.filter = 'brightness(1.08)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.filter = 'none';
+                      gap: '6px',
+                      boxShadow: '0 2px 8px rgba(14, 165, 233, 0.25)',
+                      transition: 'all 0.15s ease',
                     }}
                   >
-                    <Plus size={14} />
-                    <span>Request</span>
+                    <span>Request {svc.shortTitle}</span>
+                    <ArrowRight size={14} />
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => onNavigate && onNavigate(`/portal/digitalising/${srv.id}`)}
+                    onClick={() => onNavigate && onNavigate(`/portal/digitalising/${svc.slug}`)}
                     style={{
-                      padding: '8px 12px',
-                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
                       border: '1px solid #E5E7EB',
                       backgroundColor: '#FFFFFF',
                       color: '#374151',
-                      fontSize: '0.8125rem',
+                      fontSize: '0.84375rem',
                       fontWeight: 600,
                       cursor: 'pointer',
+                      transition: 'all 0.15s ease',
                     }}
                   >
                     Details
                   </button>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </div>
 

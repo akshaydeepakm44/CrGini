@@ -237,8 +237,11 @@ export default function ClientPortal({ user, onLogout }) {
           element={
             isChannelActive('digitalising') ? (
               <DigitalisingChannelPage
+                requests={requests}
+                onViewRequest={(req) => navigate(`/portal/requests/${req.ticketId || req.id}`)}
                 onSelectService={(slug) => navigate(`/portal/digitalising/${slug}`)}
                 onRequestService={(serviceId, customData) => handleOpenNewRequest(serviceId, customData)}
+                onOpenNewRequest={(serviceId) => handleOpenNewRequest(serviceId || null)}
               />
             ) : (
               <Navigate to="/portal/dashboard" replace />
