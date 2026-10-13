@@ -9,7 +9,7 @@
     "dev": "node --watch-path=src src/server.js",
     "seed": "node src/seed-pg.js",
     "clean": "node src/clean-fake-data.js",
-    "tunnel": "ngrok http 5000",
+    "tunnel": "ngrok http 5001",
     "test": "node tests/unit/email-system.test.js",
     "test:unit": "node tests/unit/email-system.test.js",
     "test:email": "node tests/unit/email-system.test.js",

@@ -215,7 +215,7 @@ npm install
 # (Optional) Seed the database with default accounts and demo tickets:
 npm run seed
 
-# Start the backend server (runs on port 5000):
+# Start the backend server (runs on port 5001):
 npm run dev
 ```
 

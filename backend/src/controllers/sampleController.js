@@ -597,7 +597,7 @@ export const createAdminSample = async (req, res) => {
       return res.status(409).json({ success: false, message: `A showcase with slug "${effectiveSlug}" already exists.` });
     }
 
-    let finalCompanyStudy = companyStudy || {
+    let initialCompanyStudy = companyStudy ? { ...companyStudy } : {
       company: companyName.trim(),
       industry: 'Enterprise Technology & Services',
       businessOverview: `Overview for ${companyName.trim()}.`,
@@ -605,25 +605,50 @@ export const createAdminSample = async (req, res) => {
       keyObservations: 'Opportunity for strategic acceleration.',
     };
 
-    // If PDF was attached during creation, upload immediately to storage
-    if (finalCompanyStudy.pdfFileDataUrl && isDataUrl(finalCompanyStudy.pdfFileDataUrl)) {
+    // Auto-upload company study PDF if provided as a Data URL during creation
+    if (initialCompanyStudy.pdfFileDataUrl && isDataUrl(initialCompanyStudy.pdfFileDataUrl)) {
       try {
-        const originalName = finalCompanyStudy.pdfFileName || `${companyName.trim()}_Company_Study.pdf`;
+        const originalName = initialCompanyStudy.pdfFileName || `${companyName.trim()}_Company_Study.pdf`;
         const uploadRes = await uploadFile({
-          dataUrl: finalCompanyStudy.pdfFileDataUrl,
+          dataUrl: initialCompanyStudy.pdfFileDataUrl,
           originalName,
-          mimeType: finalCompanyStudy.pdfMimeType || 'application/pdf',
+          mimeType: initialCompanyStudy.pdfMimeType || 'application/pdf',
           prefix: `public-samples/${effectiveSlug}/company-study`,
         });
-        finalCompanyStudy = {
-          ...finalCompanyStudy,
+        initialCompanyStudy = {
+          ...initialCompanyStudy,
           pdfAssetKey: uploadRes.objectKey,
           pdfFileName: originalName,
           pdfFileSize: uploadRes.size,
           pdfMimeType: uploadRes.mimeType,
         };
       } catch (uploadErr) {
-        console.warn('[SampleController.createAdminSample] PDF upload to storage failed, retaining data URL fallback:', uploadErr.message);
+        console.warn('[createAdminSample] PDF upload to storage failed, retaining data URL fallback:', uploadErr.message);
+      }
+    }
+
+    let initialPitchDeck = pitchDeck ? { ...pitchDeck } : {};
+    if (initialPitchDeck.fileDataUrl && isDataUrl(initialPitchDeck.fileDataUrl)) {
+      try {
+        const originalName = initialPitchDeck.fileName || `${companyName.trim()}_Growth_Playbook.pdf`;
+        const uploadRes = await uploadFile({
+          dataUrl: initialPitchDeck.fileDataUrl,
+          originalName,
+          mimeType: initialPitchDeck.mimeType || 'application/pdf',
+          prefix: `public-samples/${effectiveSlug}/pitch-deck`,
+        });
+        initialPitchDeck = {
+          ...initialPitchDeck,
+          id: initialPitchDeck.id || `pitch-${Date.now()}`,
+          fileName: originalName,
+          assetKey: uploadRes.objectKey,
+          mimeType: uploadRes.mimeType,
+          fileSize: uploadRes.size,
+          previewAvailable: true,
+        };
+        delete initialPitchDeck.fileDataUrl;
+      } catch (uploadErr) {
+        console.error('[createAdminSample] Failed to upload pitch deck:', uploadErr.message);
       }
     }
 
@@ -634,10 +659,10 @@ export const createAdminSample = async (req, res) => {
       description: description || `Curated account intelligence and sales acceleration brief prepared for ${companyName.trim()}.`,
       logoUrl: logoUrl || '/logo.png',
       status: status || 'PUBLISHED',
-      companyStudy: finalCompanyStudy,
+      companyStudy: initialCompanyStudy,
       leads: Array.isArray(leads) ? leads : [],
       leadStudies: Array.isArray(leadStudies) ? leadStudies : [],
-      pitchDeck: pitchDeck || {},
+      pitchDeck: initialPitchDeck,
     });
 
     return res.status(201).json({
@@ -690,7 +715,31 @@ export const updateAdminSample = async (req, res) => {
           pdfMimeType: uploadRes.mimeType,
         };
       } catch (uploadErr) {
-        console.warn('[SampleController.updateAdminSample] PDF upload to storage failed, retaining data URL fallback:', uploadErr.message);
+        console.warn('[updateAdminSample] PDF upload to storage failed, retaining data URL fallback:', uploadErr.message);
+      }
+    }
+
+    if (body.pitchDeck?.fileDataUrl && isDataUrl(body.pitchDeck.fileDataUrl)) {
+      try {
+        const originalName = body.pitchDeck.fileName || `${sample.companyName}_Growth_Playbook.pdf`;
+        const uploadRes = await uploadFile({
+          dataUrl: body.pitchDeck.fileDataUrl,
+          originalName,
+          mimeType: body.pitchDeck.mimeType || 'application/pdf',
+          prefix: `public-samples/${sample.slug}/pitch-deck`,
+        });
+        body.pitchDeck = {
+          ...body.pitchDeck,
+          id: body.pitchDeck.id || `pitch-${Date.now()}`,
+          fileName: originalName,
+          assetKey: uploadRes.objectKey,
+          mimeType: uploadRes.mimeType,
+          fileSize: uploadRes.size,
+          previewAvailable: true,
+        };
+        delete body.pitchDeck.fileDataUrl;
+      } catch (uploadErr) {
+        console.error('[updateAdminSample] Failed to upload pitch deck:', uploadErr.message);
       }
     }
 

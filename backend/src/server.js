@@ -16,7 +16,7 @@ dotenv.config();
 
 const app = express();
 app.set('trust proxy', 1);
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Direct static media fallbacks
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
@@ -25,27 +25,27 @@ app.use('/storage', express.static(path.resolve(process.cwd(), 'storage')));
 // Connect to PostgreSQL
 connectPostgres().then(async (ok) => {
   if (ok) {
-    console.log('[CreativeGini API] PostgreSQL connected successfully.');
+    console.log('[DiziGini API] PostgreSQL connected successfully.');
     try {
       const { ensureSchemaIntegrity } = await import('./config/ensureSchema.js');
       await ensureSchemaIntegrity();
     } catch (err) {
-      console.error('[CreativeGini API] ensureSchemaIntegrity error:', err.message);
+      console.error('[DiziGini API] ensureSchemaIntegrity error:', err.message);
     }
     try {
       const { ensureDataI2IAccount } = await import('./controllers/authController.js');
       await ensureDataI2IAccount();
     } catch (err) {
-      console.error('[CreativeGini API] ensureDataI2IAccount error:', err.message);
+      console.error('[DiziGini API] ensureDataI2IAccount error:', err.message);
     }
     try {
       const { ensureSampleTable } = await import('./repositories/sampleRepository.js');
       await ensureSampleTable();
     } catch (err) {
-      console.error('[CreativeGini API] ensureSampleTable error:', err.message);
+      console.error('[DiziGini API] ensureSampleTable error:', err.message);
     }
   } else {
-    console.error('[CreativeGini API] PostgreSQL connection failed. Check credentials.');
+    console.error('[DiziGini API] PostgreSQL connection failed. Check credentials.');
   }
 });
 
@@ -136,7 +136,7 @@ app.get('/api/health', async (req, res) => {
 
     res.status(200).json({
       status: 'online',
-      service: 'CreativeGini Portal API',
+      service: 'DiziGini Portal API',
       timestamp: new Date().toISOString(),
       database: {
         type: 'PostgreSQL',
@@ -148,7 +148,7 @@ app.get('/api/health', async (req, res) => {
   } catch (err) {
     res.status(503).json({
       status: 'degraded',
-      service: 'CreativeGini Portal API',
+      service: 'DiziGini Portal API',
       timestamp: new Date().toISOString(),
       database: {
         type: 'PostgreSQL',

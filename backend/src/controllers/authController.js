@@ -30,7 +30,7 @@ import { sendPasswordResetEmail, sendMagicLinkEmail } from '../services/emailSer
 const generateToken = (id) => {
   return jwt.sign(
     { id },
-    process.env.JWT_SECRET || 'creativegini_secret_2026',
+    process.env.JWT_SECRET || 'dizigini_secure_jwt_secret_key_2026',
     {
       expiresIn: '30d',
     }

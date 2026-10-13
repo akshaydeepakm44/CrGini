@@ -1480,9 +1480,11 @@ export default function PublicSampleDashboard() {
                   {(() => {
                     const lUrl = selectedLead.linkedin ? (selectedLead.linkedin.startsWith('http') ? selectedLead.linkedin : `https://${selectedLead.linkedin}`) : null;
                     if (lUrl) {
+                      // Handles both /in/ personal profiles and /company/ organizational links
                       const displayLabel = selectedLead.linkedin
                         .replace(/^https?:\/\/(www\.)?linkedin\.com\/(in|company)\//i, '@')
                         .replace(/\/$/, '') || 'Verified Profile';
+
                       return (
                         <a
                           href={lUrl}
@@ -1592,7 +1594,7 @@ export default function PublicSampleDashboard() {
                         }}
                       >
                         <Globe size={14} style={{ flexShrink: 0 }} />
-                        <span style={{ maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>
+                        <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }} title={coLink}>
                           {coLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}
                         </span>
                         <ExternalLink size={12} style={{ flexShrink: 0 }} />
