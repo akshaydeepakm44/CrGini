@@ -527,9 +527,9 @@ export default function NewRequestModal({
         initialServiceId === 'custom-boosting' ||
         initialServiceId === 'custom-digitalising'
       ) {
-        serviceToUse = 'custom';
+        serviceToUse = 'lead-research';
       } else if (initialServiceId === 'gtm-strategy') {
-        serviceToUse = 'gtm';
+        serviceToUse = 'lead-research';
       }
       setActiveServiceId(serviceToUse);
 
@@ -1078,9 +1078,8 @@ export default function NewRequestModal({
                     { id: 'company-study', label: 'Company Study ($1)' },
                     { id: 'key-people', label: 'Key People ($2)' },
                     { id: 'pitch-support', label: 'Pitch Support ($2)' },
-                    { id: 'custom', label: 'Custom Digitalising' },
                   ].map((s) => {
-                    const isActive = activeServiceId === s.id || (s.id === 'custom' && activeServiceId.startsWith('custom'));
+                    const isActive = activeServiceId === s.id;
                     return (
                       <button
                         key={s.id}

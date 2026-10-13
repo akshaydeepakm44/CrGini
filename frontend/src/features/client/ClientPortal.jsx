@@ -150,7 +150,7 @@ export default function ClientPortal({ user, onLogout }) {
   }, []);
 
   const handleOpenNewRequest = (serviceId = null, customData = null) => {
-    setNewRequestInitialService(serviceId || 'custom');
+    setNewRequestInitialService(serviceId || 'lead-research');
     setNewRequestCustomData(customData);
     setIsNewRequestOpen(true);
   };
@@ -198,7 +198,7 @@ export default function ClientPortal({ user, onLogout }) {
               requests={requests}
               deliverables={deliverables}
               onNavigate={handleNavigate}
-              onOpenNewRequest={() => handleOpenNewRequest(null)}
+              onOpenNewRequest={(serviceId) => handleOpenNewRequest(serviceId || 'lead-research')}
               onViewRequest={(req) => navigate(`/portal/requests/${req.ticketId || req.id}`)}
               onViewDeliverable={(del) => navigate('/portal/deliverables')}
               onRefresh={loadPortalData}
@@ -217,7 +217,7 @@ export default function ClientPortal({ user, onLogout }) {
               requests={requests}
               deliverables={deliverables}
               onNavigate={handleNavigate}
-              onOpenNewRequest={() => handleOpenNewRequest(null)}
+              onOpenNewRequest={(serviceId) => handleOpenNewRequest(serviceId || 'lead-research')}
               onViewRequest={(req) => navigate(`/portal/requests/${req.ticketId || req.id}`)}
               onViewDeliverable={(del) => navigate('/portal/deliverables')}
               onRefresh={loadPortalData}
@@ -231,7 +231,7 @@ export default function ClientPortal({ user, onLogout }) {
         <Route path="boosting/*" element={<Navigate to="/portal/digitalising" replace />} />
         <Route path="boosting" element={<Navigate to="/portal/digitalising" replace />} />
 
-        {/* 3. Digitalising Channel & Services */}
+        {/* 3. Digitalising Channel & Services (Direct Form & Requests Tracker) */}
         <Route
           path="digitalising"
           element={
@@ -241,7 +241,8 @@ export default function ClientPortal({ user, onLogout }) {
                 onViewRequest={(req) => navigate(`/portal/requests/${req.ticketId || req.id}`)}
                 onSelectService={(slug) => navigate(`/portal/digitalising/${slug}`)}
                 onRequestService={(serviceId, customData) => handleOpenNewRequest(serviceId, customData)}
-                onOpenNewRequest={(serviceId) => handleOpenNewRequest(serviceId || null)}
+                onOpenNewRequest={(serviceId) => handleOpenNewRequest(serviceId || 'lead-research')}
+                onReload={loadPortalData}
               />
             ) : (
               <Navigate to="/portal/dashboard" replace />
@@ -250,28 +251,23 @@ export default function ClientPortal({ user, onLogout }) {
         />
         <Route
           path="digitalising/custom"
-          element={
-            isChannelActive('digitalising') ? (
-              <CustomPage
-                onRequestService={(serviceId, customData) => handleOpenNewRequest(serviceId || 'custom', customData)}
-                onNavigate={handleNavigate}
-              />
-            ) : (
-              <Navigate to="/portal/dashboard" replace />
-            )
-          }
+          element={<Navigate to="/portal/digitalising" replace />}
         />
         <Route
           path="custom"
-          element={<Navigate to="/portal/bundles/custom" replace />}
+          element={<Navigate to="/portal/digitalising" replace />}
         />
         <Route
           path="digitalising/:serviceSlug"
           element={
             isChannelActive('digitalising') ? (
-              <ServiceDetailWrapper
-                onOpenNewRequest={handleOpenNewRequest}
-                channel="digitalising"
+              <DigitalisingChannelPage
+                requests={requests}
+                onViewRequest={(req) => navigate(`/portal/requests/${req.ticketId || req.id}`)}
+                onSelectService={(slug) => navigate(`/portal/digitalising/${slug}`)}
+                onRequestService={(serviceId, customData) => handleOpenNewRequest(serviceId, customData)}
+                onOpenNewRequest={(serviceId) => handleOpenNewRequest(serviceId || 'lead-research')}
+                onReload={loadPortalData}
               />
             ) : (
               <Navigate to="/portal/dashboard" replace />
