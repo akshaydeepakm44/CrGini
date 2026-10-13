@@ -122,38 +122,21 @@ export default function Footer({ onSignIn, onGetStarted }) {
             </ul>
           </div>
 
-          {/* Column 2: Active Services */}
-          {isChannelActive('digitalising') ? (
-            <div className="cg-footer-col">
-              <h4 className="cg-footer-col-header">
-                <span className="cg-col-indicator purple" />
-                <span>Digitalising Services</span>
-              </h4>
-              <ul className="cg-footer-links-list">
-                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>B2B Lead Research (ICP Sprints)</a></li>
-                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Company Study &amp; Account Dossiers</a></li>
-                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Key People &amp; Buying Committee</a></li>
-                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Executive Contact Telemetry</a></li>
-                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Market Intelligence Reports</a></li>
-                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Pitch &amp; Deck Research</a></li>
-              </ul>
-            </div>
-          ) : (
-            <div className="cg-footer-col">
-              <h4 className="cg-footer-col-header">
-                <span className="cg-col-indicator purple" />
-                <span>UI &amp; App Development</span>
-              </h4>
-              <ul className="cg-footer-links-list">
-                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>UI/UX Heuristic Audits</a></li>
-                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Production Figma Design Kits</a></li>
-                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Landing Page Redesigns</a></li>
-                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Clickable Interactive Prototypes</a></li>
-                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Full-Stack MVP Application Core</a></li>
-                <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>API &amp; Backend Architecture</a></li>
-              </ul>
-            </div>
-          )}
+          {/* Column 2: UI & App Development Services */}
+          <div className="cg-footer-col">
+            <h4 className="cg-footer-col-header">
+              <span className="cg-col-indicator purple" />
+              <span>UI &amp; App Development</span>
+            </h4>
+            <ul className="cg-footer-links-list">
+              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>UI/UX Heuristic Audits</a></li>
+              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Production Figma Design Kits</a></li>
+              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Landing Page Redesigns</a></li>
+              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Clickable Interactive Prototypes</a></li>
+              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>Full-Stack MVP Application Core</a></li>
+              <li><a href="#services" className="cg-footer-link" onClick={scrollTo('services')}>API &amp; Backend Architecture</a></li>
+            </ul>
+          </div>
 
           {/* Column 3: Legal & Support */}
           <div className="cg-footer-col">

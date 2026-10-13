@@ -97,7 +97,7 @@ export default function LandingPage({
         <MetricsSection />
       </div>
 
-      {/* Section 3: Services (Boosting & Digitalising Channels) */}
+      {/* Section 3: Services (Boosting, Design, and App Development Channels) */}
       <div className="cg-reveal-section">
         <ServiceChannels onSelectChannel={handleSelectChannel} />
       </div>

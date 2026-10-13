@@ -3,34 +3,33 @@ import {
   ArrowRight, 
   Sparkles, 
   CheckCircle2, 
-  Target, 
-  Building2, 
   Rocket, 
   PenTool, 
   Code,
   ShieldCheck,
   Zap,
-  Clock
+  Clock,
+  Palette
 } from 'lucide-react';
 
 const SPRINT_PREVIEWS = [
   {
-    id: 'lead-research',
-    label: 'Lead Research',
-    icon: Target,
-    highlight: '50 Verified B2B Enterprise Prospects',
+    id: 'ui-redesign',
+    label: 'Landing Redesign',
+    icon: Palette,
+    highlight: 'Conversion-Engineered High-Fidelity UI',
     eta: '48–72 Hours',
-    channel: 'Digitalising',
-    desc: 'Human-verified email & LinkedIn contacts matching your exact ICP criteria.'
+    channel: 'UI / Design',
+    desc: 'Modern visual overhaul, interactive component kits, and responsive layout specifications.'
   },
   {
-    id: 'company-study',
-    label: 'Company Study',
-    icon: Building2,
-    highlight: 'Deep Account Dossier & Tech Stack Telemetry',
-    eta: '3–5 Days',
-    channel: 'Digitalising',
-    desc: 'Comprehensive org mapping, key decision-maker pain points, and vendor footprints.'
+    id: 'mvp-development',
+    label: 'Full-Stack MVP',
+    icon: Code,
+    highlight: 'Production-Ready Web App & Clean Repo',
+    eta: '5–7 Days',
+    channel: 'App Development',
+    desc: 'POC + V1 turnkey application core, relational database schemas, auth flows, and staging deployment.'
   },
   {
     id: 'gtm-strategy',

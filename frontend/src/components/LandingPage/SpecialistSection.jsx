@@ -3,13 +3,13 @@ import { Search, Compass, PenTool, TrendingUp, Palette, Terminal, Award } from '
 
 const SPECIALISTS = [
   {
-    role: 'Lead & ICP Researchers',
-    category: 'Research',
-    initials: 'LR',
-    gradient: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+    role: 'Full-Stack Developers & Engineers',
+    category: 'Engineering',
+    initials: 'FE',
+    gradient: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
     textColor: '#FFFFFF',
-    desc: 'B2B domain researchers specializing in boolean search, org chart mapping, and high-intent prospect verification.',
-    tags: ['Verified Emails', 'ICP Mapping', 'Org Intelligence']
+    desc: 'Senior software engineers and architects building turnkey full-stack MVPs, modern APIs, and high-performance apps.',
+    tags: ['Full-Stack MVPs', 'React & Node', 'Cloud Architecture']
   },
   {
     role: 'Strategic Growth Planners',

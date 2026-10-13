@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Target, 
-  Building2, 
-  Users, 
   Compass, 
   PenTool, 
   Code, 
   Rocket, 
   Palette,
-  Sparkles
+  Sparkles,
+  Layers
 } from 'lucide-react';
 import OrbitRing from './OrbitRing';
 import OrbitNode from './OrbitNode';
@@ -23,39 +21,39 @@ const RINGS = [
 
 const SERVICE_NODES = [
   {
-    id: 'lead-research',
-    name: 'Lead Research',
-    category: 'Digitalising',
+    id: 'ui-ux',
+    name: 'UI / UX Design',
+    category: 'UI / Design',
     ringIndex: 0,
     ringRadius: 135,
     angleDeg: 35,
-    color: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
-    icon: Target,
-    desc: 'Find high-intent accounts and verified prospect contact intelligence tailored to your ideal customer profile.',
+    color: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+    icon: Palette,
+    desc: 'High-converting product interfaces, design systems, and heuristic UX audits engineered for conversion.',
     floatDelay: 0
   },
   {
-    id: 'company-study',
-    name: 'Company Study',
-    category: 'Digitalising',
+    id: 'prototype',
+    name: 'Interactive Prototype',
+    category: 'App Dev',
     ringIndex: 1,
     ringRadius: 195,
     angleDeg: 80,
-    color: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
-    icon: Building2,
-    desc: 'Deep organizational dossiers, tech stack telemetry, and strategic expansion insights for target accounts.',
+    color: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
+    icon: Layers,
+    desc: 'Interactive high-fidelity prototypes for rapid user testing, investor pitches, and flow validation.',
     floatDelay: 0.4
   },
   {
-    id: 'key-people',
-    name: 'Key People',
-    category: 'Digitalising',
+    id: 'mvp-development',
+    name: 'MVP Build',
+    category: 'App Dev',
     ringIndex: 2,
     ringRadius: 250,
     angleDeg: 135,
-    color: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)',
-    icon: Users,
-    desc: 'Direct access to verified decision-makers, direct emails, and key leadership reporting structures.',
+    color: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+    icon: Code,
+    desc: 'Production-ready turnkey full-stack application development, database schemas, and modern cloud deployment.',
     floatDelay: 0.8
   },
   {

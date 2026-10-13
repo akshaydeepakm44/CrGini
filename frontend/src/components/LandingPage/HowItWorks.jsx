@@ -5,7 +5,7 @@ const STEPS = [
   {
     number: '01',
     title: 'Choose a service',
-    desc: 'Select from our curated menu of Boosting or Digitalising services based on your immediate growth goals.',
+    desc: 'Select from our curated menu of Boosting, UI/UX Design, or App Development services based on your immediate goals.',
     icon: MousePointerClick
   },
   {

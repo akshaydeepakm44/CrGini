@@ -1,18 +1,20 @@
 import React from 'react';
 import { 
-  Target, 
-  Building2, 
-  Users, 
   Compass, 
   PenTool, 
   Code, 
   ArrowRight,
   Palette,
-  Sparkles
+  Sparkles,
+  Layers,
+  Terminal,
+  Smartphone,
+  Globe
 } from 'lucide-react';
 import { useServiceVisibility } from '../../features/client/context/ServiceVisibilityContext';
 
 const FEATURED_SERVICES = [
+  // Channel 1: Boosting
   {
     id: 'strategic-planner',
     title: 'Strategic Planner',
@@ -43,6 +45,8 @@ const FEATURED_SERVICES = [
     badgeBg: '#FCE7F3',
     badgeColor: '#BE185D'
   },
+
+  // Channel 2: UI / Design
   {
     id: 'ui-ux-audit',
     title: 'UI/UX Audit',
@@ -64,43 +68,56 @@ const FEATURED_SERVICES = [
     badgeColor: '#BE185D'
   },
   {
-    id: 'lead-research',
-    title: 'Lead Research',
-    category: 'Digitalising',
-    icon: Target,
-    bgIcon: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
-    desc: 'Bespoke prospect discovery matching your ICP criteria with 100% human-verified business emails and direct phone numbers.',
-    badgeBg: '#EDE9FE',
-    badgeColor: '#6D28D9'
-  },
-  {
-    id: 'company-study',
-    title: 'Company Study',
-    category: 'Digitalising',
-    icon: Building2,
+    id: 'figma-project',
+    title: 'Figma Design System',
+    category: 'Design',
+    icon: Layers,
     bgIcon: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
-    desc: 'Deep-dive account dossiers uncovering internal org charts, vendor footprints, recent funding triggers, and pain points.',
-    badgeBg: '#EDE9FE',
-    badgeColor: '#6D28D9'
+    desc: 'Production-ready component libraries, design token hierarchies, typography scales, and seamless developer handoff specs.',
+    badgeBg: '#EEF2FF',
+    badgeColor: '#4F46E5'
+  },
+
+  // Channel 3: App Development
+  {
+    id: 'technical-discovery',
+    title: 'Technical Discovery',
+    category: 'Development',
+    icon: Terminal,
+    bgIcon: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+    desc: 'Architecture blueprints, technology stack evaluation, schema design, and technical feasibility reports before building.',
+    badgeBg: '#EEF2FF',
+    badgeColor: '#4F46E5'
   },
   {
-    id: 'key-people',
-    title: 'Key People Research',
-    category: 'Digitalising',
-    icon: Users,
-    bgIcon: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)',
-    desc: 'Targeted intelligence on VP and C-level decision-makers, direct executive emails, verified social profiles, and background notes.',
-    badgeBg: '#EDE9FE',
-    badgeColor: '#6D28D9'
+    id: 'clickable-prototype',
+    title: 'Clickable App Prototype',
+    category: 'Development',
+    icon: Smartphone,
+    bgIcon: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
+    desc: 'Interactive high-fidelity clickable prototype for user testing, investor demos, and customer validation with real UX flows.',
+    badgeBg: '#F0FDFA',
+    badgeColor: '#0F766E'
+  },
+  {
+    id: 'web-app',
+    title: 'MVP Development',
+    category: 'Development',
+    icon: Globe,
+    bgIcon: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+    desc: 'POC + V1 turnkey full-stack application core, relational database, authentication, and cloud deployment ready for users.',
+    badgeBg: '#ECFDF5',
+    badgeColor: '#047857'
   }
 ];
 
 export default function FeaturedServices({ onExploreService }) {
   const { isChannelActive, isServiceActive } = useServiceVisibility();
 
-  const activeServices = FEATURED_SERVICES.filter(
+  const visible = FEATURED_SERVICES.filter(
     (srv) => isChannelActive(srv.category.toLowerCase()) && isServiceActive(srv.id)
   );
+  const activeServices = visible.length >= 3 ? visible : FEATURED_SERVICES;
 
   return (
     <section className="cg-section" aria-label="Featured Services">

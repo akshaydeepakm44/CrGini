@@ -51,13 +51,11 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
       subtitle: 'When you need market traction, our Boosting specialists execute go-to-market playbooks, high-conversion copywriting, paid campaigns, and developer advocacy sprints.'
     },
     {
-      id: isChannelActive('digitalising') ? 'digitalising' : 'design',
+      id: 'design-dev',
       stepNum: '03',
-      badge: isChannelActive('digitalising') ? '03 // BUSINESS INTELLIGENCE & DIGITALISATION' : '03 // HIGH-CONVERTING UI/UX & ARCHITECTURE',
-      title: isChannelActive('digitalising') ? 'Digitalising Market Intelligence & Org Insights' : 'Modern UI/UX & Product Architecture',
-      subtitle: isChannelActive('digitalising')
-        ? 'Deep organizational studies and executive mapping. Understand target company hierarchies, technology vendor footprints, and buying committees before pitching.'
-        : 'World-class conversion architecture, heuristic UI/UX evaluations, interactive clickable prototypes, and production design systems.'
+      badge: '03 // UI/UX DESIGN & APP DEVELOPMENT',
+      title: 'Modern UI/UX & Turnkey App Development',
+      subtitle: 'From pixel-perfect Figma design systems and clickable prototypes to production-grade full-stack MVP code engineered by senior developers.'
     }
   ];
 
@@ -156,9 +154,9 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
                 >
                   <span className="cg-tab-num">{st.stepNum}</span>
                   <span className="cg-tab-label">
-                    {idx === 0 && 'Request Leads'}
-                    {idx === 1 && 'Boosting Services'}
-                    {idx === 2 && 'Digitalising Intel'}
+                    {idx === 0 && 'Client Portal'}
+                    {idx === 1 && 'Boosting Channel'}
+                    {idx === 2 && 'Design & App Dev'}
                   </span>
                   {activeStep === idx && <span className="cg-tab-indicator" />}
                 </button>
@@ -396,7 +394,7 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
               </div>
             </div>
 
-            {/* CARD 3: Digitalising Market Intelligence & Org Insights */}
+            {/* CARD 3: UI/UX Design & Full-Stack App Development */}
             <div className={`cg-journey-card ${activeStep === 2 ? 'card-active' : activeStep > 2 ? 'card-prev' : 'card-next'}`}>
               <div className="cg-window-chrome">
                 <div className="cg-window-dots">
@@ -405,111 +403,111 @@ export default function ClientExperienceJourney({ onExplorePlatform, onExploreSe
                   <span className="cg-window-dot green" />
                 </div>
                 <div className="cg-window-address">
-                  <Building2 size={13} color="#7C3AED" />
-                  <span>app.creativegini.com/digitalising &mdash; Account Dossiers &amp; Org Mapping</span>
+                  <Code size={13} color="#059669" />
+                  <span>app.creativegini.com/development &mdash; Production UI &amp; App MVP Core</span>
                 </div>
-                <div className="cg-window-status">Company Intelligence</div>
+                <div className="cg-window-status">Production Ready</div>
               </div>
 
               <div className="cg-mockup-canvas">
                 <div className="cg-dossier-layout">
-                  {/* Left Column: Target Account Profile */}
+                  {/* Left Column: Project Profile */}
                   <div className="cg-dossier-sidebar">
                     <div className="cg-dossier-account-header">
-                      <div className="cg-account-logo-box">NS</div>
+                      <div className="cg-account-logo-box" style={{ background: '#ECFDF5', color: '#059669', borderColor: '#A7F3D0' }}>MVP</div>
                       <div>
-                        <h4 className="cg-account-name">NexaScale Global</h4>
-                        <span className="cg-account-industry">Cloud &amp; DevOps Infrastructure</span>
+                        <h4 className="cg-account-name">Acme Cloud Core</h4>
+                        <span className="cg-account-industry">SaaS Platform &amp; Responsive Web App</span>
                       </div>
                     </div>
 
                     <div className="cg-dossier-meta-list">
                       <div className="cg-meta-row">
-                        <span className="cg-meta-lbl">Headquarters:</span>
-                        <span className="cg-meta-val">Berlin, Germany</span>
-                      </div>
-                      <div className="cg-meta-row">
-                        <span className="cg-meta-lbl">Headcount:</span>
-                        <span className="cg-meta-val">450 &mdash; 600 Employees</span>
-                      </div>
-                      <div className="cg-meta-row">
                         <span className="cg-meta-lbl">Tech Stack:</span>
-                        <span className="cg-meta-val">AWS, Snowflake, K8s</span>
+                        <span className="cg-meta-val">React, Node, PostgreSQL</span>
                       </div>
                       <div className="cg-meta-row">
-                        <span className="cg-meta-lbl">Buying Stage:</span>
-                        <span className="cg-meta-val" style={{ color: '#10B981', fontWeight: 700 }}>Active RFP / High Intent</span>
+                        <span className="cg-meta-lbl">Sprint Type:</span>
+                        <span className="cg-meta-val">Full-Stack POC + V1 Build</span>
+                      </div>
+                      <div className="cg-meta-row">
+                        <span className="cg-meta-lbl">Deliverable:</span>
+                        <span className="cg-meta-val">Clean GitHub Repo &amp; Live URL</span>
+                      </div>
+                      <div className="cg-meta-row">
+                        <span className="cg-meta-lbl">Status:</span>
+                        <span className="cg-meta-val" style={{ color: '#059669', fontWeight: 700 }}>100% Shipped &amp; Verified</span>
                       </div>
                     </div>
 
                     <div className="cg-dossier-files-box">
                       <span className="cg-files-heading">Attached Deliverable Files</span>
                       <div className="cg-file-item">
-                        <FileText size={14} color="#7C3AED" />
+                        <FileText size={14} color="#0284C7" />
                         <div className="cg-file-info">
-                          <span className="cg-file-name">nexascale-dossier-v2.pdf</span>
-                          <span className="cg-file-sz">1.8 MB &bull; Verified</span>
+                          <span className="cg-file-name">figma-design-system-v2.fig</span>
+                          <span className="cg-file-sz">42 MB &bull; Design Tokens</span>
                         </div>
                         <DownloadCloud size={13} className="cg-file-dl" />
                       </div>
                       <div className="cg-file-item">
-                        <FileText size={14} color="#2563EB" />
+                        <FileText size={14} color="#059669" />
                         <div className="cg-file-info">
-                          <span className="cg-file-name">org-decision-makers.xlsx</span>
-                          <span className="cg-file-sz">840 KB &bull; Verified</span>
+                          <span className="cg-file-name">production-mvp-repo.zip</span>
+                          <span className="cg-file-sz">12.4 MB &bull; Clean Code</span>
                         </div>
                         <DownloadCloud size={13} className="cg-file-dl" />
                       </div>
                     </div>
                   </div>
 
-                  {/* Right Column: Key People & Buying Committee Mapping */}
+                  {/* Right Column: Deliverable Telemetry & Milestone Verification */}
                   <div className="cg-dossier-main">
                     <div className="cg-panel-header">
                       <div>
-                        <span className="cg-panel-title">Buying Committee &amp; Key People Telemetry</span>
-                        <span className="cg-panel-meta">Direct verified contacts for enterprise outreach</span>
+                        <span className="cg-panel-title">Specialist Architecture &amp; Deliverable Telemetry</span>
+                        <span className="cg-panel-meta">Production-ready design assets, OpenAPI contracts, and full source code</span>
                       </div>
-                      <span className="cg-status-pill completed">100% Validated</span>
+                      <span className="cg-status-pill completed">100% Deployed</span>
                     </div>
 
                     <div className="cg-people-cards-list">
                       <div className="cg-person-row">
-                        <div className="cg-person-avatar">CTO</div>
+                        <div className="cg-person-avatar" style={{ background: '#0284C7' }}>UI</div>
                         <div className="cg-person-details">
                           <div className="cg-person-name-row">
-                            <strong>Dr. Klaus Weber</strong>
-                            <span className="cg-role-badge decision-maker">Chief Technology Officer</span>
+                            <strong>Elena Vance</strong>
+                            <span className="cg-role-badge champion">Senior UI/UX Architect</span>
                           </div>
                           <div className="cg-person-reach">
-                            <code>klaus.weber@nexascale.de</code>
-                            <span>&bull; Direct Phone: +49 30 555-0192</span>
+                            <code>Figma Component Library &bull; Auto-Layout Specs</code>
+                            <span>&bull; Design System Verified</span>
                           </div>
-                          <p className="cg-person-insight">"Overseeing multi-region sovereignty cloud migrations. Currently reviewing enterprise data workflow automation."</p>
+                          <p className="cg-person-insight">"Complete high-converting design system, interactive prototypes, and responsive mobile layouts engineered for rapid developer implementation."</p>
                         </div>
                       </div>
 
                       <div className="cg-person-row">
-                        <div className="cg-person-avatar" style={{ background: '#3B82F6' }}>VP</div>
+                        <div className="cg-person-avatar" style={{ background: '#059669' }}>DEV</div>
                         <div className="cg-person-details">
                           <div className="cg-person-name-row">
-                            <strong>Elena Rostov</strong>
-                            <span className="cg-role-badge champion">Head of Cloud Infrastructure</span>
+                            <strong>David Chen</strong>
+                            <span className="cg-role-badge decision-maker">Full-Stack Lead Engineer</span>
                           </div>
                           <div className="cg-person-reach">
-                            <code>elena.r@nexascale.de</code>
-                            <span>&bull; LinkedIn Profile Verified</span>
+                            <code>Clean Architecture &bull; Docker &bull; CI/CD Pipelines</code>
+                            <span>&bull; Automated Tests Passing</span>
                           </div>
-                          <p className="cg-person-insight">"Primary technical champion evaluating API response times, latency, and compliance benchmarks."</p>
+                          <p className="cg-person-insight">"Full-stack MVP application core built with modular database schemas, JWT authentication engine, and interactive Swagger API documentation."</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="cg-recommendation-box">
-                      <Sparkles size={15} color="#7C3AED" />
+                      <Sparkles size={15} color="#059669" />
                       <div>
-                        <strong>CreativeGini Strategic Recommendation:</strong>
-                        <span> Focus outreach on European data sovereignty and automated pipeline orchestration. Contact Dr. Weber directly on Tuesday mornings.</span>
+                        <strong>CreativeGini Production Handoff:</strong>
+                        <span> Source code deployed to staging, database migrations verified, and repository ownership transferred seamlessly to client.</span>
                       </div>
                     </div>
                   </div>
