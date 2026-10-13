@@ -25,6 +25,7 @@ import {
   Mail,
   Phone,
   CheckCircle,
+  CheckCircle2,
   Globe,
   X
 } from 'lucide-react';
