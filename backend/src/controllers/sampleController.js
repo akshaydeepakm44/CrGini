@@ -1117,7 +1117,6 @@ export const submitPublicInquiry = async (req, res) => {
       process.env.EMAIL_USER,
       process.env.ADMIN_EMAIL,
       process.env.SUPPORT_EMAIL,
-      'contact@creativegini.com',
       'contact@dizigini.com',
       'team@dizigini.com',
     ]
@@ -1213,7 +1212,7 @@ export const submitPublicInquiry = async (req, res) => {
     console.error('[SampleController.submitPublicInquiry] Error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to submit inquiry. Please try again or email us directly at contact@creativegini.com.',
+      message: 'Failed to submit inquiry. Please try again or email us directly at contact@dizigini.com.',
     });
   }
 };

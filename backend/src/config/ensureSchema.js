@@ -204,7 +204,14 @@ export async function ensureSchemaIntegrity() {
       console.warn('[Schema] public_sample_inquiries step note:', e5.message);
     }
 
-    // 7. Ensure public_sample_showcases leads JSONB payloads are optimized (strip multi-megabyte base64 strings)
+    // 7. Ensure default Finkr showcase exists in public_sample_showcases
+    try {
+      await ensureFinkrShowcase();
+    } catch (eFinkr) {
+      console.warn('[Schema] ensureFinkrShowcase step note:', eFinkr.message);
+    }
+
+    // 8. Ensure public_sample_showcases leads JSONB payloads are optimized (strip multi-megabyte base64 strings)
     try {
       await ensureOptimizedProspectPayloads();
     } catch (e6) {
@@ -302,4 +309,110 @@ export async function ensureOptimizedProspectPayloads() {
     console.warn('[Schema] ensureOptimizedProspectPayloads warning:', err.message);
   }
 }
+
+/**
+ * Ensures the default Finkr showcase row exists in public_sample_showcases
+ * matching the Image 2 briefing presentation.
+ */
+export async function ensureFinkrShowcase() {
+  try {
+    const existing = await query("SELECT id FROM public_sample_showcases WHERE slug = 'finkr' LIMIT 1");
+    if (existing.rows && existing.rows.length > 0) {
+      return;
+    }
+
+    const companyStudy = {
+      company: 'Finkr',
+      industry: 'Fintech & Embedded Financial Infrastructure',
+      overviewTitle: 'B2B financial infrastructure for modern businesses',
+      businessOverview: 'Finkr provides embedded finance solutions, focusing on seamless payment and banking infrastructure for digital-first companies.',
+      marketTitle: 'Growing segment with strong momentum',
+      marketPosition: 'Finkr is positioned in the fast-growing embedded finance market, competing with established players like Stripe, Marqeta and Kontent.',
+      opportunitiesTitle: 'Expansion in European markets and verticals',
+      keyObservations: 'There are opportunities in cross-border payments, new verticals (eCommerce, SaaS) and deeper product integrations with fintech partners.',
+      focusTitle: 'Enterprise partnerships and product expansion',
+      potentialOpportunity: 'Focus on strategic partnerships and integrated solutions to increase wallet share and enter new markets.',
+      hasPdf: true,
+      pdfUrl: '/api/samples/finkr/company-study-pdf',
+      pdfFileName: 'Finkr - Company Study.pdf',
+    };
+
+    const leads = [
+      {
+        id: 'lead-finkr-1',
+        name: 'Wearemarmalade',
+        title: 'Key Executive',
+        company: 'Finkr',
+        whySuitsBest: 'Leads product strategy and growth initiatives. Relevant to your business based on their role, company focus and recent activity.',
+        avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=180&auto=format&fit=crop&q=80',
+        linkedinUrl: 'https://linkedin.com',
+        companyUrl: 'https://finkr.com',
+        whyItMatters: [
+          'Leads product and platform strategy',
+          'Focused on growth and partnerships',
+          'Active in embedded finance ecosystem'
+        ],
+        tags: ['Verified role', 'Public sources'],
+        isUnlocked: true,
+      },
+      {
+        id: 'lead-finkr-2',
+        name: 'Daniel Carter',
+        title: 'Co-Founder & CEO',
+        company: 'Finkr',
+        tags: ['Founders', 'Product'],
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=180&auto=format&fit=crop&q=80',
+        isUnlocked: false,
+      },
+      {
+        id: 'lead-finkr-3',
+        name: 'Sophie Martin',
+        title: 'Head of Partnerships',
+        company: 'Finkr',
+        tags: ['Partnerships', 'Growth'],
+        avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=180&auto=format&fit=crop&q=80',
+        isUnlocked: false,
+      },
+      {
+        id: 'lead-finkr-4',
+        name: 'James Ellison',
+        title: 'VP Engineering',
+        company: 'Finkr',
+        tags: ['Engineering', 'Product'],
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=180&auto=format&fit=crop&q=80',
+        isUnlocked: false,
+      },
+      {
+        id: 'lead-finkr-5',
+        name: 'Priya Nair',
+        title: 'Head of Marketing',
+        company: 'Finkr',
+        tags: ['Marketing', 'Brand'],
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=180&auto=format&fit=crop&q=80',
+        isUnlocked: false,
+      }
+    ];
+
+    await query(
+      `
+        INSERT INTO public_sample_showcases (
+          slug, title, company_name, description, status, company_study, leads, published_at, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), NOW())
+      `,
+      [
+        'finkr',
+        'Finkr’s next growth opportunities, explored.',
+        'Finkr',
+        'Get a tailored view of your market position, key decision-makers, and strategic opportunities — all backed by real-time research and AI-powered insights.',
+        'PUBLISHED',
+        JSON.stringify(companyStudy),
+        JSON.stringify(leads),
+      ]
+    );
+    console.log('[Schema] Seeded default Finkr showcase matching Image 2.');
+  } catch (err) {
+    console.warn('[Schema] ensureFinkrShowcase notice:', err.message);
+  }
+}
+
 

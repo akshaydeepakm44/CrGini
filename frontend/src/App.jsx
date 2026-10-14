@@ -123,15 +123,10 @@ export default function App() {
     <ServiceVisibilityProvider>
       <div className="app-root">
         <Routes>
-        {/* 1. Public Light Theme Landing Page */}
+        {/* 1. Public Intelligence Showcase Briefing (Image 2 - default for all visitors) */}
         <Route
           path="/"
-          element={
-            <LandingPage
-              onSignIn={() => navigate('/signin')}
-              onGetStarted={() => navigate('/signin?view=signup')}
-            />
-          }
+          element={<PublicSampleDashboard />}
         />
 
         {/* Public Sample Intelligence Showcases */}
@@ -141,11 +136,30 @@ export default function App() {
         />
         <Route
           path="/samples"
-          element={<Navigate to="/samples/data-i2i" replace />}
+          element={<PublicSampleDashboard />}
         />
         <Route
           path="/showcase/:slug"
           element={<PublicSampleDashboard />}
+        />
+        <Route
+          path="/showcase"
+          element={<PublicSampleDashboard />}
+        />
+        <Route
+          path="/briefing"
+          element={<PublicSampleDashboard />}
+        />
+
+        {/* Legacy / Agency overview */}
+        <Route
+          path="/overview"
+          element={
+            <LandingPage
+              onSignIn={() => navigate('/signin')}
+              onGetStarted={() => navigate('/signin?view=signup')}
+            />
+          }
         />
 
         {/* Dedicated Sign Up redirect */}
