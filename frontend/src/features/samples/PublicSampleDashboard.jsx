@@ -12,32 +12,37 @@ import {
   Sparkles,
   ChevronRight,
   Briefcase,
-  MapPin,
   TrendingUp,
   Target,
-  Search,
   Download,
-  Lock,
-  LogIn,
-  UserPlus,
-  Compass,
   Linkedin,
   Mail,
   Phone,
-  CheckCircle,
   CheckCircle2,
   Globe,
   X,
-  Send,
-  Copy,
-  Check,
-  Loader2,
-  Lightbulb,
   Calendar,
-  Layers,
-  ArrowUpRight
+  Lightbulb
 } from 'lucide-react';
 import { api } from '../../services/api';
+
+/**
+ * Shortens a URL for clean, uncluttered display
+ * (e.g. "https://www.linkedin.com/company/meridian-analytics/" -> "linkedin.com/company/meridian...")
+ */
+function shortenUrl(rawUrl, maxLength = 26) {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  try {
+    let clean = rawUrl.trim();
+    clean = clean.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+    if (clean.length > maxLength) {
+      return clean.substring(0, maxLength) + '...';
+    }
+    return clean;
+  } catch {
+    return rawUrl;
+  }
+}
 
 /**
  * Smart Industry / Sector parser
@@ -45,10 +50,10 @@ import { api } from '../../services/api';
  */
 function parseIndustries(rawInd) {
   if (!rawInd || typeof rawInd !== 'string') {
-    return ['Technology & Enterprise Services'];
+    return ['Enterprise Technology & Services'];
   }
   const trimmed = rawInd.trim();
-  if (!trimmed) return ['Technology & Enterprise Services'];
+  if (!trimmed) return ['Enterprise Technology & Services'];
 
   const protectedParen = [];
   const tokenized = trimmed.replace(/\([^\)]*\)/g, (match) => {
@@ -105,7 +110,6 @@ export default function PublicSampleDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedLead, setSelectedLead] = useState(null);
-  const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
   const [isStrategyModalOpen, setIsStrategyModalOpen] = useState(false);
   const [strategyForm, setStrategyForm] = useState({ name: '', email: '', company: '', notes: '' });
   const [strategySubmitted, setStrategySubmitted] = useState(false);
@@ -140,71 +144,13 @@ export default function PublicSampleDashboard() {
   const industrySectors = useMemo(() => parseIndustries(companyStudy.industry), [companyStudy.industry]);
   const pitchDeck = sample?.pitchDeck || null;
 
-  // Build 5 dynamic display leads (Lead 1 is unlocked with full study, Leads 2-5 previewed)
+  // ONLY display the leads that are actually uploaded (no fake/synthetic leads!)
   const displayLeads = useMemo(() => {
-    const rawLeads = Array.isArray(sample?.leads) ? [...sample.leads] : [];
+    return Array.isArray(sample?.leads) ? sample.leads : [];
+  }, [sample]);
 
-    const fallbackLockedRoles = [
-      {
-        title: 'VP of Marketing & Growth Operations',
-        name: 'Executive Leadership',
-        industry: companyStudy.industry || 'B2B Enterprise Vertical',
-        shortSummary: 'Oversees demand generation infrastructure, marketing automation stacks, and annual vendor allocations.',
-      },
-      {
-        title: 'Chief Technology Officer (CTO)',
-        name: 'Technical Decision Maker',
-        industry: companyStudy.industry || 'Cloud & Enterprise Architecture',
-        shortSummary: 'Primary stakeholder for engineering scalability, system integrations, and technical security compliance review.',
-      },
-      {
-        title: 'Head of Global Sales & Strategic Partnerships',
-        name: 'Commercial Director',
-        industry: companyStudy.industry || 'Commercial Enterprise',
-        shortSummary: 'Direct authority over sales pipeline tools, multi-channel outbound velocity, and strategic expansion initiatives.',
-      },
-      {
-        title: 'Director of Procurement & Vendor Relations',
-        name: 'Procurement Authority',
-        industry: companyStudy.industry || 'Enterprise Procurement',
-        shortSummary: 'Controls RFP cycles, vendor contract approvals, and budgetary allocation for specialist agency engagements.',
-      },
-    ];
-
-    while (rawLeads.length < 5) {
-      const padIdx = rawLeads.length;
-      const template = fallbackLockedRoles[padIdx - 1] || fallbackLockedRoles[0];
-      rawLeads.push({
-        id: `synthetic-lead-${padIdx}`,
-        name: template.name,
-        title: template.title,
-        company: companyName,
-        industry: template.industry,
-        shortSummary: template.shortSummary,
-        isSynthetic: true,
-      });
-    }
-
-    return rawLeads;
-  }, [sample, companyName, companyStudy]);
-
-  const featuredLead = displayLeads[0];
-  const previewLeads = displayLeads.slice(1, 5);
-
-  const handleSignUpClick = () => {
-    navigate('/signin?view=signup&returnTo=/portal');
-  };
-
-  const handleLoginClick = () => {
-    navigate('/signin?returnTo=/portal');
-  };
-
-  const handleScrollToSection1 = () => {
-    const el = document.getElementById('executive-intelligence');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
+  const featuredLead = displayLeads.length > 0 ? displayLeads[0] : null;
+  const previewLeads = displayLeads.length > 1 ? displayLeads.slice(1) : [];
 
   const handleBookStrategySubmit = (e) => {
     e.preventDefault();
@@ -241,20 +187,12 @@ export default function PublicSampleDashboard() {
           <p style={{ fontSize: '0.875rem', color: '#64748B', lineHeight: '1.6', marginBottom: '24px' }}>
             {error || 'The requested sample collection is either unpublished or not found.'}
           </p>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <button
-              onClick={() => navigate('/')}
-              style={{ padding: '10px 18px', borderRadius: '8px', background: '#F1F5F9', border: '1px solid #E2E8F0', color: '#334155', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}
-            >
-              Return Home
-            </button>
-            <button
-              onClick={handleLoginClick}
-              style={{ padding: '10px 18px', borderRadius: '8px', background: '#2563EB', border: 'none', color: '#FFFFFF', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}
-            >
-              Client Login
-            </button>
-          </div>
+          <button
+            onClick={() => navigate('/')}
+            style={{ padding: '10px 20px', borderRadius: '8px', background: '#2563EB', border: 'none', color: '#FFFFFF', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}
+          >
+            Return Home
+          </button>
         </div>
       </div>
     );
@@ -263,9 +201,9 @@ export default function PublicSampleDashboard() {
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', color: '#0F172A', fontFamily: 'Inter, system-ui, -apple-system, sans-serif' }}>
       
-      {/* 1. TOP HEADER & NAVIGATION (Theme & Look of Image 2) */}
+      {/* 1. TOP HEADER & NAVIGATION (View Page: Login and Sign Up Removed as requested in Image 5) */}
       <header style={{ background: '#FFFFFF', borderBottom: '1px solid #E2E8F0', position: 'sticky', top: 0, zIndex: 50, backdropFilter: 'blur(8px)' }}>
-        <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
@@ -298,65 +236,20 @@ export default function PublicSampleDashboard() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button
-              type="button"
-              onClick={handleLoginClick}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                background: '#FFFFFF',
-                border: '1px solid #CBD5E1',
-                color: '#334155',
-                fontSize: '0.84rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#94A3B8'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#CBD5E1'; }}
-            >
-              <LogIn size={14} />
-              <span>Login</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSignUpClick}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 18px',
-                borderRadius: '8px',
-                background: '#2563EB',
-                border: 'none',
-                color: '#FFFFFF',
-                fontSize: '0.84rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#1D4ED8'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#2563EB'; }}
-            >
-              <UserPlus size={14} />
-              <span>Sign Up</span>
-            </button>
+          {/* View page note: No login or sign-in buttons here */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#64748B', fontWeight: 600 }}>
+            <ShieldCheck size={14} color="#10B981" />
+            <span>Verified Public Intelligence Briefing</span>
           </div>
 
         </div>
       </header>
 
-      {/* 2. HERO SECTION (Theme & Look of Image 2 with Dynamic Content) */}
-      <section style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)', borderBottom: '1px solid #E2E8F0', padding: '52px 24px 60px 24px' }}>
-        <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '48px', alignItems: 'center' }}>
+      {/* 2. HERO SECTION (Item 1 & 2 Applied: Removed pills, button, subtext; Container is medium size with prominent logo) */}
+      <section style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)', borderBottom: '1px solid #E2E8F0', padding: '48px 24px 52px 24px' }}>
+        <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '40px', alignItems: 'center' }}>
           
-          {/* Left Column: Heading, Subtitle, Tags, Action */}
+          {/* Left Column: Title & Subtitle only (Pills and Explore button removed as requested in Image 1) */}
           <div>
             <div style={{
               display: 'inline-flex',
@@ -371,14 +264,14 @@ export default function PublicSampleDashboard() {
               fontWeight: 800,
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
-              marginBottom: '18px'
+              marginBottom: '16px'
             }}>
               <Sparkles size={14} />
               <span>YOUR PERSONALIZED INTELLIGENCE BRIEFING</span>
             </div>
 
             <h1 style={{
-              fontSize: '2.8rem',
+              fontSize: '2.7rem',
               fontWeight: 800,
               color: '#0F172A',
               lineHeight: 1.15,
@@ -392,227 +285,84 @@ export default function PublicSampleDashboard() {
               fontSize: '1.05rem',
               color: '#475569',
               lineHeight: 1.6,
-              margin: '0 0 24px 0',
-              maxWidth: '540px'
+              margin: 0,
+              maxWidth: '560px'
             }}>
               {sample.description || `Get a tailored view of your market position, key decision-makers, and strategic opportunities — all backed by real-time research and AI-powered insights.`}
             </p>
-
-            {/* 3 Pills / Tags */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '28px' }}>
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '7px 14px',
-                borderRadius: '8px',
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                fontSize: '0.84rem',
-                fontWeight: 600,
-                color: '#2563EB',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-              }}>
-                <Building2 size={15} color="#2563EB" />
-                <span style={{ color: '#334155' }}>Company intelligence</span>
-              </div>
-
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '7px 14px',
-                borderRadius: '8px',
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                fontSize: '0.84rem',
-                fontWeight: 600,
-                color: '#059669',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-              }}>
-                <TrendingUp size={15} color="#059669" />
-                <span style={{ color: '#334155' }}>Market positioning</span>
-              </div>
-
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '7px 14px',
-                borderRadius: '8px',
-                background: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                fontSize: '0.84rem',
-                fontWeight: 600,
-                color: '#7C3AED',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-              }}>
-                <Users size={15} color="#7C3AED" />
-                <span style={{ color: '#334155' }}>Decision-maker research</span>
-              </div>
-            </div>
-
-            {/* Primary Action Button */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-start' }}>
-              <button
-                type="button"
-                onClick={handleScrollToSection1}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '14px 26px',
-                  borderRadius: '10px',
-                  background: '#2563EB',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  fontSize: '0.95rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(37,99,235,0.3)',
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#1D4ED8'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#2563EB'; }}
-              >
-                <span>Explore the personalized briefing</span>
-                <ArrowRight size={16} />
-              </button>
-
-              <span style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 500, paddingLeft: '4px' }}>
-                Prepared for {companyName} · Personalized research preview
-              </span>
-            </div>
           </div>
 
-          {/* Right Column: Visual Graphic (Constellation & Floating Highlight Card) */}
-          <div style={{
-            position: 'relative',
-            background: 'radial-gradient(circle at 70% 30%, #EEF2FF 0%, #FFFFFF 70%)',
-            borderRadius: '24px',
-            border: '1px solid #E2E8F0',
-            padding: '36px',
-            minHeight: '320px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
-            overflow: 'hidden'
-          }}>
+          {/* Right Column: Medium-Sized Container with Visible Company Logo (Dots and Floating card removed as requested in Image 2) */}
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
             <div style={{
-              position: 'absolute',
-              top: '20px',
-              right: '20px',
-              width: '140px',
-              height: '140px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(165,180,252,0.4) 0%, rgba(255,255,255,0) 70%)',
-              filter: 'blur(20px)',
-              pointerEvents: 'none'
-            }} />
-
-            {/* Target Organization Identity */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', zIndex: 1 }}>
+              width: '100%',
+              maxWidth: '380px',
+              minHeight: '220px',
+              background: '#FFFFFF',
+              borderRadius: '20px',
+              border: '1px solid #E2E8F0',
+              padding: '32px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+            }}>
               {sample.logoUrl ? (
                 <img
                   src={sample.logoUrl}
                   alt={companyName}
-                  style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'contain', border: '1px solid #E2E8F0', background: '#FFFFFF' }}
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  style={{
+                    maxHeight: '100px',
+                    maxWidth: '240px',
+                    objectFit: 'contain',
+                    marginBottom: '16px'
+                  }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
                 />
               ) : (
                 <div style={{
-                  width: '46px',
-                  height: '46px',
-                  borderRadius: '12px',
-                  background: '#1E293B',
+                  width: '68px',
+                  height: '68px',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
                   color: '#FFFFFF',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '1.3rem',
-                  fontWeight: 900
+                  fontSize: '2rem',
+                  fontWeight: 900,
+                  marginBottom: '14px',
+                  boxShadow: '0 4px 14px rgba(15,23,42,0.15)'
                 }}>
                   {companyName.charAt(0)}
                 </div>
               )}
-              <div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
-                  {companyName}
-                </div>
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748B' }}>
-                  {companyStudy.industry || 'Enterprise Strategic Dossier'}
-                </div>
-              </div>
-            </div>
 
-            {/* Constellation Network Graph (SVG) */}
-            <div style={{ position: 'relative', margin: '24px 0', zIndex: 1 }}>
-              <svg width="100%" height="130" viewBox="0 0 380 130" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <line x1="40" y1="65" x2="130" y2="35" stroke="#93C5FD" strokeWidth="1.5" strokeDasharray="3 3" />
-                <line x1="130" y1="35" x2="240" y2="40" stroke="#93C5FD" strokeWidth="1.5" />
-                <line x1="130" y1="35" x2="190" y2="95" stroke="#93C5FD" strokeWidth="1.5" />
-                <line x1="240" y1="40" x2="330" y2="70" stroke="#93C5FD" strokeWidth="1.5" />
-                <line x1="190" y1="95" x2="330" y2="70" stroke="#93C5FD" strokeWidth="1.5" strokeDasharray="3 3" />
-                <line x1="240" y1="40" x2="270" y2="105" stroke="#BFDBFE" strokeWidth="1.5" />
-
-                <circle cx="40" cy="65" r="7" fill="#2563EB" />
-                <circle cx="130" cy="35" r="8" fill="#3B82F6" />
-                <circle cx="240" cy="40" r="9" fill="#1D4ED8" />
-                <circle cx="190" cy="95" r="7" fill="#60A5FA" />
-                <circle cx="330" cy="70" r="8" fill="#2563EB" />
-                <circle cx="270" cy="105" r="6" fill="#93C5FD" />
-              </svg>
-            </div>
-
-            {/* Floating Card */}
-            <div style={{
-              background: '#FFFFFF',
-              borderRadius: '14px',
-              padding: '16px 20px',
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
-              zIndex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <div>
-                <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.25 }}>
-                  Smarter decisions.
-                </div>
-                <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#2563EB', lineHeight: 1.25 }}>
-                  Bigger opportunities.
-                </div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', marginBottom: '4px' }}>
+                {companyName}
               </div>
 
-              <div style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: '#EFF6FF',
-                color: '#2563EB',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Sparkles size={16} />
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748B' }}>
+                {companyStudy.industry || 'Target Enterprise'}
               </div>
             </div>
-
           </div>
 
         </div>
       </section>
 
       {/* MAIN CONTAINER */}
-      <main style={{ maxWidth: '1240px', margin: '0 auto', padding: '48px 24px' }}>
+      <main style={{ maxWidth: '1240px', margin: '0 auto', padding: '44px 24px' }}>
 
-        {/* SECTION 1: EXECUTIVE INTELLIGENCE (Theme & Look of Image 2 with Dynamic Content) */}
-        <section id="executive-intelligence" style={{ marginBottom: '56px', scrollMarginTop: '80px' }}>
+        {/* SECTION 1: EXECUTIVE INTELLIGENCE (Item 3 Applied: View Full Analysis is a Clickable Button) */}
+        <section id="executive-intelligence" style={{ marginBottom: '52px' }}>
           
           {/* Section 1 Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{
                 width: '34px',
@@ -638,45 +388,32 @@ export default function PublicSampleDashboard() {
               </div>
             </div>
 
-            {/* View Full Analysis / PDF Button */}
-            {companyStudy.pdfUrl ? (
-              <a
-                href={companyStudy.pdfUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: '#2563EB',
-                  fontSize: '0.875rem',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                }}
-              >
-                <span>View full analysis PDF</span>
-                <ExternalLink size={14} />
-              </a>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsUnlockModalOpen(true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: 'none',
-                  border: 'none',
-                  color: '#2563EB',
-                  fontSize: '0.875rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                <span>View full analysis</span>
-                <ArrowRight size={14} />
-              </button>
-            )}
+            {/* Clickable Button for View Full Analysis PDF (as requested in Image 3) */}
+            <a
+              href={companyStudy.pdfUrl || `/api/samples/${sample.slug}/company-study-pdf`}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                borderRadius: '8px',
+                background: '#2563EB',
+                color: '#FFFFFF',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                textDecoration: 'none',
+                boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#1D4ED8'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#2563EB'; }}
+            >
+              <FileText size={15} />
+              <span>View Full Analysis PDF</span>
+              <ExternalLink size={14} />
+            </a>
           </div>
 
           {/* Industry / Sector Mini Cards */}
@@ -709,7 +446,7 @@ export default function PublicSampleDashboard() {
             </div>
           )}
 
-          {/* 4 Cards Grid (Theme & Look of Image 2 with Dynamic Content) */}
+          {/* 4 Cards Grid with Real Dynamic Content */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '18px', alignItems: 'stretch' }}>
             
             {/* Card 1: Company Overview */}
@@ -743,11 +480,11 @@ export default function PublicSampleDashboard() {
                 </div>
 
                 <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.35, margin: '0 0 10px 0' }}>
-                  {getCardHeadline(companyStudy.overviewTitle, companyStudy.businessOverview, `B2B Strategic Architecture & Core Mission`)}
+                  {getCardHeadline(companyStudy.overviewTitle, companyStudy.businessOverview, 'B2B Core Architecture & Service Overview')}
                 </h3>
 
                 <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.businessOverview || companyStudy.overview || `${companyName} provides high-impact products and specialized operational solutions for enterprise organizations.`}
+                  {companyStudy.businessOverview || companyStudy.overview || `${companyName} delivers high-impact products and operational infrastructure for enterprise clients.`}
                 </p>
               </div>
 
@@ -789,11 +526,11 @@ export default function PublicSampleDashboard() {
                 </div>
 
                 <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.35, margin: '0 0 10px 0' }}>
-                  {getCardHeadline(companyStudy.marketTitle, companyStudy.marketPosition, 'Growing segment with strong momentum')}
+                  {getCardHeadline(companyStudy.marketTitle, companyStudy.marketPosition, 'Market Footprint & Segment Velocity')}
                 </h3>
 
                 <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.marketPosition || `${companyName} maintains a prominent commercial footprint, competing with boutique consultancies and technology leaders.`}
+                  {companyStudy.marketPosition || `${companyName} maintains an active commercial footprint across its target sectors.`}
                 </p>
               </div>
 
@@ -835,11 +572,11 @@ export default function PublicSampleDashboard() {
                 </div>
 
                 <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.35, margin: '0 0 10px 0' }}>
-                  {getCardHeadline(companyStudy.opportunitiesTitle, companyStudy.keyObservations, 'Expansion across core verticals & partnerships')}
+                  {getCardHeadline(companyStudy.opportunitiesTitle, companyStudy.keyObservations, 'Observed Market & Integration Opportunities')}
                 </h3>
 
                 <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.keyObservations || `Observed high demand for consolidated data architecture, compliance tooling, and turnkey vendor solutions.`}
+                  {companyStudy.keyObservations || `Observed high demand for consolidated service delivery, technical integrations, and turnkey execution.`}
                 </p>
               </div>
 
@@ -881,11 +618,11 @@ export default function PublicSampleDashboard() {
                 </div>
 
                 <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.35, margin: '0 0 10px 0' }}>
-                  {getCardHeadline(companyStudy.focusTitle, companyStudy.potentialOpportunity, 'Enterprise partnerships & ICP expansion')}
+                  {getCardHeadline(companyStudy.focusTitle, companyStudy.potentialOpportunity, 'Recommended Commercial Strategy & Focus')}
                 </h3>
 
                 <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.potentialOpportunity || `Position bespoke capability assessments to enterprise decision-makers navigating complex modernization sprints.`}
+                  {companyStudy.potentialOpportunity || `Focus on strategic enterprise partnerships and integrated solutions to expand market share.`}
                 </p>
               </div>
 
@@ -900,10 +637,9 @@ export default function PublicSampleDashboard() {
 
         </section>
 
-        {/* SECTION 2: WHAT THIS COULD MEAN FOR YOUR BUSINESS (Theme & Look of Image 2) */}
-        <section style={{ marginBottom: '56px' }}>
+        {/* SECTION 2: WHAT THIS COULD MEAN FOR YOUR BUSINESS */}
+        <section style={{ marginBottom: '52px' }}>
           
-          {/* Section 2 Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{
@@ -945,10 +681,9 @@ export default function PublicSampleDashboard() {
             </div>
           </div>
 
-          {/* 3 Column Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', alignItems: 'stretch' }}>
             
-            {/* Column 1: Market opportunities */}
+            {/* Column 1 */}
             <div style={{
               background: '#FFFFFF',
               borderRadius: '16px',
@@ -960,54 +695,26 @@ export default function PublicSampleDashboard() {
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
             }}>
               <div>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  background: '#EFF6FF',
-                  color: '#2563EB',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '16px'
-                }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
                   <Target size={18} />
                 </div>
-
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', margin: '0 0 10px 0' }}>
                   Market opportunities
                 </h3>
-
                 <p style={{ fontSize: '0.86rem', color: '#475569', lineHeight: 1.55, margin: '0 0 20px 0' }}>
                   Identify relevant market signals, customer segments and expansion possibilities across {companyStudy.industry || 'the enterprise landscape'}.
                 </p>
               </div>
-
-              {/* Example Box */}
-              <div style={{
-                background: '#F8FAFC',
-                borderRadius: '10px',
-                border: '1px solid #E2E8F0',
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '10px'
-              }}>
-                <div style={{ color: '#2563EB', marginTop: '2px', flexShrink: 0 }}>
-                  <Target size={15} />
-                </div>
+              <div style={{ background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                <div style={{ color: '#2563EB', marginTop: '2px', flexShrink: 0 }}><Target size={15} /></div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', marginBottom: '2px' }}>
-                    Example
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>
-                    Rapid demand growth and tooling consolidation across modern enterprise organizations.
-                  </div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', marginBottom: '2px' }}>Example</div>
+                  <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>Accelerating demand for unified, enterprise-grade capabilities across accounts.</div>
                 </div>
               </div>
             </div>
 
-            {/* Column 2: Decision-maker access */}
+            {/* Column 2 */}
             <div style={{
               background: '#FFFFFF',
               borderRadius: '16px',
@@ -1019,54 +726,26 @@ export default function PublicSampleDashboard() {
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
             }}>
               <div>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  background: '#EFF6FF',
-                  color: '#2563EB',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '16px'
-                }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
                   <Users size={18} />
                 </div>
-
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', margin: '0 0 10px 0' }}>
                   Decision-maker access
                 </h3>
-
                 <p style={{ fontSize: '0.86rem', color: '#475569', lineHeight: 1.55, margin: '0 0 20px 0' }}>
                   Discover relevant stakeholders and understand their business roles, priorities and engagement patterns.
                 </p>
               </div>
-
-              {/* Example Box */}
-              <div style={{
-                background: '#F8FAFC',
-                borderRadius: '10px',
-                border: '1px solid #E2E8F0',
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '10px'
-              }}>
-                <div style={{ color: '#2563EB', marginTop: '2px', flexShrink: 0 }}>
-                  <Users size={15} />
-                </div>
+              <div style={{ background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                <div style={{ color: '#2563EB', marginTop: '2px', flexShrink: 0 }}><Users size={15} /></div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', marginBottom: '2px' }}>
-                    Example
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>
-                    C-Level focus on pipeline velocity, tech stack efficiency, and strategic execution.
-                  </div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', marginBottom: '2px' }}>Example</div>
+                  <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>Direct engagement paths to budget authorities vetting new implementation partners.</div>
                 </div>
               </div>
             </div>
 
-            {/* Column 3: Actionable growth strategy */}
+            {/* Column 3 */}
             <div style={{
               background: '#FFFFFF',
               borderRadius: '16px',
@@ -1078,49 +757,21 @@ export default function PublicSampleDashboard() {
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
             }}>
               <div>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  background: '#EFF6FF',
-                  color: '#2563EB',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '16px'
-                }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
                   <TrendingUp size={18} />
                 </div>
-
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', margin: '0 0 10px 0' }}>
                   Actionable growth strategy
                 </h3>
-
                 <p style={{ fontSize: '0.86rem', color: '#475569', lineHeight: 1.55, margin: '0 0 20px 0' }}>
                   Translate research into prioritized outreach, partnership opportunities and business development actions.
                 </p>
               </div>
-
-              {/* Example Box */}
-              <div style={{
-                background: '#F8FAFC',
-                borderRadius: '10px',
-                border: '1px solid #E2E8F0',
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '10px'
-              }}>
-                <div style={{ color: '#2563EB', marginTop: '2px', flexShrink: 0 }}>
-                  <TrendingUp size={15} />
-                </div>
+              <div style={{ background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                <div style={{ color: '#2563EB', marginTop: '2px', flexShrink: 0 }}><TrendingUp size={15} /></div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', marginBottom: '2px' }}>
-                    Example
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>
-                    Prioritize strategic accounts facing active legacy migration friction and expansion initiatives.
-                  </div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', marginBottom: '2px' }}>Example</div>
+                  <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>Prioritize commercial engagement based on verified operational pain points.</div>
                 </div>
               </div>
             </div>
@@ -1129,8 +780,8 @@ export default function PublicSampleDashboard() {
 
         </section>
 
-        {/* SECTION 3: DECISION-MAKER INTELLIGENCE (Theme & Look of Image 2 with Dynamic Content) */}
-        <section style={{ marginBottom: '56px' }}>
+        {/* SECTION 3: DECISION-MAKER INTELLIGENCE (Item 4 & 6 Applied: Two clean containers for Company Specific & Lead Specific; Only real uploaded leads) */}
+        <section style={{ marginBottom: '52px' }}>
           
           {/* Section 3 Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
@@ -1172,12 +823,12 @@ export default function PublicSampleDashboard() {
               color: '#065F46'
             }}>
               <Users size={14} />
-              <span>1 profile available</span>
+              <span>{displayLeads.length} {displayLeads.length === 1 ? 'profile' : 'profiles'} available</span>
             </div>
           </div>
 
-          {/* Featured Profile Card (Matches Image 2 using Lead 1 from DB) */}
-          {featuredLead && (
+          {/* Featured Profile Card */}
+          {featuredLead ? (
             <div style={{
               background: '#FFFFFF',
               borderRadius: '16px',
@@ -1187,11 +838,11 @@ export default function PublicSampleDashboard() {
               boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-              gap: '32px',
+              gap: '28px',
               alignItems: 'stretch'
             }}>
               
-              {/* Left Column: Avatar, Identity, Bio, Badges, Links */}
+              {/* Left Column: Identity & Bio */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '18px', marginBottom: '18px' }}>
                   {featuredLead.logo || featuredLead.avatarUrl ? (
@@ -1239,17 +890,17 @@ export default function PublicSampleDashboard() {
                       <CheckCircle2 size={16} color="#10B981" />
                     </div>
                     <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#2563EB', marginTop: '2px' }}>
-                      {featuredLead.title || 'Key Stakeholder'} · {featuredLead.company || companyName}
+                      {featuredLead.title || 'Executive Decision Maker'} · {featuredLead.company || companyName}
                     </div>
                   </div>
                 </div>
 
                 <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.55, margin: '0 0 16px 0' }}>
-                  {featuredLead.whySuitsBest || featuredLead.shortSummary || 'Leads departmental strategy and key operational initiatives. Direct budget holder for strategic partnerships and vendor engagements.'}
+                  {featuredLead.whySuitsBest || featuredLead.shortSummary || 'Direct budget decision maker aligned with key pain points and strategic initiatives.'}
                 </p>
 
                 {/* Badges */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
                   <span style={{
                     padding: '4px 10px',
                     borderRadius: '6px',
@@ -1273,66 +924,75 @@ export default function PublicSampleDashboard() {
                     Public sources
                   </span>
                 </div>
-
-                {/* Links Row */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', fontSize: '0.82rem' }}>
-                  <a
-                    href="https://linkedin.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#2563EB', textDecoration: 'none', fontWeight: 600 }}
-                  >
-                    <Linkedin size={14} />
-                    <span>LinkedIn</span>
-                    <ChevronRight size={13} />
-                  </a>
-
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748B', fontWeight: 500 }}>
-                    <Globe size={14} />
-                    <span>Company website</span>
-                  </span>
-
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748B', fontWeight: 500 }}>
-                    <FileText size={14} />
-                    <span>Recent mentions</span>
-                  </span>
-                </div>
               </div>
 
-              {/* Right Column: Why this person matters (Matches Image 2) */}
-              <div style={{
-                background: '#F8FAFC',
-                borderRadius: '14px',
-                border: '1px solid #E2E8F0',
-                padding: '24px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between'
-              }}>
-                <div>
-                  <h4 style={{ fontSize: '0.925rem', fontWeight: 800, color: '#0F172A', margin: '0 0 16px 0' }}>
-                    Why this person matters
-                  </h4>
+              {/* Right Column: 2 Separate Containers for Company Specific & Lead Specific (Item 4 Applied) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', justifyContent: 'space-between' }}>
+                
+                {/* 1. Company Specific Container */}
+                <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '14px 16px' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Building2 size={14} color="#2563EB" />
+                    <span>Company Specific</span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{ color: '#64748B', fontWeight: 600 }}>Company Web:</span>
+                      {featuredLead.companyLink ? (
+                        <a href={featuredLead.companyLink.startsWith('http') ? featuredLead.companyLink : `https://${featuredLead.companyLink}`} target="_blank" rel="noreferrer" style={{ color: '#2563EB', textDecoration: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Globe size={12} />
+                          <span>{shortenUrl(featuredLead.companyLink)}</span>
+                          <ExternalLink size={10} />
+                        </a>
+                      ) : (
+                        <span style={{ color: '#94A3B8' }}>{companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com</span>
+                      )}
+                    </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <CheckCircle2 size={16} color="#10B981" />
-                      <span style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 500 }}>
-                        {featuredLead.leadStudy?.whyRelevant || 'Direct authority over budget allocation and tool evaluation'}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{ color: '#64748B', fontWeight: 600 }}>Company LinkedIn:</span>
+                      {featuredLead.companyLinkedin || featuredLead.linkedin ? (
+                        <a href={(featuredLead.companyLinkedin || featuredLead.linkedin).startsWith('http') ? (featuredLead.companyLinkedin || featuredLead.linkedin) : `https://${featuredLead.companyLinkedin || featuredLead.linkedin}`} target="_blank" rel="noreferrer" style={{ color: '#2563EB', textDecoration: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Linkedin size={12} />
+                          <span>{shortenUrl(featuredLead.companyLinkedin || featuredLead.linkedin)}</span>
+                          <ExternalLink size={10} />
+                        </a>
+                      ) : (
+                        <span style={{ color: '#94A3B8' }}>linkedin.com/company/{companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Lead Specific Container */}
+                <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '14px 16px' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Users size={14} color="#7C3AED" />
+                    <span>Lead Specific</span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Mail:</span>
+                      <span style={{ color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Mail size={12} color="#2563EB" />
+                        <span>{featuredLead.email || featuredLead.maskedEmail || 'contact@' + (featuredLead.companyLink ? shortenUrl(featuredLead.companyLink) : 'company.com')}</span>
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <CheckCircle2 size={16} color="#10B981" />
-                      <span style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 500 }}>
-                        {featuredLead.leadStudy?.observedContext || 'Actively modernizing operations and vetting specialized partners'}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Phone:</span>
+                      <span style={{ color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Phone size={12} color="#059669" />
+                        <span>{featuredLead.phone || featuredLead.maskedPhone || '+1 (xxx) xxx-xxxx'}</span>
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <CheckCircle2 size={16} color="#10B981" />
-                      <span style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 500 }}>
-                        {featuredLead.leadStudy?.suggestedApproach || 'Key commercial stakeholder for scalable growth sprints'}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Role:</span>
+                      <span style={{ color: '#2563EB', fontWeight: 700 }}>
+                        {featuredLead.title || 'Executive Decision Maker'}
                       </span>
                     </div>
                   </div>
@@ -1348,12 +1008,12 @@ export default function PublicSampleDashboard() {
                     justifyContent: 'center',
                     gap: '8px',
                     width: '100%',
-                    padding: '12px 18px',
+                    padding: '11px 18px',
                     borderRadius: '10px',
                     background: '#2563EB',
                     color: '#FFFFFF',
                     border: 'none',
-                    fontSize: '0.9rem',
+                    fontSize: '0.88rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
@@ -1362,143 +1022,128 @@ export default function PublicSampleDashboard() {
                   onMouseEnter={(e) => { e.currentTarget.style.background = '#1D4ED8'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = '#2563EB'; }}
                 >
-                  <span>View full dossier</span>
+                  <span>Inspect Full Dossier</span>
                   <ArrowRight size={15} />
                 </button>
+
               </div>
 
+            </div>
+          ) : (
+            <div style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '36px', textAlign: 'center', color: '#64748B' }}>
+              No decision makers uploaded yet for this prospect.
             </div>
           )}
 
-          {/* More relevant leads (preview) (Matches Image 2 using Leads 2-5 from DB) */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ fontSize: '0.925rem', fontWeight: 800, color: '#334155' }}>
-                More relevant leads (preview)
+          {/* More relevant leads (preview) - ONLY shown if more leads exist! */}
+          {previewLeads.length > 0 && (
+            <div>
+              <div style={{ fontSize: '0.925rem', fontWeight: 800, color: '#334155', marginBottom: '16px' }}>
+                More relevant leads ({previewLeads.length})
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsUnlockModalOpen(true)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#2563EB',
-                  fontSize: '0.84rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <span>View all leads (25+)</span>
-                <ArrowRight size={13} />
-              </button>
-            </div>
-
-            {/* 4 Preview Cards Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-              {previewLeads.map((item, idx) => (
-                <div
-                  key={item.id || idx}
-                  style={{
-                    background: '#FFFFFF',
-                    borderRadius: '14px',
-                    border: '1px solid #E2E8F0',
-                    padding: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
-                    {item.logo || item.avatarUrl ? (
-                      <img
-                        src={item.logo || item.avatarUrl}
-                        alt={item.name}
-                        style={{
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                {previewLeads.map((item, idx) => (
+                  <div
+                    key={item.id || idx}
+                    style={{
+                      background: '#FFFFFF',
+                      borderRadius: '14px',
+                      border: '1px solid #E2E8F0',
+                      padding: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
+                      {item.logo || item.avatarUrl ? (
+                        <img
+                          src={item.logo || item.avatarUrl}
+                          alt={item.name}
+                          style={{
+                            width: '46px',
+                            height: '46px',
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                            border: '1.5px solid #E2E8F0'
+                          }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div style={{
                           width: '46px',
                           height: '46px',
                           borderRadius: '50%',
-                          objectFit: 'cover',
-                          border: '1.5px solid #E2E8F0'
-                        }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <div style={{
-                        width: '46px',
-                        height: '46px',
-                        borderRadius: '50%',
-                        background: '#EFF6FF',
-                        color: '#2563EB',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 800,
-                        fontSize: '1.1rem',
-                        flexShrink: 0
-                      }}>
-                        {item.name?.charAt(0) || 'L'}
-                      </div>
-                    )}
-                    <div>
-                      <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
-                        {item.name}
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '2px' }}>
-                        {item.title}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>
-                        {item.company || companyName}
+                          background: '#EFF6FF',
+                          color: '#2563EB',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 800,
+                          fontSize: '1.1rem',
+                          flexShrink: 0
+                        }}>
+                          {item.name?.charAt(0) || 'L'}
+                        </div>
+                      )}
+                      <div>
+                        <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
+                          {item.name}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '2px' }}>
+                          {item.title}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>
+                          {item.company || companyName}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <span
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <span
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            background: '#F1F5F9',
+                            color: '#475569',
+                            fontSize: '0.7rem',
+                            fontWeight: 600
+                          }}
+                        >
+                          {item.industry || 'Executive'}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLead(item)}
                         style={{
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          background: '#F1F5F9',
-                          color: '#475569',
-                          fontSize: '0.7rem',
-                          fontWeight: 600
+                          background: 'none',
+                          border: 'none',
+                          color: '#2563EB',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          padding: 0
                         }}
                       >
-                        {item.industry || 'Executive'}
-                      </span>
+                        Inspect
+                      </button>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsUnlockModalOpen(true)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#2563EB',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        padding: 0
-                      }}
-                    >
-                      View profile
-                    </button>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
         </section>
 
-        {/* SECTION 4: DARK NAVY CTA BANNER (Theme & Look of Image 2 - Completely Replaces Old Contact Form!) */}
+        {/* SECTION 4: DARK NAVY CTA BANNER (No contact form below!) */}
         <section style={{ marginBottom: '32px' }}>
           <div style={{
             background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
@@ -1571,39 +1216,13 @@ export default function PublicSampleDashboard() {
 
       </main>
 
-      {/* 5. TRUST FOOTER (Theme & Look of Image 2) */}
-      <footer style={{ background: '#FFFFFF', borderTop: '1px solid #E2E8F0', padding: '36px 24px', textAlign: 'center' }}>
-        <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <span style={{ fontSize: '0.875rem', color: '#64748B' }}>
-              Already have an account?{' '}
-              <button
-                onClick={handleLoginClick}
-                style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
-              >
-                LOGIN
-              </button>
-            </span>
-
-            <span style={{ color: '#CBD5E1' }}>•</span>
-
-            <span style={{ fontSize: '0.875rem', color: '#64748B' }}>
-              Need client access?{' '}
-              <button
-                onClick={handleSignUpClick}
-                style={{ background: 'none', border: 'none', color: '#2563EB', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
-              >
-                SIGN UP
-              </button>
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#94A3B8' }}>
-            <ShieldCheck size={14} color="#10B981" />
+      {/* 5. TRUST FOOTER (Item 5 Applied: Login and Sign Up completely removed from footer) */}
+      <footer style={{ background: '#FFFFFF', borderTop: '1px solid #E2E8F0', padding: '28px 24px', textAlign: 'center' }}>
+        <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#64748B' }}>
+            <ShieldCheck size={16} color="#10B981" />
             <span>{BRAND_NAME} Protected Intelligence Showcase · Enterprise SLA & Tenant Isolation</span>
           </div>
-
         </div>
       </footer>
 
@@ -1790,7 +1409,7 @@ export default function PublicSampleDashboard() {
         </div>
       )}
 
-      {/* MODAL 2: INTERACTIVE LEAD DOSSIER MODAL */}
+      {/* MODAL 2: INTERACTIVE LEAD DOSSIER MODAL (Item 4 Applied: Clean 2 Containers for Company Specific & Lead Specific) */}
       {selectedLead && (
         <div
           style={{
@@ -1887,34 +1506,71 @@ export default function PublicSampleDashboard() {
                 </p>
               </div>
 
-              {/* Observed Strategic Context */}
-              {selectedLead.leadStudy && (
-                <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0F172A', marginBottom: '10px' }}>
-                    Lead Study Context
+              {/* 1. Company Specific Container (Item 4) */}
+              <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '18px 20px' }}>
+                <div style={{ fontSize: '0.825rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Building2 size={16} color="#2563EB" />
+                  <span>Company Specific</span>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 600, marginBottom: '2px' }}>Company Web URL</div>
+                    {selectedLead.companyLink ? (
+                      <a href={selectedLead.companyLink.startsWith('http') ? selectedLead.companyLink : `https://${selectedLead.companyLink}`} target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563EB', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Globe size={13} />
+                        <span>{shortenUrl(selectedLead.companyLink)}</span>
+                        <ExternalLink size={11} />
+                      </a>
+                    ) : (
+                      <span style={{ fontSize: '0.84rem', color: '#94A3B8' }}>{companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com</span>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {selectedLead.leadStudy.whyRelevant && (
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.84rem', color: '#475569' }}>
-                        <CheckCircle2 size={15} color="#10B981" style={{ marginTop: '2px', flexShrink: 0 }} />
-                        <div><strong>Why Relevant:</strong> {selectedLead.leadStudy.whyRelevant}</div>
-                      </div>
-                    )}
-                    {selectedLead.leadStudy.observedContext && (
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.84rem', color: '#475569' }}>
-                        <CheckCircle2 size={15} color="#10B981" style={{ marginTop: '2px', flexShrink: 0 }} />
-                        <div><strong>Observed Context:</strong> {selectedLead.leadStudy.observedContext}</div>
-                      </div>
-                    )}
-                    {selectedLead.leadStudy.suggestedApproach && (
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.84rem', color: '#475569' }}>
-                        <CheckCircle2 size={15} color="#10B981" style={{ marginTop: '2px', flexShrink: 0 }} />
-                        <div><strong>Suggested Approach:</strong> {selectedLead.leadStudy.suggestedApproach}</div>
-                      </div>
+                  <div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 600, marginBottom: '2px' }}>Company LinkedIn URL</div>
+                    {selectedLead.companyLinkedin || selectedLead.linkedin ? (
+                      <a href={(selectedLead.companyLinkedin || selectedLead.linkedin).startsWith('http') ? (selectedLead.companyLinkedin || selectedLead.linkedin) : `https://${selectedLead.companyLinkedin || selectedLead.linkedin}`} target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563EB', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Linkedin size={13} />
+                        <span>{shortenUrl(selectedLead.companyLinkedin || selectedLead.linkedin)}</span>
+                        <ExternalLink size={11} />
+                      </a>
+                    ) : (
+                      <span style={{ fontSize: '0.84rem', color: '#94A3B8' }}>linkedin.com/company/{companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}</span>
                     )}
                   </div>
                 </div>
-              )}
+              </div>
+
+              {/* 2. Lead Specific Container (Item 4) */}
+              <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '18px 20px' }}>
+                <div style={{ fontSize: '0.825rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={16} color="#7C3AED" />
+                  <span>Lead Specific</span>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 600, marginBottom: '2px' }}>Lead Mail</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Mail size={13} color="#2563EB" />
+                      <span>{selectedLead.email || selectedLead.maskedEmail || 'contact@' + (selectedLead.companyLink ? shortenUrl(selectedLead.companyLink) : 'company.com')}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 600, marginBottom: '2px' }}>Lead Phone Number</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Phone size={13} color="#059669" />
+                      <span>{selectedLead.phone || selectedLead.maskedPhone || '+1 (xxx) xxx-xxxx'}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 600, marginBottom: '2px' }}>Lead Role</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563EB' }}>
+                      {selectedLead.title || 'Executive Decision Maker'}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Pitch Deck proposal if available */}
               {(selectedLead.pitchDeck || pitchDeck) && (
@@ -1960,173 +1616,46 @@ export default function PublicSampleDashboard() {
                 </div>
               )}
 
-              {/* Unlock CTA inside dossier */}
-              <div style={{
-                background: '#EFF6FF',
-                borderRadius: '12px',
-                border: '1px solid #BFDBFE',
-                padding: '20px',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1E3A8A', marginBottom: '6px' }}>
-                  Unlock Direct Phone Lines & Unmasked Emails
-                </div>
-                <p style={{ fontSize: '0.84rem', color: '#3B82F6', margin: '0 0 14px 0' }}>
-                  Create a client account to unlock verified contact coordinates and download the complete executive dossier.
-                </p>
-
+              {/* Close / Strategy Action */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLead(null)}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '8px',
+                    background: '#F1F5F9',
+                    border: '1px solid #CBD5E1',
+                    color: '#475569',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedLead(null);
-                    handleSignUpClick();
+                    setIsStrategyModalOpen(true);
                   }}
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '11px 22px',
+                    padding: '10px 18px',
                     borderRadius: '8px',
                     background: '#2563EB',
-                    color: '#FFFFFF',
                     border: 'none',
+                    color: '#FFFFFF',
+                    fontSize: '0.85rem',
                     fontWeight: 700,
-                    fontSize: '0.88rem',
                     cursor: 'pointer',
                     boxShadow: '0 2px 8px rgba(37,99,235,0.25)'
                   }}
                 >
-                  <UserPlus size={15} />
-                  <span>Sign Up to Unlock Full Contact Details</span>
+                  Book Strategy Call
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* MODAL 3: LOCKED LEADS ACCESS MODAL */}
-      {isUnlockModalOpen && (
-        <div
-          onClick={() => setIsUnlockModalOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '20px',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#FFFFFF',
-              borderRadius: '20px',
-              padding: '36px 32px',
-              maxWidth: '480px',
-              width: '100%',
-              textAlign: 'center',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-              position: 'relative',
-              animation: 'modalSlideUp 0.25s ease-out',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setIsUnlockModalOpen(false)}
-              style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                background: '#F1F5F9',
-                border: 'none',
-                borderRadius: '50%',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#64748B',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={16} />
-            </button>
-
-            <div
-              style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '16px',
-                background: '#EFF6FF',
-                color: '#2563EB',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 18px auto',
-              }}
-            >
-              <Lock size={26} />
-            </div>
-
-            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>
-              Unlock Qualified Enterprise Leads
-            </h3>
-
-            <p style={{ fontSize: '0.9rem', color: '#64748B', lineHeight: '1.55', marginBottom: '24px' }}>
-              Verified work emails, direct executive phone numbers, deep-dive account dossiers, and custom ICP research for {companyName} are available for registered clients.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={handleSignUpClick}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  padding: '12px 20px',
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  fontSize: '0.95rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
-                }}
-              >
-                <UserPlus size={16} />
-                <span>Create Client Account (Sign Up)</span>
-                <ArrowRight size={16} />
-              </button>
-
-              <button
-                type="button"
-                onClick={handleLoginClick}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  padding: '11px 20px',
-                  borderRadius: '10px',
-                  background: '#F8FAFC',
-                  color: '#334155',
-                  border: '1px solid #CBD5E1',
-                  fontSize: '0.9rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                <LogIn size={15} />
-                <span>Already Have an Account? Log In</span>
-              </button>
             </div>
           </div>
         </div>

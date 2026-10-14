@@ -117,39 +117,42 @@ export const getPublicSampleBySlug = async (req, res) => {
         companyLink = `https://${sample.companyName}`;
       }
 
-      // Extract real LinkedIn URL
+      // Extract real LinkedIn and Company LinkedIn URLs
       const linkedinUrl = l.linkedin || l.linkedinUrl || l.linkedin_url || l.linkedinProfile || '';
+      const companyLinkedinUrl = l.companyLinkedin || l.company_linkedin || sample.companyStudy?.linkedin || '';
 
-      // Direct email: Open & unmasked for the first lead
+      // Direct email: Open & unmasked for the first lead if present
       const unmaskedEmail = l.email || l.directWorkEmail || l.workEmail || '';
       const emailForFirst = unmaskedEmail || (l.maskedEmail ? l.maskedEmail.replace('••••', 'contact') : '');
 
       return {
         id: leadId,
         name: leadName,
-        title: l.title || 'Decision Maker',
+        title: l.title || 'Executive Decision Maker',
         company: l.company || l.lead_company || sample.companyName,
         companyLink: companyLink,
+        companyLinkedin: companyLinkedinUrl,
         logo: (l.logo && !l.logo.startsWith('data:')) ? l.logo : (l.logo ? l.logo : null),
         industry: l.industry || '',
         location: l.location || '',
         linkedin: linkedinUrl,
-        email: isFirstLead ? emailForFirst : undefined,
+        email: isFirstLead ? emailForFirst : (l.maskedEmail || maskEmail(l.email)),
         isUnlocked: isFirstLead,
         leadStudyPdf: hasLeadStudy ? leadStudyUrl : null,
         leadStudyPdfName: l.leadStudyPdfName || `${leadName.replace(/\s+/g, '_')}_Study.pdf`,
         pitchDeckPdf: hasLeadPitch ? leadPitchUrl : null,
         pitchDeckPdfName: l.pitchDeckPdfName || `${leadName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
-        aboutCompany: l.aboutCompany || l.company_summary || `Leading innovator in ${l.industry || 'the enterprise sector'}.`,
-        whySuitsBest: l.whySuitsBest || l.why_suits_best || `Strategic decision maker evaluating modern solutions in ${l.industry || 'their market'}.`,
+        aboutCompany: l.aboutCompany || l.company_summary || '',
+        whySuitsBest: l.whySuitsBest || l.why_suits_best || l.shortSummary || '',
         maskedEmail: l.maskedEmail || maskEmail(l.email),
-        maskedPhone: l.maskedPhone || maskPhone(l.phone),
+        phone: l.phone ? `${l.phone.slice(0, 4)} xxxxx` : '+1 (xxx) xxx-xxxx',
+        maskedPhone: l.phone ? `${l.phone.slice(0, 4)} xxxxx` : '+1 (xxx) xxx-xxxx',
         shortSummary: l.shortSummary || l.summary || l.whySuitsBest || '',
         leadStudy: {
-          whyRelevant: matchedStudy.whyRelevant || l.whyRelevant || 'Key decision maker with immediate budget and modernization authority.',
-          observedContext: matchedStudy.observedContext || l.observedContext || 'Currently consolidating operational workflows and modernizing vendor architecture.',
-          potentialOpportunity: matchedStudy.potentialOpportunity || l.potentialOpportunity || 'High-probability engagement for specialized outsourced execution.',
-          suggestedApproach: matchedStudy.suggestedApproach || l.suggestedApproach || 'Lead with technical proof-of-concept and scalable delivery SLA guarantees.',
+          whyRelevant: matchedStudy.whyRelevant || l.whyRelevant || '',
+          observedContext: matchedStudy.observedContext || l.observedContext || '',
+          potentialOpportunity: matchedStudy.potentialOpportunity || l.potentialOpportunity || '',
+          suggestedApproach: matchedStudy.suggestedApproach || l.suggestedApproach || '',
         },
         pitchDeck: hasLeadPitch ? {
           title: l.pitchDeck?.title || `${leadName} Proposal Pitch Deck`,
