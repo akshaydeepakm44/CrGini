@@ -55,7 +55,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
     slug: '',
     title: '',
     description: '',
-    logoUrl: '/logo.png',
+    logoUrl: '',
     status: 'PUBLISHED',
     companyStudy: {
       company: '',
@@ -129,7 +129,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
       slug: '',
       title: '',
       description: '',
-      logoUrl: '/logo.png',
+      logoUrl: '',
       status: 'PUBLISHED',
       companyStudy: {
         company: '',
@@ -177,7 +177,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
       slug: showcase.slug || '',
       title: showcase.title || '',
       description: showcase.description || '',
-      logoUrl: showcase.logoUrl || '/logo.png',
+      logoUrl: showcase.logoUrl && showcase.logoUrl !== '/logo.png' ? showcase.logoUrl : '',
       status: showcase.status || 'PUBLISHED',
       companyStudy: showcase.companyStudy || {
         company: showcase.companyName || '',
@@ -1057,6 +1057,95 @@ support@dizigini.com`;
                         fontSize: '0.875rem',
                       }}
                     />
+                  </div>
+
+                  {/* Target Company Logo Upload / URL */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                      Target Company Logo (Uploaded Logo or Image URL)
+                    </label>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      {formData.logoUrl && (
+                        <img
+                          src={formData.logoUrl}
+                          alt="Logo Preview"
+                          style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '8px',
+                            objectFit: 'contain',
+                            border: '1px solid #D1D5DB',
+                            padding: '3px',
+                            background: '#FFFFFF',
+                            flexShrink: 0
+                          }}
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                      )}
+                      <input
+                        type="text"
+                        placeholder="Paste image URL or click upload to select company logo..."
+                        value={formData.logoUrl}
+                        onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                        style={{
+                          flex: 1,
+                          padding: '10px 14px',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem',
+                        }}
+                      />
+                      <label style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#F3F4F6',
+                        border: '1px solid #D1D5DB',
+                        color: '#374151',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        fontSize: '0.8125rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        <Upload size={14} />
+                        <span>Upload Logo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (evt) => {
+                              setFormData((prev) => ({ ...prev, logoUrl: evt.target.result }));
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
+                      {formData.logoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, logoUrl: '' })}
+                          style={{
+                            background: '#FEE2E2',
+                            border: '1px solid #FECACA',
+                            color: '#DC2626',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            fontSize: '0.8125rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>

@@ -189,6 +189,18 @@ export const getPublicSampleBySlug = async (req, res) => {
         }
       : null;
 
+    // Ensure company logo is target company's uploaded logo, never platform logo (/logo.png)
+    let resolvedCompanyLogo = sample.logoUrl;
+    if (!resolvedCompanyLogo || resolvedCompanyLogo === '/logo.png' || resolvedCompanyLogo.includes('dizigini') || resolvedCompanyLogo.includes('creativegini')) {
+      resolvedCompanyLogo = sample.companyLogo || sample.companyStudy?.logoUrl || sample.companyStudy?.logo || null;
+      if (!resolvedCompanyLogo && Array.isArray(sample.leads) && sample.leads.length > 0) {
+        const leadWithLogo = sample.leads.find((l) => l.companyLogo || (l.logo && !l.logo.startsWith('data:')));
+        if (leadWithLogo) {
+          resolvedCompanyLogo = leadWithLogo.companyLogo || leadWithLogo.logo;
+        }
+      }
+    }
+
     return res.status(200).json({
       success: true,
       sample: {
@@ -196,7 +208,7 @@ export const getPublicSampleBySlug = async (req, res) => {
         title: sample.title,
         companyName: sample.companyName,
         description: sample.description,
-        logoUrl: sample.logoUrl,
+        logoUrl: resolvedCompanyLogo || null,
         status: sample.status,
         companyStudy: publicCompanyStudy,
         leads: publicLeads,
@@ -724,7 +736,7 @@ export const createAdminSample = async (req, res) => {
       title: effectiveTitle,
       companyName: companyName.trim(),
       description: description || `Curated account intelligence and sales acceleration brief prepared for ${companyName.trim()}.`,
-      logoUrl: logoUrl || '/logo.png',
+      logoUrl: (logoUrl && logoUrl !== '/logo.png') ? logoUrl : null,
       status: status || 'PUBLISHED',
       companyStudy: initialCompanyStudy,
       leads: processedLeads,

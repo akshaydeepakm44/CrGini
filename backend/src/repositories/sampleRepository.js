@@ -148,7 +148,7 @@ export const createSampleShowcase = async ({
   title,
   companyName,
   description = '',
-  logoUrl = '/logo.png',
+  logoUrl = null,
   status = 'PUBLISHED',
   companyStudy = {},
   leads = [],
