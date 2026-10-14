@@ -35,87 +35,67 @@ import {
   Lightbulb,
   Calendar,
   Layers,
-  ArrowUpRight,
-  Clock,
-  CheckSquare
+  ArrowUpRight
 } from 'lucide-react';
 import { api } from '../../services/api';
 
 /**
- * Authoritative fallback showcase data (matching Image 2 for Finkr)
+ * Smart Industry / Sector parser
+ * Splits commas, semicolons, newlines, bullets, or pipes into clean individual labels for mini-cards.
  */
-const FINKR_DEFAULT_SHOWCASE = {
-  companyName: 'Finkr',
-  title: 'Finkr’s next growth opportunities, explored.',
-  description: 'Get a tailored view of your market position, key decision-makers, and strategic opportunities — all backed by real-time research and AI-powered insights.',
-  companyStudy: {
-    company: 'Finkr',
-    industry: 'Fintech & Embedded Financial Infrastructure',
-    overviewTitle: 'B2B financial infrastructure for modern businesses',
-    businessOverview: 'Finkr provides embedded finance solutions, focusing on seamless payment and banking infrastructure for digital-first companies.',
-    marketTitle: 'Growing segment with strong momentum',
-    marketPosition: 'Finkr is positioned in the fast-growing embedded finance market, competing with established players like Stripe, Marqeta and Kontent.',
-    opportunitiesTitle: 'Expansion in European markets and verticals',
-    keyObservations: 'There are opportunities in cross-border payments, new verticals (eCommerce, SaaS) and deeper product integrations with fintech partners.',
-    focusTitle: 'Enterprise partnerships and product expansion',
-    potentialOpportunity: 'Focus on strategic partnerships and integrated solutions to increase wallet share and enter new markets.',
-  },
-  leads: [
-    {
-      id: 'lead-finkr-1',
-      name: 'Wearemarmalade',
-      title: 'Key Executive',
-      company: 'Finkr',
-      whySuitsBest: 'Leads product strategy and growth initiatives. Relevant to your business based on their role, company focus and recent activity.',
-      avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=180&auto=format&fit=crop&q=80',
-      linkedinUrl: 'https://linkedin.com',
-      companyUrl: 'https://finkr.com',
-      whyItMatters: [
-        'Leads product and platform strategy',
-        'Focused on growth and partnerships',
-        'Active in embedded finance ecosystem'
-      ],
-      tags: ['Verified role', 'Public sources'],
-      isUnlocked: true,
-    },
-    {
-      id: 'lead-finkr-2',
-      name: 'Daniel Carter',
-      title: 'Co-Founder & CEO',
-      company: 'Finkr',
-      tags: ['Founders', 'Product'],
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=180&auto=format&fit=crop&q=80',
-      isUnlocked: false,
-    },
-    {
-      id: 'lead-finkr-3',
-      name: 'Sophie Martin',
-      title: 'Head of Partnerships',
-      company: 'Finkr',
-      tags: ['Partnerships', 'Growth'],
-      avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=180&auto=format&fit=crop&q=80',
-      isUnlocked: false,
-    },
-    {
-      id: 'lead-finkr-4',
-      name: 'James Ellison',
-      title: 'VP Engineering',
-      company: 'Finkr',
-      tags: ['Engineering', 'Product'],
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=180&auto=format&fit=crop&q=80',
-      isUnlocked: false,
-    },
-    {
-      id: 'lead-finkr-5',
-      name: 'Priya Nair',
-      title: 'Head of Marketing',
-      company: 'Finkr',
-      tags: ['Marketing', 'Brand'],
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=180&auto=format&fit=crop&q=80',
-      isUnlocked: false,
+function parseIndustries(rawInd) {
+  if (!rawInd || typeof rawInd !== 'string') {
+    return ['Technology & Enterprise Services'];
+  }
+  const trimmed = rawInd.trim();
+  if (!trimmed) return ['Technology & Enterprise Services'];
+
+  const protectedParen = [];
+  const tokenized = trimmed.replace(/\([^\)]*\)/g, (match) => {
+    protectedParen.push(match);
+    return `__PAREN_${protectedParen.length - 1}__`;
+  });
+
+  const hasExplicitDelimiters = /[\r\n;,•·|]|\s+\/\s+/.test(tokenized);
+  let sectors = [];
+  if (hasExplicitDelimiters) {
+    sectors = tokenized
+      .split(/(?:[\r\n;,•·|]+|\s+\/\s+)/)
+      .map((s) => s.replace(/^[\s•\-\*\d\.\)\:]+/, '').trim())
+      .filter((s) => s.length > 0);
+  } else if (tokenized.length > 50) {
+    const splitRegex = /(?<=(?:Exploration|Management|Trading|Consulting|Services|Systems|Software|Solutions|Logistics|Manufacturing|Platform|Capital|Finance|Insurance|Banking|Infrastructure|Security|Development|Design|Strategy|Operations|Supply|Analytics|__PAREN_\d+__))\s+(?=[A-Z][a-z0-9]+(?:\s+&|\s+[A-Z]))/g;
+    sectors = tokenized.split(splitRegex).map((s) => s.trim()).filter(Boolean);
+    if (sectors.length <= 1) {
+      sectors = [tokenized];
     }
-  ]
-};
+  } else {
+    sectors = [tokenized];
+  }
+
+  sectors = sectors.map((item) => {
+    return item.replace(/__PAREN_(\d+)__/g, (_, idx) => protectedParen[Number(idx)] || '').trim();
+  }).filter((s) => s.length > 1);
+
+  return sectors.length > 0 ? sectors : [trimmed];
+}
+
+/**
+ * Extracts a concise headline from text if custom headline is not explicitly provided
+ */
+function getCardHeadline(customTitle, text, fallback) {
+  if (customTitle && typeof customTitle === 'string' && customTitle.trim()) {
+    return customTitle.trim();
+  }
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return fallback;
+  }
+  const firstSentence = text.split(/[.\n]/)[0].trim();
+  if (firstSentence && firstSentence.length >= 15 && firstSentence.length <= 75) {
+    return firstSentence;
+  }
+  return fallback;
+}
 
 export default function PublicSampleDashboard() {
   const { slug } = useParams();
@@ -123,68 +103,93 @@ export default function PublicSampleDashboard() {
 
   const [sample, setSample] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [selectedLead, setSelectedLead] = useState(null);
   const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
   const [isStrategyModalOpen, setIsStrategyModalOpen] = useState(false);
   const [strategyForm, setStrategyForm] = useState({ name: '', email: '', company: '', notes: '' });
   const [strategySubmitted, setStrategySubmitted] = useState(false);
 
-  const effectiveSlug = slug ? slug.trim().toLowerCase() : 'finkr';
+  // Dynamic slug: defaults to 'data-i2i' if none specified in route
+  const effectiveSlug = slug ? slug.trim().toLowerCase() : 'data-i2i';
 
   useEffect(() => {
     setLoading(true);
+    setError('');
 
     api.getPublicSample(effectiveSlug)
       .then((data) => {
         if (data?.sample) {
-          // Merge with Finkr defaults to guarantee high-converting presentation
-          const s = data.sample;
-          const merged = {
-            ...s,
-            companyName: s.companyName || s.companyStudy?.company || (effectiveSlug === 'finkr' ? 'Finkr' : 'Enterprise Target'),
-            title: s.title || `${s.companyName || 'Target'}’s next growth opportunities, explored.`,
-            description: s.description || FINKR_DEFAULT_SHOWCASE.description,
-            companyStudy: {
-              ...FINKR_DEFAULT_SHOWCASE.companyStudy,
-              company: s.companyStudy?.company || s.companyName || 'Finkr',
-              industry: s.companyStudy?.industry || FINKR_DEFAULT_SHOWCASE.companyStudy.industry,
-              overviewTitle: s.companyStudy?.overviewTitle || FINKR_DEFAULT_SHOWCASE.companyStudy.overviewTitle,
-              businessOverview: s.companyStudy?.businessOverview || s.companyStudy?.overview || FINKR_DEFAULT_SHOWCASE.companyStudy.businessOverview,
-              marketTitle: s.companyStudy?.marketTitle || FINKR_DEFAULT_SHOWCASE.companyStudy.marketTitle,
-              marketPosition: s.companyStudy?.marketPosition || FINKR_DEFAULT_SHOWCASE.companyStudy.marketPosition,
-              opportunitiesTitle: s.companyStudy?.opportunitiesTitle || FINKR_DEFAULT_SHOWCASE.companyStudy.opportunitiesTitle,
-              keyObservations: s.companyStudy?.keyObservations || FINKR_DEFAULT_SHOWCASE.companyStudy.keyObservations,
-              focusTitle: s.companyStudy?.focusTitle || FINKR_DEFAULT_SHOWCASE.companyStudy.focusTitle,
-              potentialOpportunity: s.companyStudy?.potentialOpportunity || FINKR_DEFAULT_SHOWCASE.companyStudy.potentialOpportunity,
-            },
-            leads: Array.isArray(s.leads) && s.leads.length > 0 ? s.leads : FINKR_DEFAULT_SHOWCASE.leads,
-          };
-          setSample(merged);
+          setSample(data.sample);
         } else {
-          setSample({
-            ...FINKR_DEFAULT_SHOWCASE,
-            companyName: effectiveSlug === 'data-i2i' ? 'Data I2I' : effectiveSlug.charAt(0).toUpperCase() + effectiveSlug.slice(1),
-          });
+          setError('The requested intelligence showcase could not be loaded.');
         }
       })
-      .catch(() => {
-        // Fallback to high-converting showcase for instant zero-downtime render
-        setSample({
-          ...FINKR_DEFAULT_SHOWCASE,
-          companyName: effectiveSlug === 'data-i2i' ? 'Data I2I' : (effectiveSlug ? effectiveSlug.charAt(0).toUpperCase() + effectiveSlug.slice(1) : 'Finkr'),
-        });
+      .catch((err) => {
+        console.error('[PublicSampleDashboard] Failed to fetch showcase:', err);
+        setError(err.message || 'Intelligence showcase not found or currently unpublished.');
       })
       .finally(() => {
         setLoading(false);
       });
   }, [effectiveSlug]);
 
-  const activeSample = sample || FINKR_DEFAULT_SHOWCASE;
-  const companyName = activeSample.companyName || 'Finkr';
-  const companyStudy = activeSample.companyStudy || FINKR_DEFAULT_SHOWCASE.companyStudy;
-  const leads = activeSample.leads && activeSample.leads.length > 0 ? activeSample.leads : FINKR_DEFAULT_SHOWCASE.leads;
-  const featuredLead = leads[0] || FINKR_DEFAULT_SHOWCASE.leads[0];
-  const previewLeads = leads.slice(1, 5).length === 4 ? leads.slice(1, 5) : FINKR_DEFAULT_SHOWCASE.leads.slice(1, 5);
+  // Dynamic Prospect Extraction
+  const companyName = sample?.companyName || sample?.companyStudy?.company || 'Target Organization';
+  const companyStudy = sample?.companyStudy || {};
+  const industrySectors = useMemo(() => parseIndustries(companyStudy.industry), [companyStudy.industry]);
+  const pitchDeck = sample?.pitchDeck || null;
+
+  // Build 5 dynamic display leads (Lead 1 is unlocked with full study, Leads 2-5 previewed)
+  const displayLeads = useMemo(() => {
+    const rawLeads = Array.isArray(sample?.leads) ? [...sample.leads] : [];
+
+    const fallbackLockedRoles = [
+      {
+        title: 'VP of Marketing & Growth Operations',
+        name: 'Executive Leadership',
+        industry: companyStudy.industry || 'B2B Enterprise Vertical',
+        shortSummary: 'Oversees demand generation infrastructure, marketing automation stacks, and annual vendor allocations.',
+      },
+      {
+        title: 'Chief Technology Officer (CTO)',
+        name: 'Technical Decision Maker',
+        industry: companyStudy.industry || 'Cloud & Enterprise Architecture',
+        shortSummary: 'Primary stakeholder for engineering scalability, system integrations, and technical security compliance review.',
+      },
+      {
+        title: 'Head of Global Sales & Strategic Partnerships',
+        name: 'Commercial Director',
+        industry: companyStudy.industry || 'Commercial Enterprise',
+        shortSummary: 'Direct authority over sales pipeline tools, multi-channel outbound velocity, and strategic expansion initiatives.',
+      },
+      {
+        title: 'Director of Procurement & Vendor Relations',
+        name: 'Procurement Authority',
+        industry: companyStudy.industry || 'Enterprise Procurement',
+        shortSummary: 'Controls RFP cycles, vendor contract approvals, and budgetary allocation for specialist agency engagements.',
+      },
+    ];
+
+    while (rawLeads.length < 5) {
+      const padIdx = rawLeads.length;
+      const template = fallbackLockedRoles[padIdx - 1] || fallbackLockedRoles[0];
+      rawLeads.push({
+        id: `synthetic-lead-${padIdx}`,
+        name: template.name,
+        title: template.title,
+        company: companyName,
+        industry: template.industry,
+        shortSummary: template.shortSummary,
+        isSynthetic: true,
+      });
+    }
+
+    return rawLeads;
+  }, [sample, companyName, companyStudy]);
+
+  const featuredLead = displayLeads[0];
+  const previewLeads = displayLeads.slice(1, 5);
 
   const handleSignUpClick = () => {
     navigate('/signin?view=signup&returnTo=/portal');
@@ -210,14 +215,46 @@ export default function PublicSampleDashboard() {
     }, 2500);
   };
 
-  if (loading && !sample) {
+  if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC' }}>
         <div style={{ textAlign: 'center' }}>
           <div className="portal-spinner" style={{ margin: '0 auto 16px auto' }} />
           <p style={{ color: '#64748B', fontSize: '0.95rem', fontWeight: 600 }}>
-            Preparing intelligence briefing...
+            Loading Intelligence Showcase...
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !sample) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC', padding: '24px' }}>
+        <div style={{ maxWidth: '480px', width: '100%', background: '#FFFFFF', padding: '36px', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', textAlign: 'center' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+            <FileText size={24} />
+          </div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>
+            Showcase Unavailable
+          </h2>
+          <p style={{ fontSize: '0.875rem', color: '#64748B', lineHeight: '1.6', marginBottom: '24px' }}>
+            {error || 'The requested sample collection is either unpublished or not found.'}
+          </p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button
+              onClick={() => navigate('/')}
+              style={{ padding: '10px 18px', borderRadius: '8px', background: '#F1F5F9', border: '1px solid #E2E8F0', color: '#334155', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Return Home
+            </button>
+            <button
+              onClick={handleLoginClick}
+              style={{ padding: '10px 18px', borderRadius: '8px', background: '#2563EB', border: 'none', color: '#FFFFFF', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Client Login
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -226,7 +263,7 @@ export default function PublicSampleDashboard() {
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', color: '#0F172A', fontFamily: 'Inter, system-ui, -apple-system, sans-serif' }}>
       
-      {/* 1. TOP HEADER & NAVIGATION (Matches Image 2) */}
+      {/* 1. TOP HEADER & NAVIGATION (Theme & Look of Image 2) */}
       <header style={{ background: '#FFFFFF', borderBottom: '1px solid #E2E8F0', position: 'sticky', top: 0, zIndex: 50, backdropFilter: 'blur(8px)' }}>
         <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           
@@ -315,7 +352,7 @@ export default function PublicSampleDashboard() {
         </div>
       </header>
 
-      {/* 2. HERO SECTION (Matches Image 2) */}
+      {/* 2. HERO SECTION (Theme & Look of Image 2 with Dynamic Content) */}
       <section style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)', borderBottom: '1px solid #E2E8F0', padding: '52px 24px 60px 24px' }}>
         <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '48px', alignItems: 'center' }}>
           
@@ -358,7 +395,7 @@ export default function PublicSampleDashboard() {
               margin: '0 0 24px 0',
               maxWidth: '540px'
             }}>
-              Get a tailored view of your market position, key decision-makers, and strategic opportunities — all backed by real-time research and AI-powered insights.
+              {sample.description || `Get a tailored view of your market position, key decision-makers, and strategic opportunities — all backed by real-time research and AI-powered insights.`}
             </p>
 
             {/* 3 Pills / Tags */}
@@ -448,7 +485,7 @@ export default function PublicSampleDashboard() {
             </div>
           </div>
 
-          {/* Right Column: Visual Graphic (Matches Image 2 Visual) */}
+          {/* Right Column: Visual Graphic (Constellation & Floating Highlight Card) */}
           <div style={{
             position: 'relative',
             background: 'radial-gradient(circle at 70% 30%, #EEF2FF 0%, #FFFFFF 70%)',
@@ -462,7 +499,6 @@ export default function PublicSampleDashboard() {
             boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
             overflow: 'hidden'
           }}>
-            {/* Ambient backdrop glow */}
             <div style={{
               position: 'absolute',
               top: '20px',
@@ -475,28 +511,37 @@ export default function PublicSampleDashboard() {
               pointerEvents: 'none'
             }} />
 
-            {/* Target Company Badge */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1 }}>
-              <div style={{
-                width: '46px',
-                height: '46px',
-                borderRadius: '12px',
-                background: '#1E293B',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.3rem',
-                fontWeight: 900
-              }}>
-                {companyName.charAt(0)}
-              </div>
+            {/* Target Organization Identity */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', zIndex: 1 }}>
+              {sample.logoUrl ? (
+                <img
+                  src={sample.logoUrl}
+                  alt={companyName}
+                  style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'contain', border: '1px solid #E2E8F0', background: '#FFFFFF' }}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              ) : (
+                <div style={{
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '12px',
+                  background: '#1E293B',
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.3rem',
+                  fontWeight: 900
+                }}>
+                  {companyName.charAt(0)}
+                </div>
+              )}
               <div>
                 <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
                   {companyName}
                 </div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B' }}>
-                  Strategic Growth Dossier
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748B' }}>
+                  {companyStudy.industry || 'Enterprise Strategic Dossier'}
                 </div>
               </div>
             </div>
@@ -504,7 +549,6 @@ export default function PublicSampleDashboard() {
             {/* Constellation Network Graph (SVG) */}
             <div style={{ position: 'relative', margin: '24px 0', zIndex: 1 }}>
               <svg width="100%" height="130" viewBox="0 0 380 130" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Connecting Lines */}
                 <line x1="40" y1="65" x2="130" y2="35" stroke="#93C5FD" strokeWidth="1.5" strokeDasharray="3 3" />
                 <line x1="130" y1="35" x2="240" y2="40" stroke="#93C5FD" strokeWidth="1.5" />
                 <line x1="130" y1="35" x2="190" y2="95" stroke="#93C5FD" strokeWidth="1.5" />
@@ -512,7 +556,6 @@ export default function PublicSampleDashboard() {
                 <line x1="190" y1="95" x2="330" y2="70" stroke="#93C5FD" strokeWidth="1.5" strokeDasharray="3 3" />
                 <line x1="240" y1="40" x2="270" y2="105" stroke="#BFDBFE" strokeWidth="1.5" />
 
-                {/* Nodes */}
                 <circle cx="40" cy="65" r="7" fill="#2563EB" />
                 <circle cx="130" cy="35" r="8" fill="#3B82F6" />
                 <circle cx="240" cy="40" r="9" fill="#1D4ED8" />
@@ -522,7 +565,7 @@ export default function PublicSampleDashboard() {
               </svg>
             </div>
 
-            {/* Floating Card (Matches Image 2) */}
+            {/* Floating Card */}
             <div style={{
               background: '#FFFFFF',
               borderRadius: '14px',
@@ -565,11 +608,11 @@ export default function PublicSampleDashboard() {
       {/* MAIN CONTAINER */}
       <main style={{ maxWidth: '1240px', margin: '0 auto', padding: '48px 24px' }}>
 
-        {/* SECTION 1: EXECUTIVE INTELLIGENCE (Matches Image 2) */}
+        {/* SECTION 1: EXECUTIVE INTELLIGENCE (Theme & Look of Image 2 with Dynamic Content) */}
         <section id="executive-intelligence" style={{ marginBottom: '56px', scrollMarginTop: '80px' }}>
           
           {/* Section 1 Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{
                 width: '34px',
@@ -595,27 +638,78 @@ export default function PublicSampleDashboard() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsUnlockModalOpen(true)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: 'none',
-                border: 'none',
-                color: '#2563EB',
-                fontSize: '0.875rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              <span>View full analysis</span>
-              <ArrowRight size={14} />
-            </button>
+            {/* View Full Analysis / PDF Button */}
+            {companyStudy.pdfUrl ? (
+              <a
+                href={companyStudy.pdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: '#2563EB',
+                  fontSize: '0.875rem',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                }}
+              >
+                <span>View full analysis PDF</span>
+                <ExternalLink size={14} />
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsUnlockModalOpen(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'none',
+                  border: 'none',
+                  color: '#2563EB',
+                  fontSize: '0.875rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <span>View full analysis</span>
+                <ArrowRight size={14} />
+              </button>
+            )}
           </div>
 
-          {/* 4 Cards Grid (Matches Image 2) */}
+          {/* Industry / Sector Mini Cards */}
+          {industrySectors.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '22px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: '4px' }}>
+                Industry Sectors:
+              </span>
+              {industrySectors.map((ind, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    background: '#FFFFFF',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    color: '#1E293B',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                  }}
+                >
+                  <Briefcase size={12} color="#2563EB" />
+                  <span>{ind}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 4 Cards Grid (Theme & Look of Image 2 with Dynamic Content) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '18px', alignItems: 'stretch' }}>
             
             {/* Card 1: Company Overview */}
@@ -649,11 +743,11 @@ export default function PublicSampleDashboard() {
                 </div>
 
                 <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.35, margin: '0 0 10px 0' }}>
-                  {companyStudy.overviewTitle || 'B2B financial infrastructure for modern businesses'}
+                  {getCardHeadline(companyStudy.overviewTitle, companyStudy.businessOverview, `B2B Strategic Architecture & Core Mission`)}
                 </h3>
 
                 <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.businessOverview || companyStudy.overview}
+                  {companyStudy.businessOverview || companyStudy.overview || `${companyName} provides high-impact products and specialized operational solutions for enterprise organizations.`}
                 </p>
               </div>
 
@@ -695,11 +789,11 @@ export default function PublicSampleDashboard() {
                 </div>
 
                 <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.35, margin: '0 0 10px 0' }}>
-                  {companyStudy.marketTitle || 'Growing segment with strong momentum'}
+                  {getCardHeadline(companyStudy.marketTitle, companyStudy.marketPosition, 'Growing segment with strong momentum')}
                 </h3>
 
                 <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.marketPosition}
+                  {companyStudy.marketPosition || `${companyName} maintains a prominent commercial footprint, competing with boutique consultancies and technology leaders.`}
                 </p>
               </div>
 
@@ -741,11 +835,11 @@ export default function PublicSampleDashboard() {
                 </div>
 
                 <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.35, margin: '0 0 10px 0' }}>
-                  {companyStudy.opportunitiesTitle || 'Expansion in European markets and verticals'}
+                  {getCardHeadline(companyStudy.opportunitiesTitle, companyStudy.keyObservations, 'Expansion across core verticals & partnerships')}
                 </h3>
 
                 <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.keyObservations}
+                  {companyStudy.keyObservations || `Observed high demand for consolidated data architecture, compliance tooling, and turnkey vendor solutions.`}
                 </p>
               </div>
 
@@ -787,11 +881,11 @@ export default function PublicSampleDashboard() {
                 </div>
 
                 <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.35, margin: '0 0 10px 0' }}>
-                  {companyStudy.focusTitle || 'Enterprise partnerships and product expansion'}
+                  {getCardHeadline(companyStudy.focusTitle, companyStudy.potentialOpportunity, 'Enterprise partnerships & ICP expansion')}
                 </h3>
 
                 <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.potentialOpportunity}
+                  {companyStudy.potentialOpportunity || `Position bespoke capability assessments to enterprise decision-makers navigating complex modernization sprints.`}
                 </p>
               </div>
 
@@ -806,7 +900,7 @@ export default function PublicSampleDashboard() {
 
         </section>
 
-        {/* SECTION 2: WHAT THIS COULD MEAN FOR YOUR BUSINESS (Matches Image 2) */}
+        {/* SECTION 2: WHAT THIS COULD MEAN FOR YOUR BUSINESS (Theme & Look of Image 2) */}
         <section style={{ marginBottom: '56px' }}>
           
           {/* Section 2 Header */}
@@ -851,7 +945,7 @@ export default function PublicSampleDashboard() {
             </div>
           </div>
 
-          {/* 3 Column Grid (Matches Image 2) */}
+          {/* 3 Column Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', alignItems: 'stretch' }}>
             
             {/* Column 1: Market opportunities */}
@@ -885,7 +979,7 @@ export default function PublicSampleDashboard() {
                 </h3>
 
                 <p style={{ fontSize: '0.86rem', color: '#475569', lineHeight: 1.55, margin: '0 0 20px 0' }}>
-                  Identify relevant market signals, customer segments and expansion possibilities in fintech and embedded finance.
+                  Identify relevant market signals, customer segments and expansion possibilities across {companyStudy.industry || 'the enterprise landscape'}.
                 </p>
               </div>
 
@@ -907,7 +1001,7 @@ export default function PublicSampleDashboard() {
                     Example
                   </div>
                   <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>
-                    Rapid growth in Europe’s embedded finance market (CAGR 18%+ through 2028).
+                    Rapid demand growth and tooling consolidation across modern enterprise organizations.
                   </div>
                 </div>
               </div>
@@ -966,7 +1060,7 @@ export default function PublicSampleDashboard() {
                     Example
                   </div>
                   <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>
-                    C-Level focus on product, partnerships and go-to-market expansion.
+                    C-Level focus on pipeline velocity, tech stack efficiency, and strategic execution.
                   </div>
                 </div>
               </div>
@@ -1025,7 +1119,7 @@ export default function PublicSampleDashboard() {
                     Example
                   </div>
                   <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>
-                    Prioritize enterprise partnerships in European markets and fintech verticals.
+                    Prioritize strategic accounts facing active legacy migration friction and expansion initiatives.
                   </div>
                 </div>
               </div>
@@ -1035,7 +1129,7 @@ export default function PublicSampleDashboard() {
 
         </section>
 
-        {/* SECTION 3: DECISION-MAKER INTELLIGENCE (Matches Image 2) */}
+        {/* SECTION 3: DECISION-MAKER INTELLIGENCE (Theme & Look of Image 2 with Dynamic Content) */}
         <section style={{ marginBottom: '56px' }}>
           
           {/* Section 3 Header */}
@@ -1082,180 +1176,201 @@ export default function PublicSampleDashboard() {
             </div>
           </div>
 
-          {/* Featured Profile Card (Matches Image 2) */}
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '16px',
-            border: '1px solid #E2E8F0',
-            padding: '28px',
-            marginBottom: '32px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-            gap: '32px',
-            alignItems: 'stretch'
-          }}>
-            
-            {/* Left Column: Avatar, Identity, Bio, Badges, Links */}
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '18px', marginBottom: '18px' }}>
-                <img
-                  src={featuredLead.avatarUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=180&auto=format&fit=crop&q=80'}
-                  alt={featuredLead.name}
-                  style={{
-                    width: '68px',
-                    height: '68px',
-                    borderRadius: '50%',
-                    objectFit: 'cover',
-                    border: '2px solid #E2E8F0'
-                  }}
-                  onError={(e) => {
-                    e.currentTarget.src = 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=180&auto=format&fit=crop&q=80';
-                  }}
-                />
-
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {companyName}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
-                      {featuredLead.name || 'Wearemarmalade'}
-                    </h3>
-                    <CheckCircle2 size={16} color="#10B981" />
-                  </div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#2563EB', marginTop: '2px' }}>
-                    {featuredLead.title || 'Key Executive'} · {companyName}
-                  </div>
-                </div>
-              </div>
-
-              <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.55, margin: '0 0 16px 0' }}>
-                {featuredLead.whySuitsBest || 'Leads product strategy and growth initiatives. Relevant to your business based on their role, company focus and recent activity.'}
-              </p>
-
-              {/* Badges */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
-                <span style={{
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  background: '#ECFDF5',
-                  color: '#047857',
-                  border: '1px solid #A7F3D0',
-                  fontSize: '0.75rem',
-                  fontWeight: 700
-                }}>
-                  Verified role
-                </span>
-                <span style={{
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  background: '#EFF6FF',
-                  color: '#1D4ED8',
-                  border: '1px solid #BFDBFE',
-                  fontSize: '0.75rem',
-                  fontWeight: 700
-                }}>
-                  Public sources
-                </span>
-              </div>
-
-              {/* Links Row */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', fontSize: '0.82rem' }}>
-                <a
-                  href="https://linkedin.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#2563EB', textDecoration: 'none', fontWeight: 600 }}
-                >
-                  <Linkedin size={14} />
-                  <span>LinkedIn</span>
-                  <ChevronRight size={13} />
-                </a>
-
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748B', fontWeight: 500 }}>
-                  <Globe size={14} />
-                  <span>Company website</span>
-                </span>
-
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748B', fontWeight: 500 }}>
-                  <FileText size={14} />
-                  <span>Recent mentions</span>
-                </span>
-              </div>
-            </div>
-
-            {/* Right Column: Why this person matters (Matches Image 2) */}
+          {/* Featured Profile Card (Matches Image 2 using Lead 1 from DB) */}
+          {featuredLead && (
             <div style={{
-              background: '#F8FAFC',
-              borderRadius: '14px',
+              background: '#FFFFFF',
+              borderRadius: '16px',
               border: '1px solid #E2E8F0',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between'
+              padding: '28px',
+              marginBottom: '32px',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: '32px',
+              alignItems: 'stretch'
             }}>
+              
+              {/* Left Column: Avatar, Identity, Bio, Badges, Links */}
               <div>
-                <h4 style={{ fontSize: '0.925rem', fontWeight: 800, color: '#0F172A', margin: '0 0 16px 0' }}>
-                  Why this person matters
-                </h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '18px', marginBottom: '18px' }}>
+                  {featuredLead.logo || featuredLead.avatarUrl ? (
+                    <img
+                      src={featuredLead.logo || featuredLead.avatarUrl}
+                      alt={featuredLead.name}
+                      style={{
+                        width: '68px',
+                        height: '68px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '2px solid #E2E8F0'
+                      }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: '68px',
+                      height: '68px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                      color: '#2563EB',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: '1.6rem',
+                      border: '2px solid #E2E8F0',
+                      flexShrink: 0
+                    }}>
+                      {featuredLead.name?.charAt(0) || 'L'}
+                    </div>
+                  )}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <CheckCircle2 size={16} color="#10B981" />
-                    <span style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 500 }}>
-                      Leads product and platform strategy
-                    </span>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {featuredLead.company || companyName}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                        {featuredLead.name}
+                      </h3>
+                      <CheckCircle2 size={16} color="#10B981" />
+                    </div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#2563EB', marginTop: '2px' }}>
+                      {featuredLead.title || 'Key Stakeholder'} · {featuredLead.company || companyName}
+                    </div>
                   </div>
+                </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <CheckCircle2 size={16} color="#10B981" />
-                    <span style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 500 }}>
-                      Focused on growth and partnerships
-                    </span>
-                  </div>
+                <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.55, margin: '0 0 16px 0' }}>
+                  {featuredLead.whySuitsBest || featuredLead.shortSummary || 'Leads departmental strategy and key operational initiatives. Direct budget holder for strategic partnerships and vendor engagements.'}
+                </p>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <CheckCircle2 size={16} color="#10B981" />
-                    <span style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 500 }}>
-                      Active in embedded finance ecosystem
-                    </span>
-                  </div>
+                {/* Badges */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
+                  <span style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    background: '#ECFDF5',
+                    color: '#047857',
+                    border: '1px solid #A7F3D0',
+                    fontSize: '0.75rem',
+                    fontWeight: 700
+                  }}>
+                    {featuredLead.industry || 'Verified role'}
+                  </span>
+                  <span style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    background: '#EFF6FF',
+                    color: '#1D4ED8',
+                    border: '1px solid #BFDBFE',
+                    fontSize: '0.75rem',
+                    fontWeight: 700
+                  }}>
+                    Public sources
+                  </span>
+                </div>
+
+                {/* Links Row */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', fontSize: '0.82rem' }}>
+                  <a
+                    href="https://linkedin.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#2563EB', textDecoration: 'none', fontWeight: 600 }}
+                  >
+                    <Linkedin size={14} />
+                    <span>LinkedIn</span>
+                    <ChevronRight size={13} />
+                  </a>
+
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748B', fontWeight: 500 }}>
+                    <Globe size={14} />
+                    <span>Company website</span>
+                  </span>
+
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748B', fontWeight: 500 }}>
+                    <FileText size={14} />
+                    <span>Recent mentions</span>
+                  </span>
                 </div>
               </div>
 
-              {/* Action Button */}
-              <button
-                type="button"
-                onClick={() => setSelectedLead(featuredLead)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  width: '100%',
-                  padding: '12px 18px',
-                  borderRadius: '10px',
-                  background: '#2563EB',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#1D4ED8'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#2563EB'; }}
-              >
-                <span>View full dossier</span>
-                <ArrowRight size={15} />
-              </button>
+              {/* Right Column: Why this person matters (Matches Image 2) */}
+              <div style={{
+                background: '#F8FAFC',
+                borderRadius: '14px',
+                border: '1px solid #E2E8F0',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}>
+                <div>
+                  <h4 style={{ fontSize: '0.925rem', fontWeight: 800, color: '#0F172A', margin: '0 0 16px 0' }}>
+                    Why this person matters
+                  </h4>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <CheckCircle2 size={16} color="#10B981" />
+                      <span style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 500 }}>
+                        {featuredLead.leadStudy?.whyRelevant || 'Direct authority over budget allocation and tool evaluation'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <CheckCircle2 size={16} color="#10B981" />
+                      <span style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 500 }}>
+                        {featuredLead.leadStudy?.observedContext || 'Actively modernizing operations and vetting specialized partners'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <CheckCircle2 size={16} color="#10B981" />
+                      <span style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 500 }}>
+                        {featuredLead.leadStudy?.suggestedApproach || 'Key commercial stakeholder for scalable growth sprints'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Button */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedLead(featuredLead)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    width: '100%',
+                    padding: '12px 18px',
+                    borderRadius: '10px',
+                    background: '#2563EB',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#1D4ED8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = '#2563EB'; }}
+                >
+                  <span>View full dossier</span>
+                  <ArrowRight size={15} />
+                </button>
+              </div>
+
             </div>
+          )}
 
-          </div>
-
-          {/* More relevant leads (preview) (Matches Image 2) */}
+          {/* More relevant leads (preview) (Matches Image 2 using Leads 2-5 from DB) */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <div style={{ fontSize: '0.925rem', fontWeight: 800, color: '#334155' }}>
@@ -1299,20 +1414,38 @@ export default function PublicSampleDashboard() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
-                    <img
-                      src={item.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=180&auto=format&fit=crop&q=80'}
-                      alt={item.name}
-                      style={{
+                    {item.logo || item.avatarUrl ? (
+                      <img
+                        src={item.logo || item.avatarUrl}
+                        alt={item.name}
+                        style={{
+                          width: '46px',
+                          height: '46px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '1.5px solid #E2E8F0'
+                        }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div style={{
                         width: '46px',
                         height: '46px',
                         borderRadius: '50%',
-                        objectFit: 'cover',
-                        border: '1.5px solid #E2E8F0'
-                      }}
-                      onError={(e) => {
-                        e.currentTarget.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=180&auto=format&fit=crop&q=80';
-                      }}
-                    />
+                        background: '#EFF6FF',
+                        color: '#2563EB',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: '1.1rem',
+                        flexShrink: 0
+                      }}>
+                        {item.name?.charAt(0) || 'L'}
+                      </div>
+                    )}
                     <div>
                       <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
                         {item.name}
@@ -1321,28 +1454,25 @@ export default function PublicSampleDashboard() {
                         {item.title}
                       </div>
                       <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>
-                        {companyName}
+                        {item.company || companyName}
                       </div>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      {(item.tags || ['Executive', 'Growth']).map((t, tIdx) => (
-                        <span
-                          key={tIdx}
-                          style={{
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                            background: '#F1F5F9',
-                            color: '#475569',
-                            fontSize: '0.7rem',
-                            fontWeight: 600
-                          }}
-                        >
-                          {t}
-                        </span>
-                      ))}
+                      <span
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          background: '#F1F5F9',
+                          color: '#475569',
+                          fontSize: '0.7rem',
+                          fontWeight: 600
+                        }}
+                      >
+                        {item.industry || 'Executive'}
+                      </span>
                     </div>
 
                     <button
@@ -1368,7 +1498,7 @@ export default function PublicSampleDashboard() {
 
         </section>
 
-        {/* SECTION 4: DARK NAVY CTA BANNER (Matches Image 2 - Completely Replaces Old Contact Form!) */}
+        {/* SECTION 4: DARK NAVY CTA BANNER (Theme & Look of Image 2 - Completely Replaces Old Contact Form!) */}
         <section style={{ marginBottom: '32px' }}>
           <div style={{
             background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
@@ -1441,7 +1571,7 @@ export default function PublicSampleDashboard() {
 
       </main>
 
-      {/* 5. TRUST FOOTER (Matches Image 2) */}
+      {/* 5. TRUST FOOTER (Theme & Look of Image 2) */}
       <footer style={{ background: '#FFFFFF', borderTop: '1px solid #E2E8F0', padding: '36px 24px', textAlign: 'center' }}>
         <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
           
@@ -1617,7 +1747,7 @@ export default function PublicSampleDashboard() {
                   </label>
                   <input
                     type="text"
-                    placeholder={`e.g. Focus on ${companyName} European partners`}
+                    placeholder={`e.g. Focus on enterprise banking & fintech`}
                     value={strategyForm.notes}
                     onChange={(e) => setStrategyForm({ ...strategyForm, notes: e.target.value })}
                     style={{
@@ -1702,11 +1832,17 @@ export default function PublicSampleDashboard() {
               borderRadius: '20px 20px 0 0',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <img
-                  src={selectedLead.avatarUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=180&auto=format&fit=crop&q=80'}
-                  alt={selectedLead.name}
-                  style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #E2E8F0' }}
-                />
+                {selectedLead.logo || selectedLead.avatarUrl ? (
+                  <img
+                    src={selectedLead.logo || selectedLead.avatarUrl}
+                    alt={selectedLead.name}
+                    style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #E2E8F0' }}
+                  />
+                ) : (
+                  <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.3rem' }}>
+                    {selectedLead.name?.charAt(0) || 'L'}
+                  </div>
+                )}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
@@ -1715,7 +1851,7 @@ export default function PublicSampleDashboard() {
                     <CheckCircle2 size={16} color="#10B981" />
                   </div>
                   <div style={{ fontSize: '0.85rem', color: '#2563EB', fontWeight: 600 }}>
-                    {selectedLead.title} · {companyName}
+                    {selectedLead.title} · {selectedLead.company || companyName}
                   </div>
                 </div>
               </div>
@@ -1747,27 +1883,82 @@ export default function PublicSampleDashboard() {
                   EXECUTIVE PROFILE
                 </div>
                 <p style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.6, margin: 0 }}>
-                  {selectedLead.whySuitsBest || 'Leads product strategy and growth initiatives. Relevant to your business based on their role, company focus and recent activity.'}
+                  {selectedLead.whySuitsBest || selectedLead.shortSummary || 'Direct budget decision maker aligned with key pain points and strategic initiatives.'}
                 </p>
               </div>
 
-              <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0F172A', marginBottom: '10px' }}>
-                  Strategic Priority Signals
+              {/* Observed Strategic Context */}
+              {selectedLead.leadStudy && (
+                <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0F172A', marginBottom: '10px' }}>
+                    Lead Study Context
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {selectedLead.leadStudy.whyRelevant && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.84rem', color: '#475569' }}>
+                        <CheckCircle2 size={15} color="#10B981" style={{ marginTop: '2px', flexShrink: 0 }} />
+                        <div><strong>Why Relevant:</strong> {selectedLead.leadStudy.whyRelevant}</div>
+                      </div>
+                    )}
+                    {selectedLead.leadStudy.observedContext && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.84rem', color: '#475569' }}>
+                        <CheckCircle2 size={15} color="#10B981" style={{ marginTop: '2px', flexShrink: 0 }} />
+                        <div><strong>Observed Context:</strong> {selectedLead.leadStudy.observedContext}</div>
+                      </div>
+                    )}
+                    {selectedLead.leadStudy.suggestedApproach && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.84rem', color: '#475569' }}>
+                        <CheckCircle2 size={15} color="#10B981" style={{ marginTop: '2px', flexShrink: 0 }} />
+                        <div><strong>Suggested Approach:</strong> {selectedLead.leadStudy.suggestedApproach}</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {(selectedLead.whyItMatters || [
-                    'Leads product and platform strategy',
-                    'Focused on growth and partnerships',
-                    'Active in embedded finance ecosystem'
-                  ]).map((point, pIdx) => (
-                    <div key={pIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', color: '#475569' }}>
-                      <CheckCircle2 size={15} color="#10B981" />
-                      <span>{point}</span>
+              )}
+
+              {/* Pitch Deck proposal if available */}
+              {(selectedLead.pitchDeck || pitchDeck) && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '12px'
+                }}>
+                  <div style={{ color: '#FFFFFF' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#A5B4FC', textTransform: 'uppercase' }}>Proposal Pitch Deck</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>
+                      {selectedLead.pitchDeck?.title || pitchDeck?.title || `${companyName} Growth Architecture Playbook`}
                     </div>
-                  ))}
+                  </div>
+
+                  {(selectedLead.pitchDeck?.downloadUrl || pitchDeck?.assetKey) && (
+                    <a
+                      href={selectedLead.pitchDeck?.streamUrl || selectedLead.pitchDeck?.downloadUrl || `/api/samples/${sample.slug}/pitch-deck-pdf`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#FFFFFF',
+                        color: '#1E1B4B',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        fontSize: '0.825rem',
+                        fontWeight: 700,
+                        textDecoration: 'none'
+                      }}
+                    >
+                      <Presentation size={14} />
+                      <span>Preview Deck PDF</span>
+                    </a>
+                  )}
                 </div>
-              </div>
+              )}
 
               {/* Unlock CTA inside dossier */}
               <div style={{
