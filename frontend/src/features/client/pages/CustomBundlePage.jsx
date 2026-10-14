@@ -574,7 +574,7 @@ export default function CustomBundlePage({ onRequestCustomBundle, onNavigate }) 
               Bundle Objectives & Custom Scope
             </label>
             <p style={{ margin: '0 0 10px', fontSize: '0.8125rem', color: '#6B7280' }}>
-              Describe what you would like CreativeGini to prioritize across your selected capabilities.
+              Describe what you would like DiziGini to prioritize across your selected capabilities.
             </p>
             <textarea
               rows={4}

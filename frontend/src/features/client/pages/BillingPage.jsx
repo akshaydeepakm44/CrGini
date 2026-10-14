@@ -353,7 +353,7 @@ export default function BillingPage({
                 Sprint Receipt
               </h3>
               <p style={{ fontSize: '0.8125rem', color: '#6B7280', margin: '4px 0 0' }}>
-                CreativeGini Technologies Inc.
+                DiziGini Technologies Inc.
               </p>
             </div>
 

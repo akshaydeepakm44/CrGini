@@ -35,7 +35,7 @@ export default function KeyPersonModal({
       await api.addKeyPerson(companyId, {
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        role: role.trim() || 'Key Executive',
+        role: role.trim() || 'Executive Decision Maker',
         linkedin: linkedin.trim(),
       });
       if (onSuccess) onSuccess();

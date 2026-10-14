@@ -440,7 +440,7 @@ export default function PdfViewerModal({
                 Preview unavailable
               </h4>
               <p style={{ margin: 0, fontSize: '0.84rem', lineHeight: '1.5', maxWidth: '400px', color: '#94A3B8' }}>
-                This document cannot be previewed inside CreativeGini. You can download the original document to view it.
+                This document cannot be previewed inside DiziGini. You can download the original document to view it.
               </p>
               {effectiveDownloadUrl && (
                 <a

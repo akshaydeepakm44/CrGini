@@ -99,7 +99,7 @@ export default function MagicLoginPage({ onLogin, showToast }) {
             <Sparkles size={22} />
           </div>
           <span style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.5px' }}>
-            CreativeGini
+            DiziGini
           </span>
         </div>
 

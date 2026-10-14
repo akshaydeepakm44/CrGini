@@ -2337,7 +2337,7 @@ export const sendSampleInquiryAlertEmail = async ({
   const slug = sample?.slug || inquiry?.slug || 'general';
   const senderName = inquiry?.senderName || 'Prospect Visitor';
   const senderEmail = inquiry?.senderEmail || '';
-  const message = inquiry?.message || "Hey Creativegini i'm intrested in your service";
+  const message = inquiry?.message || "Hey DiziGini i'm interested in your service";
   const portalBase = (process.env.PORTAL_BASE_URL || 'http://dizigini.com').replace(/\/$/, '');
   const showcaseUrl = `${portalBase}/samples/${encodeURIComponent(slug)}`;
 
@@ -2404,7 +2404,7 @@ export const sendSampleInquiryConfirmationEmail = async ({
   const companyName = sample?.companyName || inquiry?.companyName || inquiry?.slug || 'Target Account';
   const slug = sample?.slug || inquiry?.slug || 'general';
   const senderName = inquiry?.senderName || 'there';
-  const message = inquiry?.message || "Hey Creativegini i'm intrested in your service";
+  const message = inquiry?.message || "Hey DiziGini i'm interested in your service";
   const portalBase = (process.env.PORTAL_BASE_URL || 'http://dizigini.com').replace(/\/$/, '');
   const showcaseUrl = `${portalBase}/samples/${encodeURIComponent(slug)}`;
 

@@ -147,7 +147,7 @@ export default function AdminSamplesPage() {
             </h1>
           </div>
           <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
-            Manage curated public sample dashboards sent via email outreach to demonstrate CreativeGini deliverables.
+            Manage curated public sample dashboards sent via email outreach to demonstrate DiziGini deliverables.
           </p>
         </div>
 

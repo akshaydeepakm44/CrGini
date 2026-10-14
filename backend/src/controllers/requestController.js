@@ -409,7 +409,7 @@ export const createRequest = async (req, res) => {
           description,
           priority: priority || 'MEDIUM',
           price: finalPrice,
-          assignedTeam: teamMap[serviceType] || 'CreativeGini Core Team',
+          assignedTeam: teamMap[serviceType] || 'DiziGini Core Team',
           notes: finalNotes,
           status: 'REQUEST_CREATED',
           paymentStatus: 'PAID'
@@ -633,7 +633,7 @@ export const assignTicket = async (req, res) => {
         userId: assignedUser.id,
         type: 'ASSIGNMENT',
         title: 'New ticket assigned',
-        message: `Ticket ${request.ticketId}: "${request.title}" has been assigned to you by CreativeGini.`,
+        message: `Ticket ${request.ticketId}: "${request.title}" has been assigned to you by DiziGini.`,
         ticketId: request.id,
         ticketCode: request.ticketId
       });
@@ -1218,7 +1218,7 @@ export const sendMessage = async (req, res) => {
           userId: String(clientUserId),
           type: 'NEW_MESSAGE',
           title: `New message on ${request.ticketId}`,
-          message: `${req.user.name} (${request.assignedTeam || 'CreativeGini Team'}) sent a new message on ${request.ticketId}.`,
+          message: `${req.user.name} (${request.assignedTeam || 'DiziGini Team'}) sent a new message on ${request.ticketId}.`,
           ticketId: request.id,
           ticketCode: request.ticketId
         });

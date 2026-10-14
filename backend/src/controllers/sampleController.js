@@ -248,7 +248,7 @@ export const streamPublicPitchDeck = async (req, res) => {
       try {
         const assetKey = sample.pitchDeck.assetKey;
         const mimeType = sample.pitchDeck.mimeType || 'application/pdf';
-        const fileName = (sample.pitchDeck.fileName || 'CreativeGini_Sample_Pitch_Deck.pdf').replace(/["\r\n]/g, '_');
+        const fileName = (sample.pitchDeck.fileName || 'DiziGini_Sample_Pitch_Deck.pdf').replace(/["\r\n]/g, '_');
         const stat = await getObjectStat(assetKey).catch(() => null);
         const stream = await getFileStream(assetKey);
 
@@ -1062,7 +1062,7 @@ export const submitPublicInquiry = async (req, res) => {
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = (name && name.trim()) || 'Prospect Visitor';
-    const cleanMessage = (message && message.trim()) || "Hey Creativegini i'm intrested in your service";
+    const cleanMessage = (message && message.trim()) || "Hey DiziGini i'm intrested in your service";
 
     // 1. Resolve sample company details
     let sample = null;

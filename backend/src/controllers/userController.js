@@ -989,8 +989,10 @@ export const previewWelcomeEmailHandler = async (req, res) => {
     const clientName = (name || contactPerson || user?.name || user?.contactPerson || 'Valued Client').trim();
     const recipientEmail = (email || user?.email || '').trim();
     const resolvedCompanyName = (companyName || company?.name || 'Client Workspace').trim();
-    const emailSubject = subject?.trim() || 'Welcome to CreativeGini - Your Account & Workspace Access';
+    const emailSubject = subject?.trim() || 'Welcome to DiziGini - Your Account & Workspace Access';
     const attachmentsList = Array.isArray(attachments) ? attachments : [];
+
+    const portalUrl = (process.env.PORTAL_BASE_URL || 'http://dizigini.com').replace(/\/$/, '') + '/signin';
 
     const html = buildWelcomeEmailTemplate({
       clientName,
@@ -999,7 +1001,7 @@ export const previewWelcomeEmailHandler = async (req, res) => {
       temporaryPassword: temporaryPassword || '',
       subject: emailSubject,
       customBody,
-      portalUrl: 'https://creativegini.com/signin',
+      portalUrl,
       attachments: attachmentsList
     });
 
@@ -1112,7 +1114,7 @@ export const downloadBulkTemplateHandler = async (req, res) => {
   try {
     const csvContent = getCsvTemplateString();
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename="creativegini_bulk_onboarding_template.csv"');
+    res.setHeader('Content-Disposition', 'attachment; filename="dizigini_bulk_onboarding_template.csv"');
     return res.status(200).send(csvContent);
   } catch (error) {
     console.error('Download bulk template error:', error);

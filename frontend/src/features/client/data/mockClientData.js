@@ -132,7 +132,7 @@ export const MOCK_CLIENT_DELIVERABLES = [
     statusLabel: 'Client Review',
     date: 'Oct 03, 2026',
     fileType: 'pdf',
-    fileName: 'CreativeGini_Account_Dossier_V1.pdf',
+    fileName: 'DiziGini_Account_Dossier_V1.pdf',
     fileSize: '4.2 MB',
     summary: 'Detailed organizational hierarchy, technology stack telemetry, and key strategic priorities for 10 target accounts.',
     downloadUrl: '#',

@@ -90,7 +90,7 @@ export const protect = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message:
-          'Your account has been disabled. Please contact CreativeGini support.',
+          'Your account has been disabled. Please contact DiziGini support.',
       });
     }
 

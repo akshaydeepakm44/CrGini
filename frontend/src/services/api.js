@@ -985,7 +985,7 @@ export const api = {
       throw new Error('Failed to download lead import template');
     }
     const blob = await res.blob();
-    const filename = format === 'csv' ? 'creativegini_leads_import_template.csv' : 'creativegini_leads_import_template.xlsx';
+    const filename = format === 'csv' ? 'dizigini_leads_import_template.csv' : 'dizigini_leads_import_template.xlsx';
     const blobUrl = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = blobUrl;

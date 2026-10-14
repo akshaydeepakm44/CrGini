@@ -198,7 +198,7 @@ export const registerUser = async (req, res) => {
       success: true,
       token,
       user: buildUserResponse(newUser),
-      message: 'Account registered successfully. Welcome to CreativeGini!',
+      message: 'Account registered successfully. Welcome to DiziGini!',
     });
   } catch (error) {
     console.error('[AuthController.registerUser] Error:', error);
@@ -281,7 +281,7 @@ export const loginUser = async (req, res) => {
         success: false,
         code: 'ACCOUNT_DISABLED',
         message:
-          'Your account has been disabled. Please contact CreativeGini support.',
+          'Your account has been disabled. Please contact DiziGini support.',
       });
     }
 

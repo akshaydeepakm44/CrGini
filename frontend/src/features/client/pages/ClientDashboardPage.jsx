@@ -133,7 +133,7 @@ export default function ClientDashboardPage({
           </h1>
 
           <p style={{ margin: 0, fontSize: '0.90625rem', color: 'var(--cg-text-secondary, #4B5563)' }}>
-            Here's an overview of your CreativeGini activities.
+            Here's an overview of your DiziGini activities.
           </p>
         </div>
 

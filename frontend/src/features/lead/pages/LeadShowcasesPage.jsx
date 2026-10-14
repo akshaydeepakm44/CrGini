@@ -419,7 +419,7 @@ support@dizigini.com`;
       pitchDeckPdf: leadForm.pitchDeckPdf || '',
       pitchDeckPdfName: leadForm.pitchDeckPdfName || '',
       logo: leadForm.logo || '',
-      title: leadForm.title?.trim() || 'Key Executive',
+      title: leadForm.title?.trim() || '',
       company: companyName,
       aboutCompany: leadForm.aboutCompany?.trim() || `Enterprise organization operating in ${formData.companyStudy?.industry || 'technology'}.`,
       whySuitsBest: leadForm.whySuitsBest?.trim() || 'Strategic decision maker aligned with key pain points.',
@@ -480,7 +480,7 @@ support@dizigini.com`;
         const companyLink = parts[1]?.trim() || '';
         const email = parts[2]?.trim() || '';
         const linkedin = parts[3]?.trim() || '';
-        const title = parts[4]?.trim() || 'Key Executive';
+        const title = parts[4]?.trim() || '';
         const whySuitsBest = parts[5]?.trim() || 'Vetted prospect with immediate relevance to strategic offering.';
 
         if (name && name.toLowerCase() !== 'name') {

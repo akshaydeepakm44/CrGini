@@ -22,8 +22,7 @@ import {
   Globe,
   X,
   Calendar,
-  Lightbulb,
-  Lock
+  Lightbulb
 } from 'lucide-react';
 import { api } from '../../services/api';
 
@@ -119,7 +118,6 @@ export default function PublicSampleDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedLead, setSelectedLead] = useState(null);
-  const [lockedLeadTarget, setLockedLeadTarget] = useState(null);
   const [isStrategyModalOpen, setIsStrategyModalOpen] = useState(false);
   const [strategyForm, setStrategyForm] = useState({ name: '', email: '', company: '', notes: '' });
   const [strategySubmitted, setStrategySubmitted] = useState(false);
@@ -229,14 +227,9 @@ export default function PublicSampleDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
               <img src={BRAND_LOGO} alt={BRAND_NAME} style={{ height: '34px', width: 'auto', objectFit: 'contain' }} />
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.1, letterSpacing: '-0.02em' }}>
-                  {BRAND_NAME}
-                </span>
-                <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Powered by CreativeGini
-                </span>
-              </div>
+              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
+                {BRAND_NAME}
+              </span>
             </Link>
 
             <span style={{ height: '20px', width: '1px', background: '#E2E8F0', margin: '0 4px' }} />
@@ -897,30 +890,15 @@ export default function PublicSampleDashboard() {
                 )}
 
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
                       {featuredLead.name}
                     </h3>
                     <CheckCircle2 size={16} color="#10B981" />
-                    <span style={{
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      background: '#ECFDF5',
-                      color: '#047857',
-                      border: '1px solid #A7F3D0',
-                      fontSize: '0.72rem',
-                      fontWeight: 700
-                    }}>
-                      Unlocked Sample
-                    </span>
-                  </div>
-
-                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2563EB', marginTop: '3px' }}>
-                    {featuredLead.title || 'Executive Decision Maker'} · {featuredLead.company || companyName}
                   </div>
 
                   {featuredLead.whySuitsBest && (
-                    <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: 1.5, margin: '6px 0 0 0', maxWidth: '680px' }}>
+                    <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: 1.5, margin: '8px 0 0 0', maxWidth: '680px' }}>
                       {featuredLead.whySuitsBest}
                     </p>
                   )}
@@ -961,16 +939,12 @@ export default function PublicSampleDashboard() {
             </div>
           )}
 
-          {/* More relevant leads (preview) - other leads are LOCKED as requested in Point 4 */}
+          {/* More relevant leads */}
           {previewLeads.length > 0 && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-                <div style={{ fontSize: '0.925rem', fontWeight: 800, color: '#334155' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A' }}>
                   More relevant leads ({previewLeads.length})
-                </div>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: '#DC2626', fontWeight: 700, background: '#FEF2F2', border: '1px solid #FECACA', padding: '3px 10px', borderRadius: '20px' }}>
-                  <Lock size={12} />
-                  <span>{previewLeads.length} Profiles Locked</span>
                 </div>
               </div>
 
@@ -987,7 +961,6 @@ export default function PublicSampleDashboard() {
                       flexDirection: 'column',
                       justifyContent: 'space-between',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                      position: 'relative'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
@@ -1024,40 +997,16 @@ export default function PublicSampleDashboard() {
                         </div>
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {item.name}
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {item.title}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>
-                          {item.company || companyName}
                         </div>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', paddingTop: '10px', borderTop: '1px solid #F1F5F9' }}>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          background: '#FEF2F2',
-                          color: '#DC2626',
-                          border: '1px solid #FECACA',
-                          fontSize: '0.7rem',
-                          fontWeight: 700
-                        }}
-                      >
-                        <Lock size={10} />
-                        <span>Locked</span>
-                      </span>
-
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: '8px', paddingTop: '10px', borderTop: '1px solid #F1F5F9' }}>
                       <button
                         type="button"
-                        onClick={() => setLockedLeadTarget(item)}
+                        onClick={() => setSelectedLead(item)}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -1065,15 +1014,18 @@ export default function PublicSampleDashboard() {
                           background: '#EFF6FF',
                           border: '1px solid #BFDBFE',
                           color: '#2563EB',
-                          padding: '5px 12px',
+                          padding: '6px 14px',
                           borderRadius: '8px',
-                          fontSize: '0.78rem',
+                          fontSize: '0.8rem',
                           fontWeight: 700,
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
                         }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#DBEAFE'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = '#EFF6FF'; }}
                       >
-                        <Lock size={11} />
-                        <span>Unlock</span>
+                        <span>Inspect</span>
+                        <ArrowRight size={13} />
                       </button>
                     </div>
                   </div>
@@ -1410,9 +1362,6 @@ export default function PublicSampleDashboard() {
                     </h3>
                     <CheckCircle2 size={16} color="#10B981" />
                   </div>
-                  <div style={{ fontSize: '0.85rem', color: '#2563EB', fontWeight: 600 }}>
-                    {selectedLead.title} · {selectedLead.company || companyName}
-                  </div>
                 </div>
               </div>
 
@@ -1512,7 +1461,7 @@ export default function PublicSampleDashboard() {
                       Lead Role
                     </div>
                     <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0F172A' }}>
-                      {selectedLead.title || 'Executive Decision Maker'}
+                      {(selectedLead.title && selectedLead.title.trim().toLowerCase() !== 'key executive') ? selectedLead.title : 'Executive Decision Maker'}
                     </div>
                   </div>
 
@@ -1649,131 +1598,6 @@ export default function PublicSampleDashboard() {
               </div>
 
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: LOCKED LEAD PROFILE MODAL (Point 4 Applied) */}
-      {lockedLeadTarget && (
-        <div
-          onClick={() => setLockedLeadTarget(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '20px',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#FFFFFF',
-              borderRadius: '20px',
-              padding: '36px 32px',
-              maxWidth: '480px',
-              width: '100%',
-              textAlign: 'center',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-              position: 'relative',
-              animation: 'modalSlideUp 0.25s ease-out',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setLockedLeadTarget(null)}
-              style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                background: '#F1F5F9',
-                border: 'none',
-                borderRadius: '50%',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#64748B',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={16} />
-            </button>
-
-            <div
-              style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '16px',
-                background: '#FEF2F2',
-                color: '#DC2626',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px auto',
-              }}
-            >
-              <Lock size={26} />
-            </div>
-
-            <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>
-              Decision-Maker Profile Locked
-            </h3>
-
-            <p style={{ fontSize: '0.88rem', color: '#64748B', lineHeight: '1.55', marginBottom: '22px' }}>
-              Direct phone lines, verified work email addresses, and customized research dossiers for <strong>{lockedLeadTarget.name || lockedLeadTarget.company}</strong> are reserved for qualified clients.
-            </p>
-
-            <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '14px 16px', marginBottom: '24px', textAlign: 'left', fontSize: '0.825rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#64748B', fontWeight: 600 }}>Decision Maker:</span>
-                <span style={{ fontWeight: 700, color: '#0F172A' }}>{lockedLeadTarget.name}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#64748B', fontWeight: 600 }}>Role:</span>
-                <span style={{ fontWeight: 700, color: '#2563EB' }}>{lockedLeadTarget.title || 'Executive Lead'}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#64748B', fontWeight: 600 }}>Verified Email:</span>
-                <span style={{ fontWeight: 700, color: '#64748B', filter: 'blur(4px)', userSelect: 'none' }}>direct.email@company.com</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748B', fontWeight: 600 }}>Direct Phone:</span>
-                <span style={{ fontWeight: 700, color: '#64748B', filter: 'blur(4px)', userSelect: 'none' }}>+1 (555) 019-xxxx</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setLockedLeadTarget(null);
-                setIsStrategyModalOpen(true);
-              }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                width: '100%',
-                padding: '12px 20px',
-                borderRadius: '10px',
-                background: '#2563EB',
-                color: '#FFFFFF',
-                border: 'none',
-                fontSize: '0.92rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
-              }}
-            >
-              <span>Book Strategy Call to Unlock All Leads</span>
-              <ArrowRight size={16} />
-            </button>
           </div>
         </div>
       )}
