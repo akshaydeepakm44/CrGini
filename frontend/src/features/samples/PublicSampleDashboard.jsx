@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { BRAND_LOGO } from '../../assets/branding';
+import { BRAND_LOGO, BRAND_NAME } from '../../assets/branding';
 import {
   Building2,
   Users,
@@ -124,6 +124,62 @@ function renderStructuredNarrative(text, defaultFallback, accentColor = '#2563EB
 }
 
 /**
+ * Smart Industry / Sector parser
+ * Splits commas, semicolons, newlines, bullets, pipes, or conjoined multi-sector strings
+ * into clean, individual industry sector labels for mini-card presentation.
+ */
+function parseIndustries(rawInd) {
+  if (!rawInd || typeof rawInd !== 'string') {
+    return ['Technology & Professional Services'];
+  }
+
+  const trimmed = rawInd.trim();
+  if (!trimmed) return ['Technology & Professional Services'];
+
+  // Protect commas inside parentheses e.g. "(Legal, Finance, Marketing)" or "(for mineral supply)"
+  const protectedParen = [];
+  const tokenized = trimmed.replace(/\([^\)]*\)/g, (match) => {
+    protectedParen.push(match);
+    return `__PAREN_${protectedParen.length - 1}__`;
+  });
+
+  // Check if there are explicit delimiters (newlines, semicolons, commas, bullets, pipes, or slashes surrounded by spaces)
+  const hasExplicitDelimiters = /[\r\n;,•·|]|\s+\/\s+/.test(tokenized);
+
+  let sectors = [];
+  if (hasExplicitDelimiters) {
+    sectors = tokenized
+      .split(/(?:[\r\n;,•·|]+|\s+\/\s+)/)
+      .map((s) => s.replace(/^[\s•\-\*\d\.\)\:]+/, '').trim())
+      .filter((s) => s.length > 0);
+  } else if (tokenized.length > 55) {
+    // Only run delimiter-free heuristics if the text is long and contains conjoined sectors (like Image 1)
+    const splitRegex = /(?<=(?:Exploration|Management|Trading|Consulting|Services|Systems|Software|Solutions|Logistics|Manufacturing|Platform|Capital|Finance|Insurance|Banking|Infrastructure|Security|Development|Design|Strategy|Operations|Supply|__PAREN_\d+__))\s+(?=[A-Z][a-z0-9]+(?:\s+&|\s+[A-Z]))/g;
+    sectors = tokenized.split(splitRegex).map((s) => s.trim()).filter(Boolean);
+
+    if (sectors.length <= 1) {
+      sectors = tokenized
+        .split(/(?:(?<=[a-z])\s{2,}(?=[A-Z])|(?<=[a-z])\s+(?=[A-Z][a-z]+\s+&))/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+  } else {
+    sectors = [tokenized];
+  }
+
+  // Restore protected parentheses
+  sectors = sectors.map((item) => {
+    return item.replace(/__PAREN_(\d+)__/g, (_, idx) => protectedParen[Number(idx)] || '').trim();
+  }).filter((s) => s.length > 1);
+
+  if (!sectors || sectors.length === 0) {
+    sectors = [trimmed];
+  }
+
+  return sectors;
+}
+
+/**
  * PublicSampleDashboard Component
  * Controlled public read-only showcase of curated intelligence:
  * Company Studies, Lead Intelligence, Lead Studies, and Pitch Deck samples.
@@ -138,16 +194,7 @@ export default function PublicSampleDashboard() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'company' | 'leads' | 'study' | 'pitch'
   const [selectedLead, setSelectedLead] = useState(null);
-
-  // In-page contact form state
-  const [contactName, setContactName] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
-  const [contactMessage, setContactMessage] = useState("Hey Creativegini i'm intrested in your service");
-  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
-  const [contactSubmitted, setContactSubmitted] = useState(false);
-  const [contactSuccessMessage, setContactSuccessMessage] = useState('');
-  const [contactError, setContactError] = useState('');
-  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
 
   const effectiveSlug = slug || 'data-i2i';
 
@@ -225,79 +272,12 @@ export default function PublicSampleDashboard() {
     return rawLeads;
   }, [sample]);
 
-  const scrollToContactForm = () => {
-    const el = document.getElementById('contact-section');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-      setTimeout(() => {
-        const input = document.getElementById('contact-email-input');
-        if (input) input.focus();
-      }, 350);
-    }
-  };
-
-  const defaultDraftSubject = "Hey Creativegini i'm intrested in your service";
-  const defaultDraftBody = `Hey Creativegini i'm intrested in your service\n\nProspect Company: ${sample?.companyName || 'Lead Inquiry'}`;
-
-  const gmailWebUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=contact@creativegini.com&su=${encodeURIComponent(defaultDraftSubject)}&body=${encodeURIComponent(defaultDraftBody)}`;
-  const outlookWebUrl = `https://outlook.office.com/mail/deeplink/compose?to=contact@creativegini.com&subject=${encodeURIComponent(defaultDraftSubject)}&body=${encodeURIComponent(defaultDraftBody)}`;
-  const contactMailtoUrl = `mailto:contact@creativegini.com?subject=${encodeURIComponent(defaultDraftSubject)}&body=${encodeURIComponent(defaultDraftBody)}`;
-
-  const handleCopyEmail = (e) => {
-    if (e) e.preventDefault();
-    const textToCopy = `To: contact@creativegini.com\nSubject: ${defaultDraftSubject}\n\n${defaultDraftBody}`;
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(textToCopy)
-        .then(() => {
-          setCopiedEmail(true);
-          setTimeout(() => setCopiedEmail(false), 3000);
-        })
-        .catch(() => {
-          setCopiedEmail(true);
-          setTimeout(() => setCopiedEmail(false), 3000);
-        });
-    } else {
-      setCopiedEmail(true);
-      setTimeout(() => setCopiedEmail(false), 3000);
-    }
-  };
-
-  const handleContactSubmit = async (e) => {
-    e.preventDefault();
-    if (!contactEmail || !contactEmail.includes('@')) {
-      setContactError('Please enter a valid work email address.');
-      return;
-    }
-
-    setIsSubmittingContact(true);
-    setContactError('');
-
-    try {
-      const res = await api.submitPublicInquiry(effectiveSlug, {
-        name: contactName.trim() || 'Prospect Visitor',
-        email: contactEmail.trim(),
-        message: contactMessage.trim() || "Hey Creativegini i'm intrested in your service",
-      });
-
-      setContactSuccessMessage(
-        res?.message ||
-        `Inquiry recorded successfully! Our lead specialist team will reach out to ${contactEmail.trim()} within 2-4 hours.`
-      );
-      setContactSubmitted(true);
-    } catch (err) {
-      console.error('[PublicSampleDashboard] Contact submit error:', err);
-      setContactError(err.message || 'Unable to submit directly. Please use the instant Gmail or Outlook buttons below.');
-    } finally {
-      setIsSubmittingContact(false);
-    }
-  };
-
   // Enforce single lead preview restriction: only the 1st lead can be opened
   useEffect(() => {
     if (selectedLead && displayLeads.length > 0) {
       if (selectedLead.id !== displayLeads[0].id) {
         setSelectedLead(null);
-        scrollToContactForm();
+        setIsUnlockModalOpen(true);
       }
     }
   }, [selectedLead, displayLeads]);
@@ -384,7 +364,7 @@ export default function PublicSampleDashboard() {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-              <img src={BRAND_LOGO} alt="CreativeGini" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
+              <img src={BRAND_LOGO} alt={BRAND_NAME} style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
             </Link>
             <span style={{ height: '18px', width: '1px', background: '#CBD5E1' }} />
             <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#475569', background: '#F1F5F9', padding: '4px 10px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
@@ -450,7 +430,7 @@ export default function PublicSampleDashboard() {
           </div>
 
           <h1 style={{ fontSize: '2.25rem', fontWeight: 800, color: '#0F172A', lineHeight: '1.2', letterSpacing: '-0.5px', marginBottom: '12px' }}>
-            See the kind of intelligence CreativeGini can prepare for your team.
+            See the kind of intelligence {BRAND_NAME} can prepare for your team.
           </h1>
 
           <p style={{ fontSize: '1.05rem', color: '#475569', maxWidth: '780px', lineHeight: '1.6', marginBottom: '24px' }}>
@@ -539,34 +519,65 @@ export default function PublicSampleDashboard() {
                 </div>
 
                 <div style={{ background: '#F8FAFC', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748B', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748B', marginBottom: '10px' }}>
                     Industry / Sector
                   </div>
                   {(() => {
-                    const rawInd = companyStudy.industry || 'Technology & Professional Services';
-                    const industries = rawInd.split(/[,;]+/).map((s) => s.trim()).filter(Boolean);
-                    if (industries.length === 0) industries.push('Technology & Professional Services');
+                    const industries = parseIndustries(companyStudy.industry);
                     return (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
                         {industries.map((ind, i) => (
-                          <span
+                          <div
                             key={i}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              padding: '5px 12px',
-                              borderRadius: '8px',
+                              gap: '8px',
+                              padding: '7px 13px',
+                              borderRadius: '9px',
                               backgroundColor: '#FFFFFF',
-                              border: '1px solid #CBD5E1',
-                              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-                              color: '#0F172A',
-                              fontSize: '0.825rem',
-                              fontWeight: 700,
-                              letterSpacing: '0.01em',
+                              border: '1.5px solid #CBD5E1',
+                              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.05)',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = '#93C5FD';
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                              e.currentTarget.style.boxShadow = '0 3px 8px rgba(37, 99, 235, 0.1)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = '#CBD5E1';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 1px 3px rgba(15, 23, 42, 0.05)';
                             }}
                           >
-                            {ind}
-                          </span>
+                            <div
+                              style={{
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '5px',
+                                backgroundColor: '#EFF6FF',
+                                color: '#2563EB',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Briefcase size={11} />
+                            </div>
+                            <span
+                              style={{
+                                fontSize: '0.825rem',
+                                fontWeight: 700,
+                                color: '#0F172A',
+                                letterSpacing: '-0.01em',
+                                lineHeight: '1.25',
+                              }}
+                            >
+                              {ind}
+                            </span>
+                          </div>
                         ))}
                       </div>
                     );
@@ -720,7 +731,7 @@ export default function PublicSampleDashboard() {
                     if (isUnlocked) {
                       setSelectedLead(lead);
                     } else {
-                      scrollToContactForm();
+                      setIsUnlockModalOpen(true);
                     }
                   }}
                   style={{
@@ -921,7 +932,7 @@ export default function PublicSampleDashboard() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          scrollToContactForm();
+                          setIsUnlockModalOpen(true);
                         }}
                         style={{
                           display: 'inline-flex',
@@ -1030,283 +1041,6 @@ export default function PublicSampleDashboard() {
           </section>
         )}
 
-        {/* SECTION 5: CONTACT FORM & ACTION (REPLACES "MORE LEADS +") */}
-        <section
-          id="contact-section"
-          style={{
-            background: '#FFFFFF',
-            borderRadius: '24px',
-            border: '2px solid #2563EB',
-            padding: '48px 36px',
-            boxShadow: '0 12px 36px rgba(37,99,235,0.08)',
-            marginBottom: '48px',
-          }}
-        >
-          <div style={{ maxWidth: '780px', margin: '0 auto', textAlign: 'center' }}>
-            <div style={{ display: 'inline-flex', padding: '14px', borderRadius: '50%', background: '#EFF6FF', color: '#2563EB', marginBottom: '16px' }}>
-              <Mail size={32} />
-            </div>
-
-            <h2 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0F172A', marginBottom: '10px', letterSpacing: '-0.3px' }}>
-              Unlock All Qualified Leads & Custom Campaigns
-            </h2>
-
-            <p style={{ fontSize: '1rem', color: '#64748B', margin: '0 auto 28px auto', lineHeight: '1.6', maxWidth: '640px' }}>
-              Connect directly with our specialist team to unlock verified emails, phone lines, deep-dive account dossiers, and custom intelligence execution.
-            </p>
-
-            {/* Quick 1-Click Launchers Grid */}
-            <div style={{ marginBottom: '32px' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
-                Instant 1-Click Contact Options
-              </div>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
-                {/* 1. Gmail Web (Works 100% across all devices without desktop mail apps) */}
-                <a
-                  href={gmailWebUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '12px 20px',
-                    borderRadius: '10px',
-                    background: '#EA4335',
-                    color: '#FFFFFF',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    boxShadow: '0 3px 10px rgba(234,67,53,0.25)',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <Mail size={16} />
-                  <span>Open in Gmail (Web)</span>
-                  <ExternalLink size={14} />
-                </a>
-
-                {/* 2. Outlook 365 Web */}
-                <a
-                  href={outlookWebUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '12px 20px',
-                    borderRadius: '10px',
-                    background: '#0078D4',
-                    color: '#FFFFFF',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    boxShadow: '0 3px 10px rgba(0,120,212,0.25)',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <Mail size={16} />
-                  <span>Open in Outlook 365</span>
-                  <ExternalLink size={14} />
-                </a>
-
-                {/* 3. Default Mail App */}
-                <a
-                  href={contactMailtoUrl}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '12px 20px',
-                    borderRadius: '10px',
-                    background: '#2563EB',
-                    color: '#FFFFFF',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    boxShadow: '0 3px 10px rgba(37,99,235,0.25)',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <Mail size={16} />
-                  <span>Default Mail App</span>
-                  <ArrowRight size={14} />
-                </a>
-
-                {/* 4. Copy Email & Draft */}
-                <button
-                  type="button"
-                  onClick={handleCopyEmail}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '12px 20px',
-                    borderRadius: '10px',
-                    background: copiedEmail ? '#ECFDF5' : '#F1F5F9',
-                    border: copiedEmail ? '1px solid #10B981' : '1px solid #CBD5E1',
-                    color: copiedEmail ? '#059669' : '#334155',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {copiedEmail ? <Check size={16} color="#059669" /> : <Copy size={16} />}
-                  <span>{copiedEmail ? 'Copied to Clipboard! ✓' : 'Copy Email & Draft'}</span>
-                </button>
-              </div>
-
-              <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '12px' }}>
-                Launches pre-filled draft: <em>"Hey Creativegini i'm intrested in your service"</em> to <strong>contact@creativegini.com</strong>
-              </div>
-            </div>
-
-            {/* In-Page Quick Contact Form */}
-            <div
-              style={{
-                background: '#F8FAFC',
-                border: '1px solid #E2E8F0',
-                borderRadius: '16px',
-                padding: '28px',
-                textAlign: 'left',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Sparkles size={16} color="#2563EB" />
-                  <span>Direct In-Page Inquiry / Request Lead Unlock</span>
-                </div>
-                <span style={{ fontSize: '0.75rem', color: '#059669', background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '3px 10px', borderRadius: '12px', fontWeight: 600 }}>
-                  ⚡ Sent directly to CreativeGini team
-                </span>
-              </div>
-
-              {contactSubmitted ? (
-                <div style={{ background: '#ECFDF5', border: '1.5px solid #10B981', color: '#065F46', padding: '28px 24px', borderRadius: '12px', textAlign: 'center' }}>
-                  <CheckCircle2 size={38} style={{ margin: '0 auto 12px auto', display: 'block', color: '#059669' }} />
-                  <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#065F46', marginBottom: '6px' }}>
-                    Inquiry Received Successfully!
-                  </div>
-                  <p style={{ fontSize: '0.875rem', color: '#047857', margin: '0 auto 16px auto', maxWidth: '520px', lineHeight: '1.55' }}>
-                    {contactSuccessMessage || `Thank you! Your inquiry regarding ${sample?.companyName || 'Lead Intelligence'} has been recorded. Our enterprise specialist will reach back out to ${contactEmail} shortly.`}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setContactSubmitted(false);
-                      setContactEmail('');
-                    }}
-                    style={{
-                      background: '#059669',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      padding: '8px 20px',
-                      borderRadius: '8px',
-                      fontSize: '0.825rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Send Another Inquiry
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleContactSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {contactError && (
-                    <div style={{ background: '#FEF2F2', border: '1px solid #F87171', color: '#991B1B', padding: '10px 14px', borderRadius: '8px', fontSize: '0.825rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <X size={16} />
-                      <span>{contactError}</span>
-                    </div>
-                  )}
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                        Your Full Name
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Alex Morgan"
-                        value={contactName}
-                        onChange={(e) => setContactName(e.target.value)}
-                        style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.875rem', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                        Your Work Email *
-                      </label>
-                      <input
-                        id="contact-email-input"
-                        type="email"
-                        required
-                        placeholder="e.g. alex@company.com"
-                        value={contactEmail}
-                        onChange={(e) => setContactEmail(e.target.value)}
-                        style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.875rem', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                      Message to CreativeGini
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={contactMessage}
-                      onChange={(e) => setContactMessage(e.target.value)}
-                      style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.875rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                    <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
-                      Recipient: <strong style={{ color: '#0F172A' }}>contact@creativegini.com</strong>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isSubmittingContact}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '12px 28px',
-                        borderRadius: '10px',
-                        background: '#2563EB',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        fontWeight: 700,
-                        fontSize: '0.925rem',
-                        cursor: isSubmittingContact ? 'not-allowed' : 'pointer',
-                        boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
-                        opacity: isSubmittingContact ? 0.7 : 1,
-                      }}
-                    >
-                      {isSubmittingContact ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          <span>Sending Inquiry...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send size={16} />
-                          <span>Send Inquiry to Team</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-
-          </div>
-        </section>
-
       </main>
 
       {/* 6. TRUST FOOTER */}
@@ -1339,7 +1073,7 @@ export default function PublicSampleDashboard() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#94A3B8' }}>
             <ShieldCheck size={14} color="#10B981" />
-            <span>CreativeGini Protected Intelligence Showcase · Enterprise SLA & Tenant Isolation</span>
+            <span>{BRAND_NAME} Protected Intelligence Showcase · Enterprise SLA & Tenant Isolation</span>
           </div>
 
         </div>
@@ -1800,7 +1534,7 @@ export default function PublicSampleDashboard() {
                   type="button"
                   onClick={() => {
                     setSelectedLead(null);
-                    scrollToContactForm();
+                    handleSignUpClick();
                   }}
                   style={{
                     display: 'inline-flex',
@@ -1817,14 +1551,141 @@ export default function PublicSampleDashboard() {
                     boxShadow: '0 4px 14px rgba(37,99,235,0.3)',
                   }}
                 >
-                  <Mail size={16} />
-                  <span>CONTACT CREATIVEGINI TO UNLOCK ALL LEADS</span>
+                  <UserPlus size={16} />
+                  <span>SIGN UP TO ACCESS FULL LEAD REPOSITORY</span>
                   <ArrowRight size={16} />
                 </button>
               </div>
 
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* LOCKED LEADS ACCESS MODAL */}
+      {isUnlockModalOpen && (
+        <div
+          onClick={() => setIsUnlockModalOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '20px',
+              padding: '36px 32px',
+              maxWidth: '480px',
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
+              position: 'relative',
+              animation: 'modalSlideUp 0.25s ease-out',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setIsUnlockModalOpen(false)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: '#F1F5F9',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#64748B',
+                cursor: 'pointer',
+              }}
+            >
+              <X size={16} />
+            </button>
+
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '16px',
+                background: '#EFF6FF',
+                color: '#2563EB',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 18px auto',
+              }}
+            >
+              <Lock size={26} />
+            </div>
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>
+              Unlock Qualified Enterprise Leads
+            </h3>
+
+            <p style={{ fontSize: '0.9rem', color: '#64748B', lineHeight: '1.55', marginBottom: '24px' }}>
+              Verified work emails, direct executive phone numbers, deep-dive account dossiers, and custom ICP research are available for registered clients.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={handleSignUpClick}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '12px 20px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
+                }}
+              >
+                <UserPlus size={16} />
+                <span>Create Client Account (Sign Up)</span>
+                <ArrowRight size={16} />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLoginClick}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '11px 20px',
+                  borderRadius: '10px',
+                  background: '#F8FAFC',
+                  color: '#334155',
+                  border: '1px solid #CBD5E1',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <LogIn size={15} />
+                <span>Already Have an Account? Log In</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

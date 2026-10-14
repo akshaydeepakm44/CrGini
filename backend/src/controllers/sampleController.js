@@ -94,7 +94,7 @@ export const getPublicSampleBySlug = async (req, res) => {
       pdfFileName: companyStudyData.pdfFileName || `${sample.companyName} - Company Study.pdf`,
     };
 
-    // Strict projection: sanitize and verify NO private client fields leak
+    // Strict projection: sanitize and verify NO private client fields leak, and NEVER inline large base64 files
     const publicLeads = (sample.leads || []).map((l, index) => {
       const leadId = l.id || `lead-${index + 1}`;
       const leadName = l.name || 'Executive Lead';
@@ -104,18 +104,10 @@ export const getPublicSampleBySlug = async (req, res) => {
       const matchedStudy = l.leadStudy || (sample.leadStudies || []).find((s) => s.leadName === leadName || s.id === leadId) || {};
 
       // Match lead-specific pitch deck or fall back to general pitch deck
-      const leadPitch = l.pitchDeck || (l.pitchDeckPdf ? {
-        title: l.pitchDeckTitle || `${leadName} Proposal Pitch Deck`,
-        summary: `Strategic value pitch tailored for ${l.title || 'executive decision makers'}.`,
-        fileName: l.pitchDeckPdfName || `${leadName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
-        streamUrl: l.pitchDeckPdf,
-        downloadUrl: l.pitchDeckPdf,
-      } : (sample.pitchDeck?.assetKey ? {
-        title: `${sample.companyName} Proposal for ${l.company || sample.companyName}`,
-        summary: `Strategic value pitch tailored for ${l.title || 'executive decision makers'}.`,
-        fileName: sample.pitchDeck.fileName,
-        streamUrl: `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck`,
-      } : null));
+      const hasLeadPitch = Boolean(l.pitchDeckAssetKey || l.pitchDeckPdf || l.pitchDeck);
+      const leadPitchUrl = `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck`;
+      const hasLeadStudy = Boolean(l.leadStudyPdfAssetKey || l.leadStudyPdf || l.leadStudy);
+      const leadStudyUrl = `/api/samples/${sample.slug}/leads/${leadId}/lead-study-pdf`;
 
       // Extract real or inferred company link / website
       let companyLink = l.companyLink || l.company_link || l.website || l.companyWebsite || l.domain || '';
@@ -138,16 +130,16 @@ export const getPublicSampleBySlug = async (req, res) => {
         title: l.title || 'Decision Maker',
         company: l.company || l.lead_company || sample.companyName,
         companyLink: companyLink,
-        logo: l.logo || null,
+        logo: (l.logo && !l.logo.startsWith('data:')) ? l.logo : (l.logo ? l.logo : null),
         industry: l.industry || '',
         location: l.location || '',
         linkedin: linkedinUrl,
         email: isFirstLead ? emailForFirst : undefined,
         isUnlocked: isFirstLead,
-        leadStudyPdf: l.leadStudyPdf || null,
-        leadStudyPdfName: l.leadStudyPdfName || null,
-        pitchDeckPdf: l.pitchDeckPdf || null,
-        pitchDeckPdfName: l.pitchDeckPdfName || null,
+        leadStudyPdf: hasLeadStudy ? leadStudyUrl : null,
+        leadStudyPdfName: l.leadStudyPdfName || `${leadName.replace(/\s+/g, '_')}_Study.pdf`,
+        pitchDeckPdf: hasLeadPitch ? leadPitchUrl : null,
+        pitchDeckPdfName: l.pitchDeckPdfName || `${leadName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
         aboutCompany: l.aboutCompany || l.company_summary || `Leading innovator in ${l.industry || 'the enterprise sector'}.`,
         whySuitsBest: l.whySuitsBest || l.why_suits_best || `Strategic decision maker evaluating modern solutions in ${l.industry || 'their market'}.`,
         maskedEmail: l.maskedEmail || maskEmail(l.email),
@@ -159,19 +151,13 @@ export const getPublicSampleBySlug = async (req, res) => {
           potentialOpportunity: matchedStudy.potentialOpportunity || l.potentialOpportunity || 'High-probability engagement for specialized outsourced execution.',
           suggestedApproach: matchedStudy.suggestedApproach || l.suggestedApproach || 'Lead with technical proof-of-concept and scalable delivery SLA guarantees.',
         },
-        pitchDeck: leadPitch ? {
-          title: leadPitch.title || `Tailored Pitch for ${leadName}`,
-          summary: leadPitch.summary || 'Strategic presentation proposal designed to convert this stakeholder.',
-          streamUrl: leadPitch.streamUrl || (leadPitch.assetKey ? `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck` : (l.pitchDeckPdf || `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck`)),
-          downloadUrl: leadPitch.downloadUrl || leadPitch.streamUrl || (leadPitch.assetKey ? `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck?download=true` : (l.pitchDeckPdf || `/api/samples/${sample.slug}/leads/${leadId}/pitch-deck?download=true`)),
-          fileName: leadPitch.fileName || l.pitchDeckPdfName || `${leadName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
-        } : (l.pitchDeckPdf ? {
-          title: `${leadName} Proposal Pitch Deck`,
-          summary: 'Tailored strategic pitch deck proposal prepared for this executive.',
-          streamUrl: l.pitchDeckPdf,
-          downloadUrl: l.pitchDeckPdf,
-          fileName: l.pitchDeckPdfName || `${leadName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
-        } : null),
+        pitchDeck: hasLeadPitch ? {
+          title: l.pitchDeck?.title || `${leadName} Proposal Pitch Deck`,
+          summary: l.pitchDeck?.summary || 'Strategic presentation proposal designed to convert this stakeholder.',
+          streamUrl: leadPitchUrl,
+          downloadUrl: `${leadPitchUrl}?download=true`,
+          fileName: l.pitchDeck?.fileName || l.pitchDeckPdfName || `${leadName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
+        } : null,
       };
     });
 
@@ -494,6 +480,74 @@ export const streamLeadStudyPdf = async (req, res) => {
  */
 
 /**
+ * Helper to offload base64 PDF payloads in leads array to object storage
+ */
+const processLeadsPayload = async (leads, slug) => {
+  if (!Array.isArray(leads) || leads.length === 0) return [];
+  const processed = [];
+
+  for (let idx = 0; idx < leads.length; idx++) {
+    const l = { ...leads[idx] };
+    const leadId = l.id || `lead-${Date.now()}-${idx + 1}`;
+    l.id = leadId;
+
+    if (l.leadStudyPdf && isDataUrl(l.leadStudyPdf)) {
+      try {
+        const originalName = l.leadStudyPdfName || `${(l.name || 'Lead').replace(/\s+/g, '_')}_Study.pdf`;
+        const uploadRes = await uploadFile({
+          dataUrl: l.leadStudyPdf,
+          originalName,
+          mimeType: 'application/pdf',
+          prefix: `public-samples/${slug}/leads/${leadId}/lead-study`,
+        });
+        l.leadStudyPdfAssetKey = uploadRes.objectKey;
+        l.leadStudyPdf = `/api/samples/${slug}/leads/${leadId}/lead-study-pdf`;
+      } catch (err) {
+        console.error(`[processLeadsPayload] Failed to upload leadStudyPdf for ${l.name}:`, err.message);
+      }
+    }
+
+    const pitchDataUrl = (l.pitchDeckPdf && isDataUrl(l.pitchDeckPdf))
+      ? l.pitchDeckPdf
+      : (l.pitchDeck?.streamUrl && isDataUrl(l.pitchDeck?.streamUrl))
+      ? l.pitchDeck.streamUrl
+      : null;
+
+    if (pitchDataUrl) {
+      try {
+        const originalName = l.pitchDeckPdfName || l.pitchDeck?.fileName || `${(l.name || 'Lead').replace(/\s+/g, '_')}_Pitch_Deck.pdf`;
+        const uploadRes = await uploadFile({
+          dataUrl: pitchDataUrl,
+          originalName,
+          mimeType: 'application/pdf',
+          prefix: `public-samples/${slug}/leads/${leadId}/pitch-deck`,
+        });
+        l.pitchDeckAssetKey = uploadRes.objectKey;
+        l.pitchDeckPdf = `/api/samples/${slug}/leads/${leadId}/pitch-deck`;
+        if (!l.pitchDeck) l.pitchDeck = {};
+        l.pitchDeck.assetKey = uploadRes.objectKey;
+        l.pitchDeck.fileName = originalName;
+        l.pitchDeck.streamUrl = `/api/samples/${slug}/leads/${leadId}/pitch-deck`;
+        l.pitchDeck.downloadUrl = `/api/samples/${slug}/leads/${leadId}/pitch-deck?download=true`;
+      } catch (err) {
+        console.error(`[processLeadsPayload] Failed to upload pitchDeckPdf for ${l.name}:`, err.message);
+      }
+    }
+
+    if (l.pitchDeck?.streamUrl && isDataUrl(l.pitchDeck.streamUrl)) {
+      l.pitchDeck.streamUrl = `/api/samples/${slug}/leads/${leadId}/pitch-deck`;
+    }
+    if (l.pitchDeck?.downloadUrl && isDataUrl(l.pitchDeck.downloadUrl)) {
+      l.pitchDeck.downloadUrl = `/api/samples/${slug}/leads/${leadId}/pitch-deck?download=true`;
+    }
+
+    processed.push(l);
+  }
+
+  return processed;
+};
+
+/**
  * @desc    Get all sample showcases
  * @route   GET /api/samples-manage
  * @access  Private (Lead Specialist & Admin)
@@ -501,10 +555,32 @@ export const streamLeadStudyPdf = async (req, res) => {
 export const getAdminSamples = async (req, res) => {
   try {
     const samples = await findAllSamples(true);
+    // Sanitize any residual base64 strings so management listing loads instantly
+    const sanitizedSamples = samples.map((s) => ({
+      ...s,
+      leads: (s.leads || []).map((l) => {
+        const cleanLead = { ...l };
+        if (cleanLead.leadStudyPdf && cleanLead.leadStudyPdf.startsWith('data:')) {
+          cleanLead.leadStudyPdf = `/api/samples/${s.slug}/leads/${cleanLead.id}/lead-study-pdf`;
+        }
+        if (cleanLead.pitchDeckPdf && cleanLead.pitchDeckPdf.startsWith('data:')) {
+          cleanLead.pitchDeckPdf = `/api/samples/${s.slug}/leads/${cleanLead.id}/pitch-deck`;
+        }
+        if (cleanLead.pitchDeck?.streamUrl && cleanLead.pitchDeck.streamUrl.startsWith('data:')) {
+          cleanLead.pitchDeck = {
+            ...cleanLead.pitchDeck,
+            streamUrl: `/api/samples/${s.slug}/leads/${cleanLead.id}/pitch-deck`,
+            downloadUrl: `/api/samples/${s.slug}/leads/${cleanLead.id}/pitch-deck?download=true`,
+          };
+        }
+        return cleanLead;
+      }),
+    }));
+
     return res.status(200).json({
       success: true,
-      count: samples.length,
-      samples,
+      count: sanitizedSamples.length,
+      samples: sanitizedSamples,
     });
   } catch (error) {
     console.error('[SampleController.getAdminSamples] Error:', error);
@@ -638,6 +714,8 @@ export const createAdminSample = async (req, res) => {
       }
     }
 
+    const processedLeads = await processLeadsPayload(leads, effectiveSlug);
+
     const created = await createSampleShowcase({
       slug: effectiveSlug,
       title: effectiveTitle,
@@ -646,7 +724,7 @@ export const createAdminSample = async (req, res) => {
       logoUrl: logoUrl || '/logo.png',
       status: status || 'PUBLISHED',
       companyStudy: initialCompanyStudy,
-      leads: Array.isArray(leads) ? leads : [],
+      leads: processedLeads,
       leadStudies: Array.isArray(leadStudies) ? leadStudies : [],
       pitchDeck: initialPitchDeck,
     });
@@ -727,6 +805,10 @@ export const updateAdminSample = async (req, res) => {
       } catch (uploadErr) {
         console.error('[updateAdminSample] Failed to upload pitch deck:', uploadErr.message);
       }
+    }
+
+    if (Array.isArray(body.leads)) {
+      body.leads = await processLeadsPayload(body.leads, body.slug || sample.slug);
     }
 
     const updated = await updateSampleShowcase(id, body);

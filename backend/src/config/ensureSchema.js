@@ -204,6 +204,13 @@ export async function ensureSchemaIntegrity() {
       console.warn('[Schema] public_sample_inquiries step note:', e5.message);
     }
 
+    // 7. Ensure public_sample_showcases leads JSONB payloads are optimized (strip multi-megabyte base64 strings)
+    try {
+      await ensureOptimizedProspectPayloads();
+    } catch (e6) {
+      console.warn('[Schema] ensureOptimizedProspectPayloads step note:', e6.message);
+    }
+
     console.log('[Schema] Database schema integrity verified & updated successfully.');
     return true;
   } catch (err) {
@@ -211,3 +218,88 @@ export async function ensureSchemaIntegrity() {
     return false;
   }
 }
+
+/**
+ * Scans public_sample_showcases table and offloads any heavy inlined base64 PDF payloads
+ * to the storage service, replacing them with streaming REST URLs to guarantee fast page loads.
+ */
+export async function ensureOptimizedProspectPayloads() {
+  try {
+    const showcasesRes = await query('SELECT id, slug, leads FROM public_sample_showcases');
+    const { uploadFile, isDataUrl } = await import('../services/storageService.js');
+
+    for (const row of showcasesRes.rows) {
+      let modified = false;
+      const leads = row.leads || [];
+
+      for (const lead of leads) {
+        const leadId = lead.id || `lead-${Date.now()}`;
+
+        // 1. Offload lead study PDF if inlined as base64
+        if (lead.leadStudyPdf && isDataUrl(lead.leadStudyPdf)) {
+          try {
+            const originalName = lead.leadStudyPdfName || `${(lead.name || 'Lead').replace(/\s+/g, '_')}_Study.pdf`;
+            const uploadRes = await uploadFile({
+              dataUrl: lead.leadStudyPdf,
+              originalName,
+              mimeType: 'application/pdf',
+              prefix: `public-samples/${row.slug}/leads/${leadId}/lead-study`,
+            });
+            lead.leadStudyPdfAssetKey = uploadRes.objectKey;
+            lead.leadStudyPdf = `/api/samples/${row.slug}/leads/${leadId}/lead-study-pdf`;
+            modified = true;
+          } catch (err) {
+            console.error(`[ensureOptimizedProspectPayloads] Failed to offload leadStudyPdf for ${lead.name}:`, err.message);
+          }
+        }
+
+        // 2. Offload pitch deck PDF if inlined as base64
+        const pitchDataUrl = (lead.pitchDeckPdf && isDataUrl(lead.pitchDeckPdf))
+          ? lead.pitchDeckPdf
+          : (lead.pitchDeck?.streamUrl && isDataUrl(lead.pitchDeck?.streamUrl))
+          ? lead.pitchDeck.streamUrl
+          : null;
+
+        if (pitchDataUrl) {
+          try {
+            const originalName = lead.pitchDeckPdfName || lead.pitchDeck?.fileName || `${(lead.name || 'Lead').replace(/\s+/g, '_')}_Pitch_Deck.pdf`;
+            const uploadRes = await uploadFile({
+              dataUrl: pitchDataUrl,
+              originalName,
+              mimeType: 'application/pdf',
+              prefix: `public-samples/${row.slug}/leads/${leadId}/pitch-deck`,
+            });
+            lead.pitchDeckAssetKey = uploadRes.objectKey;
+            lead.pitchDeckPdf = `/api/samples/${row.slug}/leads/${leadId}/pitch-deck`;
+            if (!lead.pitchDeck) lead.pitchDeck = {};
+            lead.pitchDeck.assetKey = uploadRes.objectKey;
+            lead.pitchDeck.fileName = originalName;
+            lead.pitchDeck.streamUrl = `/api/samples/${row.slug}/leads/${leadId}/pitch-deck`;
+            lead.pitchDeck.downloadUrl = `/api/samples/${row.slug}/leads/${leadId}/pitch-deck?download=true`;
+            modified = true;
+          } catch (err) {
+            console.error(`[ensureOptimizedProspectPayloads] Failed to offload pitchDeckPdf for ${lead.name}:`, err.message);
+          }
+        }
+
+        // Clean redundant large URLs if still lingering
+        if (lead.pitchDeck?.streamUrl && isDataUrl(lead.pitchDeck.streamUrl)) {
+          lead.pitchDeck.streamUrl = `/api/samples/${row.slug}/leads/${leadId}/pitch-deck`;
+          modified = true;
+        }
+        if (lead.pitchDeck?.downloadUrl && isDataUrl(lead.pitchDeck.downloadUrl)) {
+          lead.pitchDeck.downloadUrl = `/api/samples/${row.slug}/leads/${leadId}/pitch-deck?download=true`;
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        await query('UPDATE public_sample_showcases SET leads = $1, updated_at = NOW() WHERE id = $2', [JSON.stringify(leads), row.id]);
+        console.log(`[Schema] Optimized prospect showcase ID ${row.id} (${row.slug}) leads payload.`);
+      }
+    }
+  } catch (err) {
+    console.warn('[Schema] ensureOptimizedProspectPayloads warning:', err.message);
+  }
+}
+

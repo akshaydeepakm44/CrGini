@@ -1087,11 +1087,11 @@ support@dizigini.com`;
 
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
-                        Target Industry
+                        Target Industry / Sector
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. Enterprise AI & Analytics"
+                        placeholder="e.g. Mining & Exploration, Investment Banking, Commodity Trading"
                         value={formData.companyStudy.industry}
                         onChange={(e) =>
                           setFormData({
@@ -1107,6 +1107,41 @@ support@dizigini.com`;
                           fontSize: '0.875rem',
                         }}
                       />
+                      <span style={{ fontSize: '0.72rem', color: '#6B7280', marginTop: '4px', display: 'block' }}>
+                        Tip: Separate multiple sectors with commas or newlines. Each sector appears as an executive mini card on the showcase.
+                      </span>
+                      {(() => {
+                        const raw = formData.companyStudy?.industry || '';
+                        const parsed = raw
+                          .split(/(?:[\r\n;,•·|]+|\s{2,}|\s+\/\s+|(?<=[a-z\)])\s+(?=[A-Z][a-z]+(?:\s+&|\s+[A-Z])))/)
+                          .map((s) => s.replace(/^[\s•\-\*\d\.\)\:]+/, '').trim())
+                          .filter((s) => s.length > 1);
+                        if (parsed.length === 0) return null;
+                        return (
+                          <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {parsed.map((ind, i) => (
+                              <span
+                                key={i}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  background: '#EFF6FF',
+                                  border: '1px solid #BFDBFE',
+                                  color: '#1E40AF',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <span>🏷️</span>
+                                <span>{ind}</span>
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
