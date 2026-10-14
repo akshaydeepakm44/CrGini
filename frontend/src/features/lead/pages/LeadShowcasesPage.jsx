@@ -59,6 +59,8 @@ export default function LeadShowcasesPage({ onNavigate }) {
     status: 'PUBLISHED',
     companyStudy: {
       company: '',
+      website: '',
+      linkedin: '',
       industry: 'Enterprise Software & Tech',
       businessOverview: '',
       marketPosition: '',
@@ -76,6 +78,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
   const [leadForm, setLeadForm] = useState({
     name: '',
     companyLink: '',
+    companyLinkedin: '',
     email: '',
     linkedin: '',
     leadStudyPdf: '',
@@ -133,6 +136,8 @@ export default function LeadShowcasesPage({ onNavigate }) {
       status: 'PUBLISHED',
       companyStudy: {
         company: '',
+        website: '',
+        linkedin: '',
         industry: 'Enterprise Software & Tech',
         businessOverview: '',
         marketPosition: '',
@@ -167,12 +172,15 @@ export default function LeadShowcasesPage({ onNavigate }) {
       description: showcase.description || '',
       logoUrl: existingLogo,
       status: showcase.status || 'PUBLISHED',
-      companyStudy: showcase.companyStudy || {
-        company: showcase.companyName || '',
-        industry: 'Enterprise Software & Tech',
-        businessOverview: '',
-        marketPosition: '',
-        keyObservations: '',
+      companyStudy: {
+        company: showcase.companyStudy?.company || showcase.companyName || '',
+        website: showcase.companyStudy?.website || '',
+        linkedin: showcase.companyStudy?.linkedin || showcase.companyStudy?.companyLinkedin || '',
+        industry: showcase.companyStudy?.industry || 'Enterprise Software & Tech',
+        businessOverview: showcase.companyStudy?.businessOverview || '',
+        marketPosition: showcase.companyStudy?.marketPosition || '',
+        keyObservations: showcase.companyStudy?.keyObservations || '',
+        potentialOpportunity: showcase.companyStudy?.potentialOpportunity || '',
       },
       leads: cleanLeads,
       pitchDeck: showcase.pitchDeck || {
@@ -415,7 +423,8 @@ support@dizigini.com`;
     const newLead = {
       id: editingLeadIndex !== null ? formData.leads[editingLeadIndex].id : `lead-${Date.now()}`,
       name: leadForm.name.trim(),
-      companyLink: leadForm.companyLink?.trim() || '',
+      companyLink: leadForm.companyLink?.trim() || formData.companyStudy?.website || '',
+      companyLinkedin: leadForm.companyLinkedin?.trim() || formData.companyStudy?.linkedin || '',
       email: leadForm.email?.trim() || '',
       linkedin: leadForm.linkedin?.trim() || '',
       leadStudyPdf: leadForm.leadStudyPdf || '',
@@ -452,6 +461,7 @@ support@dizigini.com`;
     setLeadForm({
       name: '',
       companyLink: '',
+      companyLinkedin: '',
       email: '',
       linkedin: '',
       leadStudyPdf: '',
@@ -1178,6 +1188,56 @@ support@dizigini.com`;
                       </span>
                     </div>
 
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                          Company Website URL
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. https://company.com"
+                          value={formData.companyStudy.website || ''}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              companyStudy: { ...formData.companyStudy, website: e.target.value },
+                            })
+                          }
+                          style={{
+                            width: '100%',
+                            padding: '10px 14px',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '8px',
+                            fontSize: '0.875rem',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                          Company LinkedIn URL
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. https://linkedin.com/company/target"
+                          value={formData.companyStudy.linkedin || ''}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              companyStudy: { ...formData.companyStudy, linkedin: e.target.value },
+                            })
+                          }
+                          style={{
+                            width: '100%',
+                            padding: '10px 14px',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '8px',
+                            fontSize: '0.875rem',
+                          }}
+                        />
+                      </div>
+                    </div>
+
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
                         Target Industry / Sector
@@ -1517,10 +1577,10 @@ support@dizigini.com`;
                         />
                       </div>
 
-                      {/* 2. Company Link */}
+                      {/* 2. Company Link / Website */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          2. Company Link / Website *
+                          2. Company Web URL
                         </label>
                         <input
                           type="text"
@@ -1531,10 +1591,24 @@ support@dizigini.com`;
                         />
                       </div>
 
-                      {/* 3. Work Mail */}
+                      {/* 3. Company LinkedIn URL */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          3. Work Mail (Masked on public view)
+                          3. Company LinkedIn URL
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. https://linkedin.com/company/target"
+                          value={leadForm.companyLinkedin}
+                          onChange={(e) => setLeadForm({ ...leadForm, companyLinkedin: e.target.value })}
+                          style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
+                        />
+                      </div>
+
+                      {/* 4. Work Mail */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                          4. Lead Work Mail (Masked on public view)
                         </label>
                         <input
                           type="email"
@@ -1545,10 +1619,10 @@ support@dizigini.com`;
                         />
                       </div>
 
-                      {/* 4. Person LinkedIn ID / Profile */}
+                      {/* 5. Lead Person LinkedIn Profile URL */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          4. Person LinkedIn Profile URL
+                          5. Lead Person LinkedIn Profile URL
                         </label>
                         <input
                           type="text"
@@ -1924,6 +1998,7 @@ support@dizigini.com`;
                               setLeadForm({
                                 name: l.name || '',
                                 companyLink: l.companyLink || '',
+                                companyLinkedin: l.companyLinkedin || '',
                                 email: l.email || '',
                                 linkedin: l.linkedin || '',
                                 leadStudyPdf: l.leadStudyPdf || '',

@@ -73,6 +73,20 @@ export const isMockDummyLead = (l) => {
 };
 
 /**
+ * In-memory high performance cache for public showcases
+ */
+const showcaseCache = new Map();
+const CACHE_TTL_MS = 60 * 1000; // 60s TTL
+
+export const invalidateShowcaseCache = (slug) => {
+  if (!slug) {
+    showcaseCache.clear();
+  } else {
+    showcaseCache.delete(String(slug).toLowerCase().trim());
+  }
+};
+
+/**
  * @desc    Get published public sample showcase by slug
  * @route   GET /api/samples/:slug
  * @access  Public (No Auth Required)
@@ -87,7 +101,17 @@ export const getPublicSampleBySlug = async (req, res) => {
       });
     }
 
-    const sample = await findSampleBySlug(slug.trim(), true);
+    const cleanSlug = String(slug).toLowerCase().trim();
+
+    // Fast memory cache hit check (sub-2ms response)
+    const cached = showcaseCache.get(cleanSlug);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+      res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+      res.setHeader('X-Cache', 'HIT');
+      return res.status(200).json(cached.data);
+    }
+
+    const sample = await findSampleBySlug(cleanSlug, true);
     if (!sample) {
       return res.status(404).json({
         success: false,
@@ -99,6 +123,8 @@ export const getPublicSampleBySlug = async (req, res) => {
     const companyStudyData = sample.companyStudy || {};
     const publicCompanyStudy = {
       company: companyStudyData.company || sample.companyName,
+      website: companyStudyData.website || '',
+      linkedin: companyStudyData.linkedin || companyStudyData.companyLinkedin || '',
       industry: companyStudyData.industry || 'Enterprise Technology & Services',
       businessOverview: companyStudyData.businessOverview || '',
       marketPosition: companyStudyData.marketPosition || '',
@@ -126,20 +152,36 @@ export const getPublicSampleBySlug = async (req, res) => {
       const leadStudyUrl = `/api/samples/${sample.slug}/leads/${leadId}/lead-study-pdf`;
 
       // Extract real or inferred company link / website
-      let companyLink = l.companyLink || l.company_link || l.website || l.companyWebsite || l.domain || '';
+      let companyLink = l.companyLink || l.company_link || l.website || l.companyWebsite || l.domain || publicCompanyStudy.website || '';
       if (!companyLink && l.company && l.company.includes('.')) {
         companyLink = l.company.startsWith('http') ? l.company : `https://${l.company}`;
       } else if (!companyLink && sample.companyName && sample.companyName.includes('.')) {
         companyLink = `https://${sample.companyName}`;
       }
 
-      // Extract real LinkedIn and Company LinkedIn URLs
-      const linkedinUrl = l.linkedin || l.linkedinUrl || l.linkedin_url || l.linkedinProfile || '';
-      const companyLinkedinUrl = l.companyLinkedin || l.company_linkedin || sample.companyStudy?.linkedin || '';
+      // Intelligent separation: Company LinkedIn vs Personal Lead LinkedIn
+      const rawLinkedin = (l.linkedin || l.linkedinUrl || l.linkedin_url || l.linkedinProfile || '').trim();
+      let companyLinkedinUrl = (l.companyLinkedin || l.company_linkedin || publicCompanyStudy.linkedin || '').trim();
+      let personalLinkedinUrl = '';
+
+      if (rawLinkedin.includes('/company/')) {
+        // Lead uploaded company LinkedIn into the LinkedIn field
+        if (!companyLinkedinUrl) {
+          companyLinkedinUrl = rawLinkedin;
+        }
+        personalLinkedinUrl = '';
+      } else {
+        personalLinkedinUrl = rawLinkedin;
+      }
 
       // Direct email: Open & unmasked for the first lead if present
       const unmaskedEmail = l.email || l.directWorkEmail || l.workEmail || '';
       const emailForFirst = unmaskedEmail || (l.maskedEmail ? l.maskedEmail.replace('••••', 'contact') : '');
+
+      let leadLogo = l.logo || l.companyLogo || l.avatarUrl || null;
+      if (leadLogo && isDataUrl(leadLogo)) {
+        leadLogo = `/api/samples/${sample.slug}/leads/${leadId}/logo`;
+      }
 
       return {
         id: leadId,
@@ -148,10 +190,10 @@ export const getPublicSampleBySlug = async (req, res) => {
         company: l.company || l.lead_company || sample.companyName,
         companyLink: companyLink,
         companyLinkedin: companyLinkedinUrl,
-        logo: l.logo || l.companyLogo || l.avatarUrl || null,
+        logo: leadLogo,
         industry: l.industry || '',
         location: l.location || '',
-        linkedin: linkedinUrl,
+        linkedin: personalLinkedinUrl,
         email: isFirstLead ? emailForFirst : (l.maskedEmail || maskEmail(l.email)),
         isUnlocked: isFirstLead,
         leadStudyPdf: hasLeadStudy ? leadStudyUrl : null,
@@ -246,14 +288,20 @@ export const getPublicSampleBySlug = async (req, res) => {
       }
     }
 
-    return res.status(200).json({
+    // Never inline huge base64 in public showcase JSON (use dedicated stream endpoint)
+    let finalCompanyLogo = resolvedCompanyLogo;
+    if (finalCompanyLogo && isDataUrl(finalCompanyLogo)) {
+      finalCompanyLogo = `/api/samples/${sample.slug}/logo`;
+    }
+
+    const responsePayload = {
       success: true,
       sample: {
         slug: sample.slug,
         title: sample.title,
         companyName: sample.companyName,
         description: sample.description,
-        logoUrl: resolvedCompanyLogo || null,
+        logoUrl: finalCompanyLogo || null,
         status: sample.status,
         companyStudy: publicCompanyStudy,
         leads: publicLeads,
@@ -261,7 +309,14 @@ export const getPublicSampleBySlug = async (req, res) => {
         pitchDeck: publicPitchDeck,
         publishedAt: sample.publishedAt,
       },
-    });
+    };
+
+    // Cache response for sub-2ms subsequent requests
+    showcaseCache.set(cleanSlug, { timestamp: Date.now(), data: responsePayload });
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+    res.setHeader('X-Cache', 'MISS');
+
+    return res.status(200).json(responsePayload);
   } catch (error) {
     console.error('[SampleController.getPublicSampleBySlug] Error:', error);
     return res.status(500).json({
@@ -829,6 +884,8 @@ export const createAdminSample = async (req, res) => {
       pitchDeck: initialPitchDeck,
     });
 
+    invalidateShowcaseCache(effectiveSlug);
+
     return res.status(201).json({
       success: true,
       sample: created,
@@ -937,6 +994,10 @@ export const updateAdminSample = async (req, res) => {
     body.logoUrl = effectiveLogoUrl;
 
     const updated = await updateSampleShowcase(id, body);
+    invalidateShowcaseCache(sample.slug);
+    if (body.slug && body.slug !== sample.slug) {
+      invalidateShowcaseCache(body.slug);
+    }
     return res.status(200).json({
       success: true,
       sample: updated,
@@ -972,6 +1033,7 @@ export const deleteAdminSample = async (req, res) => {
     }
 
     await deleteSampleShowcase(id);
+    invalidateShowcaseCache(sample.slug);
     return res.status(200).json({
       success: true,
       message: 'Sample showcase deleted successfully.',

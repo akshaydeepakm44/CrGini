@@ -1,34 +1,42 @@
 import { query } from '../config/postgres.js';
 
 let tableEnsured = false;
+let tablePromise = null;
 export async function ensureSampleTable() {
   if (tableEnsured) return;
-  try {
-    await query(`
-      CREATE TABLE IF NOT EXISTS public_sample_showcases (
-        id              SERIAL PRIMARY KEY,
-        slug            VARCHAR(255) UNIQUE NOT NULL,
-        title           VARCHAR(255) NOT NULL,
-        company_name    VARCHAR(255) NOT NULL,
-        description     TEXT,
-        logo_url        TEXT,
-        status          VARCHAR(50) NOT NULL DEFAULT 'PUBLISHED',
-        company_study   JSONB DEFAULT '{}'::jsonb,
-        leads           JSONB DEFAULT '[]'::jsonb,
-        lead_studies    JSONB DEFAULT '[]'::jsonb,
-        pitch_deck      JSONB DEFAULT '{}'::jsonb,
-        published_at    TIMESTAMPTZ DEFAULT NOW(),
-        created_at      TIMESTAMPTZ DEFAULT NOW(),
-        updated_at      TIMESTAMPTZ DEFAULT NOW()
-      );
+  if (!tablePromise) {
+    tablePromise = (async () => {
+      try {
+        await query(`
+          CREATE TABLE IF NOT EXISTS public_sample_showcases (
+            id              SERIAL PRIMARY KEY,
+            slug            VARCHAR(255) UNIQUE NOT NULL,
+            title           VARCHAR(255) NOT NULL,
+            company_name    VARCHAR(255) NOT NULL,
+            description     TEXT,
+            logo_url        TEXT,
+            status          VARCHAR(50) NOT NULL DEFAULT 'PUBLISHED',
+            company_study   JSONB DEFAULT '{}'::jsonb,
+            leads           JSONB DEFAULT '[]'::jsonb,
+            lead_studies    JSONB DEFAULT '[]'::jsonb,
+            pitch_deck      JSONB DEFAULT '{}'::jsonb,
+            published_at    TIMESTAMPTZ DEFAULT NOW(),
+            created_at      TIMESTAMPTZ DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ DEFAULT NOW()
+          );
 
-      CREATE INDEX IF NOT EXISTS idx_public_samples_slug ON public_sample_showcases (slug);
-      CREATE INDEX IF NOT EXISTS idx_public_samples_status ON public_sample_showcases (status);
-    `);
-    tableEnsured = true;
-  } catch (err) {
-    console.error('[SampleRepository] Failed to ensure public_sample_showcases table:', err.message);
+          CREATE INDEX IF NOT EXISTS idx_public_samples_slug ON public_sample_showcases (slug);
+          CREATE INDEX IF NOT EXISTS idx_public_samples_status ON public_sample_showcases (status);
+        `);
+        tableEnsured = true;
+      } catch (err) {
+        console.error('[SampleRepository] Failed to ensure public_sample_showcases table:', err.message);
+      } finally {
+        tablePromise = null;
+      }
+    })();
   }
+  return tablePromise;
 }
 
 const mapSampleRow = (row) => {

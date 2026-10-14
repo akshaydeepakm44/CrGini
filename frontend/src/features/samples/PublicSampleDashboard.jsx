@@ -1472,19 +1472,19 @@ export default function PublicSampleDashboard() {
                     <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '5px' }}>
                       Company Web URL
                     </div>
-                    {selectedLead.companyLink ? (
+                    {(selectedLead.companyLink || sample?.companyStudy?.website) ? (
                       <a
-                        href={selectedLead.companyLink.startsWith('http') ? selectedLead.companyLink : `https://${selectedLead.companyLink}`}
+                        href={(selectedLead.companyLink || sample?.companyStudy?.website).startsWith('http') ? (selectedLead.companyLink || sample?.companyStudy?.website) : `https://${selectedLead.companyLink || sample?.companyStudy?.website}`}
                         target="_blank"
                         rel="noreferrer"
                         style={{ fontSize: '0.86rem', fontWeight: 700, color: '#2563EB', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
                       >
                         <Globe size={14} style={{ flexShrink: 0 }} />
-                        <span>{shortenUrl(selectedLead.companyLink, 28)}</span>
+                        <span>{shortenUrl(selectedLead.companyLink || sample?.companyStudy?.website, 28)}</span>
                         <ExternalLink size={12} style={{ flexShrink: 0 }} />
                       </a>
                     ) : (
-                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>{companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com</span>
+                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>Not specified</span>
                     )}
                   </div>
 
@@ -1492,19 +1492,20 @@ export default function PublicSampleDashboard() {
                     <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '5px' }}>
                       Company LinkedIn URL
                     </div>
-                    {selectedLead.companyLinkedin || selectedLead.linkedin ? (
+                    {/* Strictly company-level LinkedIn: never fall back to personal lead LinkedIn */}
+                    {(selectedLead.companyLinkedin || sample?.companyStudy?.linkedin) ? (
                       <a
-                        href={(selectedLead.companyLinkedin || selectedLead.linkedin).startsWith('http') ? (selectedLead.companyLinkedin || selectedLead.linkedin) : `https://${selectedLead.companyLinkedin || selectedLead.linkedin}`}
+                        href={(selectedLead.companyLinkedin || sample?.companyStudy?.linkedin).startsWith('http') ? (selectedLead.companyLinkedin || sample?.companyStudy?.linkedin) : `https://${selectedLead.companyLinkedin || sample?.companyStudy?.linkedin}`}
                         target="_blank"
                         rel="noreferrer"
                         style={{ fontSize: '0.86rem', fontWeight: 700, color: '#2563EB', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
                       >
                         <Linkedin size={14} color="#0A66C2" style={{ flexShrink: 0 }} />
-                        <span>{shortenUrl(selectedLead.companyLinkedin || selectedLead.linkedin, 28)}</span>
+                        <span>{shortenUrl(selectedLead.companyLinkedin || sample?.companyStudy?.linkedin, 28)}</span>
                         <ExternalLink size={12} style={{ flexShrink: 0 }} />
                       </a>
                     ) : (
-                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>linkedin.com/company/{companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}</span>
+                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>Not specified</span>
                     )}
                   </div>
                 </div>
@@ -1525,7 +1526,7 @@ export default function PublicSampleDashboard() {
                       Lead Role
                     </div>
                     <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0F172A' }}>
-                      {(selectedLead.title && selectedLead.title.trim().toLowerCase() !== 'key executive') ? selectedLead.title : 'Executive Decision Maker'}
+                      {selectedLead.title?.trim() || 'Decision Maker'}
                     </div>
                   </div>
 
@@ -1534,10 +1535,14 @@ export default function PublicSampleDashboard() {
                     <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '5px' }}>
                       Lead Mail
                     </div>
-                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}>
-                      <Mail size={14} color="#2563EB" style={{ flexShrink: 0 }} />
-                      <span>{selectedLead.email || selectedLead.maskedEmail || 'contact@' + (selectedLead.companyLink ? shortenUrl(selectedLead.companyLink) : 'company.com')}</span>
-                    </div>
+                    {(selectedLead.email || selectedLead.maskedEmail) ? (
+                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}>
+                        <Mail size={14} color="#2563EB" style={{ flexShrink: 0 }} />
+                        <span>{selectedLead.email || selectedLead.maskedEmail}</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>Not specified</span>
+                    )}
                   </div>
 
                   {/* Lead Phone Number (Masked strictly with xxxxx) */}
@@ -1545,18 +1550,22 @@ export default function PublicSampleDashboard() {
                     <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '5px' }}>
                       Lead Phone Number
                     </div>
-                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Phone size={14} color="#059669" style={{ flexShrink: 0 }} />
-                      <span>{formatMaskedPhone(selectedLead.phone || selectedLead.maskedPhone)}</span>
-                    </div>
+                    {(selectedLead.phone || selectedLead.maskedPhone) ? (
+                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Phone size={14} color="#059669" style={{ flexShrink: 0 }} />
+                        <span>{formatMaskedPhone(selectedLead.phone || selectedLead.maskedPhone)}</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>Not specified</span>
+                    )}
                   </div>
 
-                  {/* Lead LinkedIn URL (Item 3 Applied) */}
+                  {/* Lead LinkedIn URL (Personal Profile URL) */}
                   <div style={{ background: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
                     <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '5px' }}>
                       Lead LinkedIn URL
                     </div>
-                    {selectedLead.linkedin ? (
+                    {(selectedLead.linkedin && !selectedLead.linkedin.includes('/company/')) ? (
                       <a
                         href={selectedLead.linkedin.startsWith('http') ? selectedLead.linkedin : `https://${selectedLead.linkedin}`}
                         target="_blank"
@@ -1568,9 +1577,7 @@ export default function PublicSampleDashboard() {
                         <ExternalLink size={12} style={{ flexShrink: 0 }} />
                       </a>
                     ) : (
-                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>
-                        linkedin.com/in/{selectedLead.name ? selectedLead.name.toLowerCase().replace(/[^a-z0-9]/g, '') : 'executive'}
-                      </span>
+                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>Not specified</span>
                     )}
                   </div>
 
