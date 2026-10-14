@@ -172,12 +172,16 @@ export default function LeadShowcasesPage({ onNavigate }) {
 
   const handleOpenEditModal = (showcase) => {
     setEditingShowcase(showcase);
+    const existingLogo = (showcase.logoUrl && showcase.logoUrl !== '/logo.png')
+      ? showcase.logoUrl
+      : (showcase.leads?.find((l) => l.companyLogo || l.logo)?.companyLogo || showcase.leads?.find((l) => l.companyLogo || l.logo)?.logo || '');
+
     setFormData({
       companyName: showcase.companyName || '',
       slug: showcase.slug || '',
       title: showcase.title || '',
       description: showcase.description || '',
-      logoUrl: showcase.logoUrl && showcase.logoUrl !== '/logo.png' ? showcase.logoUrl : '',
+      logoUrl: existingLogo,
       status: showcase.status || 'PUBLISHED',
       companyStudy: showcase.companyStudy || {
         company: showcase.companyName || '',
@@ -218,8 +222,18 @@ export default function LeadShowcasesPage({ onNavigate }) {
 
       const generatedSlug = formatSlug(formData.slug) || formatSlug(formData.companyName) || `showcase-${Date.now()}`;
 
+      // Auto-promote lead logo to showcase logoUrl if not explicitly provided
+      let effectiveLogoUrl = formData.logoUrl;
+      if (!effectiveLogoUrl || effectiveLogoUrl === '/logo.png') {
+        const leadWithLogo = formData.leads?.find((l) => l.companyLogo || l.logo);
+        if (leadWithLogo) {
+          effectiveLogoUrl = leadWithLogo.companyLogo || leadWithLogo.logo;
+        }
+      }
+
       const payload = {
         ...formData,
+        logoUrl: effectiveLogoUrl || '',
         slug: generatedSlug,
         status: 'PUBLISHED', // Auto-approved and published upon save
         title: formData.title.trim() || `${formData.companyName.trim()} Intelligence & Growth Showcase`,

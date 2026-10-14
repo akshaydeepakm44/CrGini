@@ -14,6 +14,8 @@ import {
   uploadAdminPitchDeck,
   uploadLeadPitchDeck,
   submitPublicInquiry,
+  streamCompanyLogo,
+  streamLeadLogo,
 } from '../controllers/sampleController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -75,6 +77,8 @@ router.use('/manage', manageRouter);
 router.post('/inquiry', submitPublicInquiry);
 router.get('/:slug', getPublicSampleBySlug);
 router.post('/:slug/inquiry', submitPublicInquiry);
+router.get('/:slug/logo', streamCompanyLogo);
+router.get('/:slug/leads/:leadId/logo', streamLeadLogo);
 router.get('/:slug/pitch-deck', streamPublicPitchDeck);
 router.get('/:slug/company-study-pdf', streamCompanyStudyPdf);
 router.get('/:slug/leads/:leadId/pitch-deck', streamLeadPitchDeck);

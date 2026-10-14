@@ -152,16 +152,49 @@ export default function PublicSampleDashboard() {
   const industrySectors = useMemo(() => parseIndustries(companyStudy.industry), [companyStudy.industry]);
   const pitchDeck = sample?.pitchDeck || null;
 
-  // Filter out platform logo (/logo.png or dizigini/creativegini) so only target company's logo is shown
+  // Extract and resolve the target company logo uploaded by the lead team
   const companyLogo = useMemo(() => {
-    const raw = sample?.logoUrl || sample?.companyLogo || sample?.companyStudy?.logoUrl || sample?.companyStudy?.logo;
-    if (!raw || typeof raw !== 'string') return null;
-    const clean = raw.trim();
-    if (clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini')) {
+    const isPlatformLogo = (url) => {
+      if (!url || typeof url !== 'string') return true;
+      const clean = url.trim().toLowerCase();
+      return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
+    };
+
+    // 1. Direct showcase or company study logo
+    let raw = sample?.logoUrl || sample?.companyLogo || sample?.companyStudy?.logoUrl || sample?.companyStudy?.logo;
+
+    // 2. Fallback: Check if lead team uploaded company logo on any of the leads
+    if (isPlatformLogo(raw)) {
+      const leads = Array.isArray(sample?.leads) ? sample.leads : [];
+      const leadWithLogo = leads.find((l) => {
+        const candidate = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
+        return candidate && !isPlatformLogo(candidate);
+      });
+      if (leadWithLogo) {
+        raw = leadWithLogo.companyLogo || leadWithLogo.logo || leadWithLogo.company_logo || leadWithLogo.avatarUrl;
+      }
+    }
+
+    // 3. Fallback: Official company website domain favicon if available
+    if (isPlatformLogo(raw)) {
+      const leads = Array.isArray(sample?.leads) ? sample.leads : [];
+      const firstLink = leads.find((l) => l.companyLink || l.website)?.companyLink || sample?.companyStudy?.website;
+      const targetStr = firstLink || companyName;
+      if (targetStr) {
+        const cleanDomain = String(targetStr)
+          .replace(/^https?:\/\//i, '')
+          .replace(/^www\./i, '')
+          .split('/')[0]
+          .trim();
+        if (cleanDomain && cleanDomain.includes('.')) {
+          return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`;
+        }
+      }
       return null;
     }
-    return clean;
-  }, [sample]);
+
+    return raw.trim();
+  }, [sample, companyName]);
 
   // ONLY display the leads that are actually uploaded (no fake/synthetic leads!)
   const displayLeads = useMemo(() => {
@@ -324,19 +357,36 @@ export default function PublicSampleDashboard() {
               boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
             }}>
               {companyLogo ? (
-                <img
-                  src={companyLogo}
-                  alt={companyName}
-                  style={{
-                    maxHeight: '85px',
-                    maxWidth: '220px',
-                    objectFit: 'contain',
-                    marginBottom: '14px'
-                  }}
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '75px',
+                  marginBottom: '14px',
+                  padding: '4px 12px'
+                }}>
+                  <img
+                    src={companyLogo}
+                    alt={companyName}
+                    style={{
+                      maxHeight: '75px',
+                      maxWidth: '220px',
+                      objectFit: 'contain'
+                    }}
+                    onError={(e) => {
+                      const domain = (displayLeads[0]?.companyLink || companyName || '')
+                        .replace(/^https?:\/\//i, '')
+                        .replace(/^www\./i, '')
+                        .split('/')[0]
+                        .trim();
+                      if (domain && domain.includes('.') && !e.currentTarget.src.includes('gstatic.com')) {
+                        e.currentTarget.src = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=128`;
+                      } else {
+                        e.currentTarget.style.display = 'none';
+                      }
+                    }}
+                  />
+                </div>
               ) : (
                 <div style={{
                   width: '64px',

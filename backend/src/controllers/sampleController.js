@@ -132,7 +132,7 @@ export const getPublicSampleBySlug = async (req, res) => {
         company: l.company || l.lead_company || sample.companyName,
         companyLink: companyLink,
         companyLinkedin: companyLinkedinUrl,
-        logo: (l.logo && !l.logo.startsWith('data:')) ? l.logo : (l.logo ? l.logo : null),
+        logo: l.logo || l.companyLogo || l.avatarUrl || null,
         industry: l.industry || '',
         location: l.location || '',
         linkedin: linkedinUrl,
@@ -189,14 +189,43 @@ export const getPublicSampleBySlug = async (req, res) => {
         }
       : null;
 
-    // Ensure company logo is target company's uploaded logo, never platform logo (/logo.png)
+    // Helper to identify platform placeholder logos
+    const isPlatformLogo = (url) => {
+      if (!url || typeof url !== 'string') return true;
+      const clean = url.trim().toLowerCase();
+      return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
+    };
+
+    // 1. Resolve company logo: Target company's uploaded logo from showcase or companyStudy
     let resolvedCompanyLogo = sample.logoUrl;
-    if (!resolvedCompanyLogo || resolvedCompanyLogo === '/logo.png' || resolvedCompanyLogo.includes('dizigini') || resolvedCompanyLogo.includes('creativegini')) {
+    if (isPlatformLogo(resolvedCompanyLogo)) {
       resolvedCompanyLogo = sample.companyLogo || sample.companyStudy?.logoUrl || sample.companyStudy?.logo || null;
-      if (!resolvedCompanyLogo && Array.isArray(sample.leads) && sample.leads.length > 0) {
-        const leadWithLogo = sample.leads.find((l) => l.companyLogo || (l.logo && !l.logo.startsWith('data:')));
-        if (leadWithLogo) {
-          resolvedCompanyLogo = leadWithLogo.companyLogo || leadWithLogo.logo;
+    }
+
+    // 2. Comprehensive fallback: retrieve real uploaded logo from ANY of the leads
+    if (isPlatformLogo(resolvedCompanyLogo) && Array.isArray(sample.leads) && sample.leads.length > 0) {
+      const leadWithLogo = sample.leads.find((l) => {
+        const candidate = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
+        return candidate && !isPlatformLogo(candidate);
+      });
+      if (leadWithLogo) {
+        resolvedCompanyLogo = leadWithLogo.companyLogo || leadWithLogo.logo || leadWithLogo.company_logo || leadWithLogo.avatarUrl;
+      }
+    }
+
+    // 3. Official company domain favicon fallback if still not found
+    if (isPlatformLogo(resolvedCompanyLogo)) {
+      const allLeads = Array.isArray(sample.leads) ? sample.leads : [];
+      const firstWithLink = allLeads.find((l) => l.companyLink || l.website) || sample.companyStudy;
+      const rawLink = firstWithLink?.companyLink || firstWithLink?.website || sample.companyName || '';
+      if (rawLink) {
+        const cleanDomain = String(rawLink)
+          .replace(/^https?:\/\//i, '')
+          .replace(/^www\./i, '')
+          .split('/')[0]
+          .trim();
+        if (cleanDomain && cleanDomain.includes('.')) {
+          resolvedCompanyLogo = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`;
         }
       }
     }
@@ -556,6 +585,22 @@ const processLeadsPayload = async (leads, slug) => {
       l.pitchDeck.downloadUrl = `/api/samples/${slug}/leads/${leadId}/pitch-deck?download=true`;
     }
 
+    // Auto-upload lead company logo if provided as a Data URL
+    if (l.logo && isDataUrl(l.logo)) {
+      try {
+        const uploadRes = await uploadFile({
+          dataUrl: l.logo,
+          originalName: `${slug}_lead_${leadId}_logo.png`,
+          mimeType: 'image/png',
+          prefix: `public-samples/${slug}/leads/${leadId}/logo`,
+        });
+        l.logoAssetKey = uploadRes.objectKey;
+        l.logo = `/api/samples/${slug}/leads/${leadId}/logo`;
+      } catch (err) {
+        console.error(`[processLeadsPayload] Failed to upload logo for ${l.name}:`, err.message);
+      }
+    }
+
     processed.push(l);
   }
 
@@ -731,12 +776,35 @@ export const createAdminSample = async (req, res) => {
 
     const processedLeads = await processLeadsPayload(leads, effectiveSlug);
 
+    // Auto-promote lead logo to showcase company logo if not explicitly provided
+    let effectiveLogoUrl = (logoUrl && logoUrl !== '/logo.png') ? logoUrl : null;
+    if (!effectiveLogoUrl && Array.isArray(processedLeads)) {
+      const leadWithLogo = processedLeads.find((l) => l.companyLogo || l.logo);
+      if (leadWithLogo) {
+        effectiveLogoUrl = leadWithLogo.companyLogo || leadWithLogo.logo;
+      }
+    }
+
+    if (effectiveLogoUrl && isDataUrl(effectiveLogoUrl)) {
+      try {
+        const uploadRes = await uploadFile({
+          dataUrl: effectiveLogoUrl,
+          originalName: `${effectiveSlug}_company_logo.png`,
+          mimeType: 'image/png',
+          prefix: `public-samples/${effectiveSlug}/logo`,
+        });
+        effectiveLogoUrl = `/api/samples/${effectiveSlug}/logo`;
+      } catch (uploadErr) {
+        console.error('[createAdminSample] Failed to upload company logo:', uploadErr.message);
+      }
+    }
+
     const created = await createSampleShowcase({
       slug: effectiveSlug,
       title: effectiveTitle,
       companyName: companyName.trim(),
       description: description || `Curated account intelligence and sales acceleration brief prepared for ${companyName.trim()}.`,
-      logoUrl: (logoUrl && logoUrl !== '/logo.png') ? logoUrl : null,
+      logoUrl: effectiveLogoUrl,
       status: status || 'PUBLISHED',
       companyStudy: initialCompanyStudy,
       leads: processedLeads,
@@ -825,6 +893,30 @@ export const updateAdminSample = async (req, res) => {
     if (Array.isArray(body.leads)) {
       body.leads = await processLeadsPayload(body.leads, body.slug || sample.slug);
     }
+
+    let effectiveLogoUrl = body.logoUrl !== undefined ? body.logoUrl : sample.logoUrl;
+    if (effectiveLogoUrl === '/logo.png') effectiveLogoUrl = null;
+    if (!effectiveLogoUrl && Array.isArray(body.leads)) {
+      const leadWithLogo = body.leads.find((l) => l.companyLogo || l.logo);
+      if (leadWithLogo) {
+        effectiveLogoUrl = leadWithLogo.companyLogo || leadWithLogo.logo;
+      }
+    }
+
+    if (effectiveLogoUrl && isDataUrl(effectiveLogoUrl)) {
+      try {
+        const uploadRes = await uploadFile({
+          dataUrl: effectiveLogoUrl,
+          originalName: `${body.slug || sample.slug}_company_logo.png`,
+          mimeType: 'image/png',
+          prefix: `public-samples/${body.slug || sample.slug}/logo`,
+        });
+        effectiveLogoUrl = `/api/samples/${body.slug || sample.slug}/logo`;
+      } catch (uploadErr) {
+        console.error('[updateAdminSample] Failed to upload company logo:', uploadErr.message);
+      }
+    }
+    body.logoUrl = effectiveLogoUrl;
 
     const updated = await updateSampleShowcase(id, body);
     return res.status(200).json({
@@ -1229,6 +1321,105 @@ export const submitPublicInquiry = async (req, res) => {
       success: false,
       message: 'Failed to submit inquiry. Please try again or email us directly at contact@dizigini.com.',
     });
+  }
+};
+
+/**
+ * @desc Stream company logo or redirect to storage
+ * @route GET /api/samples/:slug/logo
+ * @access Public
+ */
+export const streamCompanyLogo = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const sample = await findSampleBySlug(slug, false);
+    if (!sample) {
+      return res.status(404).send('Showcase not found');
+    }
+
+    let logo = sample.logoUrl;
+    if (!logo || logo === '/logo.png') {
+      const leads = Array.isArray(sample.leads) ? sample.leads : [];
+      const leadWithLogo = leads.find((l) => l.companyLogo || l.logo);
+      logo = leadWithLogo?.companyLogo || leadWithLogo?.logo;
+    }
+
+    if (!logo) {
+      return res.status(404).send('Logo not found');
+    }
+
+    if (isDataUrl(logo)) {
+      const matches = logo.match(/^data:([A-Za-z0-9-+/]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        const mimeType = matches[1];
+        const buffer = Buffer.from(matches[2], 'base64');
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.send(buffer);
+      }
+    }
+
+    if (logo.startsWith('http')) {
+      return res.redirect(logo);
+    }
+
+    if (logo.startsWith('/api/samples/') && logo.endsWith('/logo')) {
+      // Prevent loop
+      return res.status(404).send('Logo not found');
+    }
+
+    // Assume MinIO / local storage asset key
+    const stream = await getFileStream(logo);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return stream.pipe(res);
+  } catch (err) {
+    console.error('[SampleController.streamCompanyLogo] Error:', err.message);
+    return res.status(500).send('Error streaming logo');
+  }
+};
+
+/**
+ * @desc Stream lead logo
+ * @route GET /api/samples/:slug/leads/:leadId/logo
+ * @access Public
+ */
+export const streamLeadLogo = async (req, res) => {
+  try {
+    const { slug, leadId } = req.params;
+    const sample = await findSampleBySlug(slug, false);
+    if (!sample) return res.status(404).send('Showcase not found');
+
+    const lead = (sample.leads || []).find((l) => String(l.id) === String(leadId));
+    if (!lead) return res.status(404).send('Lead not found');
+
+    if (lead.logoAssetKey) {
+      const stream = await getFileStream(lead.logoAssetKey);
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return stream.pipe(res);
+    }
+
+    const candidate = lead.logo || lead.companyLogo;
+    if (candidate && isDataUrl(candidate)) {
+      const matches = candidate.match(/^data:([A-Za-z0-9-+/]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        const mimeType = matches[1];
+        const buffer = Buffer.from(matches[2], 'base64');
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.send(buffer);
+      }
+    }
+
+    if (candidate?.startsWith('http')) {
+      return res.redirect(candidate);
+    }
+
+    return res.status(404).send('Lead logo not found');
+  } catch (err) {
+    console.error('[SampleController.streamLeadLogo] Error:', err.message);
+    return res.status(500).send('Error streaming lead logo');
   }
 };
 
