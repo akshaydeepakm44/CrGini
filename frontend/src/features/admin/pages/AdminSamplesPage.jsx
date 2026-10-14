@@ -81,29 +81,8 @@ export default function AdminSamplesPage() {
           keyObservations: 'High demand for specialized outsourced acceleration.',
           potentialOpportunity: 'Targeted account acquisition and sales enablement.',
         },
-        leads: [
-          {
-            id: 'sample-lead-1',
-            name: 'Sample Decision Maker',
-            title: 'VP of Technology',
-            company: `${newCompany} Partner`,
-            shortSummary: 'Oversees technology evaluations and strategic vendor engagements.',
-            industry: 'Technology',
-            location: 'New York, NY',
-          }
-        ],
-        leadStudies: [
-          {
-            id: 'study-1',
-            leadName: 'Sample Decision Maker',
-            role: 'VP of Technology',
-            company: `${newCompany} Partner`,
-            whyRelevant: 'Actively vetting acceleration partners for Q4 delivery.',
-            observedContext: 'Modernizing internal operational workflows.',
-            potentialOpportunity: 'Strategic audit and proof-of-concept deployment.',
-            suggestedApproach: 'Highlight peer success stories and delivery SLAs.',
-          }
-        ],
+        leads: [],
+        leadStudies: [],
       });
 
       setShowCreateModal(false);

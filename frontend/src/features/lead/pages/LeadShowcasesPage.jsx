@@ -137,33 +137,12 @@ export default function LeadShowcasesPage({ onNavigate }) {
         businessOverview: '',
         marketPosition: '',
         keyObservations: '',
+        potentialOpportunity: '',
       },
-      leads: [
-        {
-          id: `lead-${Date.now()}-1`,
-          name: 'Sarah Jenkins',
-          title: 'VP of Global Enterprise Architecture',
-          company: 'Acme Global Systems',
-          companyLink: 'https://acmeglobal.com',
-          aboutCompany: 'Enterprise IT infrastructure provider serving Fortune 500 customers.',
-          linkedin: 'https://linkedin.com/in/sarah-jenkins-sample',
-          email: 's.jenkins@acmeglobal.com',
-          logo: '/logo.png',
-          leadStudyPdf: '',
-          leadStudyPdfName: '',
-          pitchDeckPdf: '',
-          pitchDeckPdfName: '',
-          whySuitsBest: 'Leading multi-region platform migration with open Q3 procurement budget.',
-          leadStudy: {
-            whyRelevant: 'Direct budget authority for integration and architecture overhaul.',
-            observedContext: 'Recently published whitepaper on cloud modernization initiatives.',
-            suggestedApproach: 'Highlight verifiable deliverable SLAs and technical speed.',
-          },
-        },
-      ],
+      leads: [],
       pitchDeck: {
-        title: 'Enterprise Growth & Acceleration Playbook',
-        summary: 'Targeted strategic deck prepared for client leadership.',
+        title: '',
+        summary: '',
       },
     });
     setActiveTab('company');
@@ -175,6 +154,11 @@ export default function LeadShowcasesPage({ onNavigate }) {
     const existingLogo = (showcase.logoUrl && showcase.logoUrl !== '/logo.png')
       ? showcase.logoUrl
       : (showcase.leads?.find((l) => l.companyLogo || l.logo)?.companyLogo || showcase.leads?.find((l) => l.companyLogo || l.logo)?.logo || '');
+
+    // Filter out dummy/mock template leads (e.g. Sarah Jenkins from Acme Global)
+    const cleanLeads = (showcase.leads || []).filter(
+      (l) => !(l.email === 's.jenkins@acmeglobal.com' || (l.name === 'Sarah Jenkins' && l.company === 'Acme Global Systems'))
+    );
 
     setFormData({
       companyName: showcase.companyName || '',
@@ -190,7 +174,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
         marketPosition: '',
         keyObservations: '',
       },
-      leads: showcase.leads || [],
+      leads: cleanLeads,
       pitchDeck: showcase.pitchDeck || {
         title: '',
         summary: '',
@@ -222,10 +206,15 @@ export default function LeadShowcasesPage({ onNavigate }) {
 
       const generatedSlug = formatSlug(formData.slug) || formatSlug(formData.companyName) || `showcase-${Date.now()}`;
 
+      // Filter out any mock dummy leads from payload
+      const sanitizedLeads = (formData.leads || []).filter(
+        (l) => !(l.email === 's.jenkins@acmeglobal.com' || (l.name === 'Sarah Jenkins' && l.company === 'Acme Global Systems'))
+      );
+
       // Auto-promote lead logo to showcase logoUrl if not explicitly provided
       let effectiveLogoUrl = formData.logoUrl;
       if (!effectiveLogoUrl || effectiveLogoUrl === '/logo.png') {
-        const leadWithLogo = formData.leads?.find((l) => l.companyLogo || l.logo);
+        const leadWithLogo = sanitizedLeads?.find((l) => l.companyLogo || l.logo);
         if (leadWithLogo) {
           effectiveLogoUrl = leadWithLogo.companyLogo || leadWithLogo.logo;
         }
@@ -233,6 +222,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
 
       const payload = {
         ...formData,
+        leads: sanitizedLeads,
         logoUrl: effectiveLogoUrl || '',
         slug: generatedSlug,
         status: 'PUBLISHED', // Auto-approved and published upon save
@@ -1520,7 +1510,7 @@ support@dizigini.com`;
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. Sarah Jenkins"
+                          placeholder="e.g. John Doe"
                           value={leadForm.name}
                           onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
                           style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
@@ -1534,7 +1524,7 @@ support@dizigini.com`;
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. https://acmeglobal.com"
+                          placeholder="e.g. https://company.com"
                           value={leadForm.companyLink}
                           onChange={(e) => setLeadForm({ ...leadForm, companyLink: e.target.value })}
                           style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
@@ -1548,7 +1538,7 @@ support@dizigini.com`;
                         </label>
                         <input
                           type="email"
-                          placeholder="e.g. s.jenkins@acmeglobal.com"
+                          placeholder="e.g. lead@company.com"
                           value={leadForm.email}
                           onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
                           style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
@@ -1562,7 +1552,7 @@ support@dizigini.com`;
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. https://linkedin.com/in/sarah-jenkins"
+                          placeholder="e.g. https://linkedin.com/in/prospect"
                           value={leadForm.linkedin}
                           onChange={(e) => setLeadForm({ ...leadForm, linkedin: e.target.value })}
                           style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}

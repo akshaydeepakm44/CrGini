@@ -58,6 +58,21 @@ const maskPhone = (phone) => {
 };
 
 /**
+ * Helper to identify mock/dummy template leads that must never be shown or saved
+ */
+export const isMockDummyLead = (l) => {
+  if (!l) return true;
+  const email = (l.email || '').toLowerCase().trim();
+  const company = (l.company || '').toLowerCase().trim();
+  const name = (l.name || '').toLowerCase().trim();
+  return (
+    email === 's.jenkins@acmeglobal.com' ||
+    (name === 'sarah jenkins' && company === 'acme global systems') ||
+    (name === 'sample decision maker' && company.includes('partner'))
+  );
+};
+
+/**
  * @desc    Get published public sample showcase by slug
  * @route   GET /api/samples/:slug
  * @access  Public (No Auth Required)
@@ -95,7 +110,8 @@ export const getPublicSampleBySlug = async (req, res) => {
     };
 
     // Strict projection: sanitize and verify NO private client fields leak, and NEVER inline large base64 files
-    const publicLeads = (sample.leads || []).map((l, index) => {
+    const cleanLeads = (sample.leads || []).filter((l) => !isMockDummyLead(l));
+    const publicLeads = cleanLeads.map((l, index) => {
       const leadId = l.id || `lead-${index + 1}`;
       const leadName = l.name || 'Executive Lead';
       const isFirstLead = index === 0;
@@ -774,7 +790,8 @@ export const createAdminSample = async (req, res) => {
       }
     }
 
-    const processedLeads = await processLeadsPayload(leads, effectiveSlug);
+    const cleanLeadsInput = Array.isArray(leads) ? leads.filter((l) => !isMockDummyLead(l)) : [];
+    const processedLeads = await processLeadsPayload(cleanLeadsInput, effectiveSlug);
 
     // Auto-promote lead logo to showcase company logo if not explicitly provided
     let effectiveLogoUrl = (logoUrl && logoUrl !== '/logo.png') ? logoUrl : null;
@@ -891,7 +908,8 @@ export const updateAdminSample = async (req, res) => {
     }
 
     if (Array.isArray(body.leads)) {
-      body.leads = await processLeadsPayload(body.leads, body.slug || sample.slug);
+      const cleanLeadsInput = body.leads.filter((l) => !isMockDummyLead(l));
+      body.leads = await processLeadsPayload(cleanLeadsInput, body.slug || sample.slug);
     }
 
     let effectiveLogoUrl = body.logoUrl !== undefined ? body.logoUrl : sample.logoUrl;

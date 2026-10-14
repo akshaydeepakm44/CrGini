@@ -196,9 +196,23 @@ export default function PublicSampleDashboard() {
     return raw.trim();
   }, [sample, companyName]);
 
+  // Helper to detect dummy/mock template leads
+  const isMockDummyLead = (l) => {
+    if (!l) return true;
+    const email = (l.email || '').toLowerCase().trim();
+    const company = (l.company || '').toLowerCase().trim();
+    const name = (l.name || '').toLowerCase().trim();
+    return (
+      email === 's.jenkins@acmeglobal.com' ||
+      (name === 'sarah jenkins' && company === 'acme global systems') ||
+      (name === 'sample decision maker' && company.includes('partner'))
+    );
+  };
+
   // ONLY display the leads that are actually uploaded (no fake/synthetic leads!)
   const displayLeads = useMemo(() => {
-    return Array.isArray(sample?.leads) ? sample.leads : [];
+    const raw = Array.isArray(sample?.leads) ? sample.leads : [];
+    return raw.filter((l) => !isMockDummyLead(l));
   }, [sample]);
 
   const featuredLead = displayLeads.length > 0 ? displayLeads[0] : null;
