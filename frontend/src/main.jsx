@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles/index.css';
 import './styles/landing-theme.css';
 import './styles/signin.css';
