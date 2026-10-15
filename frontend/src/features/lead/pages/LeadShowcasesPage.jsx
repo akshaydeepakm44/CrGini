@@ -45,48 +45,54 @@ export const resolveShowcaseLogo = (showcase) => {
     return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
   };
 
-  // 1. Explicit showcase logo if valid and not platform default
-  if (showcase.logoUrl && !isPlatformLogo(showcase.logoUrl)) {
+  const leads = Array.isArray(showcase.leads) ? showcase.leads : [];
+  const explicitWebsite =
+    showcase.companyStudy?.website ||
+    leads.find((l) => l.companyLink || l.website)?.companyLink ||
+    leads.find((l) => l.website)?.website;
+
+  let validDomain = null;
+  if (explicitWebsite && typeof explicitWebsite === 'string') {
+    const cd = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+    if (cd.includes('.') && cd.length >= 4) {
+      validDomain = cd.toLowerCase();
+    }
+  }
+
+  // Reject auto-guessed favicons where website domain wasn't explicitly provided or doesn't match
+  const isStaleFavicon = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    if (url.includes('gstatic.com/faviconV2')) {
+      if (!validDomain) return true;
+      return !url.toLowerCase().includes(validDomain);
+    }
+    return false;
+  };
+
+  // 1. Explicit showcase logo if valid and not platform default and not stale favicon
+  if (showcase.logoUrl && !isPlatformLogo(showcase.logoUrl) && !isStaleFavicon(showcase.logoUrl)) {
     return showcase.logoUrl.trim();
   }
 
   // 2. Company study logo
   const studyLogo = showcase.companyStudy?.logoUrl || showcase.companyStudy?.logo;
-  if (studyLogo && !isPlatformLogo(studyLogo)) {
+  if (studyLogo && !isPlatformLogo(studyLogo) && !isStaleFavicon(studyLogo)) {
     return studyLogo.trim();
   }
 
   // 3. Any lead's company logo
-  const leads = Array.isArray(showcase.leads) ? showcase.leads : [];
   const leadWithLogo = leads.find((l) => {
     const candidate = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
-    return candidate && !isPlatformLogo(candidate);
+    return candidate && !isPlatformLogo(candidate) && !isStaleFavicon(candidate);
   });
   if (leadWithLogo) {
     const cand = leadWithLogo.companyLogo || leadWithLogo.logo || leadWithLogo.company_logo || leadWithLogo.avatarUrl;
     if (cand) return cand.trim();
   }
 
-  // 4. Derive from company website / lead company link / slug / company name using Google Favicon
-  const website =
-    showcase.companyStudy?.website ||
-    leads.find((l) => l.companyLink || l.website)?.companyLink ||
-    showcase.slug ||
-    showcase.companyName;
-
-  if (website) {
-    let clean = String(website)
-      .replace(/^https?:\/\//i, '')
-      .replace(/^www\./i, '')
-      .split('/')[0]
-      .split('?')[0]
-      .trim();
-    if (clean) {
-      if (!clean.includes('.')) {
-        clean = `${clean}.com`;
-      }
-      return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${clean.toLowerCase()}&size=128`;
-    }
+  // 4. Derive from explicit company website only if a valid domain with a dot exists
+  if (validDomain) {
+    return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${validDomain}&size=128`;
   }
 
   return '';
@@ -213,7 +219,21 @@ export default function LeadShowcasesPage({ onNavigate }) {
 
   const handleOpenEditModal = (showcase) => {
     setEditingShowcase(showcase);
-    const existingLogo = resolveShowcaseLogo(showcase);
+    const rawLogo = showcase.logoUrl || '';
+    const isPlatformLogo = (url) => {
+      if (!url || typeof url !== 'string') return true;
+      const clean = url.trim().toLowerCase();
+      return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
+    };
+    const leads = Array.isArray(showcase.leads) ? showcase.leads : [];
+    const explicitWebsite = showcase.companyStudy?.website || leads.find((l) => l.companyLink || l.website)?.companyLink;
+    let validDomain = null;
+    if (explicitWebsite) {
+      const cd = String(explicitWebsite).replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+      if (cd.includes('.') && cd.length >= 4) validDomain = cd.toLowerCase();
+    }
+    const isStaleFavicon = rawLogo.includes('gstatic.com/faviconV2') && (!validDomain || !rawLogo.toLowerCase().includes(validDomain));
+    const initialLogo = (!rawLogo || isPlatformLogo(rawLogo) || isStaleFavicon) ? '' : rawLogo;
 
     // Filter out dummy/mock template leads (e.g. Sarah Jenkins from Acme Global)
     const cleanLeads = (showcase.leads || []).filter(
@@ -225,7 +245,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
       slug: showcase.slug || '',
       title: showcase.title || '',
       description: showcase.description || '',
-      logoUrl: existingLogo,
+      logoUrl: initialLogo,
       status: showcase.status || 'PUBLISHED',
       companyStudy: {
         company: showcase.companyStudy?.company || showcase.companyName || '',
@@ -279,44 +299,29 @@ export default function LeadShowcasesPage({ onNavigate }) {
         (l) => !(l.email === 's.jenkins@acmeglobal.com' || (l.name === 'Sarah Jenkins' && l.company === 'Acme Global Systems'))
       );
 
-      // Auto-promote lead/study logo or Google favicon to showcase logoUrl if not explicitly provided
-      let effectiveLogoUrl = formData.logoUrl;
+      // Keep whatever the user set in formData.logoUrl.
+      // If user cleared it (formData.logoUrl === ''), DO NOT auto-fill with Google favicon!
+      // ONLY promote real uploaded logo from lead or study if formData.logoUrl is empty or platform placeholder.
+      let effectiveLogoUrl = formData.logoUrl ? formData.logoUrl.trim() : '';
       const isPlatformLogo = (url) => {
         if (!url || typeof url !== 'string') return true;
         const clean = url.trim().toLowerCase();
         return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
       };
 
-      if (isPlatformLogo(effectiveLogoUrl)) {
-        const leadWithLogo = sanitizedLeads?.find((l) => l.companyLogo || l.logo);
+      if (!effectiveLogoUrl || isPlatformLogo(effectiveLogoUrl)) {
+        const leadWithLogo = sanitizedLeads?.find((l) => {
+          const cand = l.companyLogo || l.logo;
+          return cand && !isPlatformLogo(cand) && !cand.includes('gstatic.com/faviconV2');
+        });
         if (leadWithLogo) {
           effectiveLogoUrl = leadWithLogo.companyLogo || leadWithLogo.logo;
-        }
-      }
-      if (isPlatformLogo(effectiveLogoUrl)) {
-        const studyLogo = formData.companyStudy?.logoUrl || formData.companyStudy?.logo;
-        if (studyLogo && !isPlatformLogo(studyLogo)) {
-          effectiveLogoUrl = studyLogo;
-        }
-      }
-      if (isPlatformLogo(effectiveLogoUrl)) {
-        const targetStr =
-          formData.companyStudy?.website ||
-          sanitizedLeads?.find((l) => l.companyLink || l.website)?.companyLink ||
-          formData.slug ||
-          formData.companyName;
-        if (targetStr) {
-          let cleanDomain = String(targetStr)
-            .replace(/^https?:\/\//i, '')
-            .replace(/^www\./i, '')
-            .split('/')[0]
-            .split('?')[0]
-            .trim();
-          if (cleanDomain) {
-            if (!cleanDomain.includes('.')) {
-              cleanDomain = `${cleanDomain}.com`;
-            }
-            effectiveLogoUrl = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain.toLowerCase()}&size=128`;
+        } else {
+          const studyLogo = formData.companyStudy?.logoUrl || formData.companyStudy?.logo;
+          if (studyLogo && !isPlatformLogo(studyLogo) && !studyLogo.includes('gstatic.com/faviconV2')) {
+            effectiveLogoUrl = studyLogo;
+          } else {
+            effectiveLogoUrl = '';
           }
         }
       }
@@ -884,22 +889,9 @@ support@dizigini.com`;
                               padding: '4px',
                             }}
                             onError={(e) => {
-                              const target = showcase.companyStudy?.website || showcase.slug || showcase.companyName || '';
-                              let clean = String(target)
-                                .replace(/^https?:\/\//i, '')
-                                .replace(/^www\./i, '')
-                                .split('/')[0]
-                                .trim();
-                              if (clean && !clean.includes('.')) {
-                                clean = `${clean}.com`;
-                              }
-                              if (clean && !e.currentTarget.src.includes('gstatic.com')) {
-                                e.currentTarget.src = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${clean.toLowerCase()}&size=128`;
-                              } else {
-                                e.currentTarget.style.display = 'none';
-                                if (e.currentTarget.nextSibling) {
-                                  e.currentTarget.nextSibling.style.display = 'flex';
-                                }
+                              e.currentTarget.style.display = 'none';
+                              if (e.currentTarget.nextSibling) {
+                                e.currentTarget.nextSibling.style.display = 'flex';
                               }
                             }}
                           />
@@ -1252,22 +1244,28 @@ support@dizigini.com`;
                       <button
                         type="button"
                         onClick={() => {
-                          const target = formData.companyStudy?.website || formData.slug || formData.companyName;
-                          if (!target) {
-                            alert('Please enter a company name or website first');
-                            return;
+                          const websiteTarget = formData.companyStudy?.website || formData.leads?.find(l => l.companyLink || l.website)?.companyLink;
+                          let clean = '';
+                          if (websiteTarget) {
+                            clean = String(websiteTarget)
+                              .replace(/^https?:\/\//i, '')
+                              .replace(/^www\./i, '')
+                              .split('/')[0]
+                              .split('?')[0]
+                              .trim();
                           }
-                          let clean = String(target)
-                            .replace(/^https?:\/\//i, '')
-                            .replace(/^www\./i, '')
-                            .split('/')[0]
-                            .split('?')[0]
-                            .trim();
-                          if (!clean.includes('.')) {
-                            clean = `${clean}.com`;
+                          if (!clean || !clean.includes('.')) {
+                            const inputDomain = window.prompt(
+                              'Please enter the company website domain (e.g. finkr.ai or company.com):',
+                              formData.companyName ? `${formData.companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com` : ''
+                            );
+                            if (!inputDomain || !inputDomain.trim()) return;
+                            clean = inputDomain.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].trim();
                           }
-                          const faviconUrl = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${clean.toLowerCase()}&size=128`;
-                          setFormData((prev) => ({ ...prev, logoUrl: faviconUrl }));
+                          if (clean && clean.includes('.')) {
+                            const faviconUrl = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${clean.toLowerCase()}&size=128`;
+                            setFormData((prev) => ({ ...prev, logoUrl: faviconUrl }));
+                          }
                         }}
                         style={{
                           display: 'inline-flex',

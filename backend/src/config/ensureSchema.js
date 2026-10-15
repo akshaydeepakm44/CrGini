@@ -211,6 +211,22 @@ export async function ensureSchemaIntegrity() {
       console.warn('[Schema] ensureOptimizedProspectPayloads step note:', e6.message);
     }
 
+    // 8. Clean up any wrongly inferred or auto-promoted favicons (e.g. umbrella icons from domain guessing like finkr.com)
+    try {
+      await query(`
+        UPDATE public_sample_showcases
+        SET logo_url = NULL
+        WHERE logo_url LIKE '%gstatic.com/faviconV2%'
+          AND (
+            company_study->>'website' IS NULL 
+            OR company_study->>'website' = ''
+            OR (company_study->>'website' NOT LIKE '%finkr.com%' AND logo_url LIKE '%finkr.com%')
+          );
+      `);
+    } catch (e7) {
+      console.warn('[Schema] Favicon cleanup note:', e7.message);
+    }
+
     console.log('[Schema] Database schema integrity verified & updated successfully.');
     return true;
   } catch (err) {

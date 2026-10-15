@@ -265,38 +265,50 @@ export const getPublicSampleBySlug = async (req, res) => {
       return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
     };
 
+    const explicitWebsite =
+      sample.companyStudy?.website ||
+      (Array.isArray(sample.leads) ? sample.leads.find((l) => l.companyLink || l.website)?.companyLink : null) ||
+      (Array.isArray(sample.leads) ? sample.leads.find((l) => l.website)?.website : null);
+
+    let validWebsiteDomain = null;
+    if (explicitWebsite && typeof explicitWebsite === 'string') {
+      const cd = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+      if (cd.includes('.') && cd.length >= 4) {
+        validWebsiteDomain = cd.toLowerCase();
+      }
+    }
+
+    // Helper to detect stale or wrongly guessed favicons
+    const isStaleFavicon = (url) => {
+      if (!url || typeof url !== 'string') return false;
+      if (url.includes('gstatic.com/faviconV2')) {
+        if (!validWebsiteDomain) return true; // No explicit website domain, discard favicon
+        return !url.toLowerCase().includes(validWebsiteDomain);
+      }
+      return false;
+    };
+
     // 1. Resolve company logo: Target company's uploaded logo from showcase or companyStudy
     let resolvedCompanyLogo = sample.logoUrl;
-    if (isPlatformLogo(resolvedCompanyLogo)) {
+    if (isPlatformLogo(resolvedCompanyLogo) || isStaleFavicon(resolvedCompanyLogo)) {
       resolvedCompanyLogo = sample.companyLogo || sample.companyStudy?.logoUrl || sample.companyStudy?.logo || null;
+      if (isStaleFavicon(resolvedCompanyLogo)) resolvedCompanyLogo = null;
     }
 
     // 2. Comprehensive fallback: retrieve real uploaded logo from ANY of the leads
-    if (isPlatformLogo(resolvedCompanyLogo) && Array.isArray(sample.leads) && sample.leads.length > 0) {
+    if ((!resolvedCompanyLogo || isPlatformLogo(resolvedCompanyLogo)) && Array.isArray(sample.leads) && sample.leads.length > 0) {
       const leadWithLogo = sample.leads.find((l) => {
         const candidate = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
-        return candidate && !isPlatformLogo(candidate);
+        return candidate && !isPlatformLogo(candidate) && !isStaleFavicon(candidate);
       });
       if (leadWithLogo) {
         resolvedCompanyLogo = leadWithLogo.companyLogo || leadWithLogo.logo || leadWithLogo.company_logo || leadWithLogo.avatarUrl;
       }
     }
 
-    // 3. Official company domain favicon fallback if still not found
-    if (isPlatformLogo(resolvedCompanyLogo)) {
-      const allLeads = Array.isArray(sample.leads) ? sample.leads : [];
-      const firstWithLink = allLeads.find((l) => l.companyLink || l.website) || sample.companyStudy;
-      const rawLink = firstWithLink?.companyLink || firstWithLink?.website || sample.companyName || '';
-      if (rawLink) {
-        const cleanDomain = String(rawLink)
-          .replace(/^https?:\/\//i, '')
-          .replace(/^www\./i, '')
-          .split('/')[0]
-          .trim();
-        if (cleanDomain && cleanDomain.includes('.')) {
-          resolvedCompanyLogo = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`;
-        }
-      }
+    // 3. Official company domain favicon fallback ONLY if explicit valid domain was provided
+    if ((!resolvedCompanyLogo || isPlatformLogo(resolvedCompanyLogo)) && validWebsiteDomain) {
+      resolvedCompanyLogo = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${validWebsiteDomain}&size=128`;
     }
 
     // Never inline huge base64 in public showcase JSON (use dedicated stream endpoint)
@@ -904,9 +916,18 @@ export const createAdminSample = async (req, res) => {
     const processedLeads = await processLeadsPayload(cleanLeadsInput, effectiveSlug);
 
     // Auto-promote lead logo to showcase company logo if not explicitly provided
-    let effectiveLogoUrl = (logoUrl && logoUrl !== '/logo.png') ? logoUrl : null;
+    let effectiveLogoUrl = (logoUrl && logoUrl !== '/logo.png') ? logoUrl.trim() : null;
+    if (effectiveLogoUrl && effectiveLogoUrl.includes('gstatic.com/faviconV2')) {
+      const websiteStr = companyStudy?.website;
+      if (!websiteStr || !websiteStr.includes('.')) {
+        effectiveLogoUrl = null;
+      }
+    }
     if (!effectiveLogoUrl && Array.isArray(processedLeads)) {
-      const leadWithLogo = processedLeads.find((l) => l.companyLogo || l.logo);
+      const leadWithLogo = processedLeads.find((l) => {
+        const cand = l.companyLogo || l.logo;
+        return cand && cand !== '/logo.png' && !cand.includes('gstatic.com/faviconV2');
+      });
       if (leadWithLogo) {
         effectiveLogoUrl = leadWithLogo.companyLogo || leadWithLogo.logo;
       }
@@ -1051,10 +1072,19 @@ export const updateAdminSample = async (req, res) => {
       body.leads = await processLeadsPayload(cleanLeadsInput, body.slug || sample.slug, sample.leads || []);
     }
 
-    let effectiveLogoUrl = body.logoUrl !== undefined ? body.logoUrl : sample.logoUrl;
+    let effectiveLogoUrl = body.logoUrl !== undefined ? (body.logoUrl ? String(body.logoUrl).trim() : null) : sample.logoUrl;
     if (effectiveLogoUrl === '/logo.png') effectiveLogoUrl = null;
+    if (effectiveLogoUrl && effectiveLogoUrl.includes('gstatic.com/faviconV2')) {
+      const websiteStr = body.companyStudy?.website || sample.companyStudy?.website;
+      if (!websiteStr || !websiteStr.includes('.')) {
+        effectiveLogoUrl = null;
+      }
+    }
     if (!effectiveLogoUrl && Array.isArray(body.leads)) {
-      const leadWithLogo = body.leads.find((l) => l.companyLogo || l.logo);
+      const leadWithLogo = body.leads.find((l) => {
+        const cand = l.companyLogo || l.logo;
+        return cand && cand !== '/logo.png' && !cand.includes('gstatic.com/faviconV2');
+      });
       if (leadWithLogo) {
         effectiveLogoUrl = leadWithLogo.companyLogo || leadWithLogo.logo;
       }
