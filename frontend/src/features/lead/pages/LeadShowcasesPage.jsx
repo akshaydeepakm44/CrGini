@@ -133,6 +133,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
   // Lead under edit inside modal
   const [leadForm, setLeadForm] = useState({
     name: '',
+    phone: '',
     companyLink: '',
     companyLinkedin: '',
     email: '',
@@ -235,9 +236,14 @@ export default function LeadShowcasesPage({ onNavigate }) {
         marketPosition: showcase.companyStudy?.marketPosition || '',
         keyObservations: showcase.companyStudy?.keyObservations || '',
         potentialOpportunity: showcase.companyStudy?.potentialOpportunity || '',
+        pdfAssetKey: showcase.companyStudy?.pdfAssetKey || '',
+        pdfFileName: showcase.companyStudy?.pdfFileName || '',
+        pdfFileSize: showcase.companyStudy?.pdfFileSize || null,
+        pdfMimeType: showcase.companyStudy?.pdfMimeType || '',
+        hasPdf: Boolean(showcase.companyStudy?.pdfAssetKey || showcase.companyStudy?.hasPdf),
       },
       leads: cleanLeads,
-      pitchDeck: showcase.pitchDeck || {
+      pitchDeck: showcase.pitchDeck ? { ...showcase.pitchDeck } : {
         title: '',
         summary: '',
       },
@@ -507,34 +513,43 @@ support@dizigini.com`;
 
     const companyName = leadForm.company?.trim() || formData.companyName || 'Target Organization';
 
+    const existing = editingLeadIndex !== null ? formData.leads[editingLeadIndex] : null;
     const newLead = {
-      id: editingLeadIndex !== null ? formData.leads[editingLeadIndex].id : `lead-${Date.now()}`,
+      ...(existing || {}),
+      id: existing?.id || `lead-${Date.now()}`,
       name: leadForm.name.trim(),
+      phone: leadForm.phone?.trim() || existing?.phone || '',
       companyLink: leadForm.companyLink?.trim() || formData.companyStudy?.website || '',
       companyLinkedin: leadForm.companyLinkedin?.trim() || formData.companyStudy?.linkedin || '',
       email: leadForm.email?.trim() || '',
       linkedin: leadForm.linkedin?.trim() || '',
-      leadStudyPdf: leadForm.leadStudyPdf || '',
-      leadStudyPdfName: leadForm.leadStudyPdfName || '',
-      pitchDeckPdf: leadForm.pitchDeckPdf || '',
-      pitchDeckPdfName: leadForm.pitchDeckPdfName || '',
-      logo: leadForm.logo || '',
+      leadStudyPdf: leadForm.leadStudyPdf || existing?.leadStudyPdf || '',
+      leadStudyPdfName: leadForm.leadStudyPdfName || existing?.leadStudyPdfName || '',
+      leadStudyPdfAssetKey: existing?.leadStudyPdfAssetKey || '',
+      pitchDeckPdf: leadForm.pitchDeckPdf || existing?.pitchDeckPdf || '',
+      pitchDeckPdfName: leadForm.pitchDeckPdfName || existing?.pitchDeckPdfName || '',
+      pitchDeckAssetKey: existing?.pitchDeckAssetKey || existing?.pitchDeck?.assetKey || '',
+      logo: leadForm.logo || existing?.logo || '',
+      logoAssetKey: existing?.logoAssetKey || '',
       title: leadForm.title?.trim() || '',
       company: companyName,
       aboutCompany: leadForm.aboutCompany?.trim() || `Enterprise organization operating in ${formData.companyStudy?.industry || 'technology'}.`,
       whySuitsBest: leadForm.whySuitsBest?.trim() || 'Strategic decision maker aligned with key pain points.',
       leadStudy: {
+        ...(existing?.leadStudy || {}),
         whyRelevant: leadForm.whyRelevant?.trim() || 'Direct decision authority and strategic alignment.',
         observedContext: leadForm.observedContext?.trim() || 'Observed growth and strategic expansion.',
         suggestedApproach: leadForm.suggestedApproach?.trim() || 'Lead with verifiable outcomes and SLA guarantees.',
       },
       pitchDeck: leadForm.pitchDeckPdf ? {
-        title: `${leadForm.name.trim()} Proposal Pitch Deck`,
-        summary: 'Targeted strategic pitch deck prepared for client leadership.',
+        ...(existing?.pitchDeck || {}),
+        title: existing?.pitchDeck?.title || `${leadForm.name.trim()} Proposal Pitch Deck`,
+        summary: existing?.pitchDeck?.summary || 'Targeted strategic pitch deck prepared for client leadership.',
         streamUrl: leadForm.pitchDeckPdf,
         downloadUrl: leadForm.pitchDeckPdf,
-        fileName: leadForm.pitchDeckPdfName || `${leadForm.name.trim().replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
-      } : null,
+        fileName: leadForm.pitchDeckPdfName || existing?.pitchDeck?.fileName || `${leadForm.name.trim().replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
+        assetKey: existing?.pitchDeck?.assetKey || existing?.pitchDeckAssetKey || '',
+      } : (existing?.pitchDeck || null),
     };
 
     const updatedLeads = [...formData.leads];
@@ -547,6 +562,7 @@ support@dizigini.com`;
     setFormData({ ...formData, leads: updatedLeads });
     setLeadForm({
       name: '',
+      phone: '',
       companyLink: '',
       companyLinkedin: '',
       email: '',
@@ -1406,9 +1422,9 @@ support@dizigini.com`;
                       <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
                         Target Industry / Sector
                       </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Mining & Exploration, Investment Banking, Commodity Trading"
+                      <textarea
+                        rows={2}
+                        placeholder="e.g. Fintech Startups, Financial Services, Embedded Finance, WealthTech, Lending & Credit"
                         value={formData.companyStudy.industry}
                         onChange={(e) =>
                           setFormData({
@@ -1422,16 +1438,36 @@ support@dizigini.com`;
                           border: '1px solid #D1D5DB',
                           borderRadius: '8px',
                           fontSize: '0.875rem',
+                          fontFamily: 'inherit',
+                          resize: 'vertical',
                         }}
                       />
                       <span style={{ fontSize: '0.72rem', color: '#6B7280', marginTop: '4px', display: 'block' }}>
-                        Tip: Separate multiple sectors with commas or newlines. Each sector appears as an executive mini card on the showcase.
+                        Tip: Separate multiple sectors with commas, slashes, or newlines. Each sector appears as an executive mini card on the showcase.
                       </span>
                       {(() => {
                         const raw = formData.companyStudy?.industry || '';
-                        const parsed = raw
-                          .split(/(?:[\r\n;,•·|]+|\s{2,}|\s+\/\s+|(?<=[a-z\)])\s+(?=[A-Z][a-z]+(?:\s+&|\s+[A-Z])))/)
+                        if (!raw.trim()) return null;
+                        const protectedParen = [];
+                        const tokenized = raw.replace(/\([^\)]*\)/g, (match) => {
+                          protectedParen.push(match);
+                          return `___PAREN_${protectedParen.length - 1}___`;
+                        });
+                        const boundary = /(?<=(?:Startups|Services|Finance|Providers|WealthTech|InsurTech|FinTech|HealthTech|BioTech|EdTech|PropTech|AgTech|Credit|Lending|Banking|Software|Management|Consulting|Solutions|Logistics|Insurance|Capital|Healthcare|Biotech|E-commerce|Systems|Platform|Analytics|Trading|Mining|Exploration|Brands|Agency))\s+(?=[A-Z])/g;
+                        const rawChunks = tokenized
+                          .split(/(?:[\r\n;,•·|]+|\t+|\s{2,}|\s*\/\s*)/)
                           .map((s) => s.replace(/^[\s•\-\*\d\.\)\:]+/, '').trim())
+                          .filter(Boolean);
+                        let parsed = [];
+                        for (const chunk of rawChunks) {
+                          if (boundary.test(chunk)) {
+                            parsed.push(...chunk.split(boundary).map((s) => s.trim()).filter(Boolean));
+                          } else {
+                            parsed.push(chunk);
+                          }
+                        }
+                        parsed = parsed
+                          .map((item) => item.replace(/___PAREN_(\d+)___/g, (_, idx) => protectedParen[Number(idx)] || '').trim())
                           .filter((s) => s.length > 1);
                         if (parsed.length === 0) return null;
                         return (
@@ -1443,7 +1479,7 @@ support@dizigini.com`;
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '4px',
-                                  padding: '3px 8px',
+                                  padding: '4px 10px',
                                   borderRadius: '6px',
                                   background: '#EFF6FF',
                                   border: '1px solid #BFDBFE',
@@ -1452,7 +1488,7 @@ support@dizigini.com`;
                                   fontWeight: 600,
                                 }}
                               >
-                                <span>🏷️</span>
+                                <span>💼</span>
                                 <span>{ind}</span>
                               </span>
                             ))}
@@ -1783,10 +1819,24 @@ support@dizigini.com`;
                         />
                       </div>
 
-                      {/* 5. Lead Person LinkedIn Profile URL */}
+                      {/* 5. Phone Number */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          5. Lead Person LinkedIn Profile URL
+                          5. Direct Phone / Mobile Number (Masked on public view)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. +1 (555) 234-8900"
+                          value={leadForm.phone}
+                          onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
+                          style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
+                        />
+                      </div>
+
+                      {/* 6. Lead Person LinkedIn Profile URL */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                          6. Lead Person LinkedIn Profile URL
                         </label>
                         <input
                           type="text"
@@ -2136,6 +2186,11 @@ support@dizigini.com`;
                                   <span>{l.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')}</span>
                                 </a>
                               )}
+                              {l.phone && (
+                                <span style={{ fontSize: '0.75rem', color: '#059669', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  <Phone size={11} /> {l.phone}
+                                </span>
+                              )}
                               {l.email && (
                                 <span style={{ fontSize: '0.75rem', color: '#4B5563', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                   <Mail size={11} /> {l.email}
@@ -2172,6 +2227,7 @@ support@dizigini.com`;
                               setEditingLeadIndex(index);
                               setLeadForm({
                                 name: l.name || '',
+                                phone: l.phone || '',
                                 companyLink: l.companyLink || '',
                                 companyLinkedin: l.companyLinkedin || '',
                                 email: l.email || '',

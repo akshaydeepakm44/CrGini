@@ -64,31 +64,36 @@ function parseIndustries(rawInd) {
   const trimmed = rawInd.trim();
   if (!trimmed) return ['Enterprise Technology & Services'];
 
+  // Protect parenthetical terms like (Legal, Finance, Marketing)
   const protectedParen = [];
   const tokenized = trimmed.replace(/\([^\)]*\)/g, (match) => {
     protectedParen.push(match);
-    return `__PAREN_${protectedParen.length - 1}__`;
+    return `___PAREN_${protectedParen.length - 1}___`;
   });
 
-  const hasExplicitDelimiters = /[\r\n;,•·|]|\s+\/\s+/.test(tokenized);
+  // Common sector nouns after which a new capitalized sector often begins when pasted without commas
+  const boundary = /(?<=(?:Startups|Services|Finance|Providers|WealthTech|InsurTech|FinTech|HealthTech|BioTech|EdTech|PropTech|AgTech|Credit|Lending|Banking|Software|Management|Consulting|Solutions|Logistics|Insurance|Capital|Healthcare|Biotech|E-commerce|Systems|Platform|Analytics|Trading|Mining|Exploration|Brands|Agency))\s+(?=[A-Z])/g;
+
+  // Split on all standard delimiters: commas, semicolons, newlines, pipes, bullets, tabs, multiple spaces, and slashes
+  let rawChunks = tokenized
+    .split(/(?:[\r\n;,•·|]+|\t+|\s{2,}|\s*\/\s*)/)
+    .map((s) => s.replace(/^[\s•\-\*\d\.\)\:]+/, '').trim())
+    .filter(Boolean);
+
   let sectors = [];
-  if (hasExplicitDelimiters) {
-    sectors = tokenized
-      .split(/(?:[\r\n;,•·|]+|\s+\/\s+)/)
-      .map((s) => s.replace(/^[\s•\-\*\d\.\)\:]+/, '').trim())
-      .filter((s) => s.length > 0);
-  } else if (tokenized.length > 50) {
-    const splitRegex = /(?<=(?:Exploration|Management|Trading|Consulting|Services|Systems|Software|Solutions|Logistics|Manufacturing|Platform|Capital|Finance|Insurance|Banking|Infrastructure|Security|Development|Design|Strategy|Operations|Supply|Analytics|__PAREN_\d+__))\s+(?=[A-Z][a-z0-9]+(?:\s+&|\s+[A-Z]))/g;
-    sectors = tokenized.split(splitRegex).map((s) => s.trim()).filter(Boolean);
-    if (sectors.length <= 1) {
-      sectors = [tokenized];
+  for (const chunk of rawChunks) {
+    if (boundary.test(chunk)) {
+      const sub = chunk.split(boundary).map((s) => s.trim()).filter(Boolean);
+      sectors.push(...sub);
+    } else {
+      sectors.push(chunk);
     }
-  } else {
-    sectors = [tokenized];
   }
 
+  // Restore protected parentheses and cleanup
   sectors = sectors.map((item) => {
-    return item.replace(/__PAREN_(\d+)__/g, (_, idx) => protectedParen[Number(idx)] || '').trim();
+    let restored = item.replace(/___PAREN_(\d+)___/g, (_, idx) => protectedParen[Number(idx)] || '').trim();
+    return restored.replace(/^[,;.\s/]+|[,;.\s/]+$/g, '').trim();
   }).filter((s) => s.length > 1);
 
   return sectors.length > 0 ? sectors : [trimmed];
@@ -1398,9 +1403,10 @@ export default function PublicSampleDashboard() {
               const leadMail = isLeadUnlocked
                 ? (selectedLead.email || featuredLead?.email || 'contact@' + ((sample?.companyStudy?.website || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || 'company.com'))
                 : (selectedLead.maskedEmail || '••••••••@' + ((sample?.companyStudy?.website || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || 'company.com'));
+              const hasPhone = Boolean(selectedLead.phone || selectedLead.maskedPhone);
               const leadPhone = isLeadUnlocked
-                ? (selectedLead.phone || featuredLead?.phone || '+1 (555) 234-8900')
-                : formatMaskedPhone(selectedLead.phone || selectedLead.maskedPhone);
+                ? (selectedLead.phone || (selectedLead.maskedPhone ? formatMaskedPhone(selectedLead.maskedPhone) : null))
+                : (hasPhone ? formatMaskedPhone(selectedLead.phone || selectedLead.maskedPhone) : null);
 
               return (
                 <div style={{ padding: 'clamp(16px, 3.5vw, 22px) clamp(16px, 4vw, 28px)', display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -1493,10 +1499,14 @@ export default function PublicSampleDashboard() {
                       {/* Lead Phone */}
                       <div className="dossier-info-row">
                         <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead Phone:</span>
-                        <span style={{ color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}>
-                          <Phone size={14} color="#059669" style={{ flexShrink: 0 }} />
-                          <span>{leadPhone}</span>
-                        </span>
+                        {leadPhone ? (
+                          <span style={{ color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}>
+                            <Phone size={14} color="#059669" style={{ flexShrink: 0 }} />
+                            <span>{leadPhone}</span>
+                          </span>
+                        ) : (
+                          <span style={{ color: '#94A3B8' }}>Not specified</span>
+                        )}
                       </div>
 
                       {/* Lead Role */}
@@ -1545,9 +1555,9 @@ export default function PublicSampleDashboard() {
                     </div>
                   </div>
 
-                  {(selectedLead.pitchDeck?.downloadUrl || pitchDeck?.assetKey) && (
+                  {(selectedLead.pitchDeck || pitchDeck) && (
                     <a
-                      href={selectedLead.pitchDeck?.streamUrl || selectedLead.pitchDeck?.downloadUrl || `/api/samples/${sample.slug}/pitch-deck-pdf`}
+                      href={selectedLead.pitchDeck?.streamUrl || selectedLead.pitchDeck?.downloadUrl || `/api/samples/${sample.slug}/leads/${selectedLead.id}/pitch-deck`}
                       target="_blank"
                       rel="noreferrer"
                       style={{

@@ -130,6 +130,9 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
     linkedin = `https://${linkedin}`;
   }
 
+  // 6b. Direct Phone / Mobile
+  let phone = getField(['directphone', 'phonenumber', 'telephone', 'mobile', 'cell', 'phone', 'contactnumber', 'directnumber']);
+
   // 7. Verification Status
   let verificationStatus = getField(['verificationstatus', 'verifystatus', 'verification', 'status', 'verified']) || 'VERIFIED_100_PERCENT';
 
@@ -204,7 +207,9 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
     aboutCompany,
     linkedin,
     email,
+    phone: phone || '',
     maskedEmail: `${name[0]?.toLowerCase() || 's'}••••@${companyDomain}`,
+    maskedPhone: phone ? phone.replace(/\d(?=\d{2})/g, '•') : '',
     logo,
     location,
     industry,

@@ -13,6 +13,7 @@ import {
   getObjectStat,
   deleteFile,
   isDataUrl,
+  parseDataUrl,
 } from '../services/storageService.js';
 import {
   streamGeneratedCompanyStudyPdf,
@@ -412,7 +413,22 @@ export const streamCompanyStudyPdf = async (req, res) => {
       });
     }
 
-    // If PDF assetKey is in MinIO, try streaming it
+    // 1. If PDF was saved directly as base64 data URL
+    const rawPdf = sample.companyStudy?.pdfFileDataUrl || sample.companyStudy?.pdfUrl;
+    if (rawPdf && isDataUrl(rawPdf)) {
+      const parsed = parseDataUrl(rawPdf);
+      const fileName = (sample.companyStudy.pdfFileName || `${sample.companyName}_Company_Study.pdf`).replace(/["\r\n]/g, '_');
+      const disposition = download === 'true' ? `attachment; filename="${fileName}"` : `inline; filename="${fileName}"`;
+      res.writeHead(200, {
+        'Content-Type': sample.companyStudy.pdfMimeType || 'application/pdf',
+        'Content-Disposition': disposition,
+        'Content-Length': parsed.buffer.length,
+        'Cache-Control': 'public, max-age=3600',
+      });
+      return res.end(parsed.buffer);
+    }
+
+    // 2. If PDF assetKey is in MinIO / Object Storage, stream it
     if (sample.companyStudy?.pdfAssetKey) {
       try {
         const assetKey = sample.companyStudy.pdfAssetKey;
@@ -439,11 +455,11 @@ export const streamCompanyStudyPdf = async (req, res) => {
         res.writeHead(200, headers);
         return stream.pipe(res);
       } catch (streamErr) {
-        console.warn('[SampleController.streamCompanyStudyPdf] MinIO stream failed, generating document on the fly:', streamErr?.message);
+        console.warn('[SampleController.streamCompanyStudyPdf] Storage stream failed, generating document on the fly:', streamErr?.message);
       }
     }
 
-    // Dynamic on-the-fly generation: Executive Company Study PDF
+    // 3. Dynamic on-the-fly generation: Executive Company Study PDF
     return streamGeneratedCompanyStudyPdf(sample, res, download === 'true');
   } catch (error) {
     console.error('[SampleController.streamCompanyStudyPdf] Error:', error);
@@ -474,51 +490,54 @@ export const streamLeadPitchDeck = async (req, res) => {
       return String(l.id) === String(leadId) || String(genId) === String(leadId) || String(idx + 1) === String(leadId);
     });
 
-    // If PDF was saved directly as base64 data URL
-    if (lead?.pitchDeckPdf && lead.pitchDeckPdf.startsWith('data:application/pdf;base64,')) {
-      const base64Data = lead.pitchDeckPdf.replace(/^data:application\/pdf;base64,/, '');
-      const buffer = Buffer.from(base64Data, 'base64');
-      const fname = (lead.pitchDeckPdfName || lead.pitchDeck?.fileName || `${lead.name || 'Lead'}_Pitch_Deck.pdf`).replace(/["\r\n]/g, '_');
+    // 1. If PDF was saved directly as base64 data URL
+    const rawPdf = lead?.pitchDeckPdf || lead?.pitchDeck?.streamUrl;
+    if (rawPdf && isDataUrl(rawPdf)) {
+      const parsed = parseDataUrl(rawPdf);
+      const fname = (lead?.pitchDeckPdfName || lead?.pitchDeck?.fileName || `${lead?.name || 'Lead'}_Pitch_Deck.pdf`).replace(/["\r\n]/g, '_');
       const disposition = download === 'true' ? `attachment; filename="${fname}"` : `inline; filename="${fname}"`;
       res.writeHead(200, {
         'Content-Type': 'application/pdf',
         'Content-Disposition': disposition,
-        'Content-Length': buffer.length,
+        'Content-Length': parsed.buffer.length,
         'Cache-Control': 'public, max-age=3600',
       });
-      return res.end(buffer);
+      return res.end(parsed.buffer);
     }
 
-    let assetKey = lead?.pitchDeck?.assetKey || sample.pitchDeck?.assetKey;
-    let fileName = lead?.pitchDeck?.fileName || sample.pitchDeck?.fileName || 'Proposal_Pitch_Deck.pdf';
+    // 2. If PDF assetKey is in Object Storage
+    let assetKey = lead?.pitchDeck?.assetKey || lead?.pitchDeckAssetKey || sample.pitchDeck?.assetKey;
+    let fileName = lead?.pitchDeck?.fileName || lead?.pitchDeckPdfName || sample.pitchDeck?.fileName || 'Proposal_Pitch_Deck.pdf';
 
-    if (!assetKey) {
-      return res.status(404).json({
-        success: false,
-        message: 'Pitch deck document for this lead is not currently available.',
-      });
+    if (assetKey) {
+      try {
+        fileName = fileName.replace(/["\r\n]/g, '_');
+        const stat = await getObjectStat(assetKey).catch(() => null);
+        const stream = await getFileStream(assetKey);
+
+        const disposition = download === 'true'
+          ? `attachment; filename="${fileName}"`
+          : `inline; filename="${fileName}"`;
+
+        const headers = {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': disposition,
+          'Cache-Control': 'public, max-age=3600',
+        };
+
+        if (stat?.size) {
+          headers['Content-Length'] = stat.size;
+        }
+
+        res.writeHead(200, headers);
+        return stream.pipe(res);
+      } catch (streamErr) {
+        console.warn('[streamLeadPitchDeck] Storage stream failed, generating fallback deck:', streamErr?.message);
+      }
     }
 
-    fileName = fileName.replace(/["\r\n]/g, '_');
-    const stat = await getObjectStat(assetKey).catch(() => null);
-    const stream = await getFileStream(assetKey);
-
-    const disposition = download === 'true'
-      ? `attachment; filename="${fileName}"`
-      : `inline; filename="${fileName}"`;
-
-    const headers = {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': disposition,
-      'Cache-Control': 'public, max-age=3600',
-    };
-
-    if (stat?.size) {
-      headers['Content-Length'] = stat.size;
-    }
-
-    res.writeHead(200, headers);
-    return stream.pipe(res);
+    // 3. Dynamic fallback generation: Executive Proposal Pitch Deck PDF
+    return streamGeneratedPitchDeckPdf(sample, lead, res, download === 'true');
   } catch (error) {
     console.error('[SampleController.streamLeadPitchDeck] Error:', error);
     return res.status(500).json({
@@ -611,9 +630,9 @@ export const streamLeadStudyPdf = async (req, res) => {
  */
 
 /**
- * Helper to offload base64 PDF payloads in leads array to object storage
+ * Helper to offload base64 PDF payloads in leads array to object storage, preserving existing asset keys
  */
-const processLeadsPayload = async (leads, slug) => {
+const processLeadsPayload = async (leads, slug, existingLeads = []) => {
   if (!Array.isArray(leads) || leads.length === 0) return [];
   const processed = [];
 
@@ -621,6 +640,26 @@ const processLeadsPayload = async (leads, slug) => {
     const l = { ...leads[idx] };
     const leadId = l.id || `lead-${Date.now()}-${idx + 1}`;
     l.id = leadId;
+
+    const existingLead = (existingLeads || []).find(
+      (el) => String(el.id) === String(leadId) || (el.name && l.name && String(el.name).toLowerCase() === String(l.name).toLowerCase())
+    );
+
+    // Preserve existing asset keys & phone if client didn't supply replacement
+    if (!l.leadStudyPdfAssetKey && existingLead?.leadStudyPdfAssetKey) {
+      l.leadStudyPdfAssetKey = existingLead.leadStudyPdfAssetKey;
+    }
+    if (!l.pitchDeckAssetKey && (existingLead?.pitchDeckAssetKey || existingLead?.pitchDeck?.assetKey)) {
+      l.pitchDeckAssetKey = existingLead.pitchDeckAssetKey || existingLead.pitchDeck?.assetKey;
+    }
+    if (existingLead?.pitchDeck?.assetKey && (!l.pitchDeck || !l.pitchDeck.assetKey)) {
+      if (!l.pitchDeck) l.pitchDeck = {};
+      l.pitchDeck.assetKey = existingLead.pitchDeck.assetKey;
+      l.pitchDeck.fileName = l.pitchDeck.fileName || existingLead.pitchDeck.fileName;
+    }
+    if (!l.phone && existingLead?.phone) {
+      l.phone = existingLead.phone;
+    }
 
     if (l.leadStudyPdf && isDataUrl(l.leadStudyPdf)) {
       try {
@@ -934,6 +973,20 @@ export const updateAdminSample = async (req, res) => {
       body.slug = cleanSlug(body.slug);
     }
 
+    // 1. Merge companyStudy preserving existing PDF keys
+    if (body.companyStudy) {
+      body.companyStudy = {
+        ...(sample.companyStudy || {}),
+        ...body.companyStudy,
+      };
+      if (!body.companyStudy.pdfAssetKey && sample.companyStudy?.pdfAssetKey) {
+        body.companyStudy.pdfAssetKey = sample.companyStudy.pdfAssetKey;
+        body.companyStudy.pdfFileName = sample.companyStudy.pdfFileName;
+        body.companyStudy.pdfFileSize = sample.companyStudy.pdfFileSize;
+        body.companyStudy.pdfMimeType = sample.companyStudy.pdfMimeType;
+      }
+    }
+
     if (body.companyStudy?.pdfFileDataUrl && isDataUrl(body.companyStudy.pdfFileDataUrl)) {
       try {
         const originalName = body.companyStudy.pdfFileName || `${sample.companyName}_Company_Study.pdf`;
@@ -953,6 +1006,19 @@ export const updateAdminSample = async (req, res) => {
         delete body.companyStudy.pdfFileDataUrl;
       } catch (uploadErr) {
         console.error('[updateAdminSample] Failed to upload company study PDF:', uploadErr.message);
+      }
+    }
+
+    // 2. Merge pitchDeck preserving existing assetKey
+    if (body.pitchDeck) {
+      body.pitchDeck = {
+        ...(sample.pitchDeck || {}),
+        ...body.pitchDeck,
+      };
+      if (!body.pitchDeck.assetKey && sample.pitchDeck?.assetKey) {
+        body.pitchDeck.assetKey = sample.pitchDeck.assetKey;
+        body.pitchDeck.fileName = sample.pitchDeck.fileName;
+        body.pitchDeck.fileSize = sample.pitchDeck.fileSize;
       }
     }
 
@@ -982,7 +1048,7 @@ export const updateAdminSample = async (req, res) => {
 
     if (Array.isArray(body.leads)) {
       const cleanLeadsInput = body.leads.filter((l) => !isMockDummyLead(l));
-      body.leads = await processLeadsPayload(cleanLeadsInput, body.slug || sample.slug);
+      body.leads = await processLeadsPayload(cleanLeadsInput, body.slug || sample.slug, sample.leads || []);
     }
 
     let effectiveLogoUrl = body.logoUrl !== undefined ? body.logoUrl : sample.logoUrl;
