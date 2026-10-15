@@ -25,6 +25,7 @@ import {
   Lock
 } from 'lucide-react';
 import { api } from '../../services/api';
+import './publicSample.css';
 
 /**
  * Ensures phone number masks strictly display with 'xxxxx' and no bullets
@@ -143,6 +144,18 @@ export default function PublicSampleDashboard() {
         setLoading(false);
       });
   }, [effectiveSlug]);
+
+  // Ensure body background is light and no horizontal scroll occurs on this page
+  useEffect(() => {
+    const originalBg = document.body.style.backgroundColor;
+    const originalOverflowX = document.body.style.overflowX;
+    document.body.style.backgroundColor = '#F8FAFC';
+    document.body.style.overflowX = 'hidden';
+    return () => {
+      document.body.style.backgroundColor = originalBg;
+      document.body.style.overflowX = originalOverflowX;
+    };
+  }, []);
 
   // Dynamic Prospect Extraction
   const companyName = sample?.companyName || sample?.companyStudy?.company || 'Target Organization';
@@ -312,126 +325,74 @@ export default function PublicSampleDashboard() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', color: '#0F172A', fontFamily: 'Inter, system-ui, -apple-system, sans-serif' }}>
+    <div className="public-sample-page">
       
-      {/* 1. TOP HEADER & NAVIGATION (View Page: Login and Sign Up Removed as requested in Image 5) */}
-      <header style={{ background: '#FFFFFF', borderBottom: '1px solid #E2E8F0', position: 'sticky', top: 0, zIndex: 50, backdropFilter: 'blur(8px)' }}>
-        <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* 1. TOP HEADER & NAVIGATION */}
+      <header className="sample-header">
+        <div className="sample-header-inner">
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div className="sample-brand-group">
             <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
-              <img src={BRAND_LOGO} alt={BRAND_NAME} style={{ height: '34px', width: 'auto', objectFit: 'contain' }} />
-              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
+              <img src={BRAND_LOGO} alt={BRAND_NAME} style={{ height: '30px', width: 'auto', objectFit: 'contain' }} />
+              <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
                 {BRAND_NAME}
               </span>
             </Link>
 
-            <span style={{ height: '20px', width: '1px', background: '#E2E8F0', margin: '0 4px' }} />
+            <span className="d-none d-sm-inline" style={{ height: '20px', width: '1px', background: '#E2E8F0', margin: '0 4px' }} />
 
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '5px 12px',
-              borderRadius: '20px',
-              background: '#F8FAFC',
-              border: '1px solid #E2E8F0',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              color: '#334155'
-            }}>
+            <div className="sample-brand-pill">
               <span>Personalized Intelligence for {companyName}</span>
             </div>
           </div>
 
-          {/* View page note: No login or sign-in buttons here */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#64748B', fontWeight: 600 }}>
+          <div className="sample-verified-badge">
             <ShieldCheck size={14} color="#10B981" />
-            <span>Verified Public Intelligence Briefing</span>
+            <span>Verified Intelligence Briefing</span>
           </div>
 
         </div>
       </header>
 
-      {/* 2. HERO SECTION (Item 1 & 2 Applied: Removed pills, button, subtext; Container is medium size with prominent logo) */}
-      <section style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)', borderBottom: '1px solid #E2E8F0', padding: '48px 24px 52px 24px' }}>
-        <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '40px', alignItems: 'center' }}>
+      {/* 2. HERO SECTION */}
+      <section className="sample-hero-section">
+        <div className="sample-hero-grid">
           
-          {/* Left Column: Title & Subtitle only (Pills and Explore button removed as requested in Image 1) */}
+          {/* Left Column: Title & Subtitle */}
           <div>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              background: '#EEF2FF',
-              border: '1px solid #C7D2FE',
-              color: '#4F46E5',
-              fontSize: '0.75rem',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '16px'
-            }}>
+            <div className="sample-hero-pill">
               <Sparkles size={14} />
-              <span>YOUR PERSONALIZED INTELLIGENCE BRIEFING</span>
+              <span>PERSONALIZED INTELLIGENCE BRIEFING</span>
             </div>
 
-            <h1 style={{
-              fontSize: '2.7rem',
-              fontWeight: 800,
-              color: '#0F172A',
-              lineHeight: 1.15,
-              letterSpacing: '-0.03em',
-              margin: '0 0 16px 0'
-            }}>
-              {companyName}’s next growth<br />opportunities, explored.
+            <h1 className="sample-hero-title">
+              {companyName}’s next growth opportunities, explored.
             </h1>
 
-            <p style={{
-              fontSize: '1.05rem',
-              color: '#475569',
-              lineHeight: 1.6,
-              margin: 0,
-              maxWidth: '560px'
-            }}>
+            <p className="sample-hero-desc">
               {sample.description || `Get a tailored view of your market position, key decision-makers, and strategic opportunities — all backed by real-time research and AI-powered insights.`}
             </p>
           </div>
 
-          {/* Right Column: Medium-Sized Container with Visible Company Logo (Point 1: Company Logo only, no industry/sector under it) */}
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div style={{
-              width: '100%',
-              maxWidth: '380px',
-              minHeight: '190px',
-              background: '#FFFFFF',
-              borderRadius: '20px',
-              border: '1px solid #E2E8F0',
-              padding: '28px 24px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-            }}>
+          {/* Right Column: Medium-Sized Container with Visible Company Logo */}
+          <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+            <div className="sample-hero-card">
               {companyLogo ? (
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  minHeight: '75px',
-                  marginBottom: '14px',
-                  padding: '4px 12px'
+                  minHeight: '70px',
+                  marginBottom: '12px',
+                  padding: '4px 12px',
+                  maxWidth: '100%'
                 }}>
                   <img
                     src={companyLogo}
                     alt={companyName}
                     style={{
-                      maxHeight: '75px',
-                      maxWidth: '220px',
+                      maxHeight: '70px',
+                      maxWidth: '100%',
                       objectFit: 'contain'
                     }}
                     onError={(e) => {
@@ -467,7 +428,7 @@ export default function PublicSampleDashboard() {
                 </div>
               )}
 
-              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', wordBreak: 'break-word' }}>
                 {companyName}
               </div>
             </div>
@@ -477,59 +438,33 @@ export default function PublicSampleDashboard() {
       </section>
 
       {/* MAIN CONTAINER */}
-      <main style={{ maxWidth: '1240px', margin: '0 auto', padding: '44px 24px' }}>
+      <main className="sample-main">
 
-        {/* SECTION 1: EXECUTIVE INTELLIGENCE (Item 3 Applied: View Full Analysis is a Clickable Button) */}
-        <section id="executive-intelligence" style={{ marginBottom: '52px' }}>
+        {/* SECTION 1: EXECUTIVE INTELLIGENCE */}
+        <section id="executive-intelligence" className="sample-section">
           
           {/* Section 1 Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '50%',
-                background: '#2563EB',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 800,
-                fontSize: '0.95rem'
-              }}>
+          <div className="sample-section-header">
+            <div className="sample-section-title-wrap">
+              <div className="sample-section-badge">
                 1
               </div>
               <div>
-                <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
+                <h2 className="sample-section-title">
                   Executive Intelligence
                 </h2>
-                <p style={{ fontSize: '0.85rem', color: '#64748B', margin: '2px 0 0 0' }}>
+                <p className="sample-section-subtitle">
                   Key findings about {companyName}’s business, market position and growth potential.
                 </p>
               </div>
             </div>
 
-            {/* Clickable Button for View Full Analysis PDF (as requested in Image 3) */}
+            {/* Clickable Button for View Full Analysis PDF */}
             <a
               href={companyStudy.pdfUrl || `/api/samples/${sample.slug}/company-study-pdf`}
               target="_blank"
               rel="noreferrer"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 18px',
-                borderRadius: '8px',
-                background: '#2563EB',
-                color: '#FFFFFF',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                textDecoration: 'none',
-                boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#1D4ED8'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#2563EB'; }}
+              className="sample-action-btn"
             >
               <FileText size={15} />
               <span>View Full Analysis PDF</span>
@@ -539,7 +474,7 @@ export default function PublicSampleDashboard() {
 
           {/* Industry / Sector Mini Cards */}
           {industrySectors.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '22px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '20px' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: '4px' }}>
                 Industry Sectors:
               </span>
@@ -567,8 +502,8 @@ export default function PublicSampleDashboard() {
             </div>
           )}
 
-          {/* 4 Cards Grid with Real Dynamic Content */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '18px', alignItems: 'stretch' }}>
+          {/* 4 Cards Grid */}
+          <div className="sample-grid-4">
             
             {/* Card 1: Company Overview */}
             <div style={{
@@ -759,29 +694,18 @@ export default function PublicSampleDashboard() {
         </section>
 
         {/* SECTION 2: WHAT THIS COULD MEAN FOR YOUR BUSINESS */}
-        <section style={{ marginBottom: '52px' }}>
+        <section className="sample-section">
           
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '50%',
-                background: '#2563EB',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 800,
-                fontSize: '0.95rem'
-              }}>
+          <div className="sample-section-header">
+            <div className="sample-section-title-wrap">
+              <div className="sample-section-badge">
                 2
               </div>
               <div>
-                <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
+                <h2 className="sample-section-title">
                   What this could mean for your business
                 </h2>
-                <p style={{ fontSize: '0.85rem', color: '#64748B', margin: '2px 0 0 0' }}>
+                <p className="sample-section-subtitle">
                   How {companyName}’s position and market dynamics create opportunities for your team.
                 </p>
               </div>
@@ -796,13 +720,15 @@ export default function PublicSampleDashboard() {
               border: '1px solid #E2E8F0',
               fontSize: '0.78rem',
               fontWeight: 600,
-              color: '#475569'
+              color: '#475569',
+              maxWidth: '100%',
+              wordBreak: 'break-word'
             }}>
               <span>Research-backed insights · Not financial advice</span>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', alignItems: 'stretch' }}>
+          <div className="sample-grid-3">
             
             {/* Column 1 */}
             <div style={{
@@ -901,31 +827,20 @@ export default function PublicSampleDashboard() {
 
         </section>
 
-        {/* SECTION 3: DECISION-MAKER INTELLIGENCE (Item 4 & 6 Applied: Two clean containers for Company Specific & Lead Specific; Only real uploaded leads) */}
-        <section style={{ marginBottom: '52px' }}>
+        {/* SECTION 3: DECISION-MAKER INTELLIGENCE */}
+        <section className="sample-section">
           
           {/* Section 3 Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '50%',
-                background: '#2563EB',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 800,
-                fontSize: '0.95rem'
-              }}>
+          <div className="sample-section-header">
+            <div className="sample-section-title-wrap">
+              <div className="sample-section-badge">
                 3
               </div>
               <div>
-                <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
+                <h2 className="sample-section-title">
                   Decision-maker intelligence
                 </h2>
-                <p style={{ fontSize: '0.85rem', color: '#64748B', margin: '2px 0 0 0' }}>
+                <p className="sample-section-subtitle">
                   A preview of the people relevant to your target account.
                 </p>
               </div>
@@ -941,37 +856,27 @@ export default function PublicSampleDashboard() {
               border: '1px solid #A7F3D0',
               fontSize: '0.8rem',
               fontWeight: 700,
-              color: '#065F46'
+              color: '#065F46',
+              maxWidth: '100%',
+              wordBreak: 'break-word'
             }}>
               <Users size={14} />
               <span>{featuredLead ? 1 + lockedLeads.length : 0} profiles available (1 featured, {lockedLeads.length} locked)</span>
             </div>
           </div>
 
-          {/* Featured Profile Card (Clean outer card - details live inside dossier modal) */}
+          {/* Featured Profile Card */}
           {featuredLead ? (
-            <div style={{
-              background: '#FFFFFF',
-              borderRadius: '16px',
-              border: '1px solid #E2E8F0',
-              padding: '28px 32px',
-              marginBottom: '32px',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '24px',
-            }}>
+            <div className="featured-lead-card">
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: '1 1 360px' }}>
+              <div className="featured-lead-info">
                 {resolveLeadLogo(featuredLead) ? (
                   <img
                     src={resolveLeadLogo(featuredLead)}
                     alt={featuredLead.name}
                     style={{
-                      width: '68px',
-                      height: '68px',
+                      width: '64px',
+                      height: '64px',
                       borderRadius: '50%',
                       objectFit: 'cover',
                       border: '2px solid #E2E8F0',
@@ -987,37 +892,37 @@ export default function PublicSampleDashboard() {
                 ) : null}
                 <div style={{
                   display: resolveLeadLogo(featuredLead) ? 'none' : 'flex',
-                  width: '68px',
-                  height: '68px',
+                  width: '64px',
+                  height: '64px',
                   borderRadius: '50%',
                   background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
                   color: '#2563EB',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 800,
-                  fontSize: '1.6rem',
+                  fontSize: '1.5rem',
                   border: '2px solid #E2E8F0',
                   flexShrink: 0
                 }}>
                   {featuredLead.name?.charAt(0) || 'L'}
                 </div>
 
-                <div>
+                <div style={{ flex: '1 1 auto', minWidth: 0 }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     {featuredLead.company || companyName}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                    <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                    <h3 style={{ fontSize: 'clamp(1.15rem, 3.5vw, 1.3rem)', fontWeight: 800, color: '#0F172A', margin: 0, wordBreak: 'break-word' }}>
                       {featuredLead.name}
                     </h3>
                     <CheckCircle2 size={18} color="#10B981" />
                   </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2563EB', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2563EB', marginTop: '2px', wordBreak: 'break-word' }}>
                     {featuredLead.title || 'Executive Decision Maker'} · {featuredLead.company || companyName}
                   </div>
 
                   {featuredLead.whySuitsBest && (
-                    <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: 1.5, margin: '8px 0 0 0', maxWidth: '680px' }}>
+                    <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: 1.5, margin: '8px 0 0 0', maxWidth: '680px', wordBreak: 'break-word' }}>
                       {featuredLead.whySuitsBest}
                     </p>
                   )}
@@ -1027,25 +932,8 @@ export default function PublicSampleDashboard() {
               {/* Action Button to inspect internal container */}
               <button
                 type="button"
+                className="featured-lead-btn"
                 onClick={() => setSelectedLead(featuredLead)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '13px 24px',
-                  borderRadius: '10px',
-                  background: '#2563EB',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#1D4ED8'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#2563EB'; }}
               >
                 <span>Inspect Full Dossier</span>
                 <ArrowRight size={16} />
@@ -1063,10 +951,10 @@ export default function PublicSampleDashboard() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '8px' }}>
                 <div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.01em' }}>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.01em', wordBreak: 'break-word' }}>
                     Additional target accounts & decision-makers
                   </div>
-                  <div style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '2px', wordBreak: 'break-word' }}>
                     Target profiles for this prospect dossier ({lockedLeads.length} locked in sample preview).
                   </div>
                 </div>
@@ -1081,14 +969,15 @@ export default function PublicSampleDashboard() {
                   border: '1px solid #FDE68A',
                   fontSize: '0.78rem',
                   fontWeight: 700,
-                  color: '#92400E'
+                  color: '#92400E',
+                  flexShrink: 0
                 }}>
                   <Lock size={13} color="#D97706" />
                   <span>{lockedLeads.length} Profiles Locked</span>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+              <div className="sample-grid-4">
                 {lockedLeads.map((item, idx) => {
                   const leadLogoUrl = resolveLeadLogo(item);
                   const effectiveCompany = item.company || sample?.companyName || 'Target Organization';
@@ -1264,12 +1153,12 @@ export default function PublicSampleDashboard() {
 
       </main>
 
-      {/* 5. TRUST FOOTER (Item 5 Applied: Login and Sign Up completely removed from footer) */}
-      <footer style={{ background: '#FFFFFF', borderTop: '1px solid #E2E8F0', padding: '28px 24px', textAlign: 'center' }}>
+      {/* 5. TRUST FOOTER */}
+      <footer style={{ background: '#FFFFFF', borderTop: '1px solid #E2E8F0', padding: '24px 16px', textAlign: 'center', width: '100%' }}>
         <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#64748B' }}>
-            <ShieldCheck size={16} color="#10B981" />
-            <span>{BRAND_NAME} Protected Intelligence Showcase · Enterprise SLA & Tenant Isolation</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '6px', fontSize: '0.8rem', color: '#64748B' }}>
+            <ShieldCheck size={16} color="#10B981" style={{ flexShrink: 0 }} />
+            <span style={{ wordBreak: 'break-word', lineHeight: 1.45 }}>{BRAND_NAME} Protected Intelligence Showcase · Enterprise SLA & Tenant Isolation</span>
           </div>
         </div>
       </footer>
@@ -1287,15 +1176,15 @@ export default function PublicSampleDashboard() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 9999,
-            padding: '20px',
+            padding: 'clamp(10px, 3vw, 20px)',
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
               background: '#FFFFFF',
-              borderRadius: '20px',
-              padding: '36px 32px',
+              borderRadius: 'clamp(14px, 3vw, 20px)',
+              padding: 'clamp(24px, 5vw, 36px) clamp(16px, 4vw, 32px)',
               maxWidth: '460px',
               width: '100%',
               boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
@@ -1308,8 +1197,8 @@ export default function PublicSampleDashboard() {
               onClick={() => setLockedLeadNotice(null)}
               style={{
                 position: 'absolute',
-                top: '16px',
-                right: '16px',
+                top: '14px',
+                right: '14px',
                 background: '#F1F5F9',
                 border: 'none',
                 borderRadius: '50%',
@@ -1327,25 +1216,25 @@ export default function PublicSampleDashboard() {
 
             <div
               style={{
-                width: '56px',
-                height: '56px',
+                width: '52px',
+                height: '52px',
                 borderRadius: '16px',
                 background: '#FEF3C7',
                 color: '#D97706',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                margin: '0 auto 18px auto',
+                margin: '0 auto 16px auto',
               }}
             >
-              <Lock size={26} />
+              <Lock size={24} />
             </div>
 
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>
+            <h3 style={{ fontSize: 'clamp(1.1rem, 3.5vw, 1.25rem)', fontWeight: 800, color: '#0F172A', marginBottom: '8px', wordBreak: 'break-word' }}>
               Decision-Maker Profile Locked
             </h3>
 
-            <p style={{ fontSize: '0.88rem', color: '#64748B', lineHeight: '1.5', marginBottom: '18px' }}>
+            <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: '1.5', marginBottom: '18px', wordBreak: 'break-word' }}>
               Direct contact details, verified mobile phone, and tailored intelligence dossier for <strong style={{ color: '#0F172A' }}>{lockedLeadNotice.name}</strong> at <strong style={{ color: '#0F172A' }}>{lockedLeadNotice.company || companyName}</strong> are locked in this sample preview.
             </p>
 
@@ -1353,14 +1242,15 @@ export default function PublicSampleDashboard() {
               background: '#F8FAFC',
               border: '1px solid #E2E8F0',
               borderRadius: '12px',
-              padding: '16px',
+              padding: '14px 16px',
               marginBottom: '20px',
               textAlign: 'left',
               fontSize: '0.82rem',
               color: '#475569',
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px'
+              gap: '6px',
+              wordBreak: 'break-word'
             }}>
               <div><strong>Target Account:</strong> {lockedLeadNotice.company || companyName}</div>
               <div><strong>Decision Maker:</strong> {lockedLeadNotice.name} ({lockedLeadNotice.title || 'Executive'})</div>
@@ -1400,7 +1290,7 @@ export default function PublicSampleDashboard() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '20px',
+            padding: 'clamp(10px, 3vw, 20px)',
           }}
           onClick={() => setSelectedLead(null)}
         >
@@ -1408,10 +1298,10 @@ export default function PublicSampleDashboard() {
             onClick={(e) => e.stopPropagation()}
             style={{
               backgroundColor: '#FFFFFF',
-              borderRadius: '20px',
+              borderRadius: 'clamp(14px, 3vw, 20px)',
               maxWidth: '680px',
               width: '100%',
-              maxHeight: '90vh',
+              maxHeight: '92vh',
               overflowY: 'auto',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
               border: '1px solid #E2E8F0',
@@ -1421,13 +1311,13 @@ export default function PublicSampleDashboard() {
           >
             {/* Modal Header */}
             <div style={{
-              padding: '24px 28px',
+              padding: 'clamp(14px, 3.5vw, 22px) clamp(16px, 4vw, 28px)',
               borderBottom: '1px solid #F1F5F9',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               background: '#F8FAFC',
-              borderRadius: '20px 20px 0 0',
+              borderRadius: 'clamp(14px, 3vw, 20px) clamp(14px, 3vw, 20px) 0 0',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 {selectedLead.logo || selectedLead.avatarUrl ? (
@@ -1485,32 +1375,32 @@ export default function PublicSampleDashboard() {
                 : formatMaskedPhone(selectedLead.phone || selectedLead.maskedPhone);
 
               return (
-                <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div style={{ padding: 'clamp(16px, 3.5vw, 22px) clamp(16px, 4vw, 28px)', display: 'flex', flexDirection: 'column', gap: '18px' }}>
                   <div>
                     <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
                       EXECUTIVE PROFILE
                     </div>
-                    <p style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.6, margin: 0 }}>
+                    <p style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.6, margin: 0, wordBreak: 'break-word' }}>
                       {selectedLead.whySuitsBest || selectedLead.shortSummary || 'Direct budget decision maker aligned with key pain points and strategic initiatives.'}
                     </p>
                   </div>
 
                   {/* 1. Company Specific Container (Image 2) */}
-                  <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px 20px' }}>
+                  <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px 18px' }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Building2 size={16} color="#2563EB" />
                       <span>COMPANY SPECIFIC</span>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.86rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ color: '#64748B', fontWeight: 600 }}>Company Web:</span>
+                      <div className="dossier-info-row">
+                        <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Company Web:</span>
                         {(selectedLead.companyLink || sample?.companyStudy?.website) ? (
                           <a
                             href={(selectedLead.companyLink || sample?.companyStudy?.website).startsWith('http') ? (selectedLead.companyLink || sample?.companyStudy?.website) : `https://${selectedLead.companyLink || sample?.companyStudy?.website}`}
                             target="_blank"
                             rel="noreferrer"
-                            style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
                           >
                             <Globe size={14} style={{ flexShrink: 0 }} />
                             <span>{shortenUrl(selectedLead.companyLink || sample?.companyStudy?.website, 32)}</span>
@@ -1521,14 +1411,14 @@ export default function PublicSampleDashboard() {
                         )}
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ color: '#64748B', fontWeight: 600 }}>Company LinkedIn:</span>
+                      <div className="dossier-info-row">
+                        <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Company LinkedIn:</span>
                         {(selectedLead.companyLinkedin || sample?.companyStudy?.linkedin) ? (
                           <a
                             href={(selectedLead.companyLinkedin || sample?.companyStudy?.linkedin).startsWith('http') ? (selectedLead.companyLinkedin || sample?.companyStudy?.linkedin) : `https://${selectedLead.companyLinkedin || sample?.companyStudy?.linkedin}`}
                             target="_blank"
                             rel="noreferrer"
-                            style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
                           >
                             <Linkedin size={14} color="#0A66C2" style={{ flexShrink: 0 }} />
                             <span>{shortenUrl(selectedLead.companyLinkedin || sample?.companyStudy?.linkedin, 32)}</span>
@@ -1542,7 +1432,7 @@ export default function PublicSampleDashboard() {
                   </div>
 
                   {/* 2. Lead Specific Container (Image 2) */}
-                  <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px 20px' }}>
+                  <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px 18px' }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Users size={16} color="#7C3AED" />
                       <span>LEAD SPECIFIC</span>
@@ -1550,19 +1440,19 @@ export default function PublicSampleDashboard() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.86rem' }}>
                       {/* Lead Mail */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Mail:</span>
+                      <div className="dossier-info-row">
+                        <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead Mail:</span>
                         {leadMail ? (
                           isLeadUnlocked ? (
                             <a
                               href={`mailto:${leadMail}`}
-                              style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                              style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
                             >
                               <Mail size={14} color="#2563EB" style={{ flexShrink: 0 }} />
                               <span>{leadMail}</span>
                             </a>
                           ) : (
-                            <span style={{ color: '#475569', fontFamily: 'monospace', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: '#475569', fontFamily: 'monospace', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}>
                               <Mail size={14} color="#94A3B8" style={{ flexShrink: 0 }} />
                               <span>{leadMail}</span>
                             </span>
@@ -1573,31 +1463,31 @@ export default function PublicSampleDashboard() {
                       </div>
 
                       {/* Lead Phone */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Phone:</span>
-                        <span style={{ color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <div className="dossier-info-row">
+                        <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead Phone:</span>
+                        <span style={{ color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}>
                           <Phone size={14} color="#059669" style={{ flexShrink: 0 }} />
                           <span>{leadPhone}</span>
                         </span>
                       </div>
 
                       {/* Lead Role */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Role:</span>
-                        <span style={{ color: '#0F172A', fontWeight: 800 }}>
+                      <div className="dossier-info-row">
+                        <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead Role:</span>
+                        <span style={{ color: '#0F172A', fontWeight: 800, wordBreak: 'break-word' }}>
                           {selectedLead.title?.trim() || 'Executive Decision Maker'}
                         </span>
                       </div>
 
                       {/* Lead LinkedIn URL */}
                       {selectedLead.linkedin && !selectedLead.linkedin.includes('/company/') && (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                          <span style={{ color: '#64748B', fontWeight: 600 }}>Lead LinkedIn:</span>
+                        <div className="dossier-info-row">
+                          <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead LinkedIn:</span>
                           <a
                             href={selectedLead.linkedin.startsWith('http') ? selectedLead.linkedin : `https://${selectedLead.linkedin}`}
                             target="_blank"
                             rel="noreferrer"
-                            style={{ color: '#0A66C2', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            style={{ color: '#0A66C2', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
                           >
                             <Linkedin size={14} color="#0A66C2" style={{ flexShrink: 0 }} />
                             <span>{shortenUrl(selectedLead.linkedin, 32)}</span>
