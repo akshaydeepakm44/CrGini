@@ -213,7 +213,7 @@ export const getPublicSampleBySlug = async (req, res) => {
         aboutCompany: l.aboutCompany || l.company_summary || '',
         whySuitsBest: l.whySuitsBest || l.why_suits_best || l.shortSummary || '',
         maskedEmail: l.maskedEmail || maskEmail(l.email),
-        phone: l.phone ? `${l.phone.slice(0, 4)} xxxxx` : '+1 (xxx) xxx-xxxx',
+        phone: isFirstLead ? (l.phone || l.directPhone || '+1 (555) 234-8900') : (l.phone ? `${l.phone.slice(0, 4)} xxxxx` : '+1 (xxx) xxx-xxxx'),
         maskedPhone: l.phone ? `${l.phone.slice(0, 4)} xxxxx` : '+1 (xxx) xxx-xxxx',
         shortSummary: l.shortSummary || l.summary || l.whySuitsBest || '',
         leadStudy: {
