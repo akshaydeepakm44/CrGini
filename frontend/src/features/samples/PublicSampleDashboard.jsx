@@ -228,14 +228,16 @@ export default function PublicSampleDashboard() {
     );
   };
 
-  // Resolve best logo for any lead (uploaded logo -> company link favicon -> showcase company logo)
-  const resolveLeadLogo = (lead) => {
+  // Resolve best logo for any lead (uploaded logo -> lead's own company domain favicon -> null)
+  // Ensures leads ONLY show their own uploaded logo and NEVER duplicate the main company logo
+  const resolveLeadLogo = (lead, isFeatured = false) => {
     const isPlatformLogo = (url) => {
       if (!url || typeof url !== 'string') return true;
       const clean = url.trim().toLowerCase();
       return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
     };
 
+    // 1. Direct lead logo uploaded specifically for this lead
     if (lead?.logo && !isPlatformLogo(lead.logo)) {
       return lead.logo;
     }
@@ -245,6 +247,8 @@ export default function PublicSampleDashboard() {
     if (lead?.avatarUrl && !isPlatformLogo(lead.avatarUrl)) {
       return lead.avatarUrl;
     }
+
+    // 2. Lead's own company website domain favicon
     const rawLink = lead?.companyLink || lead?.website;
     if (rawLink && typeof rawLink === 'string') {
       let cleanDomain = rawLink
@@ -257,7 +261,14 @@ export default function PublicSampleDashboard() {
         return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain.toLowerCase()}&size=128`;
       }
     }
-    return companyLogo || null;
+
+    // 3. For the featured primary lead (#1), if its company is the main showcase company, it may fall back to the showcase logo
+    if (isFeatured && (lead?.company === companyName || !lead?.company)) {
+      return companyLogo || null;
+    }
+
+    // For all other uploaded leads, DO NOT duplicate the main company logo!
+    return null;
   };
 
   // ONLY display the leads that are actually uploaded (no fake/synthetic leads!)
@@ -873,9 +884,9 @@ export default function PublicSampleDashboard() {
             <div className="featured-lead-card">
               
               <div className="featured-lead-info">
-                {resolveLeadLogo(featuredLead) ? (
+                {resolveLeadLogo(featuredLead, true) ? (
                   <img
-                    src={resolveLeadLogo(featuredLead)}
+                    src={resolveLeadLogo(featuredLead, true)}
                     alt={featuredLead.name}
                     style={{
                       width: '64px',
@@ -894,7 +905,7 @@ export default function PublicSampleDashboard() {
                   />
                 ) : null}
                 <div style={{
-                  display: resolveLeadLogo(featuredLead) ? 'none' : 'flex',
+                  display: resolveLeadLogo(featuredLead, true) ? 'none' : 'flex',
                   width: '64px',
                   height: '64px',
                   borderRadius: '50%',
@@ -982,7 +993,7 @@ export default function PublicSampleDashboard() {
 
               <div className="sample-grid-4">
                 {lockedLeads.map((item, idx) => {
-                  const leadLogoUrl = resolveLeadLogo(item);
+                  const leadLogoUrl = resolveLeadLogo(item, false);
                   const effectiveCompany = item.company || sample?.companyName || 'Target Organization';
 
                   return (

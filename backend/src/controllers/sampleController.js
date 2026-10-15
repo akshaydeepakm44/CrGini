@@ -158,17 +158,20 @@ export const getPublicSampleBySlug = async (req, res) => {
       const hasLeadStudy = Boolean(l.leadStudyPdfAssetKey || l.leadStudyPdf || l.leadStudy);
       const leadStudyUrl = `/api/samples/${sample.slug}/leads/${leadId}/lead-study-pdf`;
 
-      // Extract real or inferred company link / website
-      let companyLink = l.companyLink || l.company_link || l.website || l.companyWebsite || l.domain || publicCompanyStudy.website || '';
+      // Extract real or inferred company link / website (do NOT inherit main company website for other leads)
+      let companyLink = l.companyLink || l.company_link || l.website || l.companyWebsite || l.domain || '';
+      if (!companyLink && isFirstLead && (l.company === sample.companyName || !l.company)) {
+        companyLink = publicCompanyStudy.website || '';
+      }
       if (!companyLink && l.company && l.company.includes('.')) {
         companyLink = l.company.startsWith('http') ? l.company : `https://${l.company}`;
-      } else if (!companyLink && sample.companyName && sample.companyName.includes('.')) {
+      } else if (!companyLink && isFirstLead && sample.companyName && sample.companyName.includes('.')) {
         companyLink = `https://${sample.companyName}`;
       }
 
       // Intelligent separation: Company LinkedIn vs Personal Lead LinkedIn
       const rawLinkedin = (l.linkedin || l.linkedinUrl || l.linkedin_url || l.linkedinProfile || '').trim();
-      let companyLinkedinUrl = (l.companyLinkedin || l.company_linkedin || publicCompanyStudy.linkedin || '').trim();
+      let companyLinkedinUrl = (l.companyLinkedin || l.company_linkedin || (isFirstLead ? publicCompanyStudy.linkedin : '') || '').trim();
       let personalLinkedinUrl = '';
 
       if (rawLinkedin.includes('/company/')) {
@@ -193,7 +196,10 @@ export const getPublicSampleBySlug = async (req, res) => {
           .split('/')[0]
           .trim();
         if (cleanDomain && cleanDomain.includes('.')) {
-          leadLogo = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`;
+          const isMainDomain = validWebsiteDomain && cleanDomain.toLowerCase().includes(validWebsiteDomain);
+          if (isFirstLead || !isMainDomain) {
+            leadLogo = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`;
+          }
         }
       }
       if (leadLogo && isDataUrl(leadLogo)) {
