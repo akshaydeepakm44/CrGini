@@ -948,236 +948,108 @@ export default function PublicSampleDashboard() {
             </div>
           </div>
 
-          {/* Featured Profile Card (First lead uploaded - All details fully visible) */}
+          {/* Featured Profile Card (Clean outer card - details live inside dossier modal) */}
           {featuredLead ? (
             <div style={{
               background: '#FFFFFF',
               borderRadius: '16px',
               border: '1px solid #E2E8F0',
-              padding: '28px',
+              padding: '28px 32px',
               marginBottom: '32px',
               boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-              gap: '28px',
-              alignItems: 'stretch'
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '24px',
             }}>
               
-              {/* Left Column: Identity, Bio, & Role Badges */}
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '18px', marginBottom: '18px' }}>
-                    {resolveLeadLogo(featuredLead) ? (
-                      <img
-                        src={resolveLeadLogo(featuredLead)}
-                        alt={featuredLead.name}
-                        style={{
-                          width: '68px',
-                          height: '68px',
-                          borderRadius: '50%',
-                          objectFit: 'cover',
-                          border: '2px solid #E2E8F0',
-                          flexShrink: 0
-                        }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          if (e.currentTarget.nextSibling) {
-                            e.currentTarget.nextSibling.style.display = 'flex';
-                          }
-                        }}
-                      />
-                    ) : null}
-                    <div style={{
-                      display: resolveLeadLogo(featuredLead) ? 'none' : 'flex',
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: '1 1 360px' }}>
+                {resolveLeadLogo(featuredLead) ? (
+                  <img
+                    src={resolveLeadLogo(featuredLead)}
+                    alt={featuredLead.name}
+                    style={{
                       width: '68px',
                       height: '68px',
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
-                      color: '#2563EB',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 800,
-                      fontSize: '1.6rem',
+                      objectFit: 'cover',
                       border: '2px solid #E2E8F0',
                       flexShrink: 0
-                    }}>
-                      {featuredLead.name?.charAt(0) || 'L'}
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        {featuredLead.company || companyName}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
-                          {featuredLead.name}
-                        </h3>
-                        <CheckCircle2 size={16} color="#10B981" />
-                      </div>
-                      <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#2563EB', marginTop: '2px' }}>
-                        {featuredLead.title || 'Executive Decision Maker'} · {featuredLead.company || companyName}
-                      </div>
-                    </div>
-                  </div>
-
-                  <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.55, margin: '0 0 16px 0' }}>
-                    {featuredLead.whySuitsBest || featuredLead.shortSummary || 'Direct budget decision maker aligned with key pain points and strategic initiatives.'}
-                  </p>
+                    }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      if (e.currentTarget.nextSibling) {
+                        e.currentTarget.nextSibling.style.display = 'flex';
+                      }
+                    }}
+                  />
+                ) : null}
+                <div style={{
+                  display: resolveLeadLogo(featuredLead) ? 'none' : 'flex',
+                  width: '68px',
+                  height: '68px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                  color: '#2563EB',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '1.6rem',
+                  border: '2px solid #E2E8F0',
+                  flexShrink: 0
+                }}>
+                  {featuredLead.name?.charAt(0) || 'L'}
                 </div>
 
-                {/* Badges */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
-                  <span style={{
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    background: '#ECFDF5',
-                    color: '#047857',
-                    border: '1px solid #A7F3D0',
-                    fontSize: '0.75rem',
-                    fontWeight: 700
-                  }}>
-                    {featuredLead.industry || 'Verified role'}
-                  </span>
-                  <span style={{
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    background: '#EFF6FF',
-                    color: '#1D4ED8',
-                    border: '1px solid #BFDBFE',
-                    fontSize: '0.75rem',
-                    fontWeight: 700
-                  }}>
-                    Direct Decision Maker
-                  </span>
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {featuredLead.company || companyName}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                    <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                      {featuredLead.name}
+                    </h3>
+                    <CheckCircle2 size={18} color="#10B981" />
+                  </div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2563EB', marginTop: '2px' }}>
+                    {featuredLead.title || 'Executive Decision Maker'} · {featuredLead.company || companyName}
+                  </div>
+
+                  {featuredLead.whySuitsBest && (
+                    <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: 1.5, margin: '8px 0 0 0', maxWidth: '680px' }}>
+                      {featuredLead.whySuitsBest}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Right Column: All details visible directly (Company Specific & Lead Specific) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', justifyContent: 'space-between' }}>
-                
-                {/* 1. Company Specific Container */}
-                <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '14px 16px' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Building2 size={14} color="#2563EB" />
-                    <span>Company Specific</span>
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>Company Web:</span>
-                      {(featuredLead.companyLink || sample?.companyStudy?.website) ? (
-                        <a href={(featuredLead.companyLink || sample?.companyStudy?.website).startsWith('http') ? (featuredLead.companyLink || sample?.companyStudy?.website) : `https://${featuredLead.companyLink || sample?.companyStudy?.website}`} target="_blank" rel="noreferrer" style={{ color: '#2563EB', textDecoration: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Globe size={12} />
-                          <span>{shortenUrl(featuredLead.companyLink || sample?.companyStudy?.website)}</span>
-                          <ExternalLink size={10} />
-                        </a>
-                      ) : (
-                        <span style={{ color: '#94A3B8' }}>Not specified</span>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>Company LinkedIn:</span>
-                      {(featuredLead.companyLinkedin || sample?.companyStudy?.linkedin) ? (
-                        <a href={(featuredLead.companyLinkedin || sample?.companyStudy?.linkedin).startsWith('http') ? (featuredLead.companyLinkedin || sample?.companyStudy?.linkedin) : `https://${featuredLead.companyLinkedin || sample?.companyStudy?.linkedin}`} target="_blank" rel="noreferrer" style={{ color: '#2563EB', textDecoration: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Linkedin size={12} color="#0A66C2" />
-                          <span>{shortenUrl(featuredLead.companyLinkedin || sample?.companyStudy?.linkedin)}</span>
-                          <ExternalLink size={10} />
-                        </a>
-                      ) : (
-                        <span style={{ color: '#94A3B8' }}>Not specified</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Lead Specific Container (Mail, Phone, Role, Profile all visible) */}
-                <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '14px 16px' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Users size={14} color="#7C3AED" />
-                    <span>Lead Specific</span>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem' }}>
-                    {/* Lead Mail - Fully visible and clickable */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Mail:</span>
-                      {featuredLead.email ? (
-                        <a
-                          href={`mailto:${featuredLead.email}`}
-                          style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <Mail size={12} color="#2563EB" />
-                          <span>{featuredLead.email}</span>
-                        </a>
-                      ) : (
-                        <span style={{ color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Mail size={12} color="#2563EB" />
-                          <span>contact@{companyStudy?.website ? companyStudy.website.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] : 'company.com'}</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Lead Phone - Fully visible */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Phone:</span>
-                      <span style={{ color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <Phone size={12} color="#059669" />
-                        <span>{featuredLead.phone || '+1 (555) 234-8900'}</span>
-                      </span>
-                    </div>
-
-                    {/* Lead Role */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Role:</span>
-                      <span style={{ color: '#0F172A', fontWeight: 700 }}>
-                        {featuredLead.title || 'Executive Decision Maker'}
-                      </span>
-                    </div>
-
-                    {/* Lead LinkedIn Profile */}
-                    {featuredLead.linkedin && (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Profile:</span>
-                        <a href={featuredLead.linkedin.startsWith('http') ? featuredLead.linkedin : `https://${featuredLead.linkedin}`} target="_blank" rel="noreferrer" style={{ color: '#0A66C2', textDecoration: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Linkedin size={12} />
-                          <span>{shortenUrl(featuredLead.linkedin)}</span>
-                          <ExternalLink size={10} />
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Action Button to inspect internal container */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedLead(featuredLead)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    width: '100%',
-                    padding: '11px 18px',
-                    borderRadius: '10px',
-                    background: '#2563EB',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    fontSize: '0.88rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#1D4ED8'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = '#2563EB'; }}
-                >
-                  <span>Inspect Full Dossier</span>
-                  <ArrowRight size={15} />
-                </button>
-
-              </div>
+              {/* Action Button to inspect internal container */}
+              <button
+                type="button"
+                onClick={() => setSelectedLead(featuredLead)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '13px 24px',
+                  borderRadius: '10px',
+                  background: '#2563EB',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontSize: '0.9rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#1D4ED8'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#2563EB'; }}
+              >
+                <span>Inspect Full Dossier</span>
+                <ArrowRight size={16} />
+              </button>
 
             </div>
           ) : (
@@ -1331,33 +1203,6 @@ export default function PublicSampleDashboard() {
 
                           <div style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.4 }}>
                             {item.title || 'Executive Decision Maker'}
-                          </div>
-                        </div>
-
-                        {/* Masked Contact Details */}
-                        <div style={{
-                          background: '#F8FAFC',
-                          borderRadius: '10px',
-                          padding: '12px 14px',
-                          border: '1px solid #F1F5F9',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '8px',
-                          fontSize: '0.8rem',
-                          color: '#64748B',
-                          marginBottom: '16px'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Mail size={13} color="#94A3B8" style={{ flexShrink: 0 }} />
-                            <span style={{ fontFamily: 'monospace', letterSpacing: '0.04em', color: '#475569' }}>
-                              {item.maskedEmail || '••••••••@' + ((item.companyLink || companyStudy?.website || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || 'company.com')}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Phone size={13} color="#94A3B8" style={{ flexShrink: 0 }} />
-                            <span style={{ fontFamily: 'monospace', color: '#475569' }}>
-                              {formatMaskedPhone(item.maskedPhone || item.phone)}
-                            </span>
                           </div>
                         </div>
                       </div>
@@ -1603,6 +1448,9 @@ export default function PublicSampleDashboard() {
                     </h3>
                     <CheckCircle2 size={16} color="#10B981" />
                   </div>
+                  <div style={{ fontSize: '0.84rem', color: '#64748B', fontWeight: 600, marginTop: '2px' }}>
+                    {selectedLead.title || 'Executive Decision Maker'} · {selectedLead.company || companyName}
+                  </div>
                 </div>
               </div>
 
@@ -1627,139 +1475,138 @@ export default function PublicSampleDashboard() {
             </div>
 
             {/* Modal Body */}
-            <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div>
-                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
-                  EXECUTIVE PROFILE
-                </div>
-                <p style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.6, margin: 0 }}>
-                  {selectedLead.whySuitsBest || selectedLead.shortSummary || 'Direct budget decision maker aligned with key pain points and strategic initiatives.'}
-                </p>
-              </div>
+            {(() => {
+              const isLeadUnlocked = Boolean(selectedLead.isUnlocked || (featuredLead && (selectedLead.id === featuredLead.id || selectedLead.name === featuredLead.name)));
+              const leadMail = isLeadUnlocked
+                ? (selectedLead.email || featuredLead?.email || 'contact@' + ((sample?.companyStudy?.website || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || 'company.com'))
+                : (selectedLead.maskedEmail || '••••••••@' + ((sample?.companyStudy?.website || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || 'company.com'));
+              const leadPhone = isLeadUnlocked
+                ? (selectedLead.phone || featuredLead?.phone || '+1 (555) 234-8900')
+                : formatMaskedPhone(selectedLead.phone || selectedLead.maskedPhone);
 
-              {/* 1. Company Specific Container (Item 4) */}
-              <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '18px 20px' }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Building2 size={16} color="#2563EB" />
-                  <span>Company Specific</span>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
-                  <div style={{ background: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '5px' }}>
-                      Company Web URL
+              return (
+                <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
+                      EXECUTIVE PROFILE
                     </div>
-                    {(selectedLead.companyLink || sample?.companyStudy?.website) ? (
-                      <a
-                        href={(selectedLead.companyLink || sample?.companyStudy?.website).startsWith('http') ? (selectedLead.companyLink || sample?.companyStudy?.website) : `https://${selectedLead.companyLink || sample?.companyStudy?.website}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ fontSize: '0.86rem', fontWeight: 700, color: '#2563EB', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
-                      >
-                        <Globe size={14} style={{ flexShrink: 0 }} />
-                        <span>{shortenUrl(selectedLead.companyLink || sample?.companyStudy?.website, 28)}</span>
-                        <ExternalLink size={12} style={{ flexShrink: 0 }} />
-                      </a>
-                    ) : (
-                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>Not specified</span>
-                    )}
+                    <p style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.6, margin: 0 }}>
+                      {selectedLead.whySuitsBest || selectedLead.shortSummary || 'Direct budget decision maker aligned with key pain points and strategic initiatives.'}
+                    </p>
                   </div>
 
-                  <div style={{ background: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '5px' }}>
-                      Company LinkedIn URL
+                  {/* 1. Company Specific Container (Image 2) */}
+                  <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px 20px' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Building2 size={16} color="#2563EB" />
+                      <span>COMPANY SPECIFIC</span>
                     </div>
-                    {/* Strictly company-level LinkedIn: never fall back to personal lead LinkedIn */}
-                    {(selectedLead.companyLinkedin || sample?.companyStudy?.linkedin) ? (
-                      <a
-                        href={(selectedLead.companyLinkedin || sample?.companyStudy?.linkedin).startsWith('http') ? (selectedLead.companyLinkedin || sample?.companyStudy?.linkedin) : `https://${selectedLead.companyLinkedin || sample?.companyStudy?.linkedin}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ fontSize: '0.86rem', fontWeight: 700, color: '#2563EB', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
-                      >
-                        <Linkedin size={14} color="#0A66C2" style={{ flexShrink: 0 }} />
-                        <span>{shortenUrl(selectedLead.companyLinkedin || sample?.companyStudy?.linkedin, 28)}</span>
-                        <ExternalLink size={12} style={{ flexShrink: 0 }} />
-                      </a>
-                    ) : (
-                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>Not specified</span>
-                    )}
-                  </div>
-                </div>
-              </div>
 
-              {/* 2. Lead Specific Container (Point 3 Applied: Uncongested 2x2 grid + Lead LinkedIn URL) */}
-              <div style={{ background: '#F8FAFC', borderRadius: '14px', border: '1px solid #E2E8F0', padding: '18px 20px' }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Users size={16} color="#7C3AED" />
-                  <span>Lead Specific</span>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
-                  
-                  {/* Lead Role */}
-                  <div style={{ background: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '5px' }}>
-                      Lead Role
-                    </div>
-                    <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0F172A' }}>
-                      {selectedLead.title?.trim() || 'Decision Maker'}
-                    </div>
-                  </div>
-
-                  {/* Lead Mail */}
-                  <div style={{ background: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '5px' }}>
-                      Lead Mail
-                    </div>
-                    {(selectedLead.email || selectedLead.maskedEmail) ? (
-                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}>
-                        <Mail size={14} color="#2563EB" style={{ flexShrink: 0 }} />
-                        <span>{selectedLead.email || selectedLead.maskedEmail}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.86rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>Company Web:</span>
+                        {(selectedLead.companyLink || sample?.companyStudy?.website) ? (
+                          <a
+                            href={(selectedLead.companyLink || sample?.companyStudy?.website).startsWith('http') ? (selectedLead.companyLink || sample?.companyStudy?.website) : `https://${selectedLead.companyLink || sample?.companyStudy?.website}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                          >
+                            <Globe size={14} style={{ flexShrink: 0 }} />
+                            <span>{shortenUrl(selectedLead.companyLink || sample?.companyStudy?.website, 32)}</span>
+                            <ExternalLink size={12} style={{ flexShrink: 0 }} />
+                          </a>
+                        ) : (
+                          <span style={{ color: '#94A3B8' }}>Not specified</span>
+                        )}
                       </div>
-                    ) : (
-                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>Not specified</span>
-                    )}
-                  </div>
 
-                  {/* Lead Phone Number (Masked strictly with xxxxx) */}
-                  <div style={{ background: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '5px' }}>
-                      Lead Phone Number
-                    </div>
-                    {(selectedLead.phone || selectedLead.maskedPhone) ? (
-                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Phone size={14} color="#059669" style={{ flexShrink: 0 }} />
-                        <span>{formatMaskedPhone(selectedLead.phone || selectedLead.maskedPhone)}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>Company LinkedIn:</span>
+                        {(selectedLead.companyLinkedin || sample?.companyStudy?.linkedin) ? (
+                          <a
+                            href={(selectedLead.companyLinkedin || sample?.companyStudy?.linkedin).startsWith('http') ? (selectedLead.companyLinkedin || sample?.companyStudy?.linkedin) : `https://${selectedLead.companyLinkedin || sample?.companyStudy?.linkedin}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                          >
+                            <Linkedin size={14} color="#0A66C2" style={{ flexShrink: 0 }} />
+                            <span>{shortenUrl(selectedLead.companyLinkedin || sample?.companyStudy?.linkedin, 32)}</span>
+                            <ExternalLink size={12} style={{ flexShrink: 0 }} />
+                          </a>
+                        ) : (
+                          <span style={{ color: '#94A3B8' }}>Not specified</span>
+                        )}
                       </div>
-                    ) : (
-                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>Not specified</span>
-                    )}
-                  </div>
-
-                  {/* Lead LinkedIn URL (Personal Profile URL) */}
-                  <div style={{ background: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '5px' }}>
-                      Lead LinkedIn URL
                     </div>
-                    {(selectedLead.linkedin && !selectedLead.linkedin.includes('/company/')) ? (
-                      <a
-                        href={selectedLead.linkedin.startsWith('http') ? selectedLead.linkedin : `https://${selectedLead.linkedin}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ fontSize: '0.86rem', fontWeight: 700, color: '#2563EB', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
-                      >
-                        <Linkedin size={14} color="#0A66C2" style={{ flexShrink: 0 }} />
-                        <span>{shortenUrl(selectedLead.linkedin, 28)}</span>
-                        <ExternalLink size={12} style={{ flexShrink: 0 }} />
-                      </a>
-                    ) : (
-                      <span style={{ fontSize: '0.86rem', color: '#94A3B8' }}>Not specified</span>
-                    )}
                   </div>
 
-                </div>
-              </div>
+                  {/* 2. Lead Specific Container (Image 2) */}
+                  <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px 20px' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Users size={16} color="#7C3AED" />
+                      <span>LEAD SPECIFIC</span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.86rem' }}>
+                      {/* Lead Mail */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Mail:</span>
+                        {leadMail ? (
+                          isLeadUnlocked ? (
+                            <a
+                              href={`mailto:${leadMail}`}
+                              style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            >
+                              <Mail size={14} color="#2563EB" style={{ flexShrink: 0 }} />
+                              <span>{leadMail}</span>
+                            </a>
+                          ) : (
+                            <span style={{ color: '#475569', fontFamily: 'monospace', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <Mail size={14} color="#94A3B8" style={{ flexShrink: 0 }} />
+                              <span>{leadMail}</span>
+                            </span>
+                          )
+                        ) : (
+                          <span style={{ color: '#94A3B8' }}>Not specified</span>
+                        )}
+                      </div>
+
+                      {/* Lead Phone */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Phone:</span>
+                        <span style={{ color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <Phone size={14} color="#059669" style={{ flexShrink: 0 }} />
+                          <span>{leadPhone}</span>
+                        </span>
+                      </div>
+
+                      {/* Lead Role */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>Lead Role:</span>
+                        <span style={{ color: '#0F172A', fontWeight: 800 }}>
+                          {selectedLead.title?.trim() || 'Executive Decision Maker'}
+                        </span>
+                      </div>
+
+                      {/* Lead LinkedIn URL */}
+                      {selectedLead.linkedin && !selectedLead.linkedin.includes('/company/') && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                          <span style={{ color: '#64748B', fontWeight: 600 }}>Lead LinkedIn:</span>
+                          <a
+                            href={selectedLead.linkedin.startsWith('http') ? selectedLead.linkedin : `https://${selectedLead.linkedin}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: '#0A66C2', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                          >
+                            <Linkedin size={14} color="#0A66C2" style={{ flexShrink: 0 }} />
+                            <span>{shortenUrl(selectedLead.linkedin, 32)}</span>
+                            <ExternalLink size={12} style={{ flexShrink: 0 }} />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
               {/* Pitch Deck proposal if available */}
               {(selectedLead.pitchDeck || pitchDeck) && (
@@ -1805,32 +1652,13 @@ export default function PublicSampleDashboard() {
                 </div>
               )}
 
-              {/* Close / Strategy Action */}
+              {/* Close Action */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
                 <button
                   type="button"
                   onClick={() => setSelectedLead(null)}
                   style={{
-                    padding: '10px 18px',
-                    borderRadius: '8px',
-                    background: '#F1F5F9',
-                    border: '1px solid #CBD5E1',
-                    color: '#475569',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedLead(null);
-                    setIsStrategyModalOpen(true);
-                  }}
-                  style={{
-                    padding: '10px 18px',
+                    padding: '10px 20px',
                     borderRadius: '8px',
                     background: '#2563EB',
                     border: 'none',
@@ -1841,11 +1669,13 @@ export default function PublicSampleDashboard() {
                     boxShadow: '0 2px 8px rgba(37,99,235,0.25)'
                   }}
                 >
-                  Book Strategy Call
+                  Close
                 </button>
               </div>
 
             </div>
+          );
+        })()}
           </div>
         </div>
       )}
