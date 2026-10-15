@@ -190,21 +190,25 @@ export default function PublicSampleDashboard() {
     if (isPlatformLogo(raw)) {
       const leads = Array.isArray(sample?.leads) ? sample.leads : [];
       const firstLink = leads.find((l) => l.companyLink || l.website)?.companyLink || sample?.companyStudy?.website;
-      const targetStr = firstLink || companyName;
+      const targetStr = firstLink || sample?.slug || companyName;
       if (targetStr) {
-        const cleanDomain = String(targetStr)
+        let cleanDomain = String(targetStr)
           .replace(/^https?:\/\//i, '')
           .replace(/^www\./i, '')
           .split('/')[0]
+          .split('?')[0]
           .trim();
-        if (cleanDomain && cleanDomain.includes('.')) {
-          return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`;
+        if (cleanDomain) {
+          if (!cleanDomain.includes('.')) {
+            cleanDomain = `${cleanDomain}.com`;
+          }
+          return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain.toLowerCase()}&size=128`;
         }
       }
       return null;
     }
 
-    return raw.trim();
+    return raw ? raw.trim() : null;
   }, [sample, companyName]);
 
   // Helper to detect dummy/mock template leads
@@ -231,15 +235,19 @@ export default function PublicSampleDashboard() {
     if (lead?.avatarUrl && !lead.avatarUrl.includes('creativegini') && !lead.avatarUrl.includes('dizigini')) {
       return lead.avatarUrl;
     }
-    const rawLink = lead?.companyLink || lead?.website;
+    const rawLink = lead?.companyLink || lead?.website || lead?.company || sample?.companyStudy?.website || companyName;
     if (rawLink) {
-      const cleanDomain = String(rawLink)
+      let cleanDomain = String(rawLink)
         .replace(/^https?:\/\//i, '')
         .replace(/^www\./i, '')
         .split('/')[0]
+        .split('?')[0]
         .trim();
-      if (cleanDomain && cleanDomain.includes('.')) {
-        return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`;
+      if (cleanDomain) {
+        if (!cleanDomain.includes('.')) {
+          cleanDomain = `${cleanDomain}.com`;
+        }
+        return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain.toLowerCase()}&size=128`;
       }
     }
     return companyLogo || null;
@@ -377,16 +385,17 @@ export default function PublicSampleDashboard() {
           {/* Right Column: Medium-Sized Container with Visible Company Logo */}
           <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
             <div className="sample-hero-card">
-              {companyLogo ? (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minHeight: '70px',
-                  marginBottom: '12px',
-                  padding: '4px 12px',
-                  maxWidth: '100%'
-                }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '70px',
+                marginBottom: '12px',
+                padding: '4px 12px',
+                maxWidth: '100%',
+                position: 'relative'
+              }}>
+                {companyLogo ? (
                   <img
                     src={companyLogo}
                     alt={companyName}
@@ -396,37 +405,39 @@ export default function PublicSampleDashboard() {
                       objectFit: 'contain'
                     }}
                     onError={(e) => {
-                      const domain = (displayLeads[0]?.companyLink || companyName || '')
+                      const domainStr = (displayLeads[0]?.companyLink || sample?.companyStudy?.website || sample?.slug || companyName || '')
                         .replace(/^https?:\/\//i, '')
                         .replace(/^www\./i, '')
                         .split('/')[0]
                         .trim();
-                      if (domain && domain.includes('.') && !e.currentTarget.src.includes('gstatic.com')) {
-                        e.currentTarget.src = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=128`;
+                      const target = domainStr ? (domainStr.includes('.') ? domainStr : `${domainStr}.com`) : '';
+                      if (target && !e.currentTarget.src.includes('gstatic.com')) {
+                        e.currentTarget.src = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${target.toLowerCase()}&size=128`;
                       } else {
                         e.currentTarget.style.display = 'none';
+                        if (e.currentTarget.nextSibling) {
+                          e.currentTarget.nextSibling.style.display = 'flex';
+                        }
                       }
                     }}
                   />
-                </div>
-              ) : (
+                ) : null}
                 <div style={{
+                  display: companyLogo ? 'none' : 'flex',
                   width: '64px',
                   height: '64px',
                   borderRadius: '16px',
                   background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
                   color: '#FFFFFF',
-                  display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '1.85rem',
                   fontWeight: 900,
-                  marginBottom: '14px',
                   boxShadow: '0 4px 14px rgba(15,23,42,0.15)'
                 }}>
                   {companyName.charAt(0)}
                 </div>
-              )}
+              </div>
 
               <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', wordBreak: 'break-word' }}>
                 {companyName}
@@ -1320,17 +1331,34 @@ export default function PublicSampleDashboard() {
               borderRadius: 'clamp(14px, 3vw, 20px) clamp(14px, 3vw, 20px) 0 0',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                {selectedLead.logo || selectedLead.avatarUrl ? (
+                {resolveLeadLogo(selectedLead) ? (
                   <img
-                    src={selectedLead.logo || selectedLead.avatarUrl}
+                    src={resolveLeadLogo(selectedLead)}
                     alt={selectedLead.name}
                     style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #E2E8F0' }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      if (e.currentTarget.nextSibling) {
+                        e.currentTarget.nextSibling.style.display = 'flex';
+                      }
+                    }}
                   />
-                ) : (
-                  <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.3rem' }}>
-                    {selectedLead.name?.charAt(0) || 'L'}
-                  </div>
-                )}
+                ) : null}
+                <div style={{
+                  display: resolveLeadLogo(selectedLead) ? 'none' : 'flex',
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '50%',
+                  background: '#EFF6FF',
+                  color: '#2563EB',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '1.3rem',
+                  border: '1.5px solid #E2E8F0'
+                }}>
+                  {selectedLead.name?.charAt(0) || 'L'}
+                </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>

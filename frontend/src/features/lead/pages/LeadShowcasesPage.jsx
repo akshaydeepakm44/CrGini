@@ -36,6 +36,62 @@ import { api } from '../../../services/api';
 import { parseLeadsFile, enrichLeadRow } from '../../client/utils/leadDataEnricher';
 import { BRAND_LOGO, BRAND_ICON } from '../../../assets/branding';
 
+// Intelligent company logo resolver across showcase, study, leads, and Google Favicon service
+export const resolveShowcaseLogo = (showcase) => {
+  if (!showcase) return '';
+  const isPlatformLogo = (url) => {
+    if (!url || typeof url !== 'string') return true;
+    const clean = url.trim().toLowerCase();
+    return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
+  };
+
+  // 1. Explicit showcase logo if valid and not platform default
+  if (showcase.logoUrl && !isPlatformLogo(showcase.logoUrl)) {
+    return showcase.logoUrl.trim();
+  }
+
+  // 2. Company study logo
+  const studyLogo = showcase.companyStudy?.logoUrl || showcase.companyStudy?.logo;
+  if (studyLogo && !isPlatformLogo(studyLogo)) {
+    return studyLogo.trim();
+  }
+
+  // 3. Any lead's company logo
+  const leads = Array.isArray(showcase.leads) ? showcase.leads : [];
+  const leadWithLogo = leads.find((l) => {
+    const candidate = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
+    return candidate && !isPlatformLogo(candidate);
+  });
+  if (leadWithLogo) {
+    const cand = leadWithLogo.companyLogo || leadWithLogo.logo || leadWithLogo.company_logo || leadWithLogo.avatarUrl;
+    if (cand) return cand.trim();
+  }
+
+  // 4. Derive from company website / lead company link / slug / company name using Google Favicon
+  const website =
+    showcase.companyStudy?.website ||
+    leads.find((l) => l.companyLink || l.website)?.companyLink ||
+    showcase.slug ||
+    showcase.companyName;
+
+  if (website) {
+    let clean = String(website)
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .split('/')[0]
+      .split('?')[0]
+      .trim();
+    if (clean) {
+      if (!clean.includes('.')) {
+        clean = `${clean}.com`;
+      }
+      return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${clean.toLowerCase()}&size=128`;
+    }
+  }
+
+  return '';
+};
+
 export default function LeadShowcasesPage({ onNavigate }) {
   const [showcases, setShowcases] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -156,9 +212,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
 
   const handleOpenEditModal = (showcase) => {
     setEditingShowcase(showcase);
-    const existingLogo = (showcase.logoUrl && showcase.logoUrl !== '/logo.png')
-      ? showcase.logoUrl
-      : (showcase.leads?.find((l) => l.companyLogo || l.logo)?.companyLogo || showcase.leads?.find((l) => l.companyLogo || l.logo)?.logo || '');
+    const existingLogo = resolveShowcaseLogo(showcase);
 
     // Filter out dummy/mock template leads (e.g. Sarah Jenkins from Acme Global)
     const cleanLeads = (showcase.leads || []).filter(
@@ -219,12 +273,45 @@ export default function LeadShowcasesPage({ onNavigate }) {
         (l) => !(l.email === 's.jenkins@acmeglobal.com' || (l.name === 'Sarah Jenkins' && l.company === 'Acme Global Systems'))
       );
 
-      // Auto-promote lead logo to showcase logoUrl if not explicitly provided
+      // Auto-promote lead/study logo or Google favicon to showcase logoUrl if not explicitly provided
       let effectiveLogoUrl = formData.logoUrl;
-      if (!effectiveLogoUrl || effectiveLogoUrl === '/logo.png') {
+      const isPlatformLogo = (url) => {
+        if (!url || typeof url !== 'string') return true;
+        const clean = url.trim().toLowerCase();
+        return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
+      };
+
+      if (isPlatformLogo(effectiveLogoUrl)) {
         const leadWithLogo = sanitizedLeads?.find((l) => l.companyLogo || l.logo);
         if (leadWithLogo) {
           effectiveLogoUrl = leadWithLogo.companyLogo || leadWithLogo.logo;
+        }
+      }
+      if (isPlatformLogo(effectiveLogoUrl)) {
+        const studyLogo = formData.companyStudy?.logoUrl || formData.companyStudy?.logo;
+        if (studyLogo && !isPlatformLogo(studyLogo)) {
+          effectiveLogoUrl = studyLogo;
+        }
+      }
+      if (isPlatformLogo(effectiveLogoUrl)) {
+        const targetStr =
+          formData.companyStudy?.website ||
+          sanitizedLeads?.find((l) => l.companyLink || l.website)?.companyLink ||
+          formData.slug ||
+          formData.companyName;
+        if (targetStr) {
+          let cleanDomain = String(targetStr)
+            .replace(/^https?:\/\//i, '')
+            .replace(/^www\./i, '')
+            .split('/')[0]
+            .split('?')[0]
+            .trim();
+          if (cleanDomain) {
+            if (!cleanDomain.includes('.')) {
+              cleanDomain = `${cleanDomain}.com`;
+            }
+            effectiveLogoUrl = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain.toLowerCase()}&size=128`;
+          }
         }
       }
 
@@ -749,39 +836,76 @@ support@dizigini.com`;
               >
                 {/* Left: Target Company Info */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: '280px' }}>
-                  {showcase.logoUrl && showcase.logoUrl !== '/logo.png' ? (
-                    <img
-                      src={showcase.logoUrl}
-                      alt={showcase.companyName}
-                      style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '12px',
-                        objectFit: 'contain',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #E5E7EB',
-                        padding: '3px',
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '12px',
-                        background: '#F3F4F6',
-                        border: '1px solid #E5E7EB',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 800,
-                        color: '#4B5563',
-                        fontSize: '1.2rem',
-                      }}
-                    >
-                      {showcase.companyName?.charAt(0) || 'C'}
-                    </div>
-                  )}
+                  {(() => {
+                    const resolvedLogo = resolveShowcaseLogo(showcase);
+                    const fallbackChar = showcase.companyName?.trim()?.charAt(0)?.toUpperCase() || 'C';
+
+                    return (
+                      <div
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '12px',
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #E5E7EB',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          position: 'relative',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        }}
+                      >
+                        {resolvedLogo ? (
+                          <img
+                            src={resolvedLogo}
+                            alt={showcase.companyName}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              padding: '4px',
+                            }}
+                            onError={(e) => {
+                              const target = showcase.companyStudy?.website || showcase.slug || showcase.companyName || '';
+                              let clean = String(target)
+                                .replace(/^https?:\/\//i, '')
+                                .replace(/^www\./i, '')
+                                .split('/')[0]
+                                .trim();
+                              if (clean && !clean.includes('.')) {
+                                clean = `${clean}.com`;
+                              }
+                              if (clean && !e.currentTarget.src.includes('gstatic.com')) {
+                                e.currentTarget.src = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${clean.toLowerCase()}&size=128`;
+                              } else {
+                                e.currentTarget.style.display = 'none';
+                                if (e.currentTarget.nextSibling) {
+                                  e.currentTarget.nextSibling.style.display = 'flex';
+                                }
+                              }
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          style={{
+                            display: resolvedLogo ? 'none' : 'flex',
+                            width: '100%',
+                            height: '100%',
+                            background: 'linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%)',
+                            color: '#374151',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 800,
+                            fontSize: '1.25rem',
+                          }}
+                        >
+                          {fallbackChar}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1109,6 +1233,46 @@ support@dizigini.com`;
                           fontSize: '0.875rem',
                         }}
                       />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = formData.companyStudy?.website || formData.slug || formData.companyName;
+                          if (!target) {
+                            alert('Please enter a company name or website first');
+                            return;
+                          }
+                          let clean = String(target)
+                            .replace(/^https?:\/\//i, '')
+                            .replace(/^www\./i, '')
+                            .split('/')[0]
+                            .split('?')[0]
+                            .trim();
+                          if (!clean.includes('.')) {
+                            clean = `${clean}.com`;
+                          }
+                          const faviconUrl = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${clean.toLowerCase()}&size=128`;
+                          setFormData((prev) => ({ ...prev, logoUrl: faviconUrl }));
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#EFF6FF',
+                          border: '1px solid #BFDBFE',
+                          color: '#2563EB',
+                          padding: '10px 14px',
+                          borderRadius: '8px',
+                          fontSize: '0.8125rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title="Auto-fetch official company logo from website or domain"
+                      >
+                        <RefreshCw size={14} />
+                        <span>Auto-Fetch</span>
+                      </button>
+
                       <label style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -1935,13 +2099,24 @@ support@dizigini.com`;
                             {index + 1}
                           </span>
 
-                          {l.logo ? (
-                            <img src={l.logo} alt={l.company} style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'contain', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF', padding: '2px' }} />
-                          ) : (
-                            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#EDE9FE', color: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem', flexShrink: 0 }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '8px', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
+                            {l.logo ? (
+                              <img
+                                src={l.logo}
+                                alt={l.company || l.name}
+                                style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  if (e.currentTarget.nextSibling) {
+                                    e.currentTarget.nextSibling.style.display = 'flex';
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            <div style={{ display: l.logo ? 'none' : 'flex', width: '100%', height: '100%', background: '#EDE9FE', color: '#7C3AED', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem' }}>
                               {l.name?.charAt(0) || 'L'}
                             </div>
-                          )}
+                          </div>
 
                           <div style={{ minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
