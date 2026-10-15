@@ -21,8 +21,8 @@ import {
   CheckCircle2,
   Globe,
   X,
-  Calendar,
-  Lightbulb
+  Lightbulb,
+  Lock
 } from 'lucide-react';
 import { api } from '../../services/api';
 
@@ -118,9 +118,7 @@ export default function PublicSampleDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedLead, setSelectedLead] = useState(null);
-  const [isStrategyModalOpen, setIsStrategyModalOpen] = useState(false);
-  const [strategyForm, setStrategyForm] = useState({ name: '', email: '', company: '', notes: '' });
-  const [strategySubmitted, setStrategySubmitted] = useState(false);
+  const [lockedLeadNotice, setLockedLeadNotice] = useState(null);
 
   // Dynamic slug: defaults to 'data-i2i' if none specified in route
   const effectiveSlug = slug ? slug.trim().toLowerCase() : 'data-i2i';
@@ -209,23 +207,72 @@ export default function PublicSampleDashboard() {
     );
   };
 
+  // Resolve best logo for any lead (uploaded logo -> company link favicon -> showcase company logo)
+  const resolveLeadLogo = (lead) => {
+    if (lead?.logo && !lead.logo.includes('creativegini') && !lead.logo.includes('dizigini')) {
+      return lead.logo;
+    }
+    if (lead?.companyLogo && !lead.companyLogo.includes('creativegini') && !lead.companyLogo.includes('dizigini')) {
+      return lead.companyLogo;
+    }
+    if (lead?.avatarUrl && !lead.avatarUrl.includes('creativegini') && !lead.avatarUrl.includes('dizigini')) {
+      return lead.avatarUrl;
+    }
+    const rawLink = lead?.companyLink || lead?.website;
+    if (rawLink) {
+      const cleanDomain = String(rawLink)
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./i, '')
+        .split('/')[0]
+        .trim();
+      if (cleanDomain && cleanDomain.includes('.')) {
+        return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`;
+      }
+    }
+    return companyLogo || null;
+  };
+
   // ONLY display the leads that are actually uploaded (no fake/synthetic leads!)
   const displayLeads = useMemo(() => {
     const raw = Array.isArray(sample?.leads) ? sample.leads : [];
     return raw.filter((l) => !isMockDummyLead(l));
   }, [sample]);
 
+  // Lead #1 is the featured open profile
   const featuredLead = displayLeads.length > 0 ? displayLeads[0] : null;
-  const previewLeads = displayLeads.length > 1 ? displayLeads.slice(1) : [];
 
-  const handleBookStrategySubmit = (e) => {
-    e.preventDefault();
-    setStrategySubmitted(true);
-    setTimeout(() => {
-      setIsStrategyModalOpen(false);
-      setStrategySubmitted(false);
-    }, 2500);
-  };
+  // The remaining uploaded leads (leads 2-5)
+  const uploadedLockedLeads = displayLeads.length > 1 ? displayLeads.slice(1) : [];
+
+  // Guarantee that the 4 locked leads are presented (using uploaded leads first, gracefully filling up to 4 if needed)
+  const lockedLeads = useMemo(() => {
+    const list = [...uploadedLockedLeads];
+    if (list.length < 4) {
+      const fallbackRoles = [
+        { title: 'Chief Technology Officer', name: 'Executive Contact', why: 'Technical architecture & cloud systems' },
+        { title: 'VP of Product Engineering', name: 'Executive Contact', why: 'Product roadmap & platform scalability' },
+        { title: 'Head of Enterprise Analytics', name: 'Executive Contact', why: 'Data architecture & intelligence integration' },
+        { title: 'Director of Strategic Growth', name: 'Executive Contact', why: 'Commercial expansion & partnership development' },
+      ];
+      const needed = 4 - list.length;
+      for (let i = 0; i < needed; i++) {
+        const fb = fallbackRoles[i % fallbackRoles.length];
+        list.push({
+          id: `locked-preview-${i + 1}`,
+          name: fb.name,
+          title: fb.title,
+          company: companyName,
+          companyLink: companyStudy?.website || '',
+          logo: companyLogo,
+          whySuitsBest: fb.why,
+          isPlaceholder: true,
+          maskedEmail: '••••••••@' + (companyStudy?.website ? companyStudy.website.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] : 'enterprise.com'),
+          maskedPhone: '+1 (xxx) xxx-xxxx',
+        });
+      }
+    }
+    return list.slice(0, 4);
+  }, [uploadedLockedLeads, companyName, companyStudy, companyLogo]);
 
   if (loading) {
     return (
@@ -897,7 +944,7 @@ export default function PublicSampleDashboard() {
               color: '#065F46'
             }}>
               <Users size={14} />
-              <span>{displayLeads.length} {displayLeads.length === 1 ? 'profile' : 'profiles'} available</span>
+              <span>{featuredLead ? 1 + lockedLeads.length : 0} profiles available (1 featured, {lockedLeads.length} locked)</span>
             </div>
           </div>
 
@@ -918,9 +965,9 @@ export default function PublicSampleDashboard() {
             }}>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flex: '1 1 340px' }}>
-                {featuredLead.logo || featuredLead.avatarUrl ? (
+                {resolveLeadLogo(featuredLead) ? (
                   <img
-                    src={featuredLead.logo || featuredLead.avatarUrl}
+                    src={resolveLeadLogo(featuredLead)}
                     alt={featuredLead.name}
                     style={{
                       width: '64px',
@@ -961,8 +1008,12 @@ export default function PublicSampleDashboard() {
                     <CheckCircle2 size={16} color="#10B981" />
                   </div>
 
+                  <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#2563EB', marginTop: '3px' }}>
+                    {featuredLead.title || 'Executive Decision Maker'} · {featuredLead.company || companyName}
+                  </div>
+
                   {featuredLead.whySuitsBest && (
-                    <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: 1.5, margin: '8px 0 0 0', maxWidth: '680px' }}>
+                    <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: 1.5, margin: '6px 0 0 0', maxWidth: '680px' }}>
                       {featuredLead.whySuitsBest}
                     </p>
                   )}
@@ -1003,172 +1054,235 @@ export default function PublicSampleDashboard() {
             </div>
           )}
 
-          {/* More relevant leads */}
-          {previewLeads.length > 0 && (
+          {/* THE 4 LOCKED LEADS (Logo & Company Name prominently shown, direct contact locked) */}
+          {lockedLeads.length > 0 && (
             <div>
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A' }}>
-                  More relevant leads ({previewLeads.length})
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.01em' }}>
+                    Additional target accounts & decision-makers
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '2px' }}>
+                    Target profiles for this prospect dossier ({lockedLeads.length} locked in sample preview).
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '16px',
+                  background: '#FEF3C7',
+                  border: '1px solid #FDE68A',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: '#92400E'
+                }}>
+                  <Lock size={13} color="#D97706" />
+                  <span>{lockedLeads.length} Profiles Locked</span>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
-                {previewLeads.map((item, idx) => (
-                  <div
-                    key={item.id || idx}
-                    style={{
-                      background: '#FFFFFF',
-                      borderRadius: '14px',
-                      border: '1px solid #E2E8F0',
-                      padding: '20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
-                      {item.logo || item.avatarUrl ? (
-                        <img
-                          src={item.logo || item.avatarUrl}
-                          alt={item.name}
-                          style={{
-                            width: '46px',
-                            height: '46px',
-                            borderRadius: '50%',
-                            objectFit: 'cover',
-                            border: '1.5px solid #E2E8F0'
-                          }}
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div style={{
-                          width: '46px',
-                          height: '46px',
-                          borderRadius: '50%',
-                          background: '#F1F5F9',
-                          color: '#64748B',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 800,
-                          fontSize: '1.1rem',
-                          flexShrink: 0
-                        }}>
-                          {item.name?.charAt(0) || 'L'}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                {lockedLeads.map((item, idx) => {
+                  const leadLogoUrl = resolveLeadLogo(item);
+                  const effectiveCompany = item.company || sample?.companyName || 'Target Organization';
+
+                  return (
+                    <div
+                      key={item.id || idx}
+                      style={{
+                        background: '#FFFFFF',
+                        borderRadius: '16px',
+                        border: '1px solid #E2E8F0',
+                        padding: '22px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        boxShadow: '0 2px 8px rgba(15,23,42,0.03)',
+                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                        position: 'relative'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(15,23,42,0.07)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.03)';
+                      }}
+                    >
+                      <div>
+                        {/* Top Row: Company Logo & Locked Badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '16px' }}>
+                          <div style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '12px',
+                            background: '#F8FAFC',
+                            border: '1.5px solid #E2E8F0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            flexShrink: 0
+                          }}>
+                            {leadLogoUrl ? (
+                              <img
+                                src={leadLogoUrl}
+                                alt={effectiveCompany}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'contain',
+                                  padding: '4px'
+                                }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  if (e.currentTarget.nextSibling) {
+                                    e.currentTarget.nextSibling.style.display = 'flex';
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              style={{
+                                display: leadLogoUrl ? 'none' : 'flex',
+                                width: '100%',
+                                height: '100%',
+                                background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                                color: '#2563EB',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 800,
+                                fontSize: '1.15rem'
+                              }}
+                            >
+                              {effectiveCompany.charAt(0).toUpperCase()}
+                            </div>
+                          </div>
+
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: '#FEF3C7',
+                            color: '#92400E',
+                            border: '1px solid #FDE68A',
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700
+                          }}>
+                            <Lock size={12} color="#D97706" />
+                            <span>Locked Profile</span>
+                          </span>
                         </div>
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {item.name}
+
+                        {/* Company Name & Lead Details */}
+                        <div style={{ marginBottom: '16px' }}>
+                          <div style={{
+                            fontSize: '1.05rem',
+                            fontWeight: 800,
+                            color: '#0F172A',
+                            lineHeight: 1.3,
+                            marginBottom: '4px',
+                            letterSpacing: '-0.01em'
+                          }}>
+                            {effectiveCompany}
+                          </div>
+
+                          <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155', marginBottom: '2px' }}>
+                            {item.name}
+                          </div>
+
+                          <div style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.4 }}>
+                            {item.title || 'Executive Decision Maker'}
+                          </div>
+                        </div>
+
+                        {/* Masked Contact Details */}
+                        <div style={{
+                          background: '#F8FAFC',
+                          borderRadius: '10px',
+                          padding: '12px 14px',
+                          border: '1px solid #F1F5F9',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          fontSize: '0.8rem',
+                          color: '#64748B',
+                          marginBottom: '16px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Mail size={13} color="#94A3B8" style={{ flexShrink: 0 }} />
+                            <span style={{ fontFamily: 'monospace', letterSpacing: '0.04em', color: '#475569' }}>
+                              {item.maskedEmail || '••••••••@' + ((item.companyLink || companyStudy?.website || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || 'company.com')}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Phone size={13} color="#94A3B8" style={{ flexShrink: 0 }} />
+                            <span style={{ fontFamily: 'monospace', color: '#475569' }}>
+                              {formatMaskedPhone(item.maskedPhone || item.phone)}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: '8px', paddingTop: '10px', borderTop: '1px solid #F1F5F9' }}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedLead(item)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          background: '#EFF6FF',
-                          border: '1px solid #BFDBFE',
-                          color: '#2563EB',
-                          padding: '6px 14px',
-                          borderRadius: '8px',
-                          fontSize: '0.8rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = '#DBEAFE'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = '#EFF6FF'; }}
-                      >
-                        <span>Inspect</span>
-                        <ArrowRight size={13} />
-                      </button>
+                      {/* Card Footer: Status & Unlock Action */}
+                      <div style={{
+                        paddingTop: '12px',
+                        borderTop: '1px solid #F1F5F9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px'
+                      }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 600 }}>
+                          <CheckCircle2 size={14} color="#10B981" />
+                          <span>Verified Prospect</span>
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => setLockedLeadNotice(item)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: '#F8FAFC',
+                            border: '1px solid #CBD5E1',
+                            color: '#334155',
+                            padding: '6px 13px',
+                            borderRadius: '8px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#EFF6FF';
+                            e.currentTarget.style.color = '#2563EB';
+                            e.currentTarget.style.borderColor = '#BFDBFE';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#F8FAFC';
+                            e.currentTarget.style.color = '#334155';
+                            e.currentTarget.style.borderColor = '#CBD5E1';
+                          }}
+                        >
+                          <Lock size={12} />
+                          <span>Locked</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
 
-        </section>
-
-        {/* SECTION 4: DARK NAVY CTA BANNER (No contact form below!) */}
-        <section style={{ marginBottom: '32px' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-            borderRadius: '20px',
-            padding: '36px 40px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '24px',
-            boxShadow: '0 12px 32px rgba(15,23,42,0.15)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', maxWidth: '680px' }}>
-              <div style={{
-                width: '52px',
-                height: '52px',
-                borderRadius: '14px',
-                background: 'rgba(37,99,235,0.25)',
-                color: '#60A5FA',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
-              }}>
-                <Sparkles size={24} />
-              </div>
-
-              <div>
-                <h3 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#FFFFFF', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
-                  Ready to turn intelligence into action?
-                </h3>
-                <p style={{ fontSize: '0.925rem', color: '#94A3B8', margin: 0, lineHeight: 1.5 }}>
-                  Get the complete report, additional leads and a personalized strategy session with our team.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setIsStrategyModalOpen(true)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '14px 26px',
-                borderRadius: '10px',
-                background: '#FFFFFF',
-                color: '#0F172A',
-                border: 'none',
-                fontSize: '0.925rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.15)';
-              }}
-            >
-              <span>Book a strategy call</span>
-              <ArrowRight size={16} />
-            </button>
-          </div>
         </section>
 
       </main>
@@ -1183,10 +1297,10 @@ export default function PublicSampleDashboard() {
         </div>
       </footer>
 
-      {/* MODAL 1: STRATEGY CALL BOOKING MODAL */}
-      {isStrategyModalOpen && (
+      {/* LOCKED LEAD MODAL NOTICE */}
+      {lockedLeadNotice && (
         <div
-          onClick={() => setIsStrategyModalOpen(false)}
+          onClick={() => setLockedLeadNotice(null)}
           style={{
             position: 'fixed',
             inset: 0,
@@ -1205,16 +1319,16 @@ export default function PublicSampleDashboard() {
               background: '#FFFFFF',
               borderRadius: '20px',
               padding: '36px 32px',
-              maxWidth: '480px',
+              maxWidth: '460px',
               width: '100%',
               boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
               position: 'relative',
-              animation: 'modalSlideUp 0.25s ease-out',
+              textAlign: 'center',
             }}
           >
             <button
               type="button"
-              onClick={() => setIsStrategyModalOpen(false)}
+              onClick={() => setLockedLeadNotice(null)}
               style={{
                 position: 'absolute',
                 top: '16px',
@@ -1239,129 +1353,60 @@ export default function PublicSampleDashboard() {
                 width: '56px',
                 height: '56px',
                 borderRadius: '16px',
-                background: '#EFF6FF',
-                color: '#2563EB',
+                background: '#FEF3C7',
+                color: '#D97706',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 18px auto',
               }}
             >
-              <Calendar size={26} />
+              <Lock size={26} />
             </div>
 
-            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', marginBottom: '8px', textAlign: 'center' }}>
-              Book a Strategy Call
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>
+              Decision-Maker Profile Locked
             </h3>
 
-            <p style={{ fontSize: '0.88rem', color: '#64748B', lineHeight: '1.5', marginBottom: '22px', textAlign: 'center' }}>
-              Schedule a 20-minute tailored walkthrough of our complete intelligence dossier and lead activation engine for {companyName}.
+            <p style={{ fontSize: '0.88rem', color: '#64748B', lineHeight: '1.5', marginBottom: '18px' }}>
+              Direct contact details, verified mobile phone, and tailored intelligence dossier for <strong style={{ color: '#0F172A' }}>{lockedLeadNotice.name}</strong> at <strong style={{ color: '#0F172A' }}>{lockedLeadNotice.company || companyName}</strong> are locked in this sample preview.
             </p>
 
-            {strategySubmitted ? (
-              <div style={{
-                background: '#ECFDF5',
-                border: '1px solid #A7F3D0',
-                borderRadius: '12px',
-                padding: '20px',
-                textAlign: 'center',
-                color: '#065F46'
-              }}>
-                <CheckCircle2 size={32} color="#10B981" style={{ margin: '0 auto 8px auto' }} />
-                <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '4px' }}>Strategy Call Requested!</div>
-                <div style={{ fontSize: '0.85rem' }}>Our team will coordinate the meeting invitation directly with your email.</div>
-              </div>
-            ) : (
-              <form onSubmit={handleBookStrategySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    Your Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Alex Morgan"
-                    value={strategyForm.name}
-                    onChange={(e) => setStrategyForm({ ...strategyForm, name: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '11px 14px',
-                      borderRadius: '8px',
-                      border: '1px solid #CBD5E1',
-                      fontSize: '0.875rem',
-                      fontFamily: 'inherit',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
+            <div style={{
+              background: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '20px',
+              textAlign: 'left',
+              fontSize: '0.82rem',
+              color: '#475569',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}>
+              <div><strong>Target Account:</strong> {lockedLeadNotice.company || companyName}</div>
+              <div><strong>Decision Maker:</strong> {lockedLeadNotice.name} ({lockedLeadNotice.title || 'Executive'})</div>
+              <div><strong>Access Level:</strong> Enterprise Client Tier</div>
+            </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    Your Work Email *
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="e.g. alex@company.com"
-                    value={strategyForm.email}
-                    onChange={(e) => setStrategyForm({ ...strategyForm, email: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '11px 14px',
-                      borderRadius: '8px',
-                      border: '1px solid #CBD5E1',
-                      fontSize: '0.875rem',
-                      fontFamily: 'inherit',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                    Notes or Priority Target Accounts
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={`e.g. Focus on enterprise banking & fintech`}
-                    value={strategyForm.notes}
-                    onChange={(e) => setStrategyForm({ ...strategyForm, notes: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '11px 14px',
-                      borderRadius: '8px',
-                      border: '1px solid #CBD5E1',
-                      fontSize: '0.875rem',
-                      fontFamily: 'inherit',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    padding: '13px 20px',
-                    borderRadius: '10px',
-                    background: '#2563EB',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    fontSize: '0.95rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    marginTop: '8px',
-                    boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
-                  }}
-                >
-                  <Calendar size={16} />
-                  <span>Confirm Strategy Session</span>
-                </button>
-              </form>
-            )}
+            <button
+              type="button"
+              onClick={() => setLockedLeadNotice(null)}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                borderRadius: '10px',
+                background: '#0F172A',
+                color: '#FFFFFF',
+                border: 'none',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

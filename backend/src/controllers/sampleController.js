@@ -179,6 +179,16 @@ export const getPublicSampleBySlug = async (req, res) => {
       const emailForFirst = unmaskedEmail || (l.maskedEmail ? l.maskedEmail.replace('••••', 'contact') : '');
 
       let leadLogo = l.logo || l.companyLogo || l.avatarUrl || null;
+      if (!leadLogo && companyLink) {
+        const cleanDomain = String(companyLink)
+          .replace(/^https?:\/\//i, '')
+          .replace(/^www\./i, '')
+          .split('/')[0]
+          .trim();
+        if (cleanDomain && cleanDomain.includes('.')) {
+          leadLogo = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`;
+        }
+      }
       if (leadLogo && isDataUrl(leadLogo)) {
         leadLogo = `/api/samples/${sample.slug}/leads/${leadId}/logo`;
       }
@@ -459,7 +469,10 @@ export const streamLeadPitchDeck = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Sample showcase not found.' });
     }
 
-    const lead = (sample.leads || []).find((l) => l.id === leadId);
+    const lead = (sample.leads || []).find((l, idx) => {
+      const genId = l.id || `lead-${idx + 1}`;
+      return String(l.id) === String(leadId) || String(genId) === String(leadId) || String(idx + 1) === String(leadId);
+    });
 
     // If PDF was saved directly as base64 data URL
     if (lead?.pitchDeckPdf && lead.pitchDeckPdf.startsWith('data:application/pdf;base64,')) {
@@ -530,7 +543,10 @@ export const streamLeadStudyPdf = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Sample showcase not found.' });
     }
 
-    const lead = (sample.leads || []).find((l) => l.id === leadId);
+    const lead = (sample.leads || []).find((l, idx) => {
+      const genId = l.id || `lead-${idx + 1}`;
+      return String(l.id) === String(leadId) || String(genId) === String(leadId) || String(idx + 1) === String(leadId);
+    });
 
     // If PDF was saved directly as base64 data URL
     if (lead?.leadStudyPdf && lead.leadStudyPdf.startsWith('data:application/pdf;base64,')) {
@@ -1470,7 +1486,10 @@ export const streamLeadLogo = async (req, res) => {
     const sample = await findSampleBySlug(slug, false);
     if (!sample) return res.status(404).send('Showcase not found');
 
-    const lead = (sample.leads || []).find((l) => String(l.id) === String(leadId));
+    const lead = (sample.leads || []).find((l, idx) => {
+      const genId = l.id || `lead-${idx + 1}`;
+      return String(l.id) === String(leadId) || String(genId) === String(leadId) || String(idx + 1) === String(leadId);
+    });
     if (!lead) return res.status(404).send('Lead not found');
 
     if (lead.logoAssetKey) {
@@ -1480,7 +1499,7 @@ export const streamLeadLogo = async (req, res) => {
       return stream.pipe(res);
     }
 
-    const candidate = lead.logo || lead.companyLogo;
+    const candidate = lead.logo || lead.companyLogo || lead.avatarUrl;
     if (candidate && isDataUrl(candidate)) {
       const matches = candidate.match(/^data:([A-Za-z0-9-+/]+);base64,(.+)$/);
       if (matches && matches.length === 3) {
@@ -1494,6 +1513,19 @@ export const streamLeadLogo = async (req, res) => {
 
     if (candidate?.startsWith('http')) {
       return res.redirect(candidate);
+    }
+
+    // Fallback: If lead has companyLink, redirect to favicon
+    const companyLink = lead.companyLink || lead.website || lead.companyWebsite;
+    if (companyLink) {
+      const cleanDomain = String(companyLink)
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./i, '')
+        .split('/')[0]
+        .trim();
+      if (cleanDomain && cleanDomain.includes('.')) {
+        return res.redirect(`https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`);
+      }
     }
 
     return res.status(404).send('Lead logo not found');
