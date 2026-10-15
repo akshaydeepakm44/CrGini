@@ -241,17 +241,47 @@ export async function ensureSchemaIntegrity() {
  */
 export async function ensureOptimizedProspectPayloads() {
   try {
-    const showcasesRes = await query('SELECT id, slug, leads FROM public_sample_showcases');
+    const showcasesRes = await query('SELECT id, slug, company_name, company_study, leads FROM public_sample_showcases');
     const { uploadFile, isDataUrl } = await import('../services/storageService.js');
 
     for (const row of showcasesRes.rows) {
-      let modified = false;
+      let leadsModified = false;
       const leads = row.leads || [];
+
+      // 1. Offload inlined company study PDF if present as base64
+      if (row.company_study?.pdfFileDataUrl && isDataUrl(row.company_study.pdfFileDataUrl)) {
+        try {
+          const originalName = row.company_study.pdfFileName || `${row.company_name || 'Company'}_Study.pdf`;
+          const uploadRes = await uploadFile({
+            dataUrl: row.company_study.pdfFileDataUrl,
+            originalName,
+            mimeType: row.company_study.pdfMimeType || 'application/pdf',
+            prefix: `public-samples/${row.slug}/company-study`,
+          });
+          const updatedStudy = {
+            ...row.company_study,
+            pdfAssetKey: uploadRes.objectKey,
+            pdfFileName: originalName,
+            pdfFileSize: uploadRes.size,
+            pdfMimeType: uploadRes.mimeType,
+          };
+          delete updatedStudy.pdfFileDataUrl;
+          await query('UPDATE public_sample_showcases SET company_study = $1, updated_at = NOW() WHERE id = $2', [JSON.stringify(updatedStudy), row.id]);
+        } catch (e) {
+          console.error(`[ensureOptimizedProspectPayloads] Failed to offload company_study for ${row.slug}:`, e.message);
+        }
+      }
 
       for (const lead of leads) {
         const leadId = lead.id || `lead-${Date.now()}`;
 
-        // 1. Offload lead study PDF if inlined as base64
+        // Clean out legacy fake phone numbers
+        if (lead.phone && (lead.phone.includes('555') || lead.phone.includes('234-8900'))) {
+          lead.phone = '';
+          leadsModified = true;
+        }
+
+        // 2. Offload lead study PDF if inlined as base64
         if (lead.leadStudyPdf && isDataUrl(lead.leadStudyPdf)) {
           try {
             const originalName = lead.leadStudyPdfName || `${(lead.name || 'Lead').replace(/\s+/g, '_')}_Study.pdf`;
@@ -263,13 +293,13 @@ export async function ensureOptimizedProspectPayloads() {
             });
             lead.leadStudyPdfAssetKey = uploadRes.objectKey;
             lead.leadStudyPdf = `/api/samples/${row.slug}/leads/${leadId}/lead-study-pdf`;
-            modified = true;
+            leadsModified = true;
           } catch (err) {
             console.error(`[ensureOptimizedProspectPayloads] Failed to offload leadStudyPdf for ${lead.name}:`, err.message);
           }
         }
 
-        // 2. Offload pitch deck PDF if inlined as base64
+        // 3. Offload pitch deck PDF if inlined as base64
         const pitchDataUrl = (lead.pitchDeckPdf && isDataUrl(lead.pitchDeckPdf))
           ? lead.pitchDeckPdf
           : (lead.pitchDeck?.streamUrl && isDataUrl(lead.pitchDeck?.streamUrl))
@@ -292,7 +322,7 @@ export async function ensureOptimizedProspectPayloads() {
             lead.pitchDeck.fileName = originalName;
             lead.pitchDeck.streamUrl = `/api/samples/${row.slug}/leads/${leadId}/pitch-deck`;
             lead.pitchDeck.downloadUrl = `/api/samples/${row.slug}/leads/${leadId}/pitch-deck?download=true`;
-            modified = true;
+            leadsModified = true;
           } catch (err) {
             console.error(`[ensureOptimizedProspectPayloads] Failed to offload pitchDeckPdf for ${lead.name}:`, err.message);
           }
@@ -301,15 +331,15 @@ export async function ensureOptimizedProspectPayloads() {
         // Clean redundant large URLs if still lingering
         if (lead.pitchDeck?.streamUrl && isDataUrl(lead.pitchDeck.streamUrl)) {
           lead.pitchDeck.streamUrl = `/api/samples/${row.slug}/leads/${leadId}/pitch-deck`;
-          modified = true;
+          leadsModified = true;
         }
         if (lead.pitchDeck?.downloadUrl && isDataUrl(lead.pitchDeck.downloadUrl)) {
           lead.pitchDeck.downloadUrl = `/api/samples/${row.slug}/leads/${leadId}/pitch-deck?download=true`;
-          modified = true;
+          leadsModified = true;
         }
       }
 
-      if (modified) {
+      if (leadsModified) {
         await query('UPDATE public_sample_showcases SET leads = $1, updated_at = NOW() WHERE id = $2', [JSON.stringify(leads), row.id]);
         console.log(`[Schema] Optimized prospect showcase ID ${row.id} (${row.slug}) leads payload.`);
       }

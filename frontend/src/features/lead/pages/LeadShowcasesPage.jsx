@@ -523,7 +523,7 @@ support@dizigini.com`;
       ...(existing || {}),
       id: existing?.id || `lead-${Date.now()}`,
       name: leadForm.name.trim(),
-      phone: leadForm.phone?.trim() || existing?.phone || '',
+      phone: leadForm.phone ? leadForm.phone.trim() : '',
       companyLink: leadForm.companyLink?.trim() || formData.companyStudy?.website || '',
       companyLinkedin: leadForm.companyLinkedin?.trim() || formData.companyStudy?.linkedin || '',
       email: leadForm.email?.trim() || '',
@@ -901,15 +901,18 @@ support@dizigini.com`;
                             display: resolvedLogo ? 'none' : 'flex',
                             width: '100%',
                             height: '100%',
-                            background: 'linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%)',
-                            color: '#374151',
+                            background: '#F8FAFC',
+                            color: '#94A3B8',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontWeight: 800,
-                            fontSize: '1.25rem',
+                            fontWeight: 600,
+                            fontSize: '0.62rem',
+                            textAlign: 'center',
+                            padding: '2px',
+                            lineHeight: 1.1,
                           }}
                         >
-                          {fallbackChar}
+                          Not mentioned
                         </div>
                       </div>
                     );
@@ -1824,7 +1827,7 @@ support@dizigini.com`;
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. +1 (555) 234-8900"
+                          placeholder="e.g. +1 (415) 890-1234 or leave blank if not available"
                           value={leadForm.phone}
                           onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
                           style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}

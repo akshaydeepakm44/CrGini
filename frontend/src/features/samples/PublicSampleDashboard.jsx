@@ -430,18 +430,18 @@ export default function PublicSampleDashboard() {
                 ) : null}
                 <div style={{
                   display: companyLogo ? 'none' : 'flex',
-                  width: '64px',
-                  height: '64px',
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
-                  color: '#FFFFFF',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '1.85rem',
-                  fontWeight: 900,
-                  boxShadow: '0 4px 14px rgba(15,23,42,0.15)'
+                  padding: '8px 18px',
+                  borderRadius: '20px',
+                  background: '#F1F5F9',
+                  border: '1px solid #E2E8F0',
+                  color: '#64748B',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                  marginBottom: '6px'
                 }}>
-                  {companyName.charAt(0)}
+                  Logo: Not mentioned
                 </div>
               </div>
 
@@ -476,17 +476,37 @@ export default function PublicSampleDashboard() {
               </div>
             </div>
 
-            {/* Clickable Button for View Full Analysis PDF */}
-            <a
-              href={companyStudy.pdfUrl || `/api/samples/${sample.slug}/company-study-pdf`}
-              target="_blank"
-              rel="noreferrer"
-              className="sample-action-btn"
-            >
-              <FileText size={15} />
-              <span>View Full Analysis PDF</span>
-              <ExternalLink size={14} />
-            </a>
+            {/* View Original Study Document or Not Uploaded */}
+            {companyStudy?.hasPdf ? (
+              <a
+                href={companyStudy.pdfUrl || `/api/samples/${sample.slug}/company-study-pdf`}
+                target="_blank"
+                rel="noreferrer"
+                className="sample-action-btn"
+              >
+                <FileText size={15} />
+                <span>View Original Study Document</span>
+                <ExternalLink size={14} />
+              </a>
+            ) : (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '9px 16px',
+                  borderRadius: '10px',
+                  background: '#F1F5F9',
+                  border: '1px solid #CBD5E1',
+                  color: '#64748B',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                }}
+              >
+                <FileText size={15} color="#94A3B8" />
+                <span>Original Study Document: Currently not uploaded</span>
+              </div>
+            )}
           </div>
 
           {/* Industry / Sector Mini Cards */}
@@ -557,7 +577,7 @@ export default function PublicSampleDashboard() {
                 </h3>
 
                 <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.businessOverview || companyStudy.overview || `${companyName} delivers high-impact products and operational infrastructure for enterprise clients.`}
+                  {companyStudy.businessOverview || companyStudy.overview || 'Overview currently not provided.'}
                 </p>
               </div>
 
@@ -603,7 +623,7 @@ export default function PublicSampleDashboard() {
                 </h3>
 
                 <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.marketPosition || `${companyName} maintains an active commercial footprint across its target sectors.`}
+                  {companyStudy.marketPosition || 'Market position currently not provided.'}
                 </p>
               </div>
 
@@ -649,7 +669,7 @@ export default function PublicSampleDashboard() {
                 </h3>
 
                 <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.keyObservations || `Observed high demand for consolidated service delivery, technical integrations, and turnkey execution.`}
+                  {companyStudy.keyObservations || 'Key observations currently not provided.'}
                 </p>
               </div>
 
@@ -695,7 +715,7 @@ export default function PublicSampleDashboard() {
                 </h3>
 
                 <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.potentialOpportunity || `Focus on strategic enterprise partnerships and integrated solutions to expand market share.`}
+                  {companyStudy.potentialOpportunity || 'Strategic recommendation currently not provided.'}
                 </p>
               </div>
 
@@ -1404,10 +1424,9 @@ export default function PublicSampleDashboard() {
               const leadMail = isLeadUnlocked
                 ? (selectedLead.email || featuredLead?.email || 'contact@' + ((sample?.companyStudy?.website || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || 'company.com'))
                 : (selectedLead.maskedEmail || '••••••••@' + ((sample?.companyStudy?.website || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || 'company.com'));
-              const hasPhone = Boolean(selectedLead.phone || selectedLead.maskedPhone);
-              const leadPhone = isLeadUnlocked
-                ? (selectedLead.phone || (selectedLead.maskedPhone ? formatMaskedPhone(selectedLead.maskedPhone) : null))
-                : (hasPhone ? formatMaskedPhone(selectedLead.phone || selectedLead.maskedPhone) : null);
+              const rawPhone = selectedLead.phone || selectedLead.maskedPhone;
+              const isFakePhone = rawPhone && (rawPhone.includes('555') || rawPhone.includes('234-8900') || rawPhone.includes('(xxx)'));
+              const leadPhone = isFakePhone ? null : (isLeadUnlocked ? (selectedLead.phone || null) : (selectedLead.maskedPhone ? formatMaskedPhone(selectedLead.maskedPhone) : null));
 
               return (
                 <div style={{ padding: 'clamp(16px, 3.5vw, 22px) clamp(16px, 4vw, 28px)', display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -1506,7 +1525,7 @@ export default function PublicSampleDashboard() {
                             <span>{leadPhone}</span>
                           </span>
                         ) : (
-                          <span style={{ color: '#94A3B8' }}>Not specified</span>
+                          <span style={{ color: '#94A3B8' }}>Not uploaded</span>
                         )}
                       </div>
 

@@ -122,6 +122,12 @@ export const getPublicSampleBySlug = async (req, res) => {
 
     // Company Study Projection
     const companyStudyData = sample.companyStudy || {};
+    const hasCompanyStudyPdf = Boolean(
+      sample.companyStudy?.pdfAssetKey ||
+      sample.companyStudy?.pdfFileDataUrl ||
+      sample.companyStudy?.pdfUrl
+    );
+
     const publicCompanyStudy = {
       company: companyStudyData.company || sample.companyName,
       website: companyStudyData.website || '',
@@ -131,9 +137,9 @@ export const getPublicSampleBySlug = async (req, res) => {
       marketPosition: companyStudyData.marketPosition || '',
       keyObservations: companyStudyData.keyObservations || '',
       potentialOpportunity: companyStudyData.potentialOpportunity || '',
-      hasPdf: true,
-      pdfUrl: `/api/samples/${sample.slug}/company-study-pdf`,
-      pdfFileName: companyStudyData.pdfFileName || `${sample.companyName} - Company Study.pdf`,
+      hasPdf: hasCompanyStudyPdf,
+      pdfUrl: hasCompanyStudyPdf ? `/api/samples/${sample.slug}/company-study-pdf` : null,
+      pdfFileName: hasCompanyStudyPdf ? (companyStudyData.pdfFileName || `${sample.companyName} - Company Study.pdf`) : null,
     };
 
     // Strict projection: sanitize and verify NO private client fields leak, and NEVER inline large base64 files
@@ -214,8 +220,18 @@ export const getPublicSampleBySlug = async (req, res) => {
         aboutCompany: l.aboutCompany || l.company_summary || '',
         whySuitsBest: l.whySuitsBest || l.why_suits_best || l.shortSummary || '',
         maskedEmail: l.maskedEmail || maskEmail(l.email),
-        phone: isFirstLead ? (l.phone || l.directPhone || '+1 (555) 234-8900') : (l.phone ? `${l.phone.slice(0, 4)} xxxxx` : '+1 (xxx) xxx-xxxx'),
-        maskedPhone: l.phone ? `${l.phone.slice(0, 4)} xxxxx` : '+1 (xxx) xxx-xxxx',
+        phone: (() => {
+          const rawPhone = (l.phone || l.directPhone || '').trim();
+          const isFake = !rawPhone || rawPhone.includes('555') || rawPhone.includes('234-8900') || rawPhone.includes('(xxx)');
+          if (isFake) return null;
+          return isFirstLead ? rawPhone : `${rawPhone.slice(0, 4)} xxxxx`;
+        })(),
+        maskedPhone: (() => {
+          const rawPhone = (l.phone || l.directPhone || '').trim();
+          const isFake = !rawPhone || rawPhone.includes('555') || rawPhone.includes('234-8900') || rawPhone.includes('(xxx)');
+          if (isFake) return null;
+          return `${rawPhone.slice(0, 4)} xxxxx`;
+        })(),
         shortSummary: l.shortSummary || l.summary || l.whySuitsBest || '',
         leadStudy: {
           whyRelevant: matchedStudy.whyRelevant || l.whyRelevant || '',
@@ -471,8 +487,20 @@ export const streamCompanyStudyPdf = async (req, res) => {
       }
     }
 
-    // 3. Dynamic on-the-fly generation: Executive Company Study PDF
-    return streamGeneratedCompanyStudyPdf(sample, res, download === 'true');
+    // 3. If not uploaded, do NOT generate fake/false document
+    return res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Document Currently Not Uploaded</title></head>
+      <body style="font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #F8FAFC; color: #1E293B;">
+        <div style="background: white; padding: 36px 44px; border-radius: 16px; border: 1px solid #E2E8F0; box-shadow: 0 4px 20px rgba(0,0,0,0.06); text-align: center; max-width: 480px;">
+          <div style="width: 48px; height: 48px; border-radius: 12px; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 24px;">📄</div>
+          <h2 style="margin: 0 0 10px 0; color: #0F172A; font-size: 1.25rem;">Original Study Document Not Uploaded</h2>
+          <p style="margin: 0; color: #64748B; font-size: 0.95rem; line-height: 1.5;">The original company study document has not been uploaded yet for ${sample.companyName}.</p>
+        </div>
+      </body>
+      </html>
+    `);
   } catch (error) {
     console.error('[SampleController.streamCompanyStudyPdf] Error:', error);
     return res.status(500).json({
@@ -548,8 +576,20 @@ export const streamLeadPitchDeck = async (req, res) => {
       }
     }
 
-    // 3. Dynamic fallback generation: Executive Proposal Pitch Deck PDF
-    return streamGeneratedPitchDeckPdf(sample, lead, res, download === 'true');
+    // 3. If not uploaded, do NOT generate fake/false document
+    return res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Pitch Deck Currently Not Uploaded</title></head>
+      <body style="font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #F8FAFC; color: #1E293B;">
+        <div style="background: white; padding: 36px 44px; border-radius: 16px; border: 1px solid #E2E8F0; box-shadow: 0 4px 20px rgba(0,0,0,0.06); text-align: center; max-width: 480px;">
+          <div style="width: 48px; height: 48px; border-radius: 12px; background: #EFF6FF; color: #2563EB; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 24px;">📊</div>
+          <h2 style="margin: 0 0 10px 0; color: #0F172A; font-size: 1.25rem;">Pitch Deck Currently Not Uploaded</h2>
+          <p style="margin: 0; color: #64748B; font-size: 0.95rem; line-height: 1.5;">The original pitch deck document has not been uploaded for ${lead?.name || 'this lead'}.</p>
+        </div>
+      </body>
+      </html>
+    `);
   } catch (error) {
     console.error('[SampleController.streamLeadPitchDeck] Error:', error);
     return res.status(500).json({
@@ -624,8 +664,20 @@ export const streamLeadStudyPdf = async (req, res) => {
       }
     }
 
-    // Dynamic generation fallback
-    return streamGeneratedLeadStudyPdf(lead || { name: 'Executive Lead' }, sample, res, download === 'true');
+    // If not uploaded, do NOT generate fake/false document
+    return res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Lead Study Currently Not Uploaded</title></head>
+      <body style="font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #F8FAFC; color: #1E293B;">
+        <div style="background: white; padding: 36px 44px; border-radius: 16px; border: 1px solid #E2E8F0; box-shadow: 0 4px 20px rgba(0,0,0,0.06); text-align: center; max-width: 480px;">
+          <div style="width: 48px; height: 48px; border-radius: 12px; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 24px;">📋</div>
+          <h2 style="margin: 0 0 10px 0; color: #0F172A; font-size: 1.25rem;">Lead Study Currently Not Uploaded</h2>
+          <p style="margin: 0; color: #64748B; font-size: 0.95rem; line-height: 1.5;">The original lead study document has not been uploaded for ${lead?.name || 'this lead'}.</p>
+        </div>
+      </body>
+      </html>
+    `);
   } catch (error) {
     console.error('[SampleController.streamLeadStudyPdf] Error:', error);
     return res.status(500).json({
