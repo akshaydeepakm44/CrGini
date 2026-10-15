@@ -294,35 +294,25 @@ export const getPublicSampleBySlug = async (req, res) => {
       }
     }
 
-    // Helper to detect stale or wrongly guessed favicons
-    const isStaleFavicon = (url) => {
-      if (!url || typeof url !== 'string') return false;
-      if (url.includes('gstatic.com/faviconV2')) {
-        if (!validWebsiteDomain) return true; // No explicit website domain, discard favicon
-        return !url.toLowerCase().includes(validWebsiteDomain);
-      }
-      return false;
-    };
-
     // 1. Resolve company logo: Target company's uploaded logo from showcase or companyStudy
     let resolvedCompanyLogo = sample.logoUrl;
-    if (isPlatformLogo(resolvedCompanyLogo) || isStaleFavicon(resolvedCompanyLogo)) {
+    if (isPlatformLogo(resolvedCompanyLogo)) {
       resolvedCompanyLogo = sample.companyLogo || sample.companyStudy?.logoUrl || sample.companyStudy?.logo || null;
-      if (isStaleFavicon(resolvedCompanyLogo)) resolvedCompanyLogo = null;
+      if (isPlatformLogo(resolvedCompanyLogo)) resolvedCompanyLogo = null;
     }
 
-    // 2. Comprehensive fallback: retrieve real uploaded logo from ANY of the leads
+    // 2. Comprehensive fallback: retrieve uploaded logo from ANY of the leads
     if ((!resolvedCompanyLogo || isPlatformLogo(resolvedCompanyLogo)) && Array.isArray(sample.leads) && sample.leads.length > 0) {
       const leadWithLogo = sample.leads.find((l) => {
         const candidate = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
-        return candidate && !isPlatformLogo(candidate) && !isStaleFavicon(candidate);
+        return candidate && !isPlatformLogo(candidate);
       });
       if (leadWithLogo) {
         resolvedCompanyLogo = leadWithLogo.companyLogo || leadWithLogo.logo || leadWithLogo.company_logo || leadWithLogo.avatarUrl;
       }
     }
 
-    // 3. Official company domain favicon fallback ONLY if explicit valid domain was provided
+    // 3. Official company domain favicon fallback if explicit valid domain was provided
     if ((!resolvedCompanyLogo || isPlatformLogo(resolvedCompanyLogo)) && validWebsiteDomain) {
       resolvedCompanyLogo = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${validWebsiteDomain}&size=128`;
     }
@@ -487,7 +477,31 @@ export const streamCompanyStudyPdf = async (req, res) => {
       }
     }
 
-    // 3. If not uploaded, do NOT generate fake/false document
+    // 3. Fallback specifically for Finkr if assetKey was unset
+    if (sample.slug === 'finkr') {
+      try {
+        const fallbackKey = 'public-samples/finkr/company-study/9da37103-c463-48cb-a41b-2c3911a55e1e-Finkr_Dossier_Report.pdf';
+        const stream = await getFileStream(fallbackKey);
+        const disposition = download === 'true'
+          ? 'attachment; filename="Finkr_Company_Study_Report.pdf"'
+          : 'inline; filename="Finkr_Company_Study_Report.pdf"';
+        res.writeHead(200, {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': disposition,
+          'Cache-Control': 'public, max-age=3600',
+        });
+        return stream.pipe(res);
+      } catch (err) {
+        console.warn('[streamCompanyStudyPdf] Finkr fallback storage stream note:', err.message);
+      }
+    }
+
+    // 4. If structured company study exists, generate high-fidelity Dossier Report
+    if (sample.companyStudy && (sample.companyStudy.businessOverview || sample.companyStudy.marketPosition || sample.companyName)) {
+      return streamGeneratedCompanyStudyPdf(sample, res, download === 'true');
+    }
+
+    // 5. If not available at all, return friendly notice
     return res.status(404).send(`
       <!DOCTYPE html>
       <html>

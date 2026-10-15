@@ -168,7 +168,7 @@ export default function PublicSampleDashboard() {
   const industrySectors = useMemo(() => parseIndustries(companyStudy.industry), [companyStudy.industry]);
   const pitchDeck = sample?.pitchDeck || null;
 
-  // Extract and resolve the target company logo uploaded by the lead team
+  // Extract and resolve the target company logo uploaded by the lead team in prospect showcase
   const companyLogo = useMemo(() => {
     const isPlatformLogo = (url) => {
       if (!url || typeof url !== 'string') return true;
@@ -176,59 +176,44 @@ export default function PublicSampleDashboard() {
       return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
     };
 
-    const leads = Array.isArray(sample?.leads) ? sample.leads : [];
-    const explicitWebsite =
-      sample?.companyStudy?.website ||
-      leads.find((l) => l.companyLink || l.website)?.companyLink ||
-      leads.find((l) => l.website)?.website;
-
-    let validWebsiteDomain = null;
-    if (explicitWebsite && typeof explicitWebsite === 'string') {
-      const cd = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
-      if (cd.includes('.') && cd.length >= 4) {
-        validWebsiteDomain = cd.toLowerCase();
-      }
-    }
-
-    // Helper to detect stale or wrongly guessed favicons
-    const isStaleFavicon = (url) => {
-      if (!url || typeof url !== 'string') return false;
-      if (url.includes('gstatic.com/faviconV2')) {
-        if (!validWebsiteDomain) return true; // No explicit website domain, discard favicon
-        return !url.toLowerCase().includes(validWebsiteDomain);
-      }
-      return false;
-    };
-
-    // 1. Direct showcase or company study logo
+    // 1. Direct showcase logo uploaded in the prospect showcase
     let raw = sample?.logoUrl || sample?.companyLogo;
-    if (raw && !isPlatformLogo(raw) && !isStaleFavicon(raw)) {
+    if (raw && !isPlatformLogo(raw)) {
       return raw.trim();
     }
 
     // 2. Company study logo
     const studyLogo = sample?.companyStudy?.logoUrl || sample?.companyStudy?.logo;
-    if (studyLogo && !isPlatformLogo(studyLogo) && !isStaleFavicon(studyLogo)) {
+    if (studyLogo && !isPlatformLogo(studyLogo)) {
       return studyLogo.trim();
     }
 
     // 3. Fallback: Check if lead team uploaded company logo on any of the leads
+    const leads = Array.isArray(sample?.leads) ? sample.leads : [];
     const leadWithLogo = leads.find((l) => {
       const candidate = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
-      return candidate && !isPlatformLogo(candidate) && !isStaleFavicon(candidate);
+      return candidate && !isPlatformLogo(candidate);
     });
     if (leadWithLogo) {
       const cand = leadWithLogo.companyLogo || leadWithLogo.logo || leadWithLogo.company_logo || leadWithLogo.avatarUrl;
       if (cand) return cand.trim();
     }
 
-    // 4. Fallback: Official company website domain favicon ONLY if an actual website was specified
-    if (validWebsiteDomain) {
-      return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${validWebsiteDomain}&size=128`;
+    // 4. Fallback: Official company website domain favicon if an actual website was specified
+    const explicitWebsite =
+      sample?.companyStudy?.website ||
+      leads.find((l) => l.companyLink || l.website)?.companyLink ||
+      leads.find((l) => l.website)?.website;
+
+    if (explicitWebsite && typeof explicitWebsite === 'string') {
+      const cd = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+      if (cd.includes('.') && cd.length >= 4) {
+        return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
+      }
     }
 
     return null;
-  }, [sample, companyName]);
+  }, [sample]);
 
   // Helper to detect dummy/mock template leads
   const isMockDummyLead = (l) => {
@@ -245,13 +230,19 @@ export default function PublicSampleDashboard() {
 
   // Resolve best logo for any lead (uploaded logo -> company link favicon -> showcase company logo)
   const resolveLeadLogo = (lead) => {
-    if (lead?.logo && !lead.logo.includes('creativegini') && !lead.logo.includes('dizigini') && !lead.logo.includes('gstatic.com/faviconV2')) {
+    const isPlatformLogo = (url) => {
+      if (!url || typeof url !== 'string') return true;
+      const clean = url.trim().toLowerCase();
+      return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
+    };
+
+    if (lead?.logo && !isPlatformLogo(lead.logo)) {
       return lead.logo;
     }
-    if (lead?.companyLogo && !lead.companyLogo.includes('creativegini') && !lead.companyLogo.includes('dizigini') && !lead.companyLogo.includes('gstatic.com/faviconV2')) {
+    if (lead?.companyLogo && !isPlatformLogo(lead.companyLogo)) {
       return lead.companyLogo;
     }
-    if (lead?.avatarUrl && !lead.avatarUrl.includes('creativegini') && !lead.avatarUrl.includes('dizigini') && !lead.avatarUrl.includes('gstatic.com/faviconV2')) {
+    if (lead?.avatarUrl && !isPlatformLogo(lead.avatarUrl)) {
       return lead.avatarUrl;
     }
     const rawLink = lead?.companyLink || lead?.website;
@@ -278,38 +269,13 @@ export default function PublicSampleDashboard() {
   // Lead #1 is the featured open profile
   const featuredLead = displayLeads.length > 0 ? displayLeads[0] : null;
 
-  // The remaining uploaded leads (leads 2-5)
+  // All the remaining uploaded leads (leads 2+) are displayed in the locked cards section
   const uploadedLockedLeads = displayLeads.length > 1 ? displayLeads.slice(1) : [];
 
-  // Guarantee that the 4 locked leads are presented (using uploaded leads first, gracefully filling up to 4 if needed)
+  // Present ALL uploaded locked leads directly with their authentic name & logo
   const lockedLeads = useMemo(() => {
-    const list = [...uploadedLockedLeads];
-    if (list.length < 4) {
-      const fallbackRoles = [
-        { title: 'Chief Technology Officer', name: 'Executive Contact', why: 'Technical architecture & cloud systems' },
-        { title: 'VP of Product Engineering', name: 'Executive Contact', why: 'Product roadmap & platform scalability' },
-        { title: 'Head of Enterprise Analytics', name: 'Executive Contact', why: 'Data architecture & intelligence integration' },
-        { title: 'Director of Strategic Growth', name: 'Executive Contact', why: 'Commercial expansion & partnership development' },
-      ];
-      const needed = 4 - list.length;
-      for (let i = 0; i < needed; i++) {
-        const fb = fallbackRoles[i % fallbackRoles.length];
-        list.push({
-          id: `locked-preview-${i + 1}`,
-          name: fb.name,
-          title: fb.title,
-          company: companyName,
-          companyLink: companyStudy?.website || '',
-          logo: companyLogo,
-          whySuitsBest: fb.why,
-          isPlaceholder: true,
-          maskedEmail: '••••••••@' + (companyStudy?.website ? companyStudy.website.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] : 'enterprise.com'),
-          maskedPhone: '+1 (xxx) xxx-xxxx',
-        });
-      }
-    }
-    return list.slice(0, 4);
-  }, [uploadedLockedLeads, companyName, companyStudy, companyLogo]);
+    return uploadedLockedLeads;
+  }, [uploadedLockedLeads]);
 
   if (loading) {
     return (
@@ -430,18 +396,18 @@ export default function PublicSampleDashboard() {
                 ) : null}
                 <div style={{
                   display: companyLogo ? 'none' : 'flex',
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                  color: '#2563EB',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: '8px 18px',
-                  borderRadius: '20px',
-                  background: '#F1F5F9',
-                  border: '1px solid #E2E8F0',
-                  color: '#64748B',
-                  fontSize: '0.8125rem',
-                  fontWeight: 600,
-                  marginBottom: '6px'
+                  fontWeight: 800,
+                  fontSize: '1.5rem',
+                  border: '1.5px solid #BFDBFE'
                 }}>
-                  Logo: Not mentioned
+                  {companyName?.charAt(0)?.toUpperCase() || 'C'}
                 </div>
               </div>
 

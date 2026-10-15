@@ -45,45 +45,22 @@ export const resolveShowcaseLogo = (showcase) => {
     return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
   };
 
-  const leads = Array.isArray(showcase.leads) ? showcase.leads : [];
-  const explicitWebsite =
-    showcase.companyStudy?.website ||
-    leads.find((l) => l.companyLink || l.website)?.companyLink ||
-    leads.find((l) => l.website)?.website;
-
-  let validDomain = null;
-  if (explicitWebsite && typeof explicitWebsite === 'string') {
-    const cd = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
-    if (cd.includes('.') && cd.length >= 4) {
-      validDomain = cd.toLowerCase();
-    }
-  }
-
-  // Reject auto-guessed favicons where website domain wasn't explicitly provided or doesn't match
-  const isStaleFavicon = (url) => {
-    if (!url || typeof url !== 'string') return false;
-    if (url.includes('gstatic.com/faviconV2')) {
-      if (!validDomain) return true;
-      return !url.toLowerCase().includes(validDomain);
-    }
-    return false;
-  };
-
-  // 1. Explicit showcase logo if valid and not platform default and not stale favicon
-  if (showcase.logoUrl && !isPlatformLogo(showcase.logoUrl) && !isStaleFavicon(showcase.logoUrl)) {
+  // 1. Explicit showcase logo if valid and not platform default
+  if (showcase.logoUrl && !isPlatformLogo(showcase.logoUrl)) {
     return showcase.logoUrl.trim();
   }
 
   // 2. Company study logo
   const studyLogo = showcase.companyStudy?.logoUrl || showcase.companyStudy?.logo;
-  if (studyLogo && !isPlatformLogo(studyLogo) && !isStaleFavicon(studyLogo)) {
+  if (studyLogo && !isPlatformLogo(studyLogo)) {
     return studyLogo.trim();
   }
 
   // 3. Any lead's company logo
+  const leads = Array.isArray(showcase.leads) ? showcase.leads : [];
   const leadWithLogo = leads.find((l) => {
     const candidate = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
-    return candidate && !isPlatformLogo(candidate) && !isStaleFavicon(candidate);
+    return candidate && !isPlatformLogo(candidate);
   });
   if (leadWithLogo) {
     const cand = leadWithLogo.companyLogo || leadWithLogo.logo || leadWithLogo.company_logo || leadWithLogo.avatarUrl;
@@ -91,8 +68,16 @@ export const resolveShowcaseLogo = (showcase) => {
   }
 
   // 4. Derive from explicit company website only if a valid domain with a dot exists
-  if (validDomain) {
-    return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${validDomain}&size=128`;
+  const explicitWebsite =
+    showcase.companyStudy?.website ||
+    leads.find((l) => l.companyLink || l.website)?.companyLink ||
+    leads.find((l) => l.website)?.website;
+
+  if (explicitWebsite && typeof explicitWebsite === 'string') {
+    const cd = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+    if (cd.includes('.') && cd.length >= 4) {
+      return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
+    }
   }
 
   return '';
@@ -225,15 +210,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
       const clean = url.trim().toLowerCase();
       return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
     };
-    const leads = Array.isArray(showcase.leads) ? showcase.leads : [];
-    const explicitWebsite = showcase.companyStudy?.website || leads.find((l) => l.companyLink || l.website)?.companyLink;
-    let validDomain = null;
-    if (explicitWebsite) {
-      const cd = String(explicitWebsite).replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
-      if (cd.includes('.') && cd.length >= 4) validDomain = cd.toLowerCase();
-    }
-    const isStaleFavicon = rawLogo.includes('gstatic.com/faviconV2') && (!validDomain || !rawLogo.toLowerCase().includes(validDomain));
-    const initialLogo = (!rawLogo || isPlatformLogo(rawLogo) || isStaleFavicon) ? '' : rawLogo;
+    const initialLogo = isPlatformLogo(rawLogo) ? '' : rawLogo;
 
     // Filter out dummy/mock template leads (e.g. Sarah Jenkins from Acme Global)
     const cleanLeads = (showcase.leads || []).filter(
@@ -901,18 +878,15 @@ support@dizigini.com`;
                             display: resolvedLogo ? 'none' : 'flex',
                             width: '100%',
                             height: '100%',
-                            background: '#F8FAFC',
-                            color: '#94A3B8',
+                            background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                            color: '#2563EB',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontWeight: 600,
-                            fontSize: '0.62rem',
-                            textAlign: 'center',
-                            padding: '2px',
-                            lineHeight: 1.1,
+                            fontWeight: 800,
+                            fontSize: '1.15rem',
                           }}
                         >
-                          Not mentioned
+                          {fallbackChar}
                         </div>
                       </div>
                     );
