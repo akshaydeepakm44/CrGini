@@ -187,11 +187,12 @@ export default function PublicSampleDashboard() {
   const [composerMinimized, setComposerMinimized] = useState(false);
   const [composerMaximized, setComposerMaximized] = useState(false);
   const [composerType, setComposerType] = useState('interested'); // 'interested' | 'not_interested'
-  const [composerTo, setComposerTo] = useState('team@dizitalgini.com');
+  const [composerTo, setComposerTo] = useState('team@dizigini.com');
   const [composerSubject, setComposerSubject] = useState('');
   const [composerBody, setComposerBody] = useState('');
   const [composerSending, setComposerSending] = useState(false);
   const [composerSent, setComposerSent] = useState(false);
+  const [sendMenuOpen, setSendMenuOpen] = useState(false);
 
   const openMailComposer = (type) => {
     const targetComp = companyName || 'LimitlessAI';
@@ -200,10 +201,11 @@ export default function PublicSampleDashboard() {
     setComposerMinimized(false);
     setComposerSent(false);
     setComposerSending(false);
-    setComposerTo('team@dizitalgini.com');
+    setSendMenuOpen(false);
+    setComposerTo('team@dizigini.com');
 
     if (type === 'interested') {
-      setComposerSubject(`Interested in the ${targetComp} Report`);
+      setComposerSubject(`Note to the team - Interested in ${targetComp}`);
       setComposerBody(
 `Hi DiziGini Team,
 
@@ -239,12 +241,13 @@ Best regards,
     }
   };
 
-  const handleSendMail = async () => {
+  const handleSendMail = (targetService = 'gmail') => {
     if (composerSending) return;
     setComposerSending(true);
+    setSendMenuOpen(false);
 
     try {
-      // 1. Submit to backend inquiry endpoint
+      // 1. Submit to backend inquiry endpoint in the background
       let extractedName = '';
       let extractedEmail = '';
       const lines = composerBody.split('\n');
@@ -256,7 +259,7 @@ Best regards,
         }
       }
 
-      await fetch(`/api/samples/${sample?.slug || effectiveSlug || 'general'}/inquiry`, {
+      fetch(`/api/samples/${sample?.slug || effectiveSlug || 'general'}/inquiry`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -268,21 +271,34 @@ Best regards,
           slug: sample?.slug || effectiveSlug
         })
       }).catch((err) => console.warn('[Inquiry] Backend submission warning:', err));
+    } catch (_) {}
 
-      // 2. Open user's email client via mailto
-      const mailtoUrl = `mailto:${encodeURIComponent(composerTo)}?subject=${encodeURIComponent(composerSubject)}&body=${encodeURIComponent(composerBody)}`;
-      window.location.href = mailtoUrl;
-
-      setComposerSent(true);
-      setTimeout(() => {
-        setComposerOpen(false);
-        setComposerSent(false);
-      }, 2200);
-    } catch (err) {
-      console.error('[Composer] Send error:', err);
-    } finally {
-      setComposerSending(false);
+    // 2. Open email directly in browser tab so user's active browser account handles it
+    let targetUrl = '';
+    if (targetService === 'outlook') {
+      targetUrl = `https://outlook.live.com/mail/0/deeplink/compose?to=${encodeURIComponent(composerTo)}&subject=${encodeURIComponent(composerSubject)}&body=${encodeURIComponent(composerBody)}`;
+    } else if (targetService === 'yahoo') {
+      targetUrl = `https://compose.mail.yahoo.com/?to=${encodeURIComponent(composerTo)}&subj=${encodeURIComponent(composerSubject)}&body=${encodeURIComponent(composerBody)}`;
+    } else if (targetService === 'mailto') {
+      targetUrl = `mailto:${encodeURIComponent(composerTo)}?subject=${encodeURIComponent(composerSubject)}&body=${encodeURIComponent(composerBody)}`;
+    } else {
+      // Default: Gmail Web in current browser tab/window
+      targetUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(composerTo)}&su=${encodeURIComponent(composerSubject)}&body=${encodeURIComponent(composerBody)}`;
     }
+
+    if (targetService === 'mailto') {
+      window.location.href = targetUrl;
+    } else {
+      // Synchronous window.open ensures popup blockers don't block opening the browser mail tab
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    setComposerSent(true);
+    setComposerSending(false);
+    setTimeout(() => {
+      setComposerOpen(false);
+      setComposerSent(false);
+    }, 2200);
   };
 
   // Extract and resolve the target company logo uploaded by the lead team in prospect showcase
@@ -2187,7 +2203,7 @@ Best regards,
                   gap: '8px'
                 }}>
                   <CheckCircle2 size={16} color="#10B981" />
-                  <span>Email client opened & note sent to team@dizitalgini.com!</span>
+                  <span>Mail opened in your browser & note sent to team@dizigini.com!</span>
                 </div>
               )}
 
@@ -2203,50 +2219,152 @@ Best regards,
               }}>
                 {/* Left controls: Send button & Formatting Icons */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  {/* Split Send Button */}
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    background: '#0B57D0',
-                    borderRadius: '24px',
-                    overflow: 'hidden',
-                    boxShadow: '0 1px 3px rgba(11, 87, 208, 0.3)'
-                  }}>
-                    <button
-                      type="button"
-                      onClick={handleSendMail}
-                      disabled={composerSending}
-                      style={{
-                        background: 'transparent',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        padding: '8px 16px 8px 18px',
-                        fontWeight: 600,
-                        fontSize: '0.86rem',
-                        cursor: 'pointer',
+                  {/* Split Send Button with options */}
+                  <div style={{ position: 'relative', display: 'inline-flex' }}>
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      background: '#0B57D0',
+                      borderRadius: '24px',
+                      overflow: 'hidden',
+                      boxShadow: '0 1px 3px rgba(11, 87, 208, 0.3)'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => handleSendMail('gmail')}
+                        disabled={composerSending}
+                        style={{
+                          background: 'transparent',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          padding: '8px 16px 8px 18px',
+                          fontWeight: 600,
+                          fontSize: '0.86rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <span>{composerSending ? 'Opening...' : (composerSent ? 'Opened!' : 'Send')}</span>
+                      </button>
+                      <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.3)' }} />
+                      <button
+                        type="button"
+                        onClick={() => setSendMenuOpen(!sendMenuOpen)}
+                        style={{
+                          background: 'transparent',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          padding: '8px 10px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        title="Choose email provider"
+                      >
+                        <span style={{ fontSize: '0.65rem' }}>▼</span>
+                      </button>
+                    </div>
+
+                    {/* Dropdown Options */}
+                    {sendMenuOpen && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '100%',
+                        left: 0,
+                        marginBottom: '8px',
+                        background: '#FFFFFF',
+                        borderRadius: '10px',
+                        border: '1px solid #E2E8F0',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                        minWidth: '220px',
+                        zIndex: 10000,
+                        padding: '6px',
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <span>{composerSending ? 'Sending...' : (composerSent ? 'Sent' : 'Send')}</span>
-                    </button>
-                    <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.3)' }} />
-                    <button
-                      type="button"
-                      onClick={handleSendMail}
-                      style={{
-                        background: 'transparent',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        padding: '8px 10px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <span style={{ fontSize: '0.65rem' }}>▼</span>
-                    </button>
+                        flexDirection: 'column',
+                        gap: '2px'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => handleSendMail('gmail')}
+                          style={{
+                            background: '#EFF6FF',
+                            border: 'none',
+                            textAlign: 'left',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            color: '#1D4ED8',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                          }}
+                        >
+                          <span>Gmail in Browser</span>
+                          <span style={{ fontSize: '0.7rem', color: '#2563EB', fontWeight: 700 }}>(Default)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSendMail('outlook')}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            textAlign: 'left',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            color: '#334155',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          Outlook Web
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSendMail('yahoo')}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            textAlign: 'left',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            color: '#334155',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          Yahoo Mail
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSendMail('mailto')}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            textAlign: 'left',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            color: '#64748B',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          Desktop App (Mail / Outlook)
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Gmail Toolbar Icons (Exact order as in user image) */}
