@@ -22,7 +22,21 @@ import {
   Globe,
   X,
   Lightbulb,
-  Lock
+  Lock,
+  ThumbsUp,
+  ThumbsDown,
+  Send,
+  Minus,
+  Maximize2,
+  Minimize2,
+  Paperclip,
+  Link2,
+  Smile,
+  Image as ImageIcon,
+  Trash2,
+  MoreVertical,
+  PenTool,
+  Clock
 } from 'lucide-react';
 import { api } from '../../services/api';
 import './publicSample.css';
@@ -167,6 +181,109 @@ export default function PublicSampleDashboard() {
   const companyStudy = sample?.companyStudy || {};
   const industrySectors = useMemo(() => parseIndustries(companyStudy.industry), [companyStudy.industry]);
   const pitchDeck = sample?.pitchDeck || null;
+
+  // Compose Card State (Gmail-style compose window for Interested / Not Interested feedback)
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerMinimized, setComposerMinimized] = useState(false);
+  const [composerMaximized, setComposerMaximized] = useState(false);
+  const [composerType, setComposerType] = useState('interested'); // 'interested' | 'not_interested'
+  const [composerTo, setComposerTo] = useState('team@dizitalgini.com');
+  const [composerSubject, setComposerSubject] = useState('');
+  const [composerBody, setComposerBody] = useState('');
+  const [composerSending, setComposerSending] = useState(false);
+  const [composerSent, setComposerSent] = useState(false);
+
+  const openMailComposer = (type) => {
+    const targetComp = companyName || 'LimitlessAI';
+    setComposerType(type);
+    setComposerOpen(true);
+    setComposerMinimized(false);
+    setComposerSent(false);
+    setComposerSending(false);
+    setComposerTo('team@dizitalgini.com');
+
+    if (type === 'interested') {
+      setComposerSubject(`Interested in the ${targetComp} Report`);
+      setComposerBody(
+`Hi DiziGini Team,
+
+I’m interested in proceeding further with the ${targetComp} report and would like to know the next steps.
+
+My Contact Details
+
+- Name: 
+- Email: 
+- Contact Number: 
+- Company: ${targetComp}
+
+Please contact me to discuss the services and next steps.
+
+Thank you.`
+      );
+    } else {
+      setComposerSubject(`Note to the team - ${targetComp}`);
+      setComposerBody(
+`Hi DiziGini Team,
+
+Thank you for reaching out and sharing the ${targetComp} report. We appreciate your time and the information you provided.
+
+At the moment, we are not looking for it now, but we will keep your details in mind for the future.
+
+Thank you for understanding.
+
+Best regards,
+[Your Name]
+[Company Name]
+[Contact Details]`
+      );
+    }
+  };
+
+  const handleSendMail = async () => {
+    if (composerSending) return;
+    setComposerSending(true);
+
+    try {
+      // 1. Submit to backend inquiry endpoint
+      let extractedName = '';
+      let extractedEmail = '';
+      const lines = composerBody.split('\n');
+      for (const line of lines) {
+        if (/^-\s*name\s*:/i.test(line)) {
+          extractedName = line.replace(/^-\s*name\s*:/i, '').trim();
+        } else if (/^-\s*email\s*:/i.test(line)) {
+          extractedEmail = line.replace(/^-\s*email\s*:/i, '').trim();
+        }
+      }
+
+      await fetch(`/api/samples/${sample?.slug || effectiveSlug || 'general'}/inquiry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: extractedName || 'Prospect Visitor',
+          email: extractedEmail || (extractedName ? `${extractedName.toLowerCase().replace(/\s+/g, '.')}@example.com` : 'feedback@prospect.com'),
+          message: composerBody,
+          subject: composerSubject,
+          companyName: companyName,
+          slug: sample?.slug || effectiveSlug
+        })
+      }).catch((err) => console.warn('[Inquiry] Backend submission warning:', err));
+
+      // 2. Open user's email client via mailto
+      const mailtoUrl = `mailto:${encodeURIComponent(composerTo)}?subject=${encodeURIComponent(composerSubject)}&body=${encodeURIComponent(composerBody)}`;
+      window.location.href = mailtoUrl;
+
+      setComposerSent(true);
+      setTimeout(() => {
+        setComposerOpen(false);
+        setComposerSent(false);
+      }, 2200);
+    } catch (err) {
+      console.error('[Composer] Send error:', err);
+    } finally {
+      setComposerSending(false);
+    }
+  };
 
   // Extract and resolve the target company logo uploaded by the lead team in prospect showcase
   const companyLogo = useMemo(() => {
@@ -1272,6 +1389,145 @@ export default function PublicSampleDashboard() {
 
         </section>
 
+        {/* SECTION 3: PROSPECT INTEREST & NEXT STEPS (Mini Contact Options) */}
+        <section id="contact-feedback" className="sample-section" style={{ marginTop: '48px', marginBottom: '24px' }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            border: '1px solid #E2E8F0',
+            padding: 'clamp(32px, 5vw, 48px) clamp(20px, 4vw, 40px)',
+            boxShadow: '0 4px 25px rgba(15, 23, 42, 0.04)',
+            textAlign: 'center',
+            maxWidth: '820px',
+            margin: '0 auto',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Top decorative gradient accent bar */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #2563EB 0%, #7C3AED 50%, #10B981 100%)'
+            }} />
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              background: '#EFF6FF',
+              border: '1px solid #DBEAFE',
+              color: '#2563EB',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              marginBottom: '16px'
+            }}>
+              <Sparkles size={14} />
+              <span>Next Steps & Collaboration</span>
+            </div>
+
+            <h2 style={{
+              fontSize: 'clamp(1.35rem, 4vw, 1.85rem)',
+              fontWeight: 800,
+              color: '#0F172A',
+              margin: '0 0 12px 0',
+              letterSpacing: '-0.02em',
+              wordBreak: 'break-word'
+            }}>
+              How would you like to proceed with {companyName}?
+            </h2>
+
+            <p style={{
+              fontSize: 'clamp(0.88rem, 2vw, 0.98rem)',
+              color: '#64748B',
+              maxWidth: '560px',
+              margin: '0 auto 28px auto',
+              lineHeight: 1.55,
+              wordBreak: 'break-word'
+            }}>
+              Let our team know your decision on this intelligence briefing. Click an option below to connect with us or send your feedback.
+            </p>
+
+            {/* Options: Interested / Not Interested */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              gap: '16px'
+            }}>
+              <button
+                type="button"
+                onClick={() => openMailComposer('interested')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '13px 30px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.28)',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(37, 99, 235, 0.38)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(37, 99, 235, 0.28)';
+                }}
+              >
+                <ThumbsUp size={18} />
+                <span>Interested</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openMailComposer('not_interested')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '13px 26px',
+                  borderRadius: '12px',
+                  background: '#F8FAFC',
+                  color: '#475569',
+                  border: '1.5px solid #CBD5E1',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#F1F5F9';
+                  e.currentTarget.style.borderColor = '#94A3B8';
+                  e.currentTarget.style.color = '#0F172A';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#F8FAFC';
+                  e.currentTarget.style.borderColor = '#CBD5E1';
+                  e.currentTarget.style.color = '#475569';
+                }}
+              >
+                <ThumbsDown size={18} />
+                <span>Not Interested</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
       </main>
 
       {/* 5. TRUST FOOTER */}
@@ -1709,6 +1965,333 @@ export default function PublicSampleDashboard() {
           );
         })()}
           </div>
+        </div>
+      )}
+
+      {/* FLOATING GMAIL-STYLE COMPOSE CARD */}
+      {composerOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: composerMaximized ? '24px' : '0',
+            right: composerMaximized ? 'auto' : 'clamp(12px, 3vw, 36px)',
+            left: composerMaximized ? '50%' : 'auto',
+            transform: composerMaximized ? 'translateX(-50%)' : 'none',
+            width: composerMaximized ? 'min(860px, 94vw)' : 'clamp(340px, 92vw, 540px)',
+            height: composerMinimized ? 'auto' : (composerMaximized ? 'min(82vh, 700px)' : 'auto'),
+            maxHeight: composerMinimized ? '44px' : '92vh',
+            background: '#FFFFFF',
+            borderRadius: composerMaximized ? '14px' : '14px 14px 0 0',
+            boxShadow: '0 12px 48px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.08)',
+            border: '1px solid #D1D5DB',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            transition: 'all 0.2s ease',
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}
+        >
+          {/* Header Bar */}
+          <div
+            onClick={() => {
+              if (composerMinimized) setComposerMinimized(false);
+            }}
+            style={{
+              height: '44px',
+              minHeight: '44px',
+              background: '#F2F6FC',
+              padding: '0 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: composerMinimized ? 'none' : '1px solid #E5E7EB',
+              cursor: composerMinimized ? 'pointer' : 'default',
+              userSelect: 'none'
+            }}
+          >
+            <div style={{
+              fontSize: '0.88rem',
+              fontWeight: 600,
+              color: '#1F2937',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              paddingRight: '12px'
+            }}>
+              {composerSubject || (composerType === 'interested' ? `Interested in the ${companyName || 'LimitlessAI'} Report` : `Note to the team - ${companyName || 'LimitlessAI'}`)}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              {/* Minimize */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setComposerMinimized(!composerMinimized);
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: '4px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#4B5563',
+                  cursor: 'pointer'
+                }}
+                title={composerMinimized ? "Expand" : "Minimize"}
+              >
+                <Minus size={14} />
+              </button>
+
+              {/* Maximize / Restore */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setComposerMinimized(false);
+                  setComposerMaximized(!composerMaximized);
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: '4px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#4B5563',
+                  cursor: 'pointer'
+                }}
+                title={composerMaximized ? "Exit full screen" : "Full screen"}
+              >
+                {composerMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+              </button>
+
+              {/* Close */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setComposerOpen(false);
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: '4px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#4B5563',
+                  cursor: 'pointer'
+                }}
+                title="Close"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* Body Content (Visible when not minimized) */}
+          {!composerMinimized && (
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              {/* To Row */}
+              <div style={{
+                padding: '6px 16px',
+                borderBottom: '1px solid #F1F5F9',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748B', width: '32px' }}>To</span>
+                <input
+                  type="text"
+                  value={composerTo}
+                  onChange={(e) => setComposerTo(e.target.value)}
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: '0.88rem',
+                    color: '#0F172A',
+                    fontWeight: 500,
+                    background: 'transparent'
+                  }}
+                  placeholder="Recipients"
+                />
+              </div>
+
+              {/* Subject Row */}
+              <div style={{
+                padding: '6px 16px',
+                borderBottom: '1px solid #F1F5F9',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <input
+                  type="text"
+                  value={composerSubject}
+                  onChange={(e) => setComposerSubject(e.target.value)}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: '0.88rem',
+                    color: '#0F172A',
+                    fontWeight: 500,
+                    background: 'transparent'
+                  }}
+                  placeholder="Subject"
+                />
+              </div>
+
+              {/* Message Textarea */}
+              <div style={{ flex: 1, padding: '12px 16px', display: 'flex', minHeight: 0 }}>
+                <textarea
+                  value={composerBody}
+                  onChange={(e) => setComposerBody(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: composerMaximized ? '360px' : '260px',
+                    border: 'none',
+                    outline: 'none',
+                    resize: 'none',
+                    fontSize: '0.88rem',
+                    lineHeight: '1.6',
+                    color: '#1E293B',
+                    fontFamily: 'inherit',
+                    background: 'transparent'
+                  }}
+                  placeholder="Compose email..."
+                />
+              </div>
+
+              {/* Sent Banner / Toast if just sent */}
+              {composerSent && (
+                <div style={{
+                  background: '#ECFDF5',
+                  border: '1px solid #A7F3D0',
+                  color: '#065F46',
+                  padding: '8px 16px',
+                  margin: '0 16px 8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <CheckCircle2 size={16} color="#10B981" />
+                  <span>Email client opened & note sent to team@dizitalgini.com!</span>
+                </div>
+              )}
+
+              {/* Bottom Action Bar */}
+              <div style={{
+                padding: '8px 16px',
+                borderTop: '1px solid #F1F5F9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                background: '#FFFFFF'
+              }}>
+                {/* Left controls: Send button & Formatting Icons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  {/* Split Send Button */}
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    background: '#0B57D0',
+                    borderRadius: '24px',
+                    overflow: 'hidden',
+                    boxShadow: '0 1px 3px rgba(11, 87, 208, 0.3)'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={handleSendMail}
+                      disabled={composerSending}
+                      style={{
+                        background: 'transparent',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        padding: '8px 16px 8px 18px',
+                        fontWeight: 600,
+                        fontSize: '0.86rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <span>{composerSending ? 'Sending...' : (composerSent ? 'Sent' : 'Send')}</span>
+                    </button>
+                    <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.3)' }} />
+                    <button
+                      type="button"
+                      onClick={handleSendMail}
+                      style={{
+                        background: 'transparent',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        padding: '8px 10px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <span style={{ fontSize: '0.65rem' }}>▼</span>
+                    </button>
+                  </div>
+
+                  {/* Gmail Toolbar Icons (Exact order as in user image) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#5F6368' }}>
+                    <span title="Formatting options" style={{ fontSize: '0.9rem', fontWeight: 700, padding: '4px 6px', cursor: 'pointer', userSelect: 'none' }}>Aa</span>
+                    <span title="Pen / Style" style={{ padding: '4px 6px', cursor: 'pointer', display: 'flex' }}><PenTool size={16} /></span>
+                    <span title="Attach files" style={{ padding: '4px 6px', cursor: 'pointer', display: 'flex' }}><Paperclip size={16} /></span>
+                    <span title="Insert link" style={{ padding: '4px 6px', cursor: 'pointer', display: 'flex' }}><Link2 size={16} /></span>
+                    <span title="Insert emoji" style={{ padding: '4px 6px', cursor: 'pointer', display: 'flex' }}><Smile size={16} /></span>
+                    <span title="Insert files using Drive" style={{ padding: '4px 6px', cursor: 'pointer', display: 'flex' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5F6368" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 17l6-10h8l-6 10H4z" />
+                        <path d="M14 7l6 10" />
+                      </svg>
+                    </span>
+                    <span title="Insert photo" style={{ padding: '4px 6px', cursor: 'pointer', display: 'flex' }}><ImageIcon size={16} /></span>
+                    <span title="Toggle confidential mode" style={{ padding: '4px 6px', cursor: 'pointer', display: 'flex' }}><Clock size={16} /></span>
+                    <span title="Insert signature" style={{ padding: '4px 6px', cursor: 'pointer', display: 'flex' }}><PenTool size={16} /></span>
+                    <span title="More options" style={{ padding: '4px 6px', cursor: 'pointer', display: 'flex' }}><MoreVertical size={16} /></span>
+                  </div>
+                </div>
+
+                {/* Right controls: Trash */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setComposerOpen(false)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#5F6368',
+                      cursor: 'pointer',
+                      padding: '6px',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Discard draft"
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
