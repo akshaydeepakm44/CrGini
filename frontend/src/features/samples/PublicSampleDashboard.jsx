@@ -425,6 +425,60 @@ export default function PublicSampleDashboard() {
               <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', wordBreak: 'break-word' }}>
                 {companyName}
               </div>
+
+              {/* View Original Study Document Button under company name */}
+              {companyStudy?.hasPdf ? (
+                <a
+                  href={companyStudy.pdfUrl || `/api/samples/${sample.slug}/company-study-pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="sample-action-btn"
+                  style={{
+                    marginTop: '16px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    background: '#2563EB',
+                    color: '#FFFFFF',
+                    padding: '10px 18px',
+                    borderRadius: '10px',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
+                    transition: 'all 0.15s ease',
+                    width: '100%',
+                    maxWidth: '260px'
+                  }}
+                >
+                  <FileText size={16} />
+                  <span>View Original Study Document</span>
+                  <ExternalLink size={14} />
+                </a>
+              ) : (
+                <div
+                  style={{
+                    marginTop: '14px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    background: '#F1F5F9',
+                    border: '1px solid #CBD5E1',
+                    color: '#64748B',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    width: '100%',
+                    maxWidth: '260px'
+                  }}
+                >
+                  <FileText size={14} color="#94A3B8" />
+                  <span>Study Document: Not Uploaded</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -434,14 +488,557 @@ export default function PublicSampleDashboard() {
       {/* MAIN CONTAINER */}
       <main className="sample-main">
 
-        {/* SECTION 1: EXECUTIVE INTELLIGENCE */}
-        <section id="executive-intelligence" className="sample-section">
+        {/* SECTION 1: DECISION-MAKER INTELLIGENCE */}
+        <section className="sample-section">
           
           {/* Section 1 Header */}
           <div className="sample-section-header">
             <div className="sample-section-title-wrap">
               <div className="sample-section-badge">
                 1
+              </div>
+              <div>
+                <h2 className="sample-section-title">
+                  Decision-maker intelligence
+                </h2>
+                <p className="sample-section-subtitle">
+                  A preview of the people relevant to your target account.
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              background: '#ECFDF5',
+              border: '1px solid #A7F3D0',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: '#065F46',
+              maxWidth: '100%',
+              wordBreak: 'break-word'
+            }}>
+              <Users size={14} />
+              <span>{featuredLead ? 1 + lockedLeads.length : 0} profiles available (1 featured, {lockedLeads.length} locked)</span>
+            </div>
+          </div>
+
+          {/* Featured Profile Card */}
+          {featuredLead ? (
+            <div className="featured-lead-card">
+              
+              <div className="featured-lead-info">
+                {resolveLeadLogo(featuredLead, true) ? (
+                  <img
+                    src={resolveLeadLogo(featuredLead, true)}
+                    alt={featuredLead.name}
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '2px solid #E2E8F0',
+                      flexShrink: 0
+                    }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      if (e.currentTarget.nextSibling) {
+                        e.currentTarget.nextSibling.style.display = 'flex';
+                      }
+                    }}
+                  />
+                ) : null}
+                <div style={{
+                  display: resolveLeadLogo(featuredLead, true) ? 'none' : 'flex',
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                  color: '#2563EB',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '1.5rem',
+                  border: '2px solid #E2E8F0',
+                  flexShrink: 0
+                }}>
+                  {featuredLead.name?.charAt(0) || 'L'}
+                </div>
+
+                <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {featuredLead.company || companyName}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                    <h3 style={{ fontSize: 'clamp(1.15rem, 3.5vw, 1.3rem)', fontWeight: 800, color: '#0F172A', margin: 0, wordBreak: 'break-word' }}>
+                      {featuredLead.name}
+                    </h3>
+                    <CheckCircle2 size={18} color="#10B981" />
+                  </div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2563EB', marginTop: '2px', wordBreak: 'break-word' }}>
+                    {featuredLead.title || 'Executive Decision Maker'} · {featuredLead.company || companyName}
+                  </div>
+
+                  {featuredLead.whySuitsBest && (
+                    <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: 1.5, margin: '8px 0 0 0', maxWidth: '680px', wordBreak: 'break-word' }}>
+                      {featuredLead.whySuitsBest}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Button: Download Pitch Deck directly instead of inspecting full dossier */}
+              {(() => {
+                const leadPitchUrl = featuredLead.pitchDeck?.downloadUrl ||
+                                     featuredLead.pitchDeckPdf ||
+                                     (sample?.pitchDeck?.downloadUrl || (sample?.pitchDeck ? `/api/samples/${sample.slug}/pitch-deck?download=true` : null));
+                const leadPitchName = featuredLead.pitchDeck?.fileName || featuredLead.pitchDeckPdfName || sample?.pitchDeck?.fileName || `${(featuredLead.name || 'Prospect').replace(/\s+/g, '_')}_Pitch_Deck.pdf`;
+
+                if (leadPitchUrl) {
+                  return (
+                    <a
+                      href={leadPitchUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      download={leadPitchName}
+                      className="featured-lead-btn"
+                      style={{
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#2563EB',
+                        color: '#FFFFFF',
+                        padding: '11px 20px',
+                        borderRadius: '10px',
+                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Download size={17} />
+                      <span>Download Pitch Deck</span>
+                    </a>
+                  );
+                }
+
+                return (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '9px 16px',
+                      borderRadius: '10px',
+                      background: '#F1F5F9',
+                      border: '1px solid #CBD5E1',
+                      color: '#64748B',
+                      fontSize: '0.82rem',
+                      fontWeight: 600
+                    }}
+                  >
+                    <Download size={14} color="#94A3B8" />
+                    <span>Pitch Deck: Not Uploaded</span>
+                  </div>
+                );
+              })()}
+
+              {/* All Details Displayed Directly on the Container */}
+              {(() => {
+                const leadMail = featuredLead.email || 'contact@' + ((sample?.companyStudy?.website || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || 'company.com');
+                const rawPhone = featuredLead.phone || featuredLead.maskedPhone;
+                const isFakePhone = rawPhone && (rawPhone.includes('555') || rawPhone.includes('234-8900') || rawPhone.includes('(xxx)'));
+                const leadPhone = isFakePhone ? null : (featuredLead.phone || null);
+                const companyWeb = featuredLead.companyLink || sample?.companyStudy?.website;
+                const companyLinkedin = featuredLead.companyLinkedin || sample?.companyStudy?.linkedin;
+
+                return (
+                  <div style={{
+                    width: '100%',
+                    marginTop: '20px',
+                    paddingTop: '20px',
+                    borderTop: '1px solid #F1F5F9',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gap: '16px'
+                  }}>
+                    {/* Container 1: COMPANY SPECIFIC */}
+                    <div style={{
+                      background: '#F8FAFC',
+                      borderRadius: '12px',
+                      border: '1px solid #E2E8F0',
+                      padding: '16px 18px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between'
+                    }}>
+                      <div>
+                        <div style={{
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          color: '#0F172A',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          marginBottom: '14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <Building2 size={16} color="#2563EB" />
+                          <span>COMPANY SPECIFIC</span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.86rem' }}>
+                          <div className="dossier-info-row">
+                            <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Company Web:</span>
+                            {companyWeb ? (
+                              <a
+                                href={companyWeb.startsWith('http') ? companyWeb : `https://${companyWeb}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
+                              >
+                                <Globe size={14} style={{ flexShrink: 0 }} />
+                                <span>{shortenUrl(companyWeb, 32)}</span>
+                                <ExternalLink size={12} style={{ flexShrink: 0 }} />
+                              </a>
+                            ) : (
+                              <span style={{ color: '#94A3B8' }}>Not specified</span>
+                            )}
+                          </div>
+
+                          <div className="dossier-info-row">
+                            <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Company LinkedIn:</span>
+                            {companyLinkedin ? (
+                              <a
+                                href={companyLinkedin.startsWith('http') ? companyLinkedin : `https://${companyLinkedin}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
+                              >
+                                <Linkedin size={14} color="#0A66C2" style={{ flexShrink: 0 }} />
+                                <span>{shortenUrl(companyLinkedin, 32)}</span>
+                                <ExternalLink size={12} style={{ flexShrink: 0 }} />
+                              </a>
+                            ) : (
+                              <span style={{ color: '#94A3B8' }}>Not specified</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Container 2: LEAD SPECIFIC */}
+                    <div style={{
+                      background: '#F8FAFC',
+                      borderRadius: '12px',
+                      border: '1px solid #E2E8F0',
+                      padding: '16px 18px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between'
+                    }}>
+                      <div>
+                        <div style={{
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          color: '#0F172A',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          marginBottom: '14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <Users size={16} color="#7C3AED" />
+                          <span>LEAD SPECIFIC</span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.86rem' }}>
+                          {/* Lead Mail */}
+                          <div className="dossier-info-row">
+                            <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead Mail:</span>
+                            {leadMail ? (
+                              <a
+                                href={`mailto:${leadMail}`}
+                                style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
+                              >
+                                <Mail size={14} color="#2563EB" style={{ flexShrink: 0 }} />
+                                <span>{leadMail}</span>
+                              </a>
+                            ) : (
+                              <span style={{ color: '#94A3B8' }}>Not specified</span>
+                            )}
+                          </div>
+
+                          {/* Lead Phone */}
+                          <div className="dossier-info-row">
+                            <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead Phone:</span>
+                            {leadPhone ? (
+                              <span style={{ color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}>
+                                <Phone size={14} color="#059669" style={{ flexShrink: 0 }} />
+                                <span>{leadPhone}</span>
+                              </span>
+                            ) : (
+                              <span style={{ color: '#94A3B8' }}>Not uploaded</span>
+                            )}
+                          </div>
+
+                          {/* Lead Role */}
+                          <div className="dossier-info-row">
+                            <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead Role:</span>
+                            <span style={{ color: '#0F172A', fontWeight: 800, wordBreak: 'break-word' }}>
+                              {featuredLead.title?.trim() || 'Executive Decision Maker'}
+                            </span>
+                          </div>
+
+                          {/* Lead LinkedIn */}
+                          {featuredLead.linkedin && !featuredLead.linkedin.includes('/company/') && (
+                            <div className="dossier-info-row">
+                              <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead LinkedIn:</span>
+                              <a
+                                href={featuredLead.linkedin.startsWith('http') ? featuredLead.linkedin : `https://${featuredLead.linkedin}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: '#0A66C2', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
+                              >
+                                <Linkedin size={14} color="#0A66C2" style={{ flexShrink: 0 }} />
+                                <span>{shortenUrl(featuredLead.linkedin, 32)}</span>
+                                <ExternalLink size={12} style={{ flexShrink: 0 }} />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+            </div>
+          ) : (
+            <div style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '36px', textAlign: 'center', color: '#64748B' }}>
+              No decision makers uploaded yet for this prospect.
+            </div>
+          )}
+
+          {/* THE 4 LOCKED LEADS (Logo & Company Name prominently shown, direct contact locked) */}
+          {lockedLeads.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.01em', wordBreak: 'break-word' }}>
+                    Additional target accounts & decision-makers
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '2px', wordBreak: 'break-word' }}>
+                    Target profiles for this prospect dossier ({lockedLeads.length} locked in sample preview).
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '16px',
+                  background: '#FEF3C7',
+                  border: '1px solid #FDE68A',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: '#92400E',
+                  flexShrink: 0
+                }}>
+                  <Lock size={13} color="#D97706" />
+                  <span>{lockedLeads.length} Profiles Locked</span>
+                </div>
+              </div>
+
+              <div className="sample-grid-4">
+                {lockedLeads.map((item, idx) => {
+                  const leadLogoUrl = resolveLeadLogo(item, false);
+                  const effectiveCompany = item.company || sample?.companyName || 'Target Organization';
+
+                  return (
+                    <div
+                      key={item.id || idx}
+                      style={{
+                        background: '#FFFFFF',
+                        borderRadius: '16px',
+                        border: '1px solid #E2E8F0',
+                        padding: '22px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        boxShadow: '0 2px 8px rgba(15,23,42,0.03)',
+                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                        position: 'relative'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(15,23,42,0.07)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.03)';
+                      }}
+                    >
+                      <div>
+                        {/* Top Row: Company Logo & Locked Badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '16px' }}>
+                          <div style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: '12px',
+                            background: '#F8FAFC',
+                            border: '1.5px solid #E2E8F0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            flexShrink: 0
+                          }}>
+                            {leadLogoUrl ? (
+                              <img
+                                src={leadLogoUrl}
+                                alt={effectiveCompany}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'contain',
+                                  padding: '4px'
+                                }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  if (e.currentTarget.nextSibling) {
+                                    e.currentTarget.nextSibling.style.display = 'flex';
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              style={{
+                                display: leadLogoUrl ? 'none' : 'flex',
+                                width: '100%',
+                                height: '100%',
+                                background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                                color: '#2563EB',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 800,
+                                fontSize: '1.15rem'
+                              }}
+                            >
+                              {effectiveCompany.charAt(0).toUpperCase()}
+                            </div>
+                          </div>
+
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: '#FEF3C7',
+                            color: '#92400E',
+                            border: '1px solid #FDE68A',
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700
+                          }}>
+                            <Lock size={12} color="#D97706" />
+                            <span>Locked Profile</span>
+                          </span>
+                        </div>
+
+                        {/* Company Name & Lead Details */}
+                        <div style={{ marginBottom: '16px' }}>
+                          <div style={{
+                            fontSize: '1.05rem',
+                            fontWeight: 800,
+                            color: '#0F172A',
+                            lineHeight: 1.3,
+                            marginBottom: '4px',
+                            letterSpacing: '-0.01em'
+                          }}>
+                            {effectiveCompany}
+                          </div>
+
+                          <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155', marginBottom: '2px' }}>
+                            {item.name}
+                          </div>
+
+                          <div style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.4 }}>
+                            {item.title || 'Executive Decision Maker'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card Footer: Status & Unlock Action */}
+                      <div style={{
+                        paddingTop: '12px',
+                        borderTop: '1px solid #F1F5F9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px'
+                      }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 600 }}>
+                          <CheckCircle2 size={14} color="#10B981" />
+                          <span>Verified Prospect</span>
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => setLockedLeadNotice(item)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: '#F8FAFC',
+                            border: '1px solid #CBD5E1',
+                            color: '#334155',
+                            padding: '6px 13px',
+                            borderRadius: '8px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#EFF6FF';
+                            e.currentTarget.style.color = '#2563EB';
+                            e.currentTarget.style.borderColor = '#BFDBFE';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#F8FAFC';
+                            e.currentTarget.style.color = '#334155';
+                            e.currentTarget.style.borderColor = '#CBD5E1';
+                          }}
+                        >
+                          <Lock size={12} />
+                          <span>Locked</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+        </section>
+
+        {/* SECTION 2: EXECUTIVE INTELLIGENCE */}
+        <section id="executive-intelligence" className="sample-section">
+          
+          {/* Section 2 Header */}
+          <div className="sample-section-header">
+            <div className="sample-section-title-wrap">
+              <div className="sample-section-badge">
+                2
               </div>
               <div>
                 <h2 className="sample-section-title">
@@ -452,38 +1049,6 @@ export default function PublicSampleDashboard() {
                 </p>
               </div>
             </div>
-
-            {/* View Original Study Document or Not Uploaded */}
-            {companyStudy?.hasPdf ? (
-              <a
-                href={companyStudy.pdfUrl || `/api/samples/${sample.slug}/company-study-pdf`}
-                target="_blank"
-                rel="noreferrer"
-                className="sample-action-btn"
-              >
-                <FileText size={15} />
-                <span>View Original Study Document</span>
-                <ExternalLink size={14} />
-              </a>
-            ) : (
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '9px 16px',
-                  borderRadius: '10px',
-                  background: '#F1F5F9',
-                  border: '1px solid #CBD5E1',
-                  color: '#64748B',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                }}
-              >
-                <FileText size={15} color="#94A3B8" />
-                <span>Original Study Document: Currently not uploaded</span>
-              </div>
-            )}
           </div>
 
           {/* Industry / Sector Mini Cards */}
@@ -704,464 +1269,6 @@ export default function PublicSampleDashboard() {
             </div>
 
           </div>
-
-        </section>
-
-        {/* SECTION 2: WHAT THIS COULD MEAN FOR YOUR BUSINESS */}
-        <section className="sample-section">
-          
-          <div className="sample-section-header">
-            <div className="sample-section-title-wrap">
-              <div className="sample-section-badge">
-                2
-              </div>
-              <div>
-                <h2 className="sample-section-title">
-                  What this could mean for your business
-                </h2>
-                <p className="sample-section-subtitle">
-                  How {companyName}’s position and market dynamics create opportunities for your team.
-                </p>
-              </div>
-            </div>
-
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              background: '#F1F5F9',
-              border: '1px solid #E2E8F0',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              color: '#475569',
-              maxWidth: '100%',
-              wordBreak: 'break-word'
-            }}>
-              <span>Research-backed insights · Not financial advice</span>
-            </div>
-          </div>
-
-          <div className="sample-grid-3">
-            
-            {/* Column 1 */}
-            <div style={{
-              background: '#FFFFFF',
-              borderRadius: '16px',
-              border: '1px solid #E2E8F0',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-            }}>
-              <div>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-                  <Target size={18} />
-                </div>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', margin: '0 0 10px 0' }}>
-                  Market opportunities
-                </h3>
-                <p style={{ fontSize: '0.86rem', color: '#475569', lineHeight: 1.55, margin: '0 0 20px 0' }}>
-                  Identify relevant market signals, customer segments and expansion possibilities across {companyStudy.industry || 'the enterprise landscape'}.
-                </p>
-              </div>
-              <div style={{ background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                <div style={{ color: '#2563EB', marginTop: '2px', flexShrink: 0 }}><Target size={15} /></div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', marginBottom: '2px' }}>Example</div>
-                  <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>Accelerating demand for unified, enterprise-grade capabilities across accounts.</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Column 2 */}
-            <div style={{
-              background: '#FFFFFF',
-              borderRadius: '16px',
-              border: '1px solid #E2E8F0',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-            }}>
-              <div>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-                  <Users size={18} />
-                </div>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', margin: '0 0 10px 0' }}>
-                  Decision-maker access
-                </h3>
-                <p style={{ fontSize: '0.86rem', color: '#475569', lineHeight: 1.55, margin: '0 0 20px 0' }}>
-                  Discover relevant stakeholders and understand their business roles, priorities and engagement patterns.
-                </p>
-              </div>
-              <div style={{ background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                <div style={{ color: '#2563EB', marginTop: '2px', flexShrink: 0 }}><Users size={15} /></div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', marginBottom: '2px' }}>Example</div>
-                  <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>Direct engagement paths to budget authorities vetting new implementation partners.</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Column 3 */}
-            <div style={{
-              background: '#FFFFFF',
-              borderRadius: '16px',
-              border: '1px solid #E2E8F0',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-            }}>
-              <div>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-                  <TrendingUp size={18} />
-                </div>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', margin: '0 0 10px 0' }}>
-                  Actionable growth strategy
-                </h3>
-                <p style={{ fontSize: '0.86rem', color: '#475569', lineHeight: 1.55, margin: '0 0 20px 0' }}>
-                  Translate research into prioritized outreach, partnership opportunities and business development actions.
-                </p>
-              </div>
-              <div style={{ background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                <div style={{ color: '#2563EB', marginTop: '2px', flexShrink: 0 }}><TrendingUp size={15} /></div>
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', marginBottom: '2px' }}>Example</div>
-                  <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>Prioritize commercial engagement based on verified operational pain points.</div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-        </section>
-
-        {/* SECTION 3: DECISION-MAKER INTELLIGENCE */}
-        <section className="sample-section">
-          
-          {/* Section 3 Header */}
-          <div className="sample-section-header">
-            <div className="sample-section-title-wrap">
-              <div className="sample-section-badge">
-                3
-              </div>
-              <div>
-                <h2 className="sample-section-title">
-                  Decision-maker intelligence
-                </h2>
-                <p className="sample-section-subtitle">
-                  A preview of the people relevant to your target account.
-                </p>
-              </div>
-            </div>
-
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              background: '#ECFDF5',
-              border: '1px solid #A7F3D0',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              color: '#065F46',
-              maxWidth: '100%',
-              wordBreak: 'break-word'
-            }}>
-              <Users size={14} />
-              <span>{featuredLead ? 1 + lockedLeads.length : 0} profiles available (1 featured, {lockedLeads.length} locked)</span>
-            </div>
-          </div>
-
-          {/* Featured Profile Card */}
-          {featuredLead ? (
-            <div className="featured-lead-card">
-              
-              <div className="featured-lead-info">
-                {resolveLeadLogo(featuredLead, true) ? (
-                  <img
-                    src={resolveLeadLogo(featuredLead, true)}
-                    alt={featuredLead.name}
-                    style={{
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      border: '2px solid #E2E8F0',
-                      flexShrink: 0
-                    }}
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                      if (e.currentTarget.nextSibling) {
-                        e.currentTarget.nextSibling.style.display = 'flex';
-                      }
-                    }}
-                  />
-                ) : null}
-                <div style={{
-                  display: resolveLeadLogo(featuredLead, true) ? 'none' : 'flex',
-                  width: '64px',
-                  height: '64px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
-                  color: '#2563EB',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 800,
-                  fontSize: '1.5rem',
-                  border: '2px solid #E2E8F0',
-                  flexShrink: 0
-                }}>
-                  {featuredLead.name?.charAt(0) || 'L'}
-                </div>
-
-                <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {featuredLead.company || companyName}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                    <h3 style={{ fontSize: 'clamp(1.15rem, 3.5vw, 1.3rem)', fontWeight: 800, color: '#0F172A', margin: 0, wordBreak: 'break-word' }}>
-                      {featuredLead.name}
-                    </h3>
-                    <CheckCircle2 size={18} color="#10B981" />
-                  </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2563EB', marginTop: '2px', wordBreak: 'break-word' }}>
-                    {featuredLead.title || 'Executive Decision Maker'} · {featuredLead.company || companyName}
-                  </div>
-
-                  {featuredLead.whySuitsBest && (
-                    <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: 1.5, margin: '8px 0 0 0', maxWidth: '680px', wordBreak: 'break-word' }}>
-                      {featuredLead.whySuitsBest}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Button to inspect internal container */}
-              <button
-                type="button"
-                className="featured-lead-btn"
-                onClick={() => setSelectedLead(featuredLead)}
-              >
-                <span>Inspect Full Dossier</span>
-                <ArrowRight size={16} />
-              </button>
-
-            </div>
-          ) : (
-            <div style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '36px', textAlign: 'center', color: '#64748B' }}>
-              No decision makers uploaded yet for this prospect.
-            </div>
-          )}
-
-          {/* THE 4 LOCKED LEADS (Logo & Company Name prominently shown, direct contact locked) */}
-          {lockedLeads.length > 0 && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '8px' }}>
-                <div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.01em', wordBreak: 'break-word' }}>
-                    Additional target accounts & decision-makers
-                  </div>
-                  <div style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '2px', wordBreak: 'break-word' }}>
-                    Target profiles for this prospect dossier ({lockedLeads.length} locked in sample preview).
-                  </div>
-                </div>
-
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '5px 12px',
-                  borderRadius: '16px',
-                  background: '#FEF3C7',
-                  border: '1px solid #FDE68A',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  color: '#92400E',
-                  flexShrink: 0
-                }}>
-                  <Lock size={13} color="#D97706" />
-                  <span>{lockedLeads.length} Profiles Locked</span>
-                </div>
-              </div>
-
-              <div className="sample-grid-4">
-                {lockedLeads.map((item, idx) => {
-                  const leadLogoUrl = resolveLeadLogo(item, false);
-                  const effectiveCompany = item.company || sample?.companyName || 'Target Organization';
-
-                  return (
-                    <div
-                      key={item.id || idx}
-                      style={{
-                        background: '#FFFFFF',
-                        borderRadius: '16px',
-                        border: '1px solid #E2E8F0',
-                        padding: '22px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        boxShadow: '0 2px 8px rgba(15,23,42,0.03)',
-                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                        position: 'relative'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(15,23,42,0.07)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.03)';
-                      }}
-                    >
-                      <div>
-                        {/* Top Row: Company Logo & Locked Badge */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '16px' }}>
-                          <div style={{
-                            width: '48px',
-                            height: '48px',
-                            borderRadius: '12px',
-                            background: '#F8FAFC',
-                            border: '1.5px solid #E2E8F0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden',
-                            flexShrink: 0
-                          }}>
-                            {leadLogoUrl ? (
-                              <img
-                                src={leadLogoUrl}
-                                alt={effectiveCompany}
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'contain',
-                                  padding: '4px'
-                                }}
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  if (e.currentTarget.nextSibling) {
-                                    e.currentTarget.nextSibling.style.display = 'flex';
-                                  }
-                                }}
-                              />
-                            ) : null}
-                            <div
-                              style={{
-                                display: leadLogoUrl ? 'none' : 'flex',
-                                width: '100%',
-                                height: '100%',
-                                background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
-                                color: '#2563EB',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 800,
-                                fontSize: '1.15rem'
-                              }}
-                            >
-                              {effectiveCompany.charAt(0).toUpperCase()}
-                            </div>
-                          </div>
-
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            background: '#FEF3C7',
-                            color: '#92400E',
-                            border: '1px solid #FDE68A',
-                            padding: '4px 10px',
-                            borderRadius: '20px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700
-                          }}>
-                            <Lock size={12} color="#D97706" />
-                            <span>Locked Profile</span>
-                          </span>
-                        </div>
-
-                        {/* Company Name & Lead Details */}
-                        <div style={{ marginBottom: '16px' }}>
-                          <div style={{
-                            fontSize: '1.05rem',
-                            fontWeight: 800,
-                            color: '#0F172A',
-                            lineHeight: 1.3,
-                            marginBottom: '4px',
-                            letterSpacing: '-0.01em'
-                          }}>
-                            {effectiveCompany}
-                          </div>
-
-                          <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155', marginBottom: '2px' }}>
-                            {item.name}
-                          </div>
-
-                          <div style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.4 }}>
-                            {item.title || 'Executive Decision Maker'}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Card Footer: Status & Unlock Action */}
-                      <div style={{
-                        paddingTop: '12px',
-                        borderTop: '1px solid #F1F5F9',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '8px'
-                      }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 600 }}>
-                          <CheckCircle2 size={14} color="#10B981" />
-                          <span>Verified Prospect</span>
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={() => setLockedLeadNotice(item)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            background: '#F8FAFC',
-                            border: '1px solid #CBD5E1',
-                            color: '#334155',
-                            padding: '6px 13px',
-                            borderRadius: '8px',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#EFF6FF';
-                            e.currentTarget.style.color = '#2563EB';
-                            e.currentTarget.style.borderColor = '#BFDBFE';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#F8FAFC';
-                            e.currentTarget.style.color = '#334155';
-                            e.currentTarget.style.borderColor = '#CBD5E1';
-                          }}
-                        >
-                          <Lock size={12} />
-                          <span>Locked</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
         </section>
 
