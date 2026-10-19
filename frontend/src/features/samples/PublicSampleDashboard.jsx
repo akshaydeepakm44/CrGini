@@ -22,8 +22,6 @@ import {
   Globe,
   X,
   Lightbulb,
-  ChevronDown,
-  ChevronUp,
   Lock,
   ThumbsUp,
   ThumbsDown,
@@ -195,30 +193,39 @@ function resolveLeadPresentation(lead, clientCompanyName = '') {
 
 /**
  * Smart Key Opportunities Parser
- * Splits dense or numbered observations into clean, concise individual points.
+ * Extracts strictly up to 3 clean, concise points without breaking inside hyphenated words.
  */
 function parseKeyOpportunities(rawText) {
   if (!rawText || typeof rawText !== 'string') return [];
   const trimmed = rawText.trim();
   if (!trimmed) return [];
 
-  // Split on inline patterns like " 1.", " 2.", "\n1.", "\n-", or "1.Integration"
-  const splitRegex = /(?:^|\n+|\s{2,}|(?<=[a-zA-Z0-9\.\)])\s*)(?:#?\d+[\.\)]|[•\-\*])\s*/g;
-  const rawParts = trimmed.split(splitRegex).map(p => p.trim()).filter(p => p.length > 3);
+  let points = [];
+  const numberedPattern = /(?:^|\s+)(?:#?\d+[\.\)]|\(\d+\))\s*|(?<=[a-zA-Z\.\)])(?=\d+[\.\)])/i;
 
-  if (rawParts.length > 1) {
-    return rawParts;
-  }
-  if (trimmed.includes('\n')) {
-    const lines = trimmed.split(/\n+/).map(p => p.replace(/^(?:#?\d+[\.\)]|[•\-\*])\s*/, '').trim()).filter(p => p.length > 3);
-    if (lines.length > 1) return lines;
-  }
-  if (trimmed.includes(';')) {
-    const parts = trimmed.split(/;\s*/).map(p => p.replace(/^(?:#?\d+[\.\)]|[•\-\*])\s*/, '').trim()).filter(p => p.length > 3);
-    if (parts.length > 1) return parts;
+  if (numberedPattern.test(trimmed)) {
+    points = trimmed
+      .split(/(?:^|\s+)(?:#?\d+[\.\)]|\(\d+\))\s*|(?<=[a-zA-Z\.\)])(?=\d+[\.\)])/i)
+      .map((p) => p.replace(/^(?:#?\d+[\.\)]|[•▪])\s*/, '').trim())
+      .filter((p) => p.length > 5);
+  } else if (trimmed.includes('\n')) {
+    points = trimmed
+      .split(/\r?\n+/)
+      .map((p) => p.replace(/^(?:#?\d+[\.\)]|[•▪\-])\s*/, '').trim())
+      .filter((p) => p.length > 5);
+  } else if (trimmed.includes(';')) {
+    points = trimmed
+      .split(/;\s*/)
+      .map((p) => p.replace(/^(?:#?\d+[\.\)]|[•▪\-])\s*/, '').trim())
+      .filter((p) => p.length > 5);
   }
 
-  return [trimmed];
+  if (points.length === 0) {
+    points = [trimmed];
+  }
+
+  // Strictly mention up to 3 points so all cards maintain equal height
+  return points.slice(0, 3);
 }
 
 export default function PublicSampleDashboard() {
@@ -229,7 +236,6 @@ export default function PublicSampleDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedLead, setSelectedLead] = useState(null);
-  const [expandedOpportunities, setExpandedOpportunities] = useState(false);
 
   // Smooth scroll handler to Next Steps & Collaboration section
   const scrollToNextSteps = (e) => {
@@ -1383,7 +1389,6 @@ Best regards,
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 700, marginTop: '20px' }}>
                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10B981' }} />
                 <span>High confidence</span>
-                <ChevronRight size={14} style={{ marginLeft: 'auto' }} />
               </div>
             </div>
 
@@ -1429,7 +1434,6 @@ Best regards,
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 700, marginTop: '20px' }}>
                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10B981' }} />
                 <span>High confidence</span>
-                <ChevronRight size={14} style={{ marginLeft: 'auto' }} />
               </div>
             </div>
 
@@ -1486,73 +1490,26 @@ Best regards,
                     );
                   }
 
-                  const visiblePoints = expandedOpportunities ? points : points.slice(0, 2);
-
                   return (
-                    <div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
-                        {visiblePoints.map((pt, idx) => (
-                          <div
-                            key={idx}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'flex-start',
-                              gap: '8px',
-                              background: '#FFFBEB',
-                              border: '1px solid #FEF3C7',
-                              padding: '8px 10px',
-                              borderRadius: '8px',
-                              fontSize: '0.8rem',
-                              color: '#78350F',
-                              lineHeight: 1.4,
-                            }}
-                          >
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '18px',
-                              height: '18px',
-                              borderRadius: '50%',
-                              background: '#FDE68A',
-                              color: '#92400E',
-                              fontWeight: 800,
-                              fontSize: '0.68rem',
-                              flexShrink: 0,
-                              marginTop: '1px'
-                            }}>
-                              {idx + 1}
-                            </span>
-                            <span style={{ wordBreak: 'break-word' }}>{pt}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {points.length > 2 && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setExpandedOpportunities(!expandedOpportunities);
-                          }}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginTop: '4px' }}>
+                      {points.slice(0, 3).map((pt, idx) => (
+                        <div
+                          key={idx}
                           style={{
-                            marginTop: '8px',
-                            background: 'none',
-                            border: 'none',
-                            color: '#D97706',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            padding: '4px 0',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px'
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '7px',
+                            fontSize: '0.83rem',
+                            color: '#475569',
+                            lineHeight: 1.45,
                           }}
                         >
-                          <span>{expandedOpportunities ? 'Show less' : `+${points.length - 2} more opportunities`}</span>
-                          {expandedOpportunities ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                        </button>
-                      )}
+                          <span style={{ color: '#D97706', fontWeight: 800, flexShrink: 0, marginTop: '1px' }}>
+                            {idx + 1}.
+                          </span>
+                          <span style={{ wordBreak: 'break-word' }}>{pt}</span>
+                        </div>
+                      ))}
                     </div>
                   );
                 })()}
@@ -1561,7 +1518,6 @@ Best regards,
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#D97706', fontWeight: 700, marginTop: '20px' }}>
                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#F59E0B' }} />
                 <span>Medium confidence</span>
-                <ChevronRight size={14} style={{ marginLeft: 'auto' }} />
               </div>
             </div>
 
@@ -1607,7 +1563,6 @@ Best regards,
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#D97706', fontWeight: 700, marginTop: '20px' }}>
                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#F59E0B' }} />
                 <span>Medium confidence</span>
-                <ChevronRight size={14} style={{ marginLeft: 'auto' }} />
               </div>
             </div>
 
