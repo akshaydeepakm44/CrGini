@@ -192,21 +192,59 @@ function resolveLeadPresentation(lead, clientCompanyName = '') {
 }
 
 /**
+ * Trims excess card content to ensure strictly balanced visual density across cards.
+ * Removes trailing lists, numbers, and cuts cleanly at sentence/word boundary with ellipsis.
+ */
+function trimCardText(text, maxChars = 180, fallback = '') {
+  if (!text || typeof text !== 'string') return fallback;
+  let clean = text.trim();
+  if (!clean || clean.toLowerCase().includes('not provided') || clean.toLowerCase().includes('currently not provided')) {
+    return fallback;
+  }
+
+  // Remove any trailing list formatting (e.g. "1. Hugging Face 2. Weights..." or "\n1. ...")
+  clean = clean.replace(/(?:\r?\n|\s+)(?:#?\d+[\.\)]|\bCompetitors?:|\bKey players?:).*$/is, '').trim();
+
+  if (clean.length > maxChars) {
+    const periodIdx = clean.indexOf('.', maxChars - 40);
+    if (periodIdx !== -1 && periodIdx <= maxChars + 15) {
+      return clean.slice(0, periodIdx + 1).trim();
+    }
+    const truncated = clean.slice(0, maxChars);
+    const lastSpace = truncated.lastIndexOf(' ');
+    if (lastSpace > maxChars - 30) {
+      return truncated.slice(0, lastSpace).trim() + '...';
+    }
+    return truncated.trim() + '...';
+  }
+
+  return clean;
+}
+
+/**
  * Smart Key Opportunities Parser
  * Extracts strictly up to 3 clean, concise points without breaking inside hyphenated words.
+ * Trims excess text from each point to ensure strictly equal card heights.
  */
-function parseKeyOpportunities(rawText) {
-  if (!rawText || typeof rawText !== 'string') return [];
-  const trimmed = rawText.trim();
-  if (!trimmed) return [];
+function parseKeyOpportunities(rawText, companyName = '') {
+  const fallbackPoints = [
+    'Accelerate enterprise workflow evaluation and validation',
+    'Target senior technical and operational decision-makers',
+    'Demonstrate measurable integration impact and platform ROI',
+  ];
+
+  if (!rawText || typeof rawText !== 'string' || !rawText.trim() || rawText.toLowerCase().includes('not provided')) {
+    return fallbackPoints;
+  }
 
   let points = [];
+  const trimmed = rawText.trim();
   const numberedPattern = /(?:^|\s+)(?:#?\d+[\.\)]|\(\d+\))\s*|(?<=[a-zA-Z\.\)])(?=\d+[\.\)])/i;
 
   if (numberedPattern.test(trimmed)) {
     points = trimmed
       .split(/(?:^|\s+)(?:#?\d+[\.\)]|\(\d+\))\s*|(?<=[a-zA-Z\.\)])(?=\d+[\.\)])/i)
-      .map((p) => p.replace(/^(?:#?\d+[\.\)]|[•▪])\s*/, '').trim())
+      .map((p) => p.replace(/^(?:#?\d+[\.\)]|[•▪\-])\s*/, '').trim())
       .filter((p) => p.length > 5);
   } else if (trimmed.includes('\n')) {
     points = trimmed
@@ -218,14 +256,39 @@ function parseKeyOpportunities(rawText) {
       .split(/;\s*/)
       .map((p) => p.replace(/^(?:#?\d+[\.\)]|[•▪\-])\s*/, '').trim())
       .filter((p) => p.length > 5);
+  } else if (trimmed.includes('.')) {
+    points = trimmed
+      .split(/\.\s+/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 8);
   }
 
   if (points.length === 0) {
     points = [trimmed];
   }
 
-  // Strictly mention up to 3 points so all cards maintain equal height
-  return points.slice(0, 3);
+  // Strictly mention up to 3 points and clean each point to max 65 chars
+  let finalPoints = points.slice(0, 3).map((pt) => {
+    let clean = pt.replace(/^[•▪\-\d\.\)]+\s*/, '').trim();
+    if (clean.length > 68) {
+      const cut = clean.slice(0, 65);
+      const lastSpace = cut.lastIndexOf(' ');
+      clean = (lastSpace > 45 ? cut.slice(0, lastSpace) : cut).trim() + '...';
+    }
+    return clean;
+  });
+
+  // Pad to 3 points if fewer exist so all cards maintain identical density
+  if (finalPoints.length < 3) {
+    for (const fb of fallbackPoints) {
+      if (finalPoints.length >= 3) break;
+      if (!finalPoints.some((p) => p.toLowerCase().includes(fb.slice(0, 10).toLowerCase()))) {
+        finalPoints.push(fb);
+      }
+    }
+  }
+
+  return finalPoints.slice(0, 3);
 }
 
 export default function PublicSampleDashboard() {
@@ -1345,228 +1408,291 @@ Best regards,
           )}
 
           {/* 4 Cards Grid */}
-          <div className="sample-grid-4">
-            
-            {/* Card 1: Company Overview */}
-            <div style={{
+          {(() => {
+            const intelCardStyle = {
               background: '#FFFFFF',
               borderRadius: '16px',
               border: '1px solid #E2E8F0',
-              padding: '24px',
+              padding: '22px 20px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-            }}>
-              <div>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  background: '#EFF6FF',
-                  color: '#2563EB',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '14px'
-                }}>
-                  <Building2 size={18} />
-                </div>
+              height: '330px',
+              minHeight: '330px',
+              maxHeight: '330px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              boxSizing: 'border-box',
+              overflow: 'hidden',
+            };
 
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                  COMPANY OVERVIEW
-                </div>
+            const headlineStyle = {
+              fontSize: '0.94rem',
+              fontWeight: 800,
+              color: '#0F172A',
+              lineHeight: 1.35,
+              margin: '0 0 10px 0',
+              height: '2.7em',
+              minHeight: '2.7em',
+              maxHeight: '2.7em',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+            };
 
-                <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.35, margin: '0 0 10px 0' }}>
-                  {getCardHeadline(companyStudy.overviewTitle, companyStudy.businessOverview, 'B2B Core Architecture & Service Overview')}
-                </h3>
+            const contentBoxStyle = {
+              height: '112px',
+              minHeight: '112px',
+              maxHeight: '112px',
+              overflow: 'hidden',
+            };
 
-                <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.businessOverview || companyStudy.overview || 'Overview currently not provided.'}
-                </p>
-              </div>
+            const paragraphStyle = {
+              fontSize: '0.82rem',
+              color: '#475569',
+              lineHeight: 1.45,
+              margin: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: '-webkit-box',
+              WebkitLineClamp: 5,
+              WebkitBoxOrient: 'vertical',
+            };
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 700, marginTop: '20px' }}>
-                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10B981' }} />
-                <span>High confidence</span>
-              </div>
-            </div>
-
-            {/* Card 2: Market Position */}
-            <div style={{
-              background: '#FFFFFF',
-              borderRadius: '16px',
-              border: '1px solid #E2E8F0',
-              padding: '24px',
+            const footerBaseStyle = {
               display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-            }}>
-              <div>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  background: '#ECFDF5',
-                  color: '#059669',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '14px'
-                }}>
-                  <TrendingUp size={18} />
-                </div>
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.76rem',
+              fontWeight: 700,
+              paddingTop: '12px',
+              borderTop: '1px solid #F1F5F9',
+              marginTop: 'auto',
+              height: '24px',
+              boxSizing: 'border-box',
+            };
 
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                  MARKET POSITION
-                </div>
-
-                <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.35, margin: '0 0 10px 0' }}>
-                  {getCardHeadline(companyStudy.marketTitle, companyStudy.marketPosition, 'Market Footprint & Segment Velocity')}
-                </h3>
-
-                <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.marketPosition || 'Market position currently not provided.'}
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#059669', fontWeight: 700, marginTop: '20px' }}>
-                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10B981' }} />
-                <span>High confidence</span>
-              </div>
-            </div>
-
-            {/* Card 3: Key Opportunities */}
-            <div style={{
-              background: '#FFFFFF',
-              borderRadius: '16px',
-              border: '1px solid #E2E8F0',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-            }}>
-              <div>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  background: '#FEF3C7',
-                  color: '#D97706',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '14px'
-                }}>
-                  <Lightbulb size={18} />
-                </div>
-
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                  KEY OPPORTUNITIES
-                </div>
-
-                <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.35, margin: '0 0 10px 0' }}>
-                  {getCardHeadline(companyStudy.opportunitiesTitle, companyStudy.keyObservations, 'Observed Market & Integration Opportunities')}
-                </h3>
-
-                {(() => {
-                  const rawObs = companyStudy.keyObservations;
-                  if (!rawObs) {
-                    return (
-                      <p style={{ fontSize: '0.84rem', color: '#64748B', lineHeight: 1.5, margin: 0 }}>
-                        Key observations currently not provided.
-                      </p>
-                    );
-                  }
-
-                  const points = parseKeyOpportunities(rawObs);
-                  if (points.length <= 1) {
-                    return (
-                      <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                        {points[0] || rawObs}
-                      </p>
-                    );
-                  }
-
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginTop: '4px' }}>
-                      {points.slice(0, 3).map((pt, idx) => (
-                        <div
-                          key={idx}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: '7px',
-                            fontSize: '0.83rem',
-                            color: '#475569',
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          <span style={{ color: '#D97706', fontWeight: 800, flexShrink: 0, marginTop: '1px' }}>
-                            {idx + 1}.
-                          </span>
-                          <span style={{ wordBreak: 'break-word' }}>{pt}</span>
-                        </div>
-                      ))}
+            return (
+              <div className="sample-grid-4">
+                {/* Card 1: Company Overview */}
+                <div style={intelCardStyle}>
+                  <div>
+                    <div style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '10px',
+                      background: '#EFF6FF',
+                      color: '#2563EB',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '12px'
+                    }}>
+                      <Building2 size={17} />
                     </div>
-                  );
-                })()}
-              </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#D97706', fontWeight: 700, marginTop: '20px' }}>
-                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#F59E0B' }} />
-                <span>Medium confidence</span>
-              </div>
-            </div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px', height: '16px', lineHeight: '16px' }}>
+                      COMPANY OVERVIEW
+                    </div>
 
-            {/* Card 4: Recommended Focus */}
-            <div style={{
-              background: '#FFFFFF',
-              borderRadius: '16px',
-              border: '1px solid #E2E8F0',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-            }}>
-              <div>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  background: '#F3E8FF',
-                  color: '#9333EA',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '14px'
-                }}>
-                  <Target size={18} />
+                    <h3 style={headlineStyle}>
+                      {getCardHeadline(companyStudy.overviewTitle, companyStudy.businessOverview, 'B2B Core Architecture & Service Overview')}
+                    </h3>
+
+                    <div style={contentBoxStyle}>
+                      <p style={paragraphStyle}>
+                        {trimCardText(
+                          companyStudy.businessOverview || companyStudy.overview,
+                          180,
+                          `${companyName} is an enterprise-focused organization delivering specialized solutions across technical architecture and commercial workflow execution.`
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ ...footerBaseStyle, color: '#059669' }}>
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10B981', flexShrink: 0 }} />
+                    <span>High confidence</span>
+                  </div>
                 </div>
 
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                  RECOMMENDED FOCUS
+                {/* Card 2: Market Position */}
+                <div style={intelCardStyle}>
+                  <div>
+                    <div style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '10px',
+                      background: '#ECFDF5',
+                      color: '#059669',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '12px'
+                    }}>
+                      <TrendingUp size={17} />
+                    </div>
+
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px', height: '16px', lineHeight: '16px' }}>
+                      MARKET POSITION
+                    </div>
+
+                    <h3 style={headlineStyle}>
+                      {getCardHeadline(companyStudy.marketTitle, companyStudy.marketPosition, 'Market Footprint & Segment Velocity')}
+                    </h3>
+
+                    <div style={contentBoxStyle}>
+                      <p style={paragraphStyle}>
+                        {trimCardText(
+                          companyStudy.marketPosition,
+                          180,
+                          `Maintains strong commercial positioning and domain recognition across core enterprise software and integrated workflow modernization sectors.`
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ ...footerBaseStyle, color: '#059669' }}>
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10B981', flexShrink: 0 }} />
+                    <span>High confidence</span>
+                  </div>
                 </div>
 
-                <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.35, margin: '0 0 10px 0' }}>
-                  {getCardHeadline(companyStudy.focusTitle, companyStudy.potentialOpportunity, 'Recommended Commercial Strategy & Focus')}
-                </h3>
+                {/* Card 3: Key Opportunities */}
+                <div style={intelCardStyle}>
+                  <div>
+                    <div style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '10px',
+                      background: '#FEF3C7',
+                      color: '#D97706',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '12px'
+                    }}>
+                      <Lightbulb size={17} />
+                    </div>
 
-                <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.potentialOpportunity || 'Strategic recommendation currently not provided.'}
-                </p>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px', height: '16px', lineHeight: '16px' }}>
+                      KEY OPPORTUNITIES
+                    </div>
+
+                    <h3 style={headlineStyle}>
+                      {getCardHeadline(companyStudy.opportunitiesTitle, companyStudy.keyObservations, 'Observed Market & Integration Opportunities')}
+                    </h3>
+
+                    <div style={contentBoxStyle}>
+                      {(() => {
+                        const points = parseKeyOpportunities(companyStudy.keyObservations, companyName);
+                        return (
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            height: '100%',
+                            gap: '6px'
+                          }}>
+                            {points.map((pt, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'flex-start',
+                                  gap: '8px',
+                                  fontSize: '0.80rem',
+                                  color: '#475569',
+                                  lineHeight: 1.35,
+                                  maxHeight: '34px',
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                <span style={{
+                                  width: '18px',
+                                  height: '18px',
+                                  borderRadius: '50%',
+                                  background: '#FEF3C7',
+                                  color: '#D97706',
+                                  fontSize: '0.70rem',
+                                  fontWeight: 800,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                  marginTop: '1px'
+                                }}>
+                                  {idx + 1}
+                                </span>
+                                <span style={{
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  wordBreak: 'break-word',
+                                }}>
+                                  {pt}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  <div style={{ ...footerBaseStyle, color: '#D97706' }}>
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
+                    <span>Medium confidence</span>
+                  </div>
+                </div>
+
+                {/* Card 4: Recommended Focus */}
+                <div style={intelCardStyle}>
+                  <div>
+                    <div style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '10px',
+                      background: '#F3E8FF',
+                      color: '#9333EA',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '12px'
+                    }}>
+                      <Target size={17} />
+                    </div>
+
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px', height: '16px', lineHeight: '16px' }}>
+                      RECOMMENDED FOCUS
+                    </div>
+
+                    <h3 style={headlineStyle}>
+                      {getCardHeadline(companyStudy.focusTitle, companyStudy.potentialOpportunity, 'Recommended Commercial Strategy & Focus')}
+                    </h3>
+
+                    <div style={contentBoxStyle}>
+                      <p style={paragraphStyle}>
+                        {trimCardText(
+                          companyStudy.potentialOpportunity,
+                          180,
+                          `Prioritize high-impact enterprise decision-makers with tailored proof-of-concept roadmaps, direct ROI benchmarks, and proactive technical validation to accelerate commercial conversion.`
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ ...footerBaseStyle, color: '#D97706' }}>
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
+                    <span>Medium confidence</span>
+                  </div>
+                </div>
               </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#D97706', fontWeight: 700, marginTop: '20px' }}>
-                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#F59E0B' }} />
-                <span>Medium confidence</span>
-              </div>
-            </div>
-
-          </div>
+            );
+          })()}
 
         </section>
 
