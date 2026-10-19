@@ -22,6 +22,8 @@ import {
   Globe,
   X,
   Lightbulb,
+  ChevronDown,
+  ChevronUp,
   Lock,
   ThumbsUp,
   ThumbsDown,
@@ -130,6 +132,95 @@ function getCardHeadline(customTitle, text, fallback) {
   return fallback;
 }
 
+/**
+ * Resolves clean presentation data for a lead without ever polluting or defaulting
+ * to the client's company name (the organization for whom the showcase is created).
+ */
+function resolveLeadPresentation(lead, clientCompanyName = '') {
+  if (!lead) {
+    return {
+      leadCompany: '',
+      leadPersonName: '',
+      role: 'Executive Decision Maker',
+      subtitle: 'Executive Decision Maker',
+    };
+  }
+
+  const isClientCompany = (c) => {
+    if (!c || !clientCompanyName) return false;
+    return c.trim().toLowerCase() === clientCompanyName.trim().toLowerCase();
+  };
+
+  let leadCompany = '';
+  if (lead.company && !isClientCompany(lead.company)) {
+    leadCompany = lead.company.trim();
+  } else if (lead.leadCompany && !isClientCompany(lead.leadCompany)) {
+    leadCompany = lead.leadCompany.trim();
+  } else if (lead.targetCompany && !isClientCompany(lead.targetCompany)) {
+    leadCompany = lead.targetCompany.trim();
+  }
+
+  let leadPersonName = (lead.name || '').trim();
+  const role = (lead.title || 'Executive Decision Maker').trim();
+
+  // If leadCompany was not explicitly set, extract domain from lead company link
+  if (!leadCompany && lead.companyLink) {
+    try {
+      const host = lead.companyLink.replace(/^https?:\/\/(www\.)?/, '').split('/')[0].split('.')[0];
+      if (host && !isClientCompany(host) && host.length >= 2) {
+        leadCompany = host.charAt(0).toUpperCase() + host.slice(1);
+      }
+    } catch (_) {}
+  }
+
+  // If leadCompany is still empty and leadPersonName is present
+  if (!leadCompany && leadPersonName) {
+    leadCompany = leadPersonName;
+  }
+
+  const isSame = leadCompany && leadPersonName && leadCompany.toLowerCase() === leadPersonName.toLowerCase();
+
+  let subtitle = role;
+  if (leadCompany && !isSame) {
+    subtitle = `${role} · ${leadCompany}`;
+  }
+
+  return {
+    leadCompany: isSame ? '' : leadCompany,
+    leadPersonName: leadPersonName || leadCompany || 'Executive Decision Maker',
+    role,
+    subtitle,
+  };
+}
+
+/**
+ * Smart Key Opportunities Parser
+ * Splits dense or numbered observations into clean, concise individual points.
+ */
+function parseKeyOpportunities(rawText) {
+  if (!rawText || typeof rawText !== 'string') return [];
+  const trimmed = rawText.trim();
+  if (!trimmed) return [];
+
+  // Split on inline patterns like " 1.", " 2.", "\n1.", "\n-", or "1.Integration"
+  const splitRegex = /(?:^|\n+|\s{2,}|(?<=[a-zA-Z0-9\.\)])\s*)(?:#?\d+[\.\)]|[•\-\*])\s*/g;
+  const rawParts = trimmed.split(splitRegex).map(p => p.trim()).filter(p => p.length > 3);
+
+  if (rawParts.length > 1) {
+    return rawParts;
+  }
+  if (trimmed.includes('\n')) {
+    const lines = trimmed.split(/\n+/).map(p => p.replace(/^(?:#?\d+[\.\)]|[•\-\*])\s*/, '').trim()).filter(p => p.length > 3);
+    if (lines.length > 1) return lines;
+  }
+  if (trimmed.includes(';')) {
+    const parts = trimmed.split(/;\s*/).map(p => p.replace(/^(?:#?\d+[\.\)]|[•\-\*])\s*/, '').trim()).filter(p => p.length > 3);
+    if (parts.length > 1) return parts;
+  }
+
+  return [trimmed];
+}
+
 export default function PublicSampleDashboard() {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -138,7 +229,19 @@ export default function PublicSampleDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedLead, setSelectedLead] = useState(null);
-  const [lockedLeadNotice, setLockedLeadNotice] = useState(null);
+  const [expandedOpportunities, setExpandedOpportunities] = useState(false);
+
+  // Smooth scroll handler to Next Steps & Collaboration section
+  const scrollToNextSteps = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const el = document.getElementById('contact-feedback') || document.getElementById('next-steps-collaboration');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
 
   // Dynamic slug: defaults to 'data-i2i' if none specified in route
   const effectiveSlug = slug ? slug.trim().toLowerCase() : 'data-i2i';
@@ -472,12 +575,6 @@ Best regards,
                 {BRAND_NAME}
               </span>
             </Link>
-
-            <span className="d-none d-sm-inline" style={{ height: '20px', width: '1px', background: '#E2E8F0', margin: '0 4px' }} />
-
-            <div className="sample-brand-pill">
-              <span>Personalized Intelligence for {companyName}</span>
-            </div>
           </div>
 
           <div className="sample-verified-badge">
@@ -494,10 +591,6 @@ Best regards,
           
           {/* Left Column: Title & Subtitle */}
           <div>
-            <div className="sample-hero-pill">
-              <Sparkles size={14} />
-              <span>PERSONALIZED INTELLIGENCE BRIEFING</span>
-            </div>
 
             <h1 className="sample-hero-title">
               {companyName}’s next growth opportunities, explored.
@@ -559,59 +652,90 @@ Best regards,
                 {companyName}
               </div>
 
-              {/* View Original Study Document Button under company name */}
-              {companyStudy?.hasPdf ? (
-                <a
-                  href={companyStudy.pdfUrl || `/api/samples/${sample.slug}/company-study-pdf`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="sample-action-btn"
-                  style={{
-                    marginTop: '16px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    background: '#2563EB',
-                    color: '#FFFFFF',
-                    padding: '10px 18px',
-                    borderRadius: '10px',
-                    fontSize: '0.84rem',
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
-                    transition: 'all 0.15s ease',
-                    width: '100%',
-                    maxWidth: '260px'
-                  }}
-                >
-                  <FileText size={16} />
-                  <span>View Original Study Document</span>
-                  <ExternalLink size={14} />
-                </a>
-              ) : (
-                <div
-                  style={{
-                    marginTop: '14px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    padding: '8px 14px',
-                    borderRadius: '10px',
-                    background: '#F1F5F9',
-                    border: '1px solid #CBD5E1',
-                    color: '#64748B',
-                    fontSize: '0.8rem',
+              {/* Study Document Box: Paragraph + Download Button */}
+              <div style={{
+                marginTop: '16px',
+                width: '100%',
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '14px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+                textAlign: 'left'
+              }}>
+                <div style={{ flex: '1 1 170px' }}>
+                  <p style={{
+                    margin: 0,
+                    fontSize: '0.86rem',
                     fontWeight: 600,
-                    width: '100%',
-                    maxWidth: '260px'
-                  }}
-                >
-                  <FileText size={14} color="#94A3B8" />
-                  <span>Study Document: Not Uploaded</span>
+                    color: '#334155',
+                    lineHeight: 1.4,
+                    wordBreak: 'break-word'
+                  }}>
+                    What we understood from your company
+                  </p>
                 </div>
-              )}
+
+                {companyStudy?.hasPdf ? (
+                  <a
+                    href={companyStudy.pdfUrl || `/api/samples/${sample.slug}/company-study-pdf`}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={`${companyName.replace(/\s+/g, '_')}_Company_Study.pdf`}
+                    className="sample-download-study-btn"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '7px',
+                      background: '#2563EB',
+                      color: '#FFFFFF',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      boxShadow: '0 2px 8px rgba(37,99,235,0.22)',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0,
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#1D4ED8';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#2563EB';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <Download size={14} />
+                    <span>Download the company study</span>
+                  </a>
+                ) : (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '7px 12px',
+                      borderRadius: '8px',
+                      background: '#FFFFFF',
+                      border: '1px solid #CBD5E1',
+                      color: '#64748B',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      flexShrink: 0
+                    }}
+                  >
+                    <FileText size={13} color="#94A3B8" />
+                    <span>Study Document: Not Uploaded</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -638,24 +762,6 @@ Best regards,
                   A preview of the people relevant to your target account.
                 </p>
               </div>
-            </div>
-
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              background: '#ECFDF5',
-              border: '1px solid #A7F3D0',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              color: '#065F46',
-              maxWidth: '100%',
-              wordBreak: 'break-word'
-            }}>
-              <Users size={14} />
-              <span>{featuredLead ? 1 + lockedLeads.length : 0} profiles available (1 featured, {lockedLeads.length} locked)</span>
             </div>
           </div>
 
@@ -701,26 +807,33 @@ Best regards,
                   {featuredLead.name?.charAt(0) || 'L'}
                 </div>
 
-                <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {featuredLead.company || companyName}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                    <h3 style={{ fontSize: 'clamp(1.15rem, 3.5vw, 1.3rem)', fontWeight: 800, color: '#0F172A', margin: 0, wordBreak: 'break-word' }}>
-                      {featuredLead.name}
-                    </h3>
-                    <CheckCircle2 size={18} color="#10B981" />
-                  </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2563EB', marginTop: '2px', wordBreak: 'break-word' }}>
-                    {featuredLead.title || 'Executive Decision Maker'} · {featuredLead.company || companyName}
-                  </div>
+                {(() => {
+                  const leadPres = resolveLeadPresentation(featuredLead, companyName);
+                  return (
+                    <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+                      {leadPres.leadCompany ? (
+                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          {leadPres.leadCompany}
+                        </div>
+                      ) : null}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                        <h3 style={{ fontSize: 'clamp(1.15rem, 3.5vw, 1.3rem)', fontWeight: 800, color: '#0F172A', margin: 0, wordBreak: 'break-word' }}>
+                          {leadPres.leadPersonName}
+                        </h3>
+                        <CheckCircle2 size={18} color="#10B981" />
+                      </div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2563EB', marginTop: '2px', wordBreak: 'break-word' }}>
+                        {leadPres.subtitle}
+                      </div>
 
-                  {featuredLead.whySuitsBest && (
-                    <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: 1.5, margin: '8px 0 0 0', maxWidth: '680px', wordBreak: 'break-word' }}>
-                      {featuredLead.whySuitsBest}
-                    </p>
-                  )}
-                </div>
+                      {featuredLead.whySuitsBest && (
+                        <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: 1.5, margin: '8px 0 0 0', maxWidth: '680px', wordBreak: 'break-word' }}>
+                          {featuredLead.whySuitsBest}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Action Button: Download Pitch Deck directly instead of inspecting full dossier */}
@@ -782,12 +895,13 @@ Best regards,
 
               {/* All Details Displayed Directly on the Container */}
               {(() => {
-                const leadMail = featuredLead.email || 'contact@' + ((sample?.companyStudy?.website || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || 'company.com');
+                const leadCompanyDomain = (featuredLead.companyLink || '').replace(/^https?:\/\/(www\.)?/, '').split('/')[0] || '';
+                const leadMail = featuredLead.email || (leadCompanyDomain ? `contact@${leadCompanyDomain}` : null);
                 const rawPhone = featuredLead.phone || featuredLead.maskedPhone;
                 const isFakePhone = rawPhone && (rawPhone.includes('555') || rawPhone.includes('234-8900') || rawPhone.includes('(xxx)'));
                 const leadPhone = isFakePhone ? null : (featuredLead.phone || null);
-                const companyWeb = featuredLead.companyLink || sample?.companyStudy?.website;
-                const companyLinkedin = featuredLead.companyLinkedin || sample?.companyStudy?.linkedin;
+                const companyWeb = featuredLead.companyLink || null;
+                const companyLinkedin = featuredLead.companyLinkedin || null;
 
                 return (
                   <div style={{
@@ -993,11 +1107,18 @@ Best regards,
               <div className="sample-grid-4">
                 {lockedLeads.map((item, idx) => {
                   const leadLogoUrl = resolveLeadLogo(item, false);
-                  const effectiveCompany = item.company || sample?.companyName || 'Target Organization';
+                  const leadPres = resolveLeadPresentation(item, companyName);
+                  const effectiveCompany = leadPres.leadCompany || leadPres.leadPersonName || 'Target Organization';
+                  const effectiveLeadPerson = leadPres.leadPersonName;
+                  const effectiveRole = leadPres.role || 'Executive Decision Maker';
 
                   return (
                     <div
                       key={item.id || idx}
+                      onClick={scrollToNextSteps}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') scrollToNextSteps(e); }}
                       style={{
                         background: '#FFFFFF',
                         borderRadius: '16px',
@@ -1008,7 +1129,8 @@ Best regards,
                         justifyContent: 'space-between',
                         boxShadow: '0 2px 8px rgba(15,23,42,0.03)',
                         transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                        position: 'relative'
+                        position: 'relative',
+                        cursor: 'pointer'
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.transform = 'translateY(-2px)';
@@ -1099,12 +1221,14 @@ Best regards,
                             {effectiveCompany}
                           </div>
 
-                          <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155', marginBottom: '2px' }}>
-                            {item.name}
-                          </div>
+                          {effectiveLeadPerson && effectiveLeadPerson.toLowerCase() !== effectiveCompany.toLowerCase() && (
+                            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155', marginBottom: '2px' }}>
+                              {effectiveLeadPerson}
+                            </div>
+                          )}
 
                           <div style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.4 }}>
-                            {item.title || 'Executive Decision Maker'}
+                            {effectiveRole}
                           </div>
                         </div>
                       </div>
@@ -1125,7 +1249,7 @@ Best regards,
 
                         <button
                           type="button"
-                          onClick={() => setLockedLeadNotice(item)}
+                          onClick={scrollToNextSteps}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -1343,9 +1467,95 @@ Best regards,
                   {getCardHeadline(companyStudy.opportunitiesTitle, companyStudy.keyObservations, 'Observed Market & Integration Opportunities')}
                 </h3>
 
-                <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                  {companyStudy.keyObservations || 'Key observations currently not provided.'}
-                </p>
+                {(() => {
+                  const rawObs = companyStudy.keyObservations;
+                  if (!rawObs) {
+                    return (
+                      <p style={{ fontSize: '0.84rem', color: '#64748B', lineHeight: 1.5, margin: 0 }}>
+                        Key observations currently not provided.
+                      </p>
+                    );
+                  }
+
+                  const points = parseKeyOpportunities(rawObs);
+                  if (points.length <= 1) {
+                    return (
+                      <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>
+                        {points[0] || rawObs}
+                      </p>
+                    );
+                  }
+
+                  const visiblePoints = expandedOpportunities ? points : points.slice(0, 2);
+
+                  return (
+                    <div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                        {visiblePoints.map((pt, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '8px',
+                              background: '#FFFBEB',
+                              border: '1px solid #FEF3C7',
+                              padding: '8px 10px',
+                              borderRadius: '8px',
+                              fontSize: '0.8rem',
+                              color: '#78350F',
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              background: '#FDE68A',
+                              color: '#92400E',
+                              fontWeight: 800,
+                              fontSize: '0.68rem',
+                              flexShrink: 0,
+                              marginTop: '1px'
+                            }}>
+                              {idx + 1}
+                            </span>
+                            <span style={{ wordBreak: 'break-word' }}>{pt}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {points.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedOpportunities(!expandedOpportunities);
+                          }}
+                          style={{
+                            marginTop: '8px',
+                            background: 'none',
+                            border: 'none',
+                            color: '#D97706',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            padding: '4px 0',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <span>{expandedOpportunities ? 'Show less' : `+${points.length - 2} more opportunities`}</span>
+                          {expandedOpportunities ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#D97706', fontWeight: 700, marginTop: '20px' }}>
@@ -1556,120 +1766,7 @@ Best regards,
         </div>
       </footer>
 
-      {/* LOCKED LEAD MODAL NOTICE */}
-      {lockedLeadNotice && (
-        <div
-          onClick={() => setLockedLeadNotice(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: 'clamp(10px, 3vw, 20px)',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#FFFFFF',
-              borderRadius: 'clamp(14px, 3vw, 20px)',
-              padding: 'clamp(24px, 5vw, 36px) clamp(16px, 4vw, 32px)',
-              maxWidth: '460px',
-              width: '100%',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-              position: 'relative',
-              textAlign: 'center',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setLockedLeadNotice(null)}
-              style={{
-                position: 'absolute',
-                top: '14px',
-                right: '14px',
-                background: '#F1F5F9',
-                border: 'none',
-                borderRadius: '50%',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#64748B',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={16} />
-            </button>
 
-            <div
-              style={{
-                width: '52px',
-                height: '52px',
-                borderRadius: '16px',
-                background: '#FEF3C7',
-                color: '#D97706',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px auto',
-              }}
-            >
-              <Lock size={24} />
-            </div>
-
-            <h3 style={{ fontSize: 'clamp(1.1rem, 3.5vw, 1.25rem)', fontWeight: 800, color: '#0F172A', marginBottom: '8px', wordBreak: 'break-word' }}>
-              Decision-Maker Profile Locked
-            </h3>
-
-            <p style={{ fontSize: '0.86rem', color: '#64748B', lineHeight: '1.5', marginBottom: '18px', wordBreak: 'break-word' }}>
-              Direct contact details, verified mobile phone, and tailored intelligence dossier for <strong style={{ color: '#0F172A' }}>{lockedLeadNotice.name}</strong> at <strong style={{ color: '#0F172A' }}>{lockedLeadNotice.company || companyName}</strong> are locked in this sample preview.
-            </p>
-
-            <div style={{
-              background: '#F8FAFC',
-              border: '1px solid #E2E8F0',
-              borderRadius: '12px',
-              padding: '14px 16px',
-              marginBottom: '20px',
-              textAlign: 'left',
-              fontSize: '0.82rem',
-              color: '#475569',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-              wordBreak: 'break-word'
-            }}>
-              <div><strong>Target Account:</strong> {lockedLeadNotice.company || companyName}</div>
-              <div><strong>Decision Maker:</strong> {lockedLeadNotice.name} ({lockedLeadNotice.title || 'Executive'})</div>
-              <div><strong>Access Level:</strong> Enterprise Client Tier</div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setLockedLeadNotice(null)}
-              style={{
-                width: '100%',
-                padding: '12px 20px',
-                borderRadius: '10px',
-                background: '#0F172A',
-                color: '#FFFFFF',
-                border: 'none',
-                fontSize: '0.9rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* MODAL 2: INTERACTIVE LEAD DOSSIER MODAL (Item 4 Applied: Clean 2 Containers for Company Specific & Lead Specific) */}
       {selectedLead && (

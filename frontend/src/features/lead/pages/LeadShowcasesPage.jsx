@@ -488,21 +488,25 @@ support@dizigini.com`;
 
   // Add / Edit Lead in Form
   const handleSaveLead = () => {
-    if (!leadForm.name.trim()) {
-      alert('Lead Name is required.');
+    const rawComp = leadForm.company?.trim() || '';
+    const rawName = leadForm.name?.trim() || '';
+
+    if (!rawComp && !rawName) {
+      alert('Please enter either Target Account / Lead Company Name or Decision Maker Name.');
       return;
     }
 
-    const companyName = leadForm.company?.trim() || formData.companyName || 'Target Organization';
+    const effectiveLeadCompany = rawComp;
+    const effectiveLeadName = rawName || rawComp || 'Executive Decision Maker';
 
     const existing = editingLeadIndex !== null ? formData.leads[editingLeadIndex] : null;
     const newLead = {
       ...(existing || {}),
       id: existing?.id || `lead-${Date.now()}`,
-      name: leadForm.name.trim(),
+      name: effectiveLeadName,
       phone: leadForm.phone ? leadForm.phone.trim() : '',
-      companyLink: leadForm.companyLink?.trim() || (editingLeadIndex === 0 ? formData.companyStudy?.website : '') || '',
-      companyLinkedin: leadForm.companyLinkedin?.trim() || (editingLeadIndex === 0 ? formData.companyStudy?.linkedin : '') || '',
+      companyLink: leadForm.companyLink?.trim() || '',
+      companyLinkedin: leadForm.companyLinkedin?.trim() || '',
       email: leadForm.email?.trim() || '',
       linkedin: leadForm.linkedin?.trim() || '',
       leadStudyPdf: leadForm.leadStudyPdf || existing?.leadStudyPdf || '',
@@ -513,9 +517,9 @@ support@dizigini.com`;
       pitchDeckAssetKey: existing?.pitchDeckAssetKey || existing?.pitchDeck?.assetKey || '',
       logo: leadForm.logo || existing?.logo || '',
       logoAssetKey: existing?.logoAssetKey || '',
-      title: leadForm.title?.trim() || '',
-      company: companyName,
-      aboutCompany: leadForm.aboutCompany?.trim() || `Enterprise organization operating in ${formData.companyStudy?.industry || 'technology'}.`,
+      title: leadForm.title?.trim() || 'Executive Decision Maker',
+      company: effectiveLeadCompany,
+      aboutCompany: leadForm.aboutCompany?.trim() || (effectiveLeadCompany ? `Enterprise organization ${effectiveLeadCompany}.` : ''),
       whySuitsBest: leadForm.whySuitsBest?.trim() || 'Strategic decision maker aligned with key pain points.',
       leadStudy: {
         ...(existing?.leadStudy || {}),
@@ -1738,38 +1742,66 @@ support@dizigini.com`;
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginBottom: '14px' }}>
-                      {/* 1. Lead Name */}
+                      {/* 1. Target Account / Lead Company Name */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          1. Lead Full Name *
+                          1. Target Account / Lead Company Name *
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. John Doe"
+                          placeholder="e.g. AppFlowy"
+                          value={leadForm.company}
+                          onChange={(e) => setLeadForm({ ...leadForm, company: e.target.value })}
+                          style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
+                        />
+                      </div>
+
+                      {/* 2. Lead Contact / Decision Maker Name */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                          2. Decision Maker / Contact Name
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Jane Smith (or leave blank if company profile)"
                           value={leadForm.name}
                           onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
                           style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
                         />
                       </div>
 
-                      {/* 2. Company Link / Website */}
+                      {/* 3. Designation / Job Title */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          2. Company Web URL
+                          3. Designation / Job Title
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. https://company.com"
+                          placeholder="e.g. Executive Decision Maker / CTO"
+                          value={leadForm.title}
+                          onChange={(e) => setLeadForm({ ...leadForm, title: e.target.value })}
+                          style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
+                        />
+                      </div>
+
+                      {/* 4. Company Link / Website */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                          4. Company Web URL
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. https://appflowy.io"
                           value={leadForm.companyLink}
                           onChange={(e) => setLeadForm({ ...leadForm, companyLink: e.target.value })}
                           style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
                         />
                       </div>
 
-                      {/* 3. Company LinkedIn URL */}
+                      {/* 5. Company LinkedIn URL */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          3. Company LinkedIn URL
+                          5. Company LinkedIn URL
                         </label>
                         <input
                           type="text"
@@ -1780,38 +1812,38 @@ support@dizigini.com`;
                         />
                       </div>
 
-                      {/* 4. Work Mail */}
+                      {/* 6. Work Mail */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          4. Lead Work Mail (Masked on public view)
+                          6. Lead Work Mail (Masked on public view)
                         </label>
                         <input
                           type="email"
-                          placeholder="e.g. lead@company.com"
+                          placeholder="e.g. contact@appflowy.io"
                           value={leadForm.email}
                           onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
                           style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
                         />
                       </div>
 
-                      {/* 5. Phone Number */}
+                      {/* 7. Phone Number */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          5. Direct Phone / Mobile Number (Masked on public view)
+                          7. Direct Phone / Mobile Number (Masked on public view)
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. +1 (415) 890-1234 or leave blank if not available"
+                          placeholder="e.g. +1 (415) 890-1234 or leave blank"
                           value={leadForm.phone}
                           onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
                           style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
                         />
                       </div>
 
-                      {/* 6. Lead Person LinkedIn Profile URL */}
+                      {/* 8. Lead Person LinkedIn Profile URL */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          6. Lead Person LinkedIn Profile URL
+                          8. Lead Person LinkedIn Profile URL
                         </label>
                         <input
                           type="text"
@@ -2001,32 +2033,17 @@ support@dizigini.com`;
                     </div>
 
                     {/* Secondary Context Fields */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px', marginBottom: '14px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#4B5563', marginBottom: '4px' }}>
-                          Designation / Job Title
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. VP of Global Enterprise Architecture"
-                          value={leadForm.title}
-                          onChange={(e) => setLeadForm({ ...leadForm, title: e.target.value })}
-                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#4B5563', marginBottom: '4px' }}>
-                          Why This Lead Suits Best (Fit Rationale)
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Leading platform overhaul with active budget..."
-                          value={leadForm.whySuitsBest}
-                          onChange={(e) => setLeadForm({ ...leadForm, whySuitsBest: e.target.value })}
-                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
+                    <div style={{ marginBottom: '14px' }}>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#4B5563', marginBottom: '4px' }}>
+                        Why This Lead Suits Best (Fit Rationale)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Leading platform overhaul with active budget..."
+                        value={leadForm.whySuitsBest}
+                        onChange={(e) => setLeadForm({ ...leadForm, whySuitsBest: e.target.value })}
+                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8rem' }}
+                      />
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>

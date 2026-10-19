@@ -148,7 +148,7 @@
 
 .sample-hero-card {
   width: 100%;
-  max-width: 360px;
+  max-width: 440px;
   margin: 0 auto;
   min-height: 150px;
   background: #FFFFFF;
@@ -161,6 +161,12 @@
   justify-content: center;
   text-align: center;
   box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+}
+
+.sample-download-study-btn:hover {
+  background: #1D4ED8 !important;
+  box-shadow: 0 4px 14px rgba(37,99,235,0.35) !important;
+  transform: translateY(-1px);
 }
 
 /* Main Content Layout */

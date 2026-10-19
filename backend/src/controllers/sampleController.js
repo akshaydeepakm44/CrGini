@@ -158,20 +158,15 @@ export const getPublicSampleBySlug = async (req, res) => {
       const hasLeadStudy = Boolean(l.leadStudyPdfAssetKey || l.leadStudyPdf || l.leadStudy);
       const leadStudyUrl = `/api/samples/${sample.slug}/leads/${leadId}/lead-study-pdf`;
 
-      // Extract real or inferred company link / website (do NOT inherit main company website for other leads)
+      // Extract real or inferred company link / website (do NOT inherit main company website)
       let companyLink = l.companyLink || l.company_link || l.website || l.companyWebsite || l.domain || '';
-      if (!companyLink && isFirstLead && (l.company === sample.companyName || !l.company)) {
-        companyLink = publicCompanyStudy.website || '';
-      }
       if (!companyLink && l.company && l.company.includes('.')) {
         companyLink = l.company.startsWith('http') ? l.company : `https://${l.company}`;
-      } else if (!companyLink && isFirstLead && sample.companyName && sample.companyName.includes('.')) {
-        companyLink = `https://${sample.companyName}`;
       }
 
       // Intelligent separation: Company LinkedIn vs Personal Lead LinkedIn
       const rawLinkedin = (l.linkedin || l.linkedinUrl || l.linkedin_url || l.linkedinProfile || '').trim();
-      let companyLinkedinUrl = (l.companyLinkedin || l.company_linkedin || (isFirstLead ? publicCompanyStudy.linkedin : '') || '').trim();
+      let companyLinkedinUrl = (l.companyLinkedin || l.company_linkedin || '').trim();
       let personalLinkedinUrl = '';
 
       if (rawLinkedin.includes('/company/')) {
@@ -206,11 +201,17 @@ export const getPublicSampleBySlug = async (req, res) => {
         leadLogo = `/api/samples/${sample.slug}/leads/${leadId}/logo`;
       }
 
+      const clientCompName = (sample.companyName || '').toLowerCase().trim();
+      const rawLeadCompany = (l.company || l.lead_company || l.targetCompany || '').trim();
+      const safeLeadCompany = (rawLeadCompany && rawLeadCompany.toLowerCase() !== clientCompName)
+        ? rawLeadCompany
+        : (l.lead_company || l.targetCompany || '');
+
       return {
         id: leadId,
         name: leadName,
         title: l.title || 'Executive Decision Maker',
-        company: l.company || l.lead_company || sample.companyName,
+        company: safeLeadCompany,
         companyLink: companyLink,
         companyLinkedin: companyLinkedinUrl,
         logo: leadLogo,
