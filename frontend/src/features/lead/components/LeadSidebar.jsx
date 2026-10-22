@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Compass
 } from 'lucide-react';
+import { BRAND_ICON } from '../../../assets/branding';
 
 export default function LeadSidebar({
   currentPath = '/lead/dashboard',
@@ -87,19 +88,16 @@ export default function LeadSidebar({
               width: '36px',
               height: '36px',
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)',
-              color: '#FFFFFF',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
               flexShrink: 0,
-              cursor: isCollapsed ? 'pointer' : 'default',
+              cursor: isCollapsed ? onToggleCollapse : 'default',
             }}
             onClick={isCollapsed ? onToggleCollapse : undefined}
             title={isCollapsed ? "Expand Sidebar" : undefined}
           >
-            <Compass size={20} />
+            <img src={BRAND_ICON} alt="DiziGini" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
           </div>
           {!isCollapsed && (
             <div style={{ overflow: 'hidden' }}>

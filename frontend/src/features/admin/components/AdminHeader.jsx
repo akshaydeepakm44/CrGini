@@ -12,6 +12,7 @@ import {
   ExternalLink,
   UserCheck
 } from 'lucide-react';
+import { BRAND_ICON } from '../../../assets/branding';
 
 export default function AdminHeader({
   user,
@@ -29,8 +30,8 @@ export default function AdminHeader({
     <header className="cg-admin-header">
       <div className="cg-admin-header-left">
         <div className="cg-admin-brand" onClick={() => navigate('/admin')}>
-          <div className="cg-admin-brand-icon">
-            <ShieldAlert size={20} />
+          <div className="cg-admin-brand-icon" style={{ background: 'transparent', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src={BRAND_ICON} alt="DiziGini" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
           </div>
           <div className="cg-admin-brand-text">
             <span className="cg-admin-brand-title">DIZIGINI</span>

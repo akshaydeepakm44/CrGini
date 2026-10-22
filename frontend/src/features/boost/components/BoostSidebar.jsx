@@ -25,6 +25,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { BOOST_SERVICES } from '../data/boostServiceData';
+import { BRAND_ICON } from '../../../assets/branding';
 
 export default function BoostSidebar({
   currentPath = '/boost/dashboard',
@@ -95,16 +96,13 @@ export default function BoostSidebar({
               width: '36px',
               height: '36px',
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, #7C3AED 0%, #9333EA 100%)',
-              color: '#FFFFFF',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
               flexShrink: 0,
             }}
           >
-            <Sparkles size={20} />
+            <img src={BRAND_ICON} alt="DiziGini" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
           </div>
           {!isCollapsed && (
             <div>

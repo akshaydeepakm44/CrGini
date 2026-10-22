@@ -702,11 +702,8 @@ Best regards,
         <div className="sample-header-inner">
           
           <div className="sample-brand-group">
-            <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
-              <img src={BRAND_LOGO} alt={BRAND_NAME} style={{ height: '30px', width: 'auto', objectFit: 'contain' }} />
-              <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
-                {BRAND_NAME}
-              </span>
+            <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+              <img src={BRAND_LOGO} alt={BRAND_NAME} style={{ height: '34px', width: 'auto', objectFit: 'contain' }} />
             </Link>
           </div>
 

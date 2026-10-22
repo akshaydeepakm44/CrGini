@@ -17,6 +17,7 @@ import {
   Check
 } from 'lucide-react';
 import { adminApi } from '../services/adminApi';
+import { BRAND_LOGO } from '../../../assets/branding';
 
 export default function AdminBillingPage() {
   const navigate = useNavigate();
@@ -358,13 +359,8 @@ export default function AdminBillingPage() {
               {/* Header Details */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', borderBottom: '2px solid #F1F5F9', paddingBottom: '1.5rem' }}>
                 <div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1E1B4B', letterSpacing: '-0.03em' }}>
-                    DIZIGINI
-                  </div>
-                  <div style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '2px' }}>
-                    B2B Intelligence &amp; Digital Solutions Platform
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: '#94A3B8', marginTop: '4px' }}>
+                  <img src={BRAND_LOGO} alt="DiziGini" style={{ height: '38px', width: 'auto', objectFit: 'contain', marginBottom: '6px' }} />
+                  <div style={{ fontSize: '0.78rem', color: '#94A3B8', marginTop: '2px' }}>
                     Settled to Registered Merchant Account
                   </div>
                 </div>

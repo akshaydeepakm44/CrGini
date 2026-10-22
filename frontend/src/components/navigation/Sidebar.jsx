@@ -105,7 +105,7 @@ export default function Sidebar({
               <img
                 src={BRAND_LOGO}
                 alt="DiziGini"
-                style={{ height: '34px', width: 'auto', objectFit: 'contain' }}
+                style={{ height: '36px', maxWidth: '195px', width: 'auto', objectFit: 'contain' }}
               />
               {roleBadge && (
                 <div
