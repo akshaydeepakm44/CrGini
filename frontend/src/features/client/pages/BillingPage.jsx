@@ -12,11 +12,13 @@ import {
 import MetricCard from '../../../components/cards/MetricCard';
 import StatusBadge from '../../../components/tickets/StatusBadge';
 import { api } from '../../../services/api';
+import PaymentCheckoutModal from '../../payment/PaymentCheckoutModal';
 
 export default function BillingPage({
   requests = [],
   onReload,
 }) {
+  const [selectedTicketForPayment, setSelectedTicketForPayment] = useState(null);
   const [payingTicketId, setPayingTicketId] = useState(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -28,19 +30,8 @@ export default function BillingPage({
   const totalPaidAmount = paidRequests.reduce((acc, r) => acc + (Number(r.price) || 0), 0);
   const totalPendingAmount = pendingRequests.reduce((acc, r) => acc + (Number(r.price) || 0), 0);
 
-  const handlePayNow = async (ticket) => {
-    setPayingTicketId(ticket.id || ticket.ticketId);
-    setIsProcessingPayment(true);
-    try {
-      await api.payRequest(ticket.id || ticket.ticketId, 'Corporate Card (Stripe)');
-      alert(`Payment for ${ticket.ticketId} completed successfully!`);
-      if (onReload) onReload();
-    } catch (err) {
-      alert(err.message || 'Payment simulation failed.');
-    } finally {
-      setIsProcessingPayment(false);
-      setPayingTicketId(null);
-    }
+  const handlePayNow = (ticket) => {
+    setSelectedTicketForPayment(ticket);
   };
 
   return (
@@ -280,22 +271,47 @@ export default function BillingPage({
                     </td>
 
                     <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedInvoice(req)}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '8px',
-                          border: '1px solid #E5E7EB',
-                          backgroundColor: '#FFFFFF',
-                          color: '#374151',
-                          fontSize: '0.78125rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        View Receipt
-                      </button>
+                      <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                        {req.paymentStatus !== 'PAID' ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTicketForPayment(req)}
+                            style={{
+                              padding: '6px 14px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              background: 'linear-gradient(135deg, #3B2874 0%, #2A1A5E 100%)',
+                              color: '#FFFFFF',
+                              fontSize: '0.78125rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 8px rgba(59, 40, 116, 0.25)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                            }}
+                          >
+                            <CreditCard size={13} />
+                            Pay Now
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedInvoice(req)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #E5E7EB',
+                            backgroundColor: '#FFFFFF',
+                            color: '#374151',
+                            fontSize: '0.78125rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          View Receipt
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -395,6 +411,19 @@ export default function BillingPage({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Settle Payment Modal (Razorpay & PayPal) */}
+      {selectedTicketForPayment && (
+        <PaymentCheckoutModal
+          isOpen={Boolean(selectedTicketForPayment)}
+          ticket={selectedTicketForPayment}
+          onClose={() => setSelectedTicketForPayment(null)}
+          onPaymentSuccess={() => {
+            setSelectedTicketForPayment(null);
+            if (onReload) onReload();
+          }}
+        />
       )}
     </div>
   );

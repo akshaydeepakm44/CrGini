@@ -591,8 +591,7 @@ export const getKeyPeople = async (companyId) => {
       department,
       contact,
       social_profile,
-      created_at,
-      updated_at
+      created_at
     FROM company_key_people
     WHERE company_id = $1
     ORDER BY created_at ASC

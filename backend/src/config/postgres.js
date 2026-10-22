@@ -29,7 +29,7 @@ const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
 const poolConfig = databaseUrl
   ? {
       connectionString: databaseUrl,
-      max: Number(process.env.POSTGRES_MAX_POOL || 15),
+      max: Number(process.env.POSTGRES_MAX_POOL || 35),
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 7000,
       ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : false,
@@ -40,7 +40,7 @@ const poolConfig = databaseUrl
       database: pgDatabase,
       user: pgUser,
       password: pgPassword,
-      max: Number(process.env.POSTGRES_MAX_POOL || 15),
+      max: Number(process.env.POSTGRES_MAX_POOL || 35),
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 7000,
       ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : false,

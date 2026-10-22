@@ -140,7 +140,14 @@ export default function ClientPortal({ user, onLogout }) {
       loadPortalData();
     }, 5 * 60 * 1000); // 5-minute auto-refresh interval
 
-    const onFocus = () => loadPortalData();
+    let lastFocusSync = Date.now();
+    const onFocus = () => {
+      // Throttle window focus refreshes to once every 30 seconds
+      if (Date.now() - lastFocusSync > 30000) {
+        lastFocusSync = Date.now();
+        loadPortalData();
+      }
+    };
     window.addEventListener('focus', onFocus);
 
     return () => {

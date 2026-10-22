@@ -5,6 +5,7 @@ import {
   Clock,
   User,
   ShieldCheck,
+  CreditCard,
   Send,
   MessageSquare,
   Package,
@@ -37,6 +38,7 @@ import StatusBadge from '../../../components/tickets/StatusBadge';
 import Badge from '../../../components/common/Badge';
 import Button from '../../../components/common/Button';
 import { api } from '../../../services/api';
+import PaymentCheckoutModal from '../../payment/PaymentCheckoutModal';
 import { formatDateTime } from '../utils/clientAdapters';
 import {
   resolveSubmissionLeads,
@@ -122,6 +124,7 @@ export default function RequestDetailPage({
   const [reviewFeedback, setReviewFeedback] = useState('');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviewSubmissionId, setReviewSubmissionId] = useState(null);
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
 
   // Centered Lead Dossier Modal State (Opens in middle of screen)
   const [inspectingLead, setInspectingLead] = useState(null);
@@ -345,6 +348,57 @@ export default function RequestDetailPage({
 
           <StatusBadge status={ticket.status} size="lg" />
         </div>
+
+        {/* Pending Payment Action Banner */}
+        {(ticket.paymentStatus === 'PENDING' || ticket.payment_status === 'UNPAID' || ticket.paymentStatus !== 'PAID') && (
+          <div
+            style={{
+              backgroundColor: '#FEF3C7',
+              border: '1px solid #FCD34D',
+              borderRadius: '12px',
+              padding: '12px 18px',
+              marginBottom: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <CreditCard size={20} color="#D97706" />
+              <div>
+                <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#92400E' }}>
+                  Sprint Payment Pending (${ticket.price || 19}.00 USD)
+                </span>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#B45309' }}>
+                  Settle via Razorpay (UPI / INR) or PayPal (Cards / USD) to activate and assign this sprint.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPayModalOpen(true)}
+              style={{
+                backgroundColor: '#D97706',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '8px 18px',
+                fontSize: '0.8125rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 6px rgba(217, 119, 6, 0.25)',
+              }}
+            >
+              <CreditCard size={14} />
+              <span>Settle Payment Now</span>
+            </button>
+          </div>
+        )}
 
         {/* Timeline Visualization */}
         <div style={{ borderTop: '1px solid #F3F4F6', paddingTop: '20px' }}>
@@ -2008,6 +2062,19 @@ export default function RequestDetailPage({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Settle Payment Modal */}
+      {isPayModalOpen && (
+        <PaymentCheckoutModal
+          isOpen={isPayModalOpen}
+          ticket={ticket}
+          onClose={() => setIsPayModalOpen(false)}
+          onPaymentSuccess={() => {
+            setIsPayModalOpen(false);
+            if (onStatusUpdated) onStatusUpdated();
+          }}
+        />
       )}
     </div>
   );

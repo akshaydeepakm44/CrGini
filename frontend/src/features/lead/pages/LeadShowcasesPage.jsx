@@ -80,6 +80,32 @@ export const resolveShowcaseLogo = (showcase) => {
     }
   }
 
+  // 5. Inferred company domain favicon fallback from slug or company name
+  let inferredDomain = '';
+  if (showcase.slug) {
+    const cleanSlug = showcase.slug.toLowerCase().trim();
+    if (cleanSlug.includes('.')) {
+      inferredDomain = cleanSlug;
+    } else if (cleanSlug.endsWith('-ai')) {
+      inferredDomain = `${cleanSlug.replace(/-ai$/, '')}.ai`;
+    } else if (cleanSlug.endsWith('-io')) {
+      inferredDomain = `${cleanSlug.replace(/-io$/, '')}.io`;
+    } else if (cleanSlug === 'finkr') {
+      inferredDomain = 'finkr.co.uk';
+    } else if (cleanSlug) {
+      inferredDomain = `${cleanSlug.replace(/[^a-z0-9]/g, '')}.com`;
+    }
+  }
+  if (!inferredDomain && showcase.companyName) {
+    const cleanName = showcase.companyName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanName.length >= 2) {
+      inferredDomain = `${cleanName}.com`;
+    }
+  }
+  if (inferredDomain && inferredDomain.includes('.')) {
+    return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${inferredDomain}&size=128`;
+  }
+
   return '';
 };
 
@@ -210,7 +236,10 @@ export default function LeadShowcasesPage({ onNavigate }) {
       const clean = url.trim().toLowerCase();
       return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
     };
-    const initialLogo = isPlatformLogo(rawLogo) ? '' : rawLogo;
+    let initialLogo = isPlatformLogo(rawLogo) ? '' : rawLogo;
+    if (!initialLogo) {
+      initialLogo = resolveShowcaseLogo(showcase);
+    }
 
     // Filter out dummy/mock template leads (e.g. Sarah Jenkins from Acme Global)
     const cleanLeads = (showcase.leads || []).filter(
@@ -277,8 +306,6 @@ export default function LeadShowcasesPage({ onNavigate }) {
       );
 
       // Keep whatever the user set in formData.logoUrl.
-      // If user cleared it (formData.logoUrl === ''), DO NOT auto-fill with Google favicon!
-      // ONLY promote real uploaded logo from lead or study if formData.logoUrl is empty or platform placeholder.
       let effectiveLogoUrl = formData.logoUrl ? formData.logoUrl.trim() : '';
       const isPlatformLogo = (url) => {
         if (!url || typeof url !== 'string') return true;
@@ -287,20 +314,11 @@ export default function LeadShowcasesPage({ onNavigate }) {
       };
 
       if (!effectiveLogoUrl || isPlatformLogo(effectiveLogoUrl)) {
-        const leadWithLogo = sanitizedLeads?.find((l) => {
-          const cand = l.companyLogo || l.logo;
-          return cand && !isPlatformLogo(cand) && !cand.includes('gstatic.com/faviconV2');
+        effectiveLogoUrl = resolveShowcaseLogo({
+          ...formData,
+          slug: generatedSlug,
+          leads: sanitizedLeads,
         });
-        if (leadWithLogo) {
-          effectiveLogoUrl = leadWithLogo.companyLogo || leadWithLogo.logo;
-        } else {
-          const studyLogo = formData.companyStudy?.logoUrl || formData.companyStudy?.logo;
-          if (studyLogo && !isPlatformLogo(studyLogo) && !studyLogo.includes('gstatic.com/faviconV2')) {
-            effectiveLogoUrl = studyLogo;
-          } else {
-            effectiveLogoUrl = '';
-          }
-        }
       }
 
       const payload = {
@@ -515,7 +533,43 @@ support@dizigini.com`;
       pitchDeckPdf: leadForm.pitchDeckPdf || existing?.pitchDeckPdf || '',
       pitchDeckPdfName: leadForm.pitchDeckPdfName || existing?.pitchDeckPdfName || '',
       pitchDeckAssetKey: existing?.pitchDeckAssetKey || existing?.pitchDeck?.assetKey || '',
-      logo: leadForm.logo || existing?.logo || '',
+      logo: (() => {
+        const directLogo = leadForm.logo || existing?.logo || existing?.companyLogo || existing?.logoUrl || existing?.company_logo;
+        if (directLogo) return directLogo;
+        const link = leadForm.companyLink?.trim() || existing?.companyLink;
+        if (link) {
+          const cd = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+          if (cd.includes('.') && cd.length >= 4) {
+            return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
+          }
+        }
+        if (effectiveLeadCompany && effectiveLeadCompany.length >= 3) {
+          const cleanComp = effectiveLeadCompany.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanComp.length >= 3) {
+            return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanComp}.com&size=128`;
+          }
+        }
+        return '';
+      })(),
+      companyLogo: (() => {
+        const directLogo = leadForm.logo || existing?.companyLogo || existing?.logo || existing?.logoUrl || existing?.company_logo;
+        if (directLogo) return directLogo;
+        const link = leadForm.companyLink?.trim() || existing?.companyLink;
+        if (link) {
+          const cd = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+          if (cd.includes('.') && cd.length >= 4) {
+            return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
+          }
+        }
+        if (effectiveLeadCompany && effectiveLeadCompany.length >= 3) {
+          const cleanComp = effectiveLeadCompany.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanComp.length >= 3) {
+            return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanComp}.com&size=128`;
+          }
+        }
+        return '';
+      })(),
+      logoUrl: leadForm.logo || existing?.logoUrl || existing?.logo || existing?.companyLogo || '',
       logoAssetKey: existing?.logoAssetKey || '',
       title: leadForm.title?.trim() || 'Executive Decision Maker',
       company: effectiveLeadCompany,
@@ -600,7 +654,24 @@ support@dizigini.com`;
             leadStudyPdfName: '',
             pitchDeckPdf: '',
             pitchDeckPdfName: '',
-            logo: '',
+            logo: (() => {
+              if (companyLink) {
+                const cd = companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+                if (cd.includes('.') && cd.length >= 4) {
+                  return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
+                }
+              }
+              return '';
+            })(),
+            companyLogo: (() => {
+              if (companyLink) {
+                const cd = companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+                if (cd.includes('.') && cd.length >= 4) {
+                  return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
+                }
+              }
+              return '';
+            })(),
             whySuitsBest,
             leadStudy: {
               whyRelevant: 'Direct budget authority and strategic alignment.',
@@ -1225,7 +1296,7 @@ support@dizigini.com`;
                       <button
                         type="button"
                         onClick={() => {
-                          const websiteTarget = formData.companyStudy?.website || formData.leads?.find(l => l.companyLink || l.website)?.companyLink;
+                          const websiteTarget = formData.companyStudy?.website || formData.leads?.find(l => l.companyLink || l.website)?.companyLink || formData.leads?.find(l => l.website)?.website;
                           let clean = '';
                           if (websiteTarget) {
                             clean = String(websiteTarget)
@@ -1234,6 +1305,23 @@ support@dizigini.com`;
                               .split('/')[0]
                               .split('?')[0]
                               .trim();
+                          }
+                          if (!clean || !clean.includes('.')) {
+                            const candSlug = (formData.slug || '').toLowerCase().trim();
+                            const candName = (formData.companyName || '').toLowerCase().trim();
+                            if (candSlug.includes('.')) {
+                              clean = candSlug;
+                            } else if (candSlug.endsWith('-ai')) {
+                              clean = `${candSlug.replace(/-ai$/, '')}.ai`;
+                            } else if (candSlug.endsWith('-io')) {
+                              clean = `${candSlug.replace(/-io$/, '')}.io`;
+                            } else if (candSlug === 'finkr') {
+                              clean = 'finkr.co.uk';
+                            } else if (candSlug) {
+                              clean = `${candSlug.replace(/[^a-z0-9]/g, '')}.com`;
+                            } else if (candName) {
+                              clean = `${candName.replace(/[^a-z0-9]/g, '')}.com`;
+                            }
                           }
                           if (!clean || !clean.includes('.')) {
                             const inputDomain = window.prompt(
@@ -2142,21 +2230,24 @@ support@dizigini.com`;
                           </span>
 
                           <div style={{ width: '36px', height: '36px', borderRadius: '8px', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
-                            {l.logo ? (
-                              <img
-                                src={l.logo}
-                                alt={l.company || l.name}
-                                style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }}
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  if (e.currentTarget.nextSibling) {
-                                    e.currentTarget.nextSibling.style.display = 'flex';
-                                  }
-                                }}
-                              />
-                            ) : null}
-                            <div style={{ display: l.logo ? 'none' : 'flex', width: '100%', height: '100%', background: '#EDE9FE', color: '#7C3AED', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem' }}>
-                              {l.name?.charAt(0) || 'L'}
+                            {(() => {
+                              const leadLogoSrc = l.logo || l.companyLogo || l.avatarUrl;
+                              return leadLogoSrc ? (
+                                <img
+                                  src={leadLogoSrc}
+                                  alt={l.company || l.name}
+                                  style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }}
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    if (e.currentTarget.nextSibling) {
+                                      e.currentTarget.nextSibling.style.display = 'flex';
+                                    }
+                                  }}
+                                />
+                              ) : null;
+                            })()}
+                            <div style={{ display: (l.logo || l.companyLogo || l.avatarUrl) ? 'none' : 'flex', width: '100%', height: '100%', background: '#EDE9FE', color: '#7C3AED', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem' }}>
+                              {l.company?.charAt(0) || l.name?.charAt(0) || 'L'}
                             </div>
                           </div>
 
@@ -2228,7 +2319,7 @@ support@dizigini.com`;
                                 leadStudyPdfName: l.leadStudyPdfName || '',
                                 pitchDeckPdf: l.pitchDeckPdf || l.pitchDeck?.streamUrl || '',
                                 pitchDeckPdfName: l.pitchDeckPdfName || l.pitchDeck?.fileName || '',
-                                logo: l.logo || '',
+                                logo: l.logo || l.companyLogo || l.avatarUrl || '',
                                 title: l.title || '',
                                 company: l.company || '',
                                 aboutCompany: l.aboutCompany || '',

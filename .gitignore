@@ -22,6 +22,7 @@ storage/
 backend/storage/
 qa-artifacts/
 qa-reports/qa_screenshots/
+scratch/
 
 # Test coverage
 coverage/

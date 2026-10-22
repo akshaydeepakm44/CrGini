@@ -60,17 +60,12 @@ export const protect = async (req, res, next) => {
         } catch (_) {}
       }
 
-      // If signature verification failed across secrets, decode payload and verify against database
       if (!decoded) {
-        try {
-          const unverified = jwt.decode(token);
-          if (unverified && unverified.id) {
-            decoded = unverified;
-          }
-        } catch (_) {}
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid or expired session token. Please sign in again.',
+        });
       }
-
-      if (!decoded) throw primaryErr;
     }
 
     const user = await findUserById(decoded.id);

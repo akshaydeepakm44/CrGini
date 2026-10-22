@@ -2,10 +2,14 @@ import * as Minio from 'minio';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { Readable } from 'stream';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * MinIO Storage Service
@@ -96,32 +100,47 @@ class LocalDiskStorageDriver {
   }
 
   async getObject(bucket, objectKey) {
-    const { targetPath } = this._resolveSafePath(bucket, objectKey);
+    let { targetPath } = this._resolveSafePath(bucket, objectKey);
     if (!fs.existsSync(targetPath)) {
-      const err = new Error(`Object ${objectKey} not found in bucket ${bucket}`);
-      err.code = 'NotFound';
-      throw err;
+      const altLocal = findLocalFileForObjectKey(objectKey, bucket);
+      if (altLocal && fs.existsSync(altLocal)) {
+        targetPath = altLocal;
+      } else {
+        const err = new Error(`Object ${objectKey} not found in bucket ${bucket}`);
+        err.code = 'NotFound';
+        throw err;
+      }
     }
     return fs.createReadStream(targetPath);
   }
 
   async getPartialObject(bucket, objectKey, offset, length) {
-    const { targetPath } = this._resolveSafePath(bucket, objectKey);
+    let { targetPath } = this._resolveSafePath(bucket, objectKey);
     if (!fs.existsSync(targetPath)) {
-      const err = new Error(`Object ${objectKey} not found in bucket ${bucket}`);
-      err.code = 'NotFound';
-      throw err;
+      const altLocal = findLocalFileForObjectKey(objectKey, bucket);
+      if (altLocal && fs.existsSync(altLocal)) {
+        targetPath = altLocal;
+      } else {
+        const err = new Error(`Object ${objectKey} not found in bucket ${bucket}`);
+        err.code = 'NotFound';
+        throw err;
+      }
     }
     const end = length !== null && length > 0 ? offset + length - 1 : undefined;
     return fs.createReadStream(targetPath, { start: offset, end });
   }
 
   async statObject(bucket, objectKey) {
-    const { targetPath } = this._resolveSafePath(bucket, objectKey);
+    let { targetPath } = this._resolveSafePath(bucket, objectKey);
     if (!fs.existsSync(targetPath)) {
-      const err = new Error(`Object ${objectKey} not found in bucket ${bucket}`);
-      err.code = 'NotFound';
-      throw err;
+      const altLocal = findLocalFileForObjectKey(objectKey, bucket);
+      if (altLocal && fs.existsSync(altLocal)) {
+        targetPath = altLocal;
+      } else {
+        const err = new Error(`Object ${objectKey} not found in bucket ${bucket}`);
+        err.code = 'NotFound';
+        throw err;
+      }
     }
 
     const stat = await fs.promises.stat(targetPath);
@@ -453,7 +472,14 @@ const findLocalFileForObjectKey = (objectKey, bucket = getBucketName()) => {
   const basename = path.basename(cleanKey);
   const candidates = [
     path.resolve(process.cwd(), 'storage', 'buckets', bucket, cleanKey),
+    path.resolve(process.cwd(), 'storage', 'buckets', 'dizigini-assets', cleanKey),
     path.resolve(process.cwd(), 'storage', 'buckets', 'creativegini-assets', cleanKey),
+    path.resolve(process.cwd(), '..', 'storage', 'buckets', bucket, cleanKey),
+    path.resolve(process.cwd(), '..', 'storage', 'buckets', 'dizigini-assets', cleanKey),
+    path.resolve(__dirname, '../../storage', 'buckets', bucket, cleanKey),
+    path.resolve(__dirname, '../../storage', 'buckets', 'dizigini-assets', cleanKey),
+    path.resolve(__dirname, '../../../storage', 'buckets', bucket, cleanKey),
+    path.resolve(__dirname, '../../../storage', 'buckets', 'dizigini-assets', cleanKey),
     path.resolve(process.cwd(), cleanKey),
     path.resolve(process.cwd(), 'uploads', basename),
     path.resolve(process.cwd(), 'storage', cleanKey),

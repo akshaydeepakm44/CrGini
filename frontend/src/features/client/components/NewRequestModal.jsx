@@ -16,6 +16,7 @@ import {
 import { SERVICES_CATALOG } from '../data/servicesData';
 import { api } from '../../../services/api';
 import { useServiceVisibility } from '../context/ServiceVisibilityContext';
+import PaymentCheckoutModal from '../../payment/PaymentCheckoutModal';
 
 /**
  * Service Configuration Registry
@@ -309,6 +310,7 @@ export default function NewRequestModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [serverPriceData, setServerPriceData] = useState(null);
+  const [createdTicketForPayment, setCreatedTicketForPayment] = useState(null);
 
   // --- 1. Strategic Planner Form State ---
   const [strategicForm, setStrategicForm] = useState({
@@ -838,8 +840,8 @@ export default function NewRequestModal({
       };
 
       const newTicket = await api.createRequest(payload);
-      if (onSuccess) onSuccess(newTicket);
-      onClose();
+      // Immediately open the Payment Gateway Checkout modal
+      setCreatedTicketForPayment(newTicket);
     } catch (err) {
       setSubmitError(err.message || 'Failed to submit sprint request. Please try again.');
     } finally {
@@ -3699,6 +3701,26 @@ export default function NewRequestModal({
           )}
         </div>
       </div>
+
+      {/* Immediate Payment Gateway Checkout Modal after Service Selection */}
+      {createdTicketForPayment && (
+        <PaymentCheckoutModal
+          isOpen={Boolean(createdTicketForPayment)}
+          ticket={createdTicketForPayment}
+          onClose={() => {
+            const tkt = createdTicketForPayment;
+            setCreatedTicketForPayment(null);
+            if (onSuccess) onSuccess(tkt);
+            onClose();
+          }}
+          onPaymentSuccess={(payRes) => {
+            const updatedTkt = payRes.request || createdTicketForPayment;
+            setCreatedTicketForPayment(null);
+            if (onSuccess) onSuccess(updatedTkt);
+            onClose();
+          }}
+        />
+      )}
     </div>
   );
 }

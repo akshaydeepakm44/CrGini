@@ -141,6 +141,18 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
   if (!logo) {
     logo = context.logoUrl || context.batchLogoUrl || '';
   }
+  if (!logo && companyLink) {
+    const cleanDomain = companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+    if (cleanDomain && cleanDomain.includes('.') && cleanDomain.length >= 4) {
+      logo = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain.toLowerCase()}&size=128`;
+    }
+  }
+  if (!logo && company && typeof company === 'string') {
+    const cleanComp = company.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanComp.length >= 3) {
+      logo = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanComp}.com&size=128`;
+    }
+  }
 
   // 9. Location / Industry
   let location = getField(['location', 'headquarters', 'hq', 'city', 'country', 'region']);
@@ -211,6 +223,7 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
     maskedEmail: `${name[0]?.toLowerCase() || 's'}••••@${companyDomain}`,
     maskedPhone: phone ? phone.replace(/\d(?=\d{2})/g, '•') : '',
     logo,
+    companyLogo: logo,
     location,
     industry,
     whySuitsBest,

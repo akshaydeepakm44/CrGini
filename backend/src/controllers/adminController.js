@@ -572,11 +572,13 @@ export const getAdminClientsOverview = async (req, res) => {
         COUNT(DISTINCT r.id) AS total_requests,
         COUNT(DISTINCT r.id) FILTER (WHERE r.status NOT IN ('COMPLETED', 'CANCELLED')) AS active_requests,
         COUNT(DISTINCT r.id) FILTER (WHERE r.status = 'COMPLETED') AS completed_requests,
-        COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'PAID'), 0) AS total_paid
+        COALESCE(
+          (SELECT SUM(amount) FROM payments WHERE company_id = c.id AND status = 'PAID'),
+          0
+        ) AS total_paid
       FROM companies c
       LEFT JOIN users u ON u.company_id = c.id AND u.is_deleted = false
       LEFT JOIN requests r ON r.company_id = c.id
-      LEFT JOIN payments p ON p.company_id = c.id
       GROUP BY c.id, c.name, c.contact_person, c.email, c.phone, c.website, c.industry, c.created_at
       ORDER BY c.created_at DESC
     `);
@@ -785,6 +787,9 @@ export const getAdminBillingOverview = async (req, res) => {
         p.currency,
         p.status,
         p.payment_method,
+        p.gateway,
+        p.gateway_payment_id,
+        p.metadata,
         p.paid_at,
         p.created_at,
         r.ticket_id,
@@ -828,6 +833,9 @@ export const getAdminBillingOverview = async (req, res) => {
         currency: row.currency,
         status: row.status,
         paymentMethod: row.payment_method,
+        gateway: row.gateway,
+        gatewayPaymentId: row.gateway_payment_id,
+        metadata: row.metadata,
         paidAt: row.paid_at,
         createdAt: row.created_at,
         ticketId: row.ticket_id,

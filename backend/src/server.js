@@ -11,6 +11,8 @@ import adminRoutes from './routes/adminRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import assetRoutes from './routes/assetRoutes.js';
 import sampleRoutes from './routes/sampleRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
+import { apiLimiter, authLimiter, paymentLimiter } from './middleware/rateLimiter.js';
 
 dotenv.config();
 
@@ -66,10 +68,17 @@ const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      origin.startsWith('http://localhost:') ||
+      origin.endsWith('.dizigini.com') ||
+      origin === 'https://dizigini.com' ||
+      origin === 'http://dizigini.com'
+    ) {
       callback(null, true);
     } else {
-      callback(null, true); // Permissive for production flexibility
+      callback(new Error(`CORS blocked for origin: ${origin}`));
     }
   },
   credentials: true
@@ -96,6 +105,7 @@ app.use((err, req, res, next) => {
 });
 
 // Prevent client/browser caching on API endpoints
+app.use('/api', apiLimiter);
 app.use('/api', (req, res, next) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
@@ -104,13 +114,14 @@ app.use('/api', (req, res, next) => {
 });
 
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/company', companyRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/samples', sampleRoutes);
+app.use('/api/payments', paymentLimiter, paymentRoutes);
 
 import { getServiceVisibility } from './controllers/serviceVisibilityController.js';
 app.get('/api/services/visibility', getServiceVisibility);
@@ -193,7 +204,34 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`[DiziGini API] Server running on port ${PORT} (mapped for dizigini.com)`);
 });
+
+// Process Crash Shields
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[API Shield] Unhandled Promise Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[API Shield] Uncaught Exception thrown:', err);
+});
+
+// Graceful Connection Draining
+const handleShutdown = async (signal) => {
+  console.log(`[DiziGini API] Received ${signal}. Draining pool and closing server gracefully...`);
+  server.close(async () => {
+    try {
+      const pool = getPool();
+      await pool.end();
+      console.log('[DiziGini API] PostgreSQL pool closed cleanly.');
+    } catch (err) {
+      console.error('[DiziGini API] Error during pool drain:', err.message);
+    }
+    process.exit(0);
+  });
+};
+
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT', () => handleShutdown('SIGINT'));
 

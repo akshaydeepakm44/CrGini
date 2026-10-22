@@ -1,19 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
-import LandingPage from './components/LandingPage/LandingPage';
 import Toast from './components/common/Toast';
-import SignInPage from './components/auth/SignInPage';
-import ResetPasswordPage from './components/auth/ResetPasswordPage';
-import MagicLoginPage from './features/auth/pages/MagicLoginPage';
 import ProtectedRoute, { getRoleHome } from './components/common/ProtectedRoute';
-import ClientPortal from './features/client/ClientPortal';
-import LeadPortal from './features/lead/LeadPortal';
-import BoostPortal from './features/boost/BoostPortal';
-import DesignPortal from './features/design/DesignPortal';
-import SuperAdminPortal from './features/admin/SuperAdminPortal';
-import PublicSampleDashboard from './features/samples/PublicSampleDashboard';
 import { api, getStoredToken, setStoredToken } from './services/api';
 import { ServiceVisibilityProvider } from './features/client/context/ServiceVisibilityContext';
+
+// Dynamic Route-Level Code Splitting (Drastically reduces initial bundle size)
+const LandingPage = lazy(() => import('./components/LandingPage/LandingPage'));
+const SignInPage = lazy(() => import('./components/auth/SignInPage'));
+const ResetPasswordPage = lazy(() => import('./components/auth/ResetPasswordPage'));
+const MagicLoginPage = lazy(() => import('./features/auth/pages/MagicLoginPage'));
+const ClientPortal = lazy(() => import('./features/client/ClientPortal'));
+const LeadPortal = lazy(() => import('./features/lead/LeadPortal'));
+const SuperAdminPortal = lazy(() => import('./features/admin/SuperAdminPortal'));
+const PublicSampleDashboard = lazy(() => import('./features/samples/PublicSampleDashboard'));
+
+function RouteLoadingSpinner() {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F8FAFC',
+        gap: '12px',
+        fontFamily: 'var(--cg-font-family, "Inter", sans-serif)',
+      }}
+    >
+      <div className="portal-spinner" style={{ width: '38px', height: '38px', borderTopColor: '#7C3AED' }} />
+      <span style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600 }}>Loading workspace...</span>
+    </div>
+  );
+}
 
 // Helper component to route /ticket/:ticketId directly to the appropriate dashboard
 function TicketRedirect({ user, isAuthChecking }) {
@@ -88,7 +108,15 @@ export default function App() {
     } else {
       setIsAuthChecking(false);
     }
-  }, []);
+
+    const handleExpired = () => {
+      setUser(null);
+      showToast('Session expired. Please sign in again.');
+      navigate('/signin?expired=true');
+    };
+    window.addEventListener('cg_session_expired', handleExpired);
+    return () => window.removeEventListener('cg_session_expired', handleExpired);
+  }, [navigate]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -122,7 +150,8 @@ export default function App() {
   return (
     <ServiceVisibilityProvider>
       <div className="app-root">
-        <Routes>
+        <Suspense fallback={<RouteLoadingSpinner />}>
+          <Routes>
         {/* 1. Public Light Theme Landing Page */}
         <Route
           path="/"
@@ -324,8 +353,9 @@ export default function App() {
         {/* Catch-all redirect */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+    </Suspense>
 
-      <Toast message={toastMessage} />
+    <Toast message={toastMessage} />
       </div>
     </ServiceVisibilityProvider>
   );

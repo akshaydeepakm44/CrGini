@@ -17,7 +17,12 @@ const mapPayment = (row) => {
 
     status: row.status,
     paymentMethod: row.payment_method,
-    transactionId: row.transaction_id,
+    transactionId: row.gateway_payment_id || row.transaction_id,
+    gateway: row.gateway,
+    gatewayOrderId: row.gateway_order_id,
+    gatewayPaymentId: row.gateway_payment_id,
+    gatewaySignature: row.gateway_signature,
+    metadata: row.metadata,
     paidAt: row.paid_at,
 
     createdAt: row.created_at,
@@ -62,7 +67,12 @@ const paymentSelect = `
     p.currency,
     p.status,
     p.payment_method,
-    NULL::text AS transaction_id,
+    p.gateway,
+    p.gateway_order_id,
+    p.gateway_payment_id,
+    p.gateway_signature,
+    p.metadata,
+    COALESCE(p.gateway_payment_id, NULL::text) AS transaction_id,
     p.paid_at,
     p.created_at,
     p.updated_at,
@@ -201,7 +211,12 @@ export const createPayment = async ({
   amount,
   currency = 'USD',
   status = 'PENDING',
-  paymentMethod = 'Stripe Credit / Debit Card',
+  paymentMethod = 'Credit / Debit Card',
+  gateway = 'MANUAL',
+  gatewayOrderId = null,
+  gatewayPaymentId = null,
+  gatewaySignature = null,
+  metadata = null,
   transactionId = null,
   paidAt = null,
 }) => {
@@ -216,6 +231,11 @@ export const createPayment = async ({
       currency,
       status,
       payment_method,
+      gateway,
+      gateway_order_id,
+      gateway_payment_id,
+      gateway_signature,
+      metadata,
       paid_at
     )
     VALUES (
@@ -227,7 +247,12 @@ export const createPayment = async ({
       $6,
       $7,
       $8,
-      $9
+      $9,
+      $10,
+      $11,
+      $12,
+      $13,
+      $14
     )
     RETURNING id
     `,
@@ -240,6 +265,11 @@ export const createPayment = async ({
       currency,
       status,
       paymentMethod,
+      gateway,
+      gatewayOrderId,
+      gatewayPaymentId || transactionId,
+      gatewaySignature,
+      metadata ? JSON.stringify(metadata) : null,
       paidAt,
     ]
   );

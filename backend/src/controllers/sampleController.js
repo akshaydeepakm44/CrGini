@@ -142,6 +142,26 @@ export const getPublicSampleBySlug = async (req, res) => {
       pdfFileName: hasCompanyStudyPdf ? (companyStudyData.pdfFileName || `${sample.companyName} - Company Study.pdf`) : null,
     };
 
+    // Helper to identify platform placeholder logos
+    const isPlatformLogo = (url) => {
+      if (!url || typeof url !== 'string') return true;
+      const clean = url.trim().toLowerCase();
+      return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
+    };
+
+    const explicitWebsite =
+      sample.companyStudy?.website ||
+      (Array.isArray(sample.leads) ? sample.leads.find((l) => l.companyLink || l.website)?.companyLink : null) ||
+      (Array.isArray(sample.leads) ? sample.leads.find((l) => l.website)?.website : null);
+
+    let validWebsiteDomain = null;
+    if (explicitWebsite && typeof explicitWebsite === 'string') {
+      const cd = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+      if (cd.includes('.') && cd.length >= 4) {
+        validWebsiteDomain = cd.toLowerCase();
+      }
+    }
+
     // Strict projection: sanitize and verify NO private client fields leak, and NEVER inline large base64 files
     const cleanLeads = (sample.leads || []).filter((l) => !isMockDummyLead(l));
     const publicLeads = cleanLeads.map((l, index) => {
@@ -281,29 +301,11 @@ export const getPublicSampleBySlug = async (req, res) => {
         }
       : null;
 
-    // Helper to identify platform placeholder logos
-    const isPlatformLogo = (url) => {
-      if (!url || typeof url !== 'string') return true;
-      const clean = url.trim().toLowerCase();
-      return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
-    };
-
-    const explicitWebsite =
-      sample.companyStudy?.website ||
-      (Array.isArray(sample.leads) ? sample.leads.find((l) => l.companyLink || l.website)?.companyLink : null) ||
-      (Array.isArray(sample.leads) ? sample.leads.find((l) => l.website)?.website : null);
-
-    let validWebsiteDomain = null;
-    if (explicitWebsite && typeof explicitWebsite === 'string') {
-      const cd = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
-      if (cd.includes('.') && cd.length >= 4) {
-        validWebsiteDomain = cd.toLowerCase();
-      }
-    }
-
-    // 1. Resolve company logo: Target company's uploaded logo from showcase or companyStudy
+    // 1. Resolve company logo: Target company's uploaded logo or stored asset key
     let resolvedCompanyLogo = sample.logoUrl;
-    if (isPlatformLogo(resolvedCompanyLogo)) {
+    if (sample.logoAssetKey || sample.logo_asset_key || sample.companyStudy?.logoAssetKey) {
+      resolvedCompanyLogo = `/api/samples/${sample.slug}/logo`;
+    } else if (isPlatformLogo(resolvedCompanyLogo)) {
       resolvedCompanyLogo = sample.companyLogo || sample.companyStudy?.logoUrl || sample.companyStudy?.logo || null;
       if (isPlatformLogo(resolvedCompanyLogo)) resolvedCompanyLogo = null;
     }
@@ -322,6 +324,23 @@ export const getPublicSampleBySlug = async (req, res) => {
     // 3. Official company domain favicon fallback if explicit valid domain was provided
     if ((!resolvedCompanyLogo || isPlatformLogo(resolvedCompanyLogo)) && validWebsiteDomain) {
       resolvedCompanyLogo = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${validWebsiteDomain}&size=128`;
+    }
+
+    // 4. Inferred company domain favicon fallback from slug or company name
+    if (!resolvedCompanyLogo || isPlatformLogo(resolvedCompanyLogo)) {
+      let inferredDomain = '';
+      if (sample.slug?.includes('-ai')) {
+        inferredDomain = `${sample.slug.replace(/-ai$/, '')}.ai`;
+      } else if (sample.slug === 'finkr') {
+        inferredDomain = 'finkr.co.uk';
+      } else if (sample.slug) {
+        inferredDomain = `${sample.slug.replace(/[^a-z0-9]/g, '')}.com`;
+      } else if (sample.companyName) {
+        inferredDomain = `${sample.companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+      }
+      if (inferredDomain && inferredDomain.includes('.')) {
+        resolvedCompanyLogo = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${inferredDomain}&size=128`;
+      }
     }
 
     // Never inline huge base64 in public showcase JSON (use dedicated stream endpoint)
@@ -731,6 +750,9 @@ const processLeadsPayload = async (leads, slug, existingLeads = []) => {
     );
 
     // Preserve existing asset keys & phone if client didn't supply replacement
+    if (!l.logoAssetKey && existingLead?.logoAssetKey) {
+      l.logoAssetKey = existingLead.logoAssetKey;
+    }
     if (!l.leadStudyPdfAssetKey && existingLead?.leadStudyPdfAssetKey) {
       l.leadStudyPdfAssetKey = existingLead.leadStudyPdfAssetKey;
     }
@@ -797,19 +819,23 @@ const processLeadsPayload = async (leads, slug, existingLeads = []) => {
     }
 
     // Auto-upload lead company logo if provided as a Data URL
-    if (l.logo && isDataUrl(l.logo)) {
+    const rawLogoDataUrl = (l.logo && isDataUrl(l.logo)) ? l.logo : ((l.companyLogo && isDataUrl(l.companyLogo)) ? l.companyLogo : null);
+    if (rawLogoDataUrl) {
       try {
         const uploadRes = await uploadFile({
-          dataUrl: l.logo,
+          dataUrl: rawLogoDataUrl,
           originalName: `${slug}_lead_${leadId}_logo.png`,
           mimeType: 'image/png',
           prefix: `public-samples/${slug}/leads/${leadId}/logo`,
         });
         l.logoAssetKey = uploadRes.objectKey;
         l.logo = `/api/samples/${slug}/leads/${leadId}/logo`;
+        l.companyLogo = l.logo;
       } catch (err) {
         console.error(`[processLeadsPayload] Failed to upload logo for ${l.name}:`, err.message);
       }
+    } else if (l.logoAssetKey && (!l.logo || l.logo.startsWith('data:'))) {
+      l.logo = `/api/samples/${slug}/leads/${leadId}/logo`;
     }
 
     processed.push(l);
@@ -918,15 +944,19 @@ export const createAdminSample = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Target company name is required.' });
     }
 
-    const effectiveSlug = cleanSlug(slug) || cleanSlug(companyName) || `showcase-${Date.now()}`;
+    let effectiveSlug = cleanSlug(slug) || cleanSlug(companyName) || `showcase-${Date.now()}`;
 
     const effectiveTitle = (title && title.trim())
       ? title.trim()
       : `${companyName.trim()} Intelligence & Growth Showcase`;
 
-    const existing = await findSampleBySlug(effectiveSlug, false);
+    let existing = await findSampleBySlug(effectiveSlug, false);
     if (existing) {
-      return res.status(409).json({ success: false, message: `A showcase with slug "${effectiveSlug}" already exists.` });
+      let counter = 2;
+      while (await findSampleBySlug(`${effectiveSlug}-${counter}`, false)) {
+        counter++;
+      }
+      effectiveSlug = `${effectiveSlug}-${counter}`;
     }
 
     let initialCompanyStudy = companyStudy ? { ...companyStudy } : {
@@ -990,19 +1020,33 @@ export const createAdminSample = async (req, res) => {
 
     // Auto-promote lead logo to showcase company logo if not explicitly provided
     let effectiveLogoUrl = (logoUrl && logoUrl !== '/logo.png') ? logoUrl.trim() : null;
-    if (effectiveLogoUrl && effectiveLogoUrl.includes('gstatic.com/faviconV2')) {
-      const websiteStr = companyStudy?.website;
-      if (!websiteStr || !websiteStr.includes('.')) {
-        effectiveLogoUrl = null;
-      }
+    let logoAssetKey = null;
+
+    if (!effectiveLogoUrl && initialCompanyStudy.logoUrl && initialCompanyStudy.logoUrl !== '/logo.png') {
+      effectiveLogoUrl = initialCompanyStudy.logoUrl;
     }
-    if (!effectiveLogoUrl && Array.isArray(processedLeads)) {
-      const leadWithLogo = processedLeads.find((l) => {
-        const cand = l.companyLogo || l.logo;
-        return cand && cand !== '/logo.png' && !cand.includes('gstatic.com/faviconV2');
-      });
-      if (leadWithLogo) {
-        effectiveLogoUrl = leadWithLogo.companyLogo || leadWithLogo.logo;
+
+    if (!effectiveLogoUrl) {
+      let domain = '';
+      const explicitWebsite = initialCompanyStudy.website || (Array.isArray(processedLeads) ? processedLeads.find(l => l.companyLink || l.website)?.companyLink : null);
+      if (explicitWebsite && typeof explicitWebsite === 'string') {
+        domain = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+      }
+      if (!domain || !domain.includes('.')) {
+        if (effectiveSlug.includes('.')) {
+          domain = effectiveSlug;
+        } else if (effectiveSlug.endsWith('-ai')) {
+          domain = `${effectiveSlug.replace(/-ai$/, '')}.ai`;
+        } else if (effectiveSlug.endsWith('-io')) {
+          domain = `${effectiveSlug.replace(/-io$/, '')}.io`;
+        } else if (effectiveSlug === 'finkr') {
+          domain = 'finkr.co.uk';
+        } else if (companyName) {
+          domain = `${companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+        }
+      }
+      if (domain && domain.includes('.')) {
+        effectiveLogoUrl = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain.toLowerCase()}&size=128`;
       }
     }
 
@@ -1014,10 +1058,15 @@ export const createAdminSample = async (req, res) => {
           mimeType: 'image/png',
           prefix: `public-samples/${effectiveSlug}/logo`,
         });
+        logoAssetKey = uploadRes.objectKey;
         effectiveLogoUrl = `/api/samples/${effectiveSlug}/logo`;
       } catch (uploadErr) {
         console.error('[createAdminSample] Failed to upload company logo:', uploadErr.message);
       }
+    }
+
+    if (logoAssetKey) {
+      initialCompanyStudy.logoAssetKey = logoAssetKey;
     }
 
     const created = await createSampleShowcase({
@@ -1026,6 +1075,7 @@ export const createAdminSample = async (req, res) => {
       companyName: companyName.trim(),
       description: description || `Curated account intelligence and sales acceleration brief prepared for ${companyName.trim()}.`,
       logoUrl: effectiveLogoUrl,
+      logoAssetKey,
       status: status || 'PUBLISHED',
       companyStudy: initialCompanyStudy,
       leads: processedLeads,
@@ -1145,21 +1195,49 @@ export const updateAdminSample = async (req, res) => {
       body.leads = await processLeadsPayload(cleanLeadsInput, body.slug || sample.slug, sample.leads || []);
     }
 
+    let logoAssetKey = sample.logoAssetKey || sample.logo_asset_key || sample.companyStudy?.logoAssetKey || null;
     let effectiveLogoUrl = body.logoUrl !== undefined ? (body.logoUrl ? String(body.logoUrl).trim() : null) : sample.logoUrl;
     if (effectiveLogoUrl === '/logo.png') effectiveLogoUrl = null;
-    if (effectiveLogoUrl && effectiveLogoUrl.includes('gstatic.com/faviconV2')) {
-      const websiteStr = body.companyStudy?.website || sample.companyStudy?.website;
-      if (!websiteStr || !websiteStr.includes('.')) {
-        effectiveLogoUrl = null;
-      }
-    }
+
     if (!effectiveLogoUrl && Array.isArray(body.leads)) {
       const leadWithLogo = body.leads.find((l) => {
         const cand = l.companyLogo || l.logo;
-        return cand && cand !== '/logo.png' && !cand.includes('gstatic.com/faviconV2');
+        return cand && cand !== '/logo.png';
       });
       if (leadWithLogo) {
         effectiveLogoUrl = leadWithLogo.companyLogo || leadWithLogo.logo;
+        if (leadWithLogo.logoAssetKey) {
+          logoAssetKey = leadWithLogo.logoAssetKey;
+        }
+      }
+    }
+
+    if (!effectiveLogoUrl && body.companyStudy?.logoUrl && body.companyStudy.logoUrl !== '/logo.png') {
+      effectiveLogoUrl = body.companyStudy.logoUrl;
+    }
+
+    if (!effectiveLogoUrl) {
+      let domain = '';
+      const targetSlug = body.slug || sample.slug || '';
+      const explicitWebsite = body.companyStudy?.website || (Array.isArray(body.leads) ? body.leads.find(l => l.companyLink || l.website)?.companyLink : null);
+      if (explicitWebsite && typeof explicitWebsite === 'string') {
+        domain = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+      }
+      if (!domain || !domain.includes('.')) {
+        if (targetSlug.includes('.')) {
+          domain = targetSlug;
+        } else if (targetSlug.endsWith('-ai')) {
+          domain = `${targetSlug.replace(/-ai$/, '')}.ai`;
+        } else if (targetSlug.endsWith('-io')) {
+          domain = `${targetSlug.replace(/-io$/, '')}.io`;
+        } else if (targetSlug === 'finkr') {
+          domain = 'finkr.co.uk';
+        } else if (sample.companyName) {
+          domain = `${sample.companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+        }
+      }
+      if (domain && domain.includes('.')) {
+        effectiveLogoUrl = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain.toLowerCase()}&size=128`;
       }
     }
 
@@ -1171,12 +1249,21 @@ export const updateAdminSample = async (req, res) => {
           mimeType: 'image/png',
           prefix: `public-samples/${body.slug || sample.slug}/logo`,
         });
+        logoAssetKey = uploadRes.objectKey;
         effectiveLogoUrl = `/api/samples/${body.slug || sample.slug}/logo`;
       } catch (uploadErr) {
         console.error('[updateAdminSample] Failed to upload company logo:', uploadErr.message);
       }
     }
+
     body.logoUrl = effectiveLogoUrl;
+    if (logoAssetKey) {
+      body.logoAssetKey = logoAssetKey;
+      body.logo_asset_key = logoAssetKey;
+      if (body.companyStudy) {
+        body.companyStudy.logoAssetKey = logoAssetKey;
+      }
+    }
 
     const updated = await updateSampleShowcase(id, body);
     invalidateShowcaseCache(sample.slug);
@@ -1602,18 +1689,35 @@ export const streamCompanyLogo = async (req, res) => {
       return res.status(404).send('Showcase not found');
     }
 
+    // 1. Direct logoAssetKey on sample or companyStudy
+    const assetKey = sample.logoAssetKey || sample.logo_asset_key || sample.companyStudy?.logoAssetKey;
+    if (assetKey) {
+      try {
+        const stream = await getFileStream(assetKey);
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return stream.pipe(res);
+      } catch (err) {
+        console.warn(`[streamCompanyLogo] Failed to stream assetKey ${assetKey}:`, err.message);
+      }
+    }
+
     let logo = sample.logoUrl;
-    if (!logo || logo === '/logo.png') {
-      const leads = Array.isArray(sample.leads) ? sample.leads : [];
-      const leadWithLogo = leads.find((l) => l.companyLogo || l.logo);
-      logo = leadWithLogo?.companyLogo || leadWithLogo?.logo;
+
+    // 2. If logo is an internal object key in storage
+    if (logo && !logo.startsWith('http') && !logo.startsWith('/api/') && !logo.startsWith('data:')) {
+      try {
+        const stream = await getFileStream(logo);
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return stream.pipe(res);
+      } catch (err) {
+        console.warn(`[streamCompanyLogo] Failed to stream logoKey ${logo}:`, err.message);
+      }
     }
 
-    if (!logo) {
-      return res.status(404).send('Logo not found');
-    }
-
-    if (isDataUrl(logo)) {
+    // 3. If logo is a base64 Data URL
+    if (logo && isDataUrl(logo)) {
       const matches = logo.match(/^data:([A-Za-z0-9-+/]+);base64,(.+)$/);
       if (matches && matches.length === 3) {
         const mimeType = matches[1];
@@ -1624,20 +1728,73 @@ export const streamCompanyLogo = async (req, res) => {
       }
     }
 
-    if (logo.startsWith('http')) {
+    // 4. If logo is an external HTTP URL
+    if (logo && logo.startsWith('http')) {
       return res.redirect(logo);
     }
 
-    if (logo.startsWith('/api/samples/') && logo.endsWith('/logo')) {
-      // Prevent loop
-      return res.status(404).send('Logo not found');
+    // 5. Company study logo fallback
+    const studyLogo = sample.companyStudy?.logoUrl || sample.companyStudy?.logo;
+    if (studyLogo && !studyLogo.includes('/logo.png') && !studyLogo.startsWith('/api/samples/')) {
+      if (studyLogo.startsWith('http')) return res.redirect(studyLogo);
+      if (isDataUrl(studyLogo)) {
+        const matches = studyLogo.match(/^data:([A-Za-z0-9-+/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          res.setHeader('Content-Type', matches[1]);
+          return res.send(Buffer.from(matches[2], 'base64'));
+        }
+      }
     }
 
-    // Assume MinIO / local storage asset key
-    const stream = await getFileStream(logo);
-    res.setHeader('Content-Type', 'image/png');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    return stream.pipe(res);
+    // 6. Check if lead #1 has a logo or if leads have uploaded logo
+    const leads = Array.isArray(sample.leads) ? sample.leads : [];
+    const leadWithLogo = leads.find((l) => l.logoAssetKey || (l.logo && isDataUrl(l.logo)) || (l.companyLogo && isDataUrl(l.companyLogo)));
+    if (leadWithLogo) {
+      if (leadWithLogo.logoAssetKey) {
+        try {
+          const stream = await getFileStream(leadWithLogo.logoAssetKey);
+          res.setHeader('Content-Type', 'image/png');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return stream.pipe(res);
+        } catch (_) {}
+      }
+      const rawLeadLogo = leadWithLogo.logo || leadWithLogo.companyLogo;
+      if (rawLeadLogo && isDataUrl(rawLeadLogo)) {
+        const matches = rawLeadLogo.match(/^data:([A-Za-z0-9-+/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          res.setHeader('Content-Type', matches[1]);
+          return res.send(Buffer.from(matches[2], 'base64'));
+        }
+      }
+    }
+
+    // 7. Auto-resolve domain favicon from explicit website, slug, or company name
+    let domain = '';
+    const explicitWebsite = sample.companyStudy?.website;
+    if (explicitWebsite && typeof explicitWebsite === 'string') {
+      domain = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+    }
+    if (!domain && sample.slug) {
+      if (sample.slug.includes('-ai')) {
+        domain = `${sample.slug.replace(/-ai$/, '')}.ai`;
+      } else if (sample.slug === 'finkr') {
+        domain = 'finkr.co.uk';
+      } else if (sample.slug === 'data-i2i') {
+        domain = 'datai2i.com';
+      } else {
+        domain = `${sample.slug.replace(/[^a-z0-9]/g, '')}.com`;
+      }
+    }
+    if (!domain && sample.companyName) {
+      const cleanName = sample.companyName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      domain = `${cleanName}.com`;
+    }
+
+    if (domain && domain.includes('.')) {
+      return res.redirect(`https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=128`);
+    }
+
+    return res.status(404).send('Logo not found');
   } catch (err) {
     console.error('[SampleController.streamCompanyLogo] Error:', err.message);
     return res.status(500).send('Error streaming logo');
@@ -1662,13 +1819,17 @@ export const streamLeadLogo = async (req, res) => {
     if (!lead) return res.status(404).send('Lead not found');
 
     if (lead.logoAssetKey) {
-      const stream = await getFileStream(lead.logoAssetKey);
-      res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      return stream.pipe(res);
+      try {
+        const stream = await getFileStream(lead.logoAssetKey);
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return stream.pipe(res);
+      } catch (e) {
+        console.warn(`[streamLeadLogo] Could not stream assetKey ${lead.logoAssetKey}:`, e.message);
+      }
     }
 
-    const candidate = lead.logo || lead.companyLogo || lead.avatarUrl;
+    const candidate = lead.logo || lead.companyLogo || lead.logoUrl || lead.company_logo || lead.companyLogoUrl || lead.avatarUrl;
     if (candidate && isDataUrl(candidate)) {
       const matches = candidate.match(/^data:([A-Za-z0-9-+/]+);base64,(.+)$/);
       if (matches && matches.length === 3) {
@@ -1680,20 +1841,47 @@ export const streamLeadLogo = async (req, res) => {
       }
     }
 
-    if (candidate?.startsWith('http')) {
+    if (candidate && candidate.startsWith('http') && !candidate.includes('/api/samples/')) {
       return res.redirect(candidate);
     }
 
-    // Fallback: If lead has companyLink, redirect to favicon
-    const companyLink = lead.companyLink || lead.website || lead.companyWebsite;
+    // Fallback: If lead has companyLink or website, redirect to favicon
+    const companyLink =
+      lead.companyLink ||
+      lead.website ||
+      lead.companyWebsite ||
+      lead.domain ||
+      lead.companyDomain ||
+      lead.websiteUrl;
+
     if (companyLink) {
       const cleanDomain = String(companyLink)
         .replace(/^https?:\/\//i, '')
         .replace(/^www\./i, '')
         .split('/')[0]
+        .split('?')[0]
         .trim();
       if (cleanDomain && cleanDomain.includes('.')) {
         return res.redirect(`https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`);
+      }
+    }
+
+    // Fallback: Use prospect's target account company name
+    let candidateName = '';
+    if (lead.company && lead.company.toLowerCase() !== sample.companyName?.toLowerCase()) {
+      candidateName = lead.company;
+    } else if (lead.targetCompany) {
+      candidateName = lead.targetCompany;
+    } else if (lead.name) {
+      candidateName = lead.name;
+    } else {
+      candidateName = lead.company;
+    }
+
+    if (candidateName && typeof candidateName === 'string') {
+      const cleanComp = candidateName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanComp.length >= 2) {
+        return res.redirect(`https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanComp}.com&size=128`);
       }
     }
 

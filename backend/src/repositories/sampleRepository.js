@@ -15,6 +15,7 @@ export async function ensureSampleTable() {
             company_name    VARCHAR(255) NOT NULL,
             description     TEXT,
             logo_url        TEXT,
+            logo_asset_key  TEXT,
             status          VARCHAR(50) NOT NULL DEFAULT 'PUBLISHED',
             company_study   JSONB DEFAULT '{}'::jsonb,
             leads           JSONB DEFAULT '[]'::jsonb,
@@ -25,6 +26,7 @@ export async function ensureSampleTable() {
             updated_at      TIMESTAMPTZ DEFAULT NOW()
           );
 
+          ALTER TABLE public_sample_showcases ADD COLUMN IF NOT EXISTS logo_asset_key TEXT;
           CREATE INDEX IF NOT EXISTS idx_public_samples_slug ON public_sample_showcases (slug);
           CREATE INDEX IF NOT EXISTS idx_public_samples_status ON public_sample_showcases (status);
         `);
@@ -48,6 +50,7 @@ const mapSampleRow = (row) => {
     companyName: row.company_name,
     description: row.description,
     logoUrl: row.logo_url,
+    logoAssetKey: row.logo_asset_key || row.company_study?.logoAssetKey || null,
     status: row.status,
     companyStudy: row.company_study || {},
     leads: row.leads || [],
@@ -77,6 +80,7 @@ export const findSampleBySlug = async (slug, onlyPublished = true) => {
       company_name,
       description,
       logo_url,
+      logo_asset_key,
       status,
       company_study,
       leads,
@@ -106,6 +110,7 @@ export const findSampleById = async (id) => {
       company_name,
       description,
       logo_url,
+      logo_asset_key,
       status,
       company_study,
       leads,
@@ -135,6 +140,7 @@ export const findAllSamples = async (includeDrafts = false) => {
       company_name,
       description,
       logo_url,
+      logo_asset_key,
       status,
       company_study,
       leads,
@@ -157,6 +163,7 @@ export const createSampleShowcase = async ({
   companyName,
   description = '',
   logoUrl = null,
+  logoAssetKey = null,
   status = 'PUBLISHED',
   companyStudy = {},
   leads = [],
@@ -172,6 +179,7 @@ export const createSampleShowcase = async ({
       company_name,
       description,
       logo_url,
+      logo_asset_key,
       status,
       company_study,
       leads,
@@ -179,7 +187,19 @@ export const createSampleShowcase = async ({
       pitch_deck,
       published_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+    ON CONFLICT (slug) DO UPDATE SET
+      title = EXCLUDED.title,
+      company_name = EXCLUDED.company_name,
+      description = EXCLUDED.description,
+      logo_url = COALESCE(EXCLUDED.logo_url, public_sample_showcases.logo_url),
+      logo_asset_key = COALESCE(EXCLUDED.logo_asset_key, public_sample_showcases.logo_asset_key),
+      status = EXCLUDED.status,
+      company_study = EXCLUDED.company_study,
+      leads = EXCLUDED.leads,
+      lead_studies = EXCLUDED.lead_studies,
+      pitch_deck = EXCLUDED.pitch_deck,
+      updated_at = NOW()
     RETURNING id
     `,
     [
@@ -188,6 +208,7 @@ export const createSampleShowcase = async ({
       companyName.trim(),
       description,
       logoUrl,
+      logoAssetKey,
       status,
       JSON.stringify(companyStudy),
       JSON.stringify(leads),
@@ -202,14 +223,22 @@ export const updateSampleShowcase = async (id, updates = {}) => {
   await ensureSampleTable();
   const allowed = {
     title: 'title',
+    slug: 'slug',
     companyName: 'company_name',
+    company_name: 'company_name',
     description: 'description',
     logoUrl: 'logo_url',
+    logo_url: 'logo_url',
+    logoAssetKey: 'logo_asset_key',
+    logo_asset_key: 'logo_asset_key',
     status: 'status',
     companyStudy: 'company_study',
+    company_study: 'company_study',
     leads: 'leads',
     leadStudies: 'lead_studies',
+    lead_studies: 'lead_studies',
     pitchDeck: 'pitch_deck',
+    pitch_deck: 'pitch_deck',
   };
 
   const setClauses = [];

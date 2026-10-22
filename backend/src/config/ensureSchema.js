@@ -205,6 +205,68 @@ export async function ensureSchemaIntegrity() {
       console.warn('[Schema] public_sample_inquiries step note:', e5.message);
     }
 
+    // 6. Ensure payments table has gateway tracking columns
+    try {
+      await query(`
+        ALTER TABLE payments 
+        ADD COLUMN IF NOT EXISTS gateway VARCHAR(50) DEFAULT 'MANUAL';
+      `);
+      await query(`
+        ALTER TABLE payments 
+        ADD COLUMN IF NOT EXISTS gateway_order_id VARCHAR(255);
+      `);
+      await query(`
+        ALTER TABLE payments 
+        ADD COLUMN IF NOT EXISTS gateway_payment_id VARCHAR(255);
+      `);
+      await query(`
+        ALTER TABLE payments 
+        ADD COLUMN IF NOT EXISTS gateway_signature VARCHAR(500);
+      `);
+      await query(`
+        ALTER TABLE payments 
+        ADD COLUMN IF NOT EXISTS metadata JSONB;
+      `);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_payments_gateway_order ON payments (gateway_order_id);
+      `);
+    } catch (ePay) {
+      console.warn('[Schema] payments gateway columns step note:', ePay.message);
+    }
+
+    // 7. Comprehensive Performance Indexes to prevent sequential table scans under load
+    try {
+      await query(`
+        -- Requests / Tickets Lookup Indexes
+        CREATE INDEX IF NOT EXISTS idx_requests_company_id ON requests(company_id);
+        CREATE INDEX IF NOT EXISTS idx_requests_assigned_to ON requests(assigned_to);
+        CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);
+        CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_requests_service_type ON requests(service_type);
+
+        -- Chat & Conversation Lookup Indexes (Optimizes 4s polling)
+        CREATE INDEX IF NOT EXISTS idx_messages_request_id ON messages(request_id);
+        CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);
+
+        -- Submissions & Deliverables
+        CREATE INDEX IF NOT EXISTS idx_submissions_request_id ON submissions(request_id);
+        CREATE INDEX IF NOT EXISTS idx_submission_files_submission_id ON submission_files(submission_id);
+        CREATE INDEX IF NOT EXISTS idx_request_deliverables_request_id ON request_deliverables(request_id);
+        CREATE INDEX IF NOT EXISTS idx_request_attachments_request_id ON request_attachments(request_id);
+
+        -- Payments & Invoices Lookup Indexes
+        CREATE INDEX IF NOT EXISTS idx_payments_company_id ON payments(company_id);
+        CREATE INDEX IF NOT EXISTS idx_payments_request_id ON payments(request_id);
+        CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+
+        -- Notifications Fast Unread Filtering
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read);
+      `);
+      await query('ALTER TABLE company_key_people ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()');
+    } catch (eIdx) {
+      console.warn('[Schema] performance indexes step note:', eIdx.message);
+    }
+
     // 7. Ensure public_sample_showcases leads JSONB payloads are optimized (strip multi-megabyte base64 strings)
     try {
       await ensureOptimizedProspectPayloads();
@@ -233,10 +295,12 @@ export async function ensureSchemaIntegrity() {
  */
 export async function ensureOptimizedProspectPayloads() {
   try {
-    const showcasesRes = await query('SELECT id, slug, company_name, company_study, leads FROM public_sample_showcases');
+    await query(`ALTER TABLE public_sample_showcases ADD COLUMN IF NOT EXISTS logo_asset_key TEXT`);
+    const showcasesRes = await query('SELECT id, slug, company_name, logo_url, logo_asset_key, company_study, leads FROM public_sample_showcases');
     const { uploadFile, isDataUrl } = await import('../services/storageService.js');
 
     for (const row of showcasesRes.rows) {
+      let rowModified = false;
       let leadsModified = false;
       const leads = row.leads || [];
 
@@ -264,6 +328,48 @@ export async function ensureOptimizedProspectPayloads() {
         }
       }
 
+      // 2. Offload inlined company logo if present as base64
+      if (row.logo_url && isDataUrl(row.logo_url)) {
+        try {
+          const originalName = `${row.slug}_company_logo.png`;
+          const uploadRes = await uploadFile({
+            dataUrl: row.logo_url,
+            originalName,
+            mimeType: 'image/png',
+            prefix: `public-samples/${row.slug}/logo`,
+          });
+          await query('UPDATE public_sample_showcases SET logo_asset_key = $1, logo_url = $2, updated_at = NOW() WHERE id = $3', [
+            uploadRes.objectKey,
+            `/api/samples/${row.slug}/logo`,
+            row.id,
+          ]);
+          rowModified = true;
+        } catch (e) {
+          console.error(`[ensureOptimizedProspectPayloads] Failed to offload company logo for ${row.slug}:`, e.message);
+        }
+      }
+
+      // 3. Resolve authentic company logo if placeholder or missing
+      if (!row.logo_url || row.logo_url === '/logo.png') {
+        let domain = '';
+        if (row.slug === 'siift-ai' || row.slug === 'siift') domain = 'siift.ai';
+        else if (row.slug === 'data-i2i') domain = 'data-i2i.com';
+        else if (row.slug === 'finkr') domain = 'finkr.co.uk';
+        else if (row.company_study?.website && typeof row.company_study.website === 'string') {
+          domain = row.company_study.website.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+        } else if (row.company_name && typeof row.company_name === 'string') {
+          const cleanName = row.company_name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanName.length >= 3) domain = `${cleanName}.com`;
+        }
+
+        if (domain && domain.includes('.')) {
+          const resolvedLogo = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=128`;
+          await query('UPDATE public_sample_showcases SET logo_url = $1, updated_at = NOW() WHERE id = $2', [resolvedLogo, row.id]);
+          rowModified = true;
+          console.log(`[Schema] Resolved company logo for ${row.slug} -> ${resolvedLogo}`);
+        }
+      }
+
       for (const lead of leads) {
         const leadId = lead.id || `lead-${Date.now()}`;
 
@@ -273,7 +379,7 @@ export async function ensureOptimizedProspectPayloads() {
           leadsModified = true;
         }
 
-        // 2. Offload lead study PDF if inlined as base64
+        // 4. Offload lead study PDF if inlined as base64
         if (lead.leadStudyPdf && isDataUrl(lead.leadStudyPdf)) {
           try {
             const originalName = lead.leadStudyPdfName || `${(lead.name || 'Lead').replace(/\s+/g, '_')}_Study.pdf`;
@@ -291,7 +397,7 @@ export async function ensureOptimizedProspectPayloads() {
           }
         }
 
-        // 3. Offload pitch deck PDF if inlined as base64
+        // 5. Offload pitch deck PDF if inlined as base64
         const pitchDataUrl = (lead.pitchDeckPdf && isDataUrl(lead.pitchDeckPdf))
           ? lead.pitchDeckPdf
           : (lead.pitchDeck?.streamUrl && isDataUrl(lead.pitchDeck?.streamUrl))
@@ -317,6 +423,26 @@ export async function ensureOptimizedProspectPayloads() {
             leadsModified = true;
           } catch (err) {
             console.error(`[ensureOptimizedProspectPayloads] Failed to offload pitchDeckPdf for ${lead.name}:`, err.message);
+          }
+        }
+
+        // 6. Offload lead logo if inlined as base64
+        const leadLogoDataUrl = (lead.logo && isDataUrl(lead.logo)) ? lead.logo : ((lead.companyLogo && isDataUrl(lead.companyLogo)) ? lead.companyLogo : null);
+        if (leadLogoDataUrl) {
+          try {
+            const originalName = `${row.slug}_lead_${leadId}_logo.png`;
+            const uploadRes = await uploadFile({
+              dataUrl: leadLogoDataUrl,
+              originalName,
+              mimeType: 'image/png',
+              prefix: `public-samples/${row.slug}/leads/${leadId}/logo`,
+            });
+            lead.logoAssetKey = uploadRes.objectKey;
+            lead.logo = `/api/samples/${row.slug}/leads/${leadId}/logo`;
+            lead.companyLogo = lead.logo;
+            leadsModified = true;
+          } catch (err) {
+            console.error(`[ensureOptimizedProspectPayloads] Failed to offload logo for ${lead.name}:`, err.message);
           }
         }
 

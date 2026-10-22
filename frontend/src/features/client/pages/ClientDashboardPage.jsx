@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   FileText,
   Clock,
@@ -46,33 +46,45 @@ export default function ClientDashboardPage({
   const companyName = company?.name || user?.companyName || 'Your Organization';
   const { isChannelActive, isServiceActive } = useServiceVisibility();
 
-  // Live accurate metrics calculated directly from in-memory requests and deliverables
-  const activeRequestsList = requests.filter(
-    (r) => !['COMPLETED', 'APPROVED', 'CANCELLED'].includes(String(r.status).toUpperCase())
-  );
-  const completedList = requests.filter(
-    (r) => ['COMPLETED', 'APPROVED'].includes(String(r.status).toUpperCase())
-  );
-  const totalDeliverablesCount = deliverables.length > 0
-    ? deliverables.length
-    : requests.reduce((acc, r) => acc + (r.submissions?.length || 0), 0);
-  const pendingPaymentsCount = requests.filter(
-    (r) => String(r.paymentStatus || r.payment_status).toUpperCase() === 'PENDING'
-  ).length;
+  // Live accurate metrics memoized directly from in-memory requests and deliverables
+  const { activeRequestsList, completedList, totalDeliverablesCount, pendingPaymentsCount } = useMemo(() => {
+    const active = requests.filter(
+      (r) => !['COMPLETED', 'APPROVED', 'CANCELLED'].includes(String(r.status).toUpperCase())
+    );
+    const completed = requests.filter(
+      (r) => ['COMPLETED', 'APPROVED'].includes(String(r.status).toUpperCase())
+    );
+    const totalDeliv = deliverables.length > 0
+      ? deliverables.length
+      : requests.reduce((acc, r) => acc + (r.submissions?.length || 0), 0);
+    const pendingPay = requests.filter(
+      (r) => String(r.paymentStatus || r.payment_status).toUpperCase() === 'PENDING'
+    ).length;
 
-  const liveMetrics = {
+    return {
+      activeRequestsList: active,
+      completedList: completed,
+      totalDeliverablesCount: totalDeliv,
+      pendingPaymentsCount: pendingPay,
+    };
+  }, [requests, deliverables]);
+
+  const liveMetrics = useMemo(() => ({
     activeRequests: activeRequestsList.length,
     completed: completedList.length,
     verifiedDeliverables: totalDeliverablesCount,
     pendingPayments: pendingPaymentsCount,
-  };
+  }), [activeRequestsList.length, completedList.length, totalDeliverablesCount, pendingPaymentsCount]);
 
   // Greeting based on client local time
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  const displayRequests = activeRequestsList.length > 0 ? activeRequestsList.slice(0, 5) : requests.slice(0, 5);
-  const recentDeliverablesList = deliverables.slice(0, 4);
+  const displayRequests = useMemo(() => {
+    return activeRequestsList.length > 0 ? activeRequestsList.slice(0, 5) : requests.slice(0, 5);
+  }, [activeRequestsList, requests]);
+
+  const recentDeliverablesList = useMemo(() => deliverables.slice(0, 4), [deliverables]);
 
   // Recent ticket communications with latest messages
   const recentConversations = requests

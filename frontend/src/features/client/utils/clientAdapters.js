@@ -150,8 +150,8 @@ export const adaptRequest = (raw) => {
 
   const assignedSpecialist = raw.assignedSpecialist || raw.assigned_to_name || (raw.assignedTo ? 'Assigned Specialist' : 'Specialist Queue');
 
-  const price = raw.price || raw.total_amount || (channel === 'Boosting' ? 799 : 499);
-  const paymentStatus = (raw.paymentStatus || raw.payment_status || (price ? 'PAID' : 'PENDING')).toUpperCase();
+  const rawPayStatus = String(raw.paymentStatus || raw.payment_status || '').toUpperCase();
+  const paymentStatus = rawPayStatus === 'PAID' ? 'PAID' : 'PENDING';
 
   return {
     id: raw.id || ticketId,

@@ -20,11 +20,13 @@ import {
   Layers,
   ExternalLink,
   ChevronRight,
-  Plus
+  Plus,
+  CreditCard
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import StatusBadge from '../../../components/tickets/StatusBadge';
 import Button from '../../../components/common/Button';
+import PaymentCheckoutModal from '../../payment/PaymentCheckoutModal';
 
 // Digitalising Service Catalog Definitions
 const DIGITALISING_SERVICES = {
@@ -196,6 +198,7 @@ export default function DigitalisingChannelPage({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccessTicket, setSubmitSuccessTicket] = useState(null);
   const [submitError, setSubmitError] = useState('');
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
 
   // Past Digitalising Requests Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -576,8 +579,30 @@ export default function DigitalisingChannelPage({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setIsPayModalOpen(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '10px 22px',
+                  fontSize: '0.875rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(124, 58, 237, 0.25)',
+                }}
+              >
+                <CreditCard size={16} />
+                <span>Settle Payment (${submitSuccessTicket.price || estimatedPrice}.00)</span>
+              </button>
+
               <Button
-                variant="primary"
+                variant="outline"
                 onClick={() => {
                   if (onViewRequest) {
                     onViewRequest(submitSuccessTicket);
@@ -1542,6 +1567,18 @@ export default function DigitalisingChannelPage({
             </div>
           )}
         </div>
+      )}
+      {/* Settle Payment Modal */}
+      {isPayModalOpen && submitSuccessTicket && (
+        <PaymentCheckoutModal
+          isOpen={isPayModalOpen}
+          ticket={submitSuccessTicket}
+          onClose={() => setIsPayModalOpen(false)}
+          onPaymentSuccess={(payRes) => {
+            setIsPayModalOpen(false);
+            if (onReload) onReload();
+          }}
+        />
       )}
     </div>
   );

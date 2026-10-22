@@ -31,6 +31,13 @@ const safeJson = async (res) => {
 const parseApiResponse = async (res, defaultErrorMessage = 'Request failed') => {
   const data = await safeJson(res);
   if (!res.ok) {
+    if (res.status === 401) {
+      clearStoredToken();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/signin') && window.location.pathname !== '/') {
+        window.dispatchEvent(new CustomEvent('cg_session_expired'));
+      }
+      throw new Error(data?.message || 'Your session has expired. Please sign in again.');
+    }
     if (res.status === 413) {
       const message = data?.message || 'Upload payload is too large. Please reduce the combined upload size and try again.';
       throw new Error(message);
@@ -346,6 +353,79 @@ export const api = {
     const data = await safeJson(res);
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Payment processing failed');
+    }
+    return data;
+  },
+
+  async getPaymentConfig() {
+    try {
+      const res = await fetch(`${API_BASE}/payments/config`, {
+        headers: getHeaders(false)
+      });
+      const data = await safeJson(res);
+      if (res.ok && data?.success) {
+        return data;
+      }
+    } catch (_) {}
+    return {
+      success: true,
+      gateways: {
+        razorpay: {
+          enabled: true,
+          keyId: 'rzp_live_SxtZmpzZxUlYV0',
+          currency: 'INR',
+          label: 'Razorpay (Credit Card, Debit Card, UPI, NetBanking)',
+        },
+        paypal: {
+          enabled: true,
+          clientId: 'Ac7EuMLUwJL9QIoncQmTbia32WENG5utxnlSgazQRlUfmgram_QT0OIvXOY8yv_lzYvgWaiGHLMfKlo4',
+          mode: 'live',
+          currency: 'USD',
+          label: 'PayPal (Global Credit Card & PayPal Account)',
+        },
+      },
+      isSandbox: false,
+      exchangeRate: {
+        usdToInr: 86.5,
+      },
+    };
+  },
+
+  async createPaymentOrder(payload) {
+    const res = await fetch(`${API_BASE}/payments/create-order`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to create payment order');
+    }
+    return data;
+  },
+
+  async verifyRazorpayPayment(payload) {
+    const res = await fetch(`${API_BASE}/payments/razorpay/verify`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Razorpay payment verification failed');
+    }
+    return data;
+  },
+
+  async capturePayPalPayment(payload) {
+    const res = await fetch(`${API_BASE}/payments/paypal/capture`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: JSON.stringify(payload)
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'PayPal payment capture failed');
     }
     return data;
   },
