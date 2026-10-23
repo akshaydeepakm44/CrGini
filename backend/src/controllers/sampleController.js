@@ -149,10 +149,8 @@ export const getPublicSampleBySlug = async (req, res) => {
       return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
     };
 
-    const explicitWebsite =
-      sample.companyStudy?.website ||
-      (Array.isArray(sample.leads) ? sample.leads.find((l) => l.companyLink || l.website)?.companyLink : null) ||
-      (Array.isArray(sample.leads) ? sample.leads.find((l) => l.website)?.website : null);
+    // ONLY use the target company's own website for the company study/showcase (NEVER borrow from leads)
+    const explicitWebsite = sample.companyStudy?.website || null;
 
     let validWebsiteDomain = null;
     if (explicitWebsite && typeof explicitWebsite === 'string') {
@@ -310,14 +308,25 @@ export const getPublicSampleBySlug = async (req, res) => {
       if (isPlatformLogo(resolvedCompanyLogo)) resolvedCompanyLogo = null;
     }
 
-    // 2. Comprehensive fallback: retrieve uploaded logo from ANY of the leads
-    if ((!resolvedCompanyLogo || isPlatformLogo(resolvedCompanyLogo)) && Array.isArray(sample.leads) && sample.leads.length > 0) {
-      const leadWithLogo = sample.leads.find((l) => {
-        const candidate = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
-        return candidate && !isPlatformLogo(candidate);
+    // Safety Sanitization: Prevent contaminated logos where a lead's logo/domain was accidentally saved as the showcase company logo
+    if (resolvedCompanyLogo && Array.isArray(sample.leads) && sample.leads.length > 0) {
+      const isLeadLogo = sample.leads.some((l) => {
+        const leadLogoCand = l.logo || l.companyLogo || l.avatarUrl;
+        if (leadLogoCand && typeof leadLogoCand === 'string' && leadLogoCand === resolvedCompanyLogo) return true;
+        if (l.companyLink && typeof l.companyLink === 'string') {
+          const lDomain = l.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim().toLowerCase();
+          if (lDomain && lDomain.length >= 4 && resolvedCompanyLogo.toLowerCase().includes(lDomain)) {
+            const compWebsite = (sample.companyStudy?.website || '').toLowerCase();
+            if (!compWebsite.includes(lDomain)) {
+              return true;
+            }
+          }
+        }
+        return false;
       });
-      if (leadWithLogo) {
-        resolvedCompanyLogo = leadWithLogo.companyLogo || leadWithLogo.logo || leadWithLogo.company_logo || leadWithLogo.avatarUrl;
+
+      if (isLeadLogo) {
+        resolvedCompanyLogo = null;
       }
     }
 
@@ -1028,7 +1037,8 @@ export const createAdminSample = async (req, res) => {
 
     if (!effectiveLogoUrl) {
       let domain = '';
-      const explicitWebsite = initialCompanyStudy.website || (Array.isArray(processedLeads) ? processedLeads.find(l => l.companyLink || l.website)?.companyLink : null);
+      // ONLY check the target company's explicit website (NEVER borrow from leads)
+      const explicitWebsite = initialCompanyStudy.website || null;
       if (explicitWebsite && typeof explicitWebsite === 'string') {
         domain = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
       }
@@ -1199,16 +1209,23 @@ export const updateAdminSample = async (req, res) => {
     let effectiveLogoUrl = body.logoUrl !== undefined ? (body.logoUrl ? String(body.logoUrl).trim() : null) : sample.logoUrl;
     if (effectiveLogoUrl === '/logo.png') effectiveLogoUrl = null;
 
-    if (!effectiveLogoUrl && Array.isArray(body.leads)) {
-      const leadWithLogo = body.leads.find((l) => {
-        const cand = l.companyLogo || l.logo;
-        return cand && cand !== '/logo.png';
-      });
-      if (leadWithLogo) {
-        effectiveLogoUrl = leadWithLogo.companyLogo || leadWithLogo.logo;
-        if (leadWithLogo.logoAssetKey) {
-          logoAssetKey = leadWithLogo.logoAssetKey;
+    // Safety check: Don't allow a lead logo or lead website favicon to persist as the showcase company logo
+    if (effectiveLogoUrl) {
+      const allLeads = Array.isArray(body.leads) ? body.leads : (Array.isArray(sample.leads) ? sample.leads : []);
+      const isLeadContaminated = allLeads.some((l) => {
+        const leadLogoCand = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
+        if (leadLogoCand && typeof leadLogoCand === 'string' && leadLogoCand === effectiveLogoUrl) return true;
+        if (l.companyLink && typeof l.companyLink === 'string') {
+          const lDomain = l.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim().toLowerCase();
+          if (lDomain && lDomain.length >= 4 && effectiveLogoUrl.toLowerCase().includes(lDomain)) {
+            const compWebsite = (body.companyStudy?.website || sample.companyStudy?.website || '').toLowerCase();
+            if (!compWebsite.includes(lDomain)) return true;
+          }
         }
+        return false;
+      });
+      if (isLeadContaminated) {
+        effectiveLogoUrl = null;
       }
     }
 
@@ -1219,7 +1236,8 @@ export const updateAdminSample = async (req, res) => {
     if (!effectiveLogoUrl) {
       let domain = '';
       const targetSlug = body.slug || sample.slug || '';
-      const explicitWebsite = body.companyStudy?.website || (Array.isArray(body.leads) ? body.leads.find(l => l.companyLink || l.website)?.companyLink : null);
+      // ONLY check target company's explicit website (NEVER borrow from leads)
+      const explicitWebsite = body.companyStudy?.website || null;
       if (explicitWebsite && typeof explicitWebsite === 'string') {
         domain = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
       }

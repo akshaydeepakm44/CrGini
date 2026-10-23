@@ -386,7 +386,9 @@ export const api = {
       },
       isSandbox: false,
       exchangeRate: {
-        usdToInr: 86.5,
+        usdToInr: 94.90,
+        isLive: true,
+        gstRatePercent: 18,
       },
     };
   },

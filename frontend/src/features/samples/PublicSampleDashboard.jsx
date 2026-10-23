@@ -483,6 +483,26 @@ Best regards,
 
     // 1. Direct showcase logo uploaded in the prospect showcase
     let raw = sample?.logoUrl || sample?.companyLogo;
+    
+    // Safety check: Ensure raw does not belong to any lead
+    if (raw && !isPlatformLogo(raw) && Array.isArray(sample?.leads) && sample.leads.length > 0) {
+      const isLeadLogo = sample.leads.some((l) => {
+        const leadLogoCand = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
+        if (leadLogoCand && typeof leadLogoCand === 'string' && leadLogoCand === raw) return true;
+        if (l.companyLink && typeof l.companyLink === 'string') {
+          const lDomain = l.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim().toLowerCase();
+          if (lDomain && lDomain.length >= 4 && raw.toLowerCase().includes(lDomain)) {
+            const compWebsite = (sample?.companyStudy?.website || '').toLowerCase();
+            if (!compWebsite.includes(lDomain)) return true;
+          }
+        }
+        return false;
+      });
+      if (isLeadLogo) {
+        raw = null;
+      }
+    }
+
     if (raw && !isPlatformLogo(raw)) {
       return raw.trim();
     }
@@ -493,22 +513,8 @@ Best regards,
       return studyLogo.trim();
     }
 
-    // 3. Fallback: Check if lead team uploaded company logo on any of the leads
-    const leads = Array.isArray(sample?.leads) ? sample.leads : [];
-    const leadWithLogo = leads.find((l) => {
-      const candidate = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
-      return candidate && !isPlatformLogo(candidate);
-    });
-    if (leadWithLogo) {
-      const cand = leadWithLogo.companyLogo || leadWithLogo.logo || leadWithLogo.company_logo || leadWithLogo.avatarUrl;
-      if (cand) return cand.trim();
-    }
-
-    // 4. Fallback: Official company website domain favicon if an actual website was specified
-    const explicitWebsite =
-      sample?.companyStudy?.website ||
-      leads.find((l) => l.companyLink || l.website)?.companyLink ||
-      leads.find((l) => l.website)?.website;
+    // 3. Fallback: Official company study website domain favicon
+    const explicitWebsite = sample?.companyStudy?.website || null;
 
     if (explicitWebsite && typeof explicitWebsite === 'string') {
       const cd = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
@@ -611,23 +617,14 @@ Best regards,
       }
     }
 
-    // 3. For the featured primary lead (#1), if its company is the main showcase company, it may fall back to the showcase logo
-    if (isFeatured && (lead.company === companyName || !lead.company)) {
-      return companyLogo || null;
-    }
-
-    // 4. Inferred company domain favicon fallback for this specific account
+    // 3. Inferred company domain favicon fallback for this specific lead's own account
     let candidateName = '';
     if (lead.company && lead.company.toLowerCase() !== companyName?.toLowerCase()) {
       candidateName = lead.company;
-    } else if (lead.targetCompany) {
+    } else if (lead.targetCompany && lead.targetCompany.toLowerCase() !== companyName?.toLowerCase()) {
       candidateName = lead.targetCompany;
-    } else if (lead.leadCompany) {
+    } else if (lead.leadCompany && lead.leadCompany.toLowerCase() !== companyName?.toLowerCase()) {
       candidateName = lead.leadCompany;
-    } else if (lead.company) {
-      candidateName = lead.company;
-    } else if (lead.name) {
-      candidateName = lead.name;
     }
 
     if (candidateName && typeof candidateName === 'string') {

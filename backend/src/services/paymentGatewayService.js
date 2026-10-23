@@ -1,15 +1,26 @@
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
 
-/**
- * Currency Conversion Helper
- * Default reference exchange rate USD to INR (configurable via USD_TO_INR_RATE env)
- */
-export const USD_TO_INR_RATE = Number(process.env.USD_TO_INR_RATE || 86.5);
+import {
+  getLiveUsdToInrRate,
+  getCurrentUsdToInrRate,
+  convertUsdToInr,
+  convertInrToUsd,
+  calculateGst,
+  calculateTicketPricing,
+} from './currencyService.js';
 
-export const convertUsdToInr = (usdAmount) => {
-  return Math.round(Number(usdAmount || 0) * USD_TO_INR_RATE);
+export {
+  getLiveUsdToInrRate,
+  getCurrentUsdToInrRate,
+  convertUsdToInr,
+  convertInrToUsd,
+  calculateGst,
+  calculateTicketPricing,
 };
+
+export const USD_TO_INR_RATE = getCurrentUsdToInrRate();
+
 
 // Check if credentials exist and are non-placeholder
 export const isRazorpayConfigured = () => {

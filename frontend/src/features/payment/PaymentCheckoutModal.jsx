@@ -72,7 +72,7 @@ export default function PaymentCheckoutModal({
                 label: 'PayPal (Global Credit Card & PayPal Balance)',
               },
             },
-            exchangeRate: { usdToInr: 86.5 },
+            exchangeRate: { usdToInr: 94.90, isLive: true, gstRatePercent: 18 },
           });
         }
       } finally {
@@ -89,8 +89,18 @@ export default function PaymentCheckoutModal({
   if (!isOpen || !ticket) return null;
 
   const ticketPriceUsd = Number(ticket.price || ticket.requirements?.totalPrice || 19);
-  const exchangeRate = config?.exchangeRate?.usdToInr || 86.5;
-  const ticketPriceInr = Math.max(100, Math.round(ticketPriceUsd * exchangeRate));
+  const exchangeRate = Number(config?.exchangeRate?.usdToInr || 94.90);
+  const isRateLive = Boolean(config?.exchangeRate?.isLive ?? true);
+  const gstRatePercent = Number(config?.exchangeRate?.gstRatePercent || 18);
+
+  // 1. Base INR before tax
+  const basePriceInr = Math.max(100, Math.round(ticketPriceUsd * exchangeRate));
+
+  // 2. 18% GST calculation for Indian transactions via Razorpay
+  const gstAmountInr = Math.round(basePriceInr * (gstRatePercent / 100));
+
+  // 3. Total amount payable through Razorpay
+  const totalRazorpayInr = basePriceInr + gstAmountInr;
 
   // Handle REAL Razorpay Checkout Modal
   const handleRazorpayPayment = async () => {
@@ -103,7 +113,8 @@ export default function PaymentCheckoutModal({
         ticketId: ticket.id || ticket.ticketId,
         gateway: 'RAZORPAY',
         price: ticketPriceUsd,
-        amountInr: ticketPriceInr,
+        priceUsd: ticketPriceUsd,
+        amountInr: totalRazorpayInr,
         allowRepay: true,
       });
 
@@ -119,14 +130,14 @@ export default function PaymentCheckoutModal({
       }
 
       const effectiveKey = config?.gateways?.razorpay?.keyId || orderRes.order?.keyId || 'rzp_live_SxtZmpzZxUlYV0';
-      const effectiveAmount = orderRes.order?.amount || (ticketPriceInr * 100);
+      const effectiveAmount = orderRes.order?.amount || (totalRazorpayInr * 100);
 
       const options = {
         key: effectiveKey,
         amount: effectiveAmount,
         currency: orderRes.order?.currency || 'INR',
         name: 'DiziGini',
-        description: `Payment for ${ticket.ticketId || 'Sprint'}: ${ticket.title || 'Sprint Service'}`,
+        description: `Payment for ${ticket.ticketId || 'Sprint'}: ${ticket.title || 'Sprint Service'} (Incl. 18% GST)`,
         image: window.location.origin + '/logo-icon.svg',
         order_id: orderRes.order?.id,
         handler: async (response) => {
@@ -145,8 +156,11 @@ export default function PaymentCheckoutModal({
               setPaymentSuccessData({
                 gateway: 'Razorpay',
                 method: 'Razorpay Live (Card / UPI / NetBanking)',
-                amount: `₹${ticketPriceInr.toLocaleString()} INR`,
+                amount: `₹${totalRazorpayInr.toLocaleString()} INR`,
+                baseAmountInr: `₹${basePriceInr.toLocaleString()} INR`,
+                gstAmountInr: `₹${gstAmountInr.toLocaleString()} INR (18% GST)`,
                 amountUsd: `$${ticketPriceUsd}.00 USD`,
+                exchangeRate: exchangeRate,
                 invoiceNumber: verifyRes.payment?.invoiceNumber || `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
                 transactionId: response.razorpay_payment_id,
                 isSimulated: false,
@@ -472,6 +486,24 @@ export default function PaymentCheckoutModal({
                   <span style={{ color: '#6B7280' }}>Gateway & Channel:</span>
                   <span style={{ fontWeight: 700, color: '#111827' }}>{paymentSuccessData.gateway} ({paymentSuccessData.method})</span>
                 </div>
+                {paymentSuccessData.baseAmountInr && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.875rem' }}>
+                    <span style={{ color: '#6B7280' }}>Sprint Base Price:</span>
+                    <span style={{ color: '#111827', fontWeight: 600 }}>{paymentSuccessData.baseAmountInr} ({paymentSuccessData.amountUsd})</span>
+                  </div>
+                )}
+                {paymentSuccessData.gstAmountInr && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.875rem' }}>
+                    <span style={{ color: '#6B7280' }}>Goods & Services Tax (GST 18%):</span>
+                    <span style={{ color: '#B45309', fontWeight: 700 }}>+{paymentSuccessData.gstAmountInr}</span>
+                  </div>
+                )}
+                {paymentSuccessData.exchangeRate && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.82rem' }}>
+                    <span style={{ color: '#6B7280' }}>Forex Conversion Rate:</span>
+                    <span style={{ color: '#4B5563' }}>1 USD = ₹{Number(paymentSuccessData.exchangeRate).toFixed(2)} INR</span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid #E5E7EB', fontSize: '1rem', fontWeight: 800 }}>
                   <span style={{ color: '#111827' }}>Total Paid:</span>
                   <span style={{ color: '#059669' }}>{paymentSuccessData.amount}</span>
@@ -528,47 +560,94 @@ export default function PaymentCheckoutModal({
                   borderRadius: '16px',
                   padding: '1.25rem 1.5rem',
                   marginBottom: '1.25rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '12px',
                 }}
               >
-                <div>
-                  <span style={{ fontSize: '0.72rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
-                    Price Summary
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
-                    <span style={{ fontSize: '2rem', fontWeight: 900, color: '#3B2874', fontFamily: 'monospace' }}>
-                      ₹{ticketPriceInr.toLocaleString()}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '10px' }}>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                      {selectedGateway === 'RAZORPAY' ? 'Total Payable with 18% GST (INR)' : 'Total Payable (USD)'}
                     </span>
-                    <span style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 600 }}>INR</span>
-                    <span style={{ color: '#9CA3AF' }}>•</span>
-                    <span style={{ fontSize: '1.15rem', fontWeight: 700, color: '#4B5563', fontFamily: 'monospace' }}>
-                      ${ticketPriceUsd}.00
-                    </span>
-                    <span style={{ fontSize: '0.8rem', color: '#6B7280', fontWeight: 500 }}>USD</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
+                      {selectedGateway === 'RAZORPAY' ? (
+                        <>
+                          <span style={{ fontSize: '2rem', fontWeight: 900, color: '#3B2874', fontFamily: 'monospace' }}>
+                            ₹{totalRazorpayInr.toLocaleString()}
+                          </span>
+                          <span style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 600 }}>INR</span>
+                          <span style={{ color: '#9CA3AF' }}>•</span>
+                          <span style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 500 }}>
+                            Base ${ticketPriceUsd}.00 USD + 18% GST
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span style={{ fontSize: '2rem', fontWeight: 900, color: '#0070BA', fontFamily: 'monospace' }}>
+                            ${ticketPriceUsd}.00
+                          </span>
+                          <span style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 600 }}>USD</span>
+                          <span style={{ color: '#9CA3AF' }}>•</span>
+                          <span style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 500 }}>
+                            Global International Checkout
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                    <div
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #DDD4FA',
+                        borderRadius: '10px',
+                        padding: '6px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '0.75rem',
+                        color: '#059669',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <ShieldCheck size={14} />
+                      <span>256-Bit SSL Encrypted</span>
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#6B7280', fontWeight: 600 }}>
+                      Live Daily Rate: 1 USD = ₹{exchangeRate.toFixed(2)} INR
+                    </div>
                   </div>
                 </div>
 
-                <div
-                  style={{
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #DDD4FA',
-                    borderRadius: '10px',
-                    padding: '6px 12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.75rem',
-                    color: '#059669',
-                    fontWeight: 700,
-                  }}
-                >
-                  <ShieldCheck size={14} />
-                  <span>256-Bit SSL Encrypted</span>
-                </div>
+                {/* Detailed Tax Breakdown Card for Razorpay */}
+                {selectedGateway === 'RAZORPAY' && (
+                  <div
+                    style={{
+                      borderTop: '1px solid #E9D5FF',
+                      paddingTop: '10px',
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                      gap: '8px',
+                      fontSize: '0.78rem',
+                    }}
+                  >
+                    <div style={{ background: '#FFFFFF', padding: '6px 10px', borderRadius: '8px', border: '1px solid #E9D5FF' }}>
+                      <span style={{ color: '#6B7280', display: 'block', fontSize: '0.7rem' }}>Sprint Base:</span>
+                      <strong style={{ color: '#111827' }}>₹{basePriceInr.toLocaleString()}</strong> (${ticketPriceUsd} USD)
+                    </div>
+                    <div style={{ background: '#FFFFFF', padding: '6px 10px', borderRadius: '8px', border: '1px solid #E9D5FF' }}>
+                      <span style={{ color: '#6B7280', display: 'block', fontSize: '0.7rem' }}>Forex Rate:</span>
+                      <strong style={{ color: '#111827' }}>₹{exchangeRate.toFixed(2)} / USD</strong>
+                    </div>
+                    <div style={{ background: '#FFFBEB', padding: '6px 10px', borderRadius: '8px', border: '1px solid #FDE68A' }}>
+                      <span style={{ color: '#B45309', display: 'block', fontSize: '0.7rem' }}>GST (18%):</span>
+                      <strong style={{ color: '#B45309' }}>+₹{gstAmountInr.toLocaleString()}</strong>
+                    </div>
+                    <div style={{ background: '#EDE9FE', padding: '6px 10px', borderRadius: '8px', border: '1px solid #DDD4FA' }}>
+                      <span style={{ color: '#3B2874', display: 'block', fontSize: '0.7rem' }}>Total Payable:</span>
+                      <strong style={{ color: '#3B2874' }}>₹{totalRazorpayInr.toLocaleString()} INR</strong>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Status or Error Banner */}
@@ -835,7 +914,7 @@ export default function PaymentCheckoutModal({
                 <span>
                   {isProcessing
                     ? 'Launching Razorpay...'
-                    : `Pay ₹${ticketPriceInr.toLocaleString()} with Razorpay (Cards, UPI, NetBanking)`}
+                    : `Pay ₹${totalRazorpayInr.toLocaleString()} with Razorpay (Cards, UPI, NetBanking · Incl. 18% GST)`}
                 </span>
                 <ArrowRight size={16} />
               </button>

@@ -47,7 +47,21 @@ export const resolveShowcaseLogo = (showcase) => {
 
   // 1. Explicit showcase logo if valid and not platform default
   if (showcase.logoUrl && !isPlatformLogo(showcase.logoUrl)) {
-    return showcase.logoUrl.trim();
+    const isLeadContaminated = Array.isArray(showcase.leads) && showcase.leads.some((l) => {
+      const cand = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
+      if (cand && typeof cand === 'string' && cand === showcase.logoUrl) return true;
+      if (l.companyLink && typeof l.companyLink === 'string') {
+        const lDomain = l.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim().toLowerCase();
+        if (lDomain && lDomain.length >= 4 && showcase.logoUrl.toLowerCase().includes(lDomain)) {
+          const compWebsite = (showcase.companyStudy?.website || '').toLowerCase();
+          if (!compWebsite.includes(lDomain)) return true;
+        }
+      }
+      return false;
+    });
+    if (!isLeadContaminated) {
+      return showcase.logoUrl.trim();
+    }
   }
 
   // 2. Company study logo
@@ -56,22 +70,8 @@ export const resolveShowcaseLogo = (showcase) => {
     return studyLogo.trim();
   }
 
-  // 3. Any lead's company logo
-  const leads = Array.isArray(showcase.leads) ? showcase.leads : [];
-  const leadWithLogo = leads.find((l) => {
-    const candidate = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
-    return candidate && !isPlatformLogo(candidate);
-  });
-  if (leadWithLogo) {
-    const cand = leadWithLogo.companyLogo || leadWithLogo.logo || leadWithLogo.company_logo || leadWithLogo.avatarUrl;
-    if (cand) return cand.trim();
-  }
-
-  // 4. Derive from explicit company website only if a valid domain with a dot exists
-  const explicitWebsite =
-    showcase.companyStudy?.website ||
-    leads.find((l) => l.companyLink || l.website)?.companyLink ||
-    leads.find((l) => l.website)?.website;
+  // 3. Derive from explicit company study website only if a valid domain with a dot exists
+  const explicitWebsite = showcase.companyStudy?.website || null;
 
   if (explicitWebsite && typeof explicitWebsite === 'string') {
     const cd = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();

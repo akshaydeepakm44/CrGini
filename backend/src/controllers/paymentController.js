@@ -17,13 +17,20 @@ import { sendTicketAssignedEmail } from '../services/emailService.js';
 import {
   isRazorpayConfigured,
   isPayPalConfigured,
-  USD_TO_INR_RATE,
-  convertUsdToInr,
   createRazorpayOrder,
   verifyRazorpaySignature,
   createPayPalOrder,
   capturePayPalOrder,
 } from '../services/paymentGatewayService.js';
+
+import {
+  getLiveUsdToInrRate,
+  calculateTicketPricing,
+  calculateGst,
+  convertUsdToInr,
+  convertInrToUsd,
+} from '../services/currencyService.js';
+
 
 /**
  * Check if the authenticated user has permission to pay for this ticket
@@ -165,6 +172,7 @@ export const getGatewayConfig = async (req, res) => {
   try {
     const razorpayAvailable = isRazorpayConfigured();
     const paypalAvailable = isPayPalConfigured();
+    const rateInfo = await getLiveUsdToInrRate();
 
     res.json({
       success: true,
@@ -185,7 +193,11 @@ export const getGatewayConfig = async (req, res) => {
       },
       isSandbox: !razorpayAvailable || !paypalAvailable,
       exchangeRate: {
-        usdToInr: USD_TO_INR_RATE,
+        usdToInr: rateInfo.rate,
+        lastUpdated: rateInfo.lastFetchedAt,
+        isLive: rateInfo.isLive,
+        source: rateInfo.source,
+        gstRatePercent: rateInfo.gstRatePercent,
       },
     });
   } catch (error) {
@@ -243,18 +255,22 @@ export const createOrder = async (req, res) => {
     const effectiveRequestId = request?.id || ticketId;
 
     if (gateway.toUpperCase() === 'RAZORPAY') {
-      let priceInr = reqAmountInr ? Number(reqAmountInr) : convertUsdToInr(priceUsd);
-      if (!priceInr || isNaN(priceInr) || priceInr < 1) {
-        priceInr = Math.max(100, Math.round(priceUsd * USD_TO_INR_RATE));
-      }
+      const pricing = await calculateTicketPricing(priceUsd);
 
       const order = await createRazorpayOrder({
-        amountInr: priceInr,
+        amountInr: pricing.totalAmountInr,
         receipt: effectiveTicketCode.substring(0, 40),
         notes: {
           ticketId: String(effectiveRequestId),
           ticketCode: String(effectiveTicketCode),
           serviceType: String(request?.serviceType || 'Sprint'),
+          priceUsd: String(pricing.priceUsd),
+          baseAmountInr: String(pricing.baseAmountInr),
+          gstRate: `${pricing.gstRate}%`,
+          gstAmountInr: String(pricing.gstAmountInr),
+          totalAmountInr: String(pricing.totalAmountInr),
+          exchangeRate: String(pricing.exchangeRate),
+          rateSource: String(pricing.rateSource),
         },
       });
 
@@ -263,14 +279,22 @@ export const createOrder = async (req, res) => {
         gateway: 'RAZORPAY',
         order,
         pricing: {
-          usd: priceUsd,
-          inr: priceInr,
-          rate: USD_TO_INR_RATE,
+          usd: pricing.priceUsd,
+          baseInr: pricing.baseAmountInr,
+          gstRate: pricing.gstRate,
+          gstAmountInr: pricing.gstAmountInr,
+          totalInr: pricing.totalAmountInr,
+          inr: pricing.totalAmountInr, // backward compatibility
+          rate: pricing.exchangeRate,
+          rateSource: pricing.rateSource,
+          rateTimestamp: pricing.rateLastUpdated,
+          isLiveRate: pricing.isLiveRate,
         },
       });
     }
 
     if (gateway.toUpperCase() === 'PAYPAL') {
+      const rateInfo = await getLiveUsdToInrRate();
       const order = await createPayPalOrder({
         amountUsd: priceUsd,
         ticketCode: effectiveTicketCode.substring(0, 40),
@@ -283,6 +307,7 @@ export const createOrder = async (req, res) => {
         order,
         pricing: {
           usd: priceUsd,
+          rate: rateInfo.rate,
         },
       });
     }
@@ -352,7 +377,7 @@ export const verifyRazorpay = async (req, res) => {
     }
 
     const priceUsd = Number(request.price || 0);
-    const priceInr = convertUsdToInr(priceUsd);
+    const pricing = await calculateTicketPricing(priceUsd);
 
     const { updatedRequest, paymentRecord } = await finalizeTicketPayment({
       request,
@@ -361,15 +386,22 @@ export const verifyRazorpay = async (req, res) => {
       gatewayOrderId: razorpay_order_id,
       gatewayPaymentId: razorpay_payment_id,
       gatewaySignature: razorpay_signature,
-      amount: priceInr,
+      amount: pricing.totalAmountInr,
       currency: 'INR',
       paymentMethod,
       metadata: {
         isSimulated: verification.isSimulated,
-        amountUsd: priceUsd,
-        amountInr: priceInr,
+        priceUsd: pricing.priceUsd,
+        baseAmountInr: pricing.baseAmountInr,
+        gstRate: pricing.gstRate,
+        gstAmountInr: pricing.gstAmountInr,
+        totalAmountInr: pricing.totalAmountInr,
+        exchangeRate: pricing.exchangeRate,
+        rateSource: pricing.rateSource,
+        taxType: `GST (${pricing.gstRate}%)`,
       },
     });
+
 
     res.json({
       success: true,
