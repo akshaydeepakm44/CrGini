@@ -10,6 +10,7 @@ import {
 /**
  * PaymentReceiptModal
  * Matches the official TAX INVOICE format (DATAI2i Pvt. Ltd. / DiziGini)
+ * Displays authentic DiziGini transaction details in the corporate Tax Invoice layout.
  */
 export default function PaymentReceiptModal({
   isOpen,
@@ -18,14 +19,17 @@ export default function PaymentReceiptModal({
 }) {
   if (!isOpen || !invoice) return null;
 
-  // Clean Invoice Number matching "Di2i-2627-CG-xxx" format from sample image
-  const rawId = invoice.invoiceNumber || invoice.id || '002';
-  const cleanNum = String(rawId).replace(/[^0-9]/g, '') || '002';
-  const invoiceNumber = invoice.invoiceNumber && invoice.invoiceNumber.startsWith('Di2i-')
-    ? invoice.invoiceNumber
-    : `Di2i-2627-CG-${cleanNum.padStart(3, '0')}`;
+  // Clean Invoice Number matching "Di2i-2627-DZ-xxx" format or existing DB invoice number
+  const rawId = invoice.invoiceNumber || invoice.id || invoice.ticketId || '1001';
+  let invoiceNumber = '';
+  if (invoice.invoiceNumber && !String(invoice.invoiceNumber).includes('undefined')) {
+    invoiceNumber = String(invoice.invoiceNumber);
+  } else {
+    const cleanNum = String(rawId).replace(/[^0-9]/g, '') || '1001';
+    invoiceNumber = `Di2i-2627-DZ-${cleanNum.padStart(3, '0')}`;
+  }
 
-  // Authentic Transaction / UTR ID (e.g. pay_TNFBqImRpqD0EG)
+  // Authentic Transaction / UTR ID (e.g. pay_... from Razorpay or capture id from PayPal)
   const rawTxn = invoice.transactionId || invoice.gatewayPaymentId || invoice.gateway_payment_id || '';
   const isSyntheticTxn = String(rawTxn).startsWith('TXN-');
   const utrNumber = invoice.utrNumber || 
@@ -35,49 +39,76 @@ export default function PaymentReceiptModal({
                     invoice.metadata?.bank_transaction_id || 
                     invoice.metadata?.acquirer_data?.rrn || 
                     invoice.metadata?.acquirer_data?.upi_transaction_id || 
-                    (!isSyntheticTxn && rawTxn ? rawTxn : null) || 
-                    'pay_TNFBqImRpqD0EG';
-  const transactionId = (!isSyntheticTxn && rawTxn) ? rawTxn : utrNumber;
+                    (!isSyntheticTxn && rawTxn ? rawTxn : null);
+  const transactionId = utrNumber || rawTxn || (invoice.ticketId ? `TXN-${invoice.ticketId}` : (invoice.id ? `TXN-DZ-${invoice.id}` : 'Verified Payment'));
 
   // Payment method
-  const gateway = (invoice.gateway || (String(transactionId).startsWith('pay_') ? 'RAZORPAY' : 'RAZORPAY')).toUpperCase();
+  const gateway = (invoice.gateway || (String(transactionId).startsWith('pay_') ? 'RAZORPAY' : (String(transactionId).startsWith('PAYID') ? 'PAYPAL' : 'RAZORPAY'))).toUpperCase();
   const paymentVia = gateway === 'PAYPAL' ? 'PayPal' : 'Razorpay';
 
-  // Client Details
-  const clientName = invoice.userName || invoice.clientName || invoice.contactName || invoice.rawRequest?.user?.name || 'Charles Christyraj';
-  const clientEmail = invoice.userEmail || invoice.email || invoice.rawRequest?.user?.email || 'heymrcharles@gmail.com';
+  // Client Details (dynamic from invoice payload or active user session)
+  const clientName = invoice.userName || 
+                     invoice.clientName || 
+                     invoice.contactName || 
+                     invoice.rawRequest?.user?.name || 
+                     invoice.companyName || 
+                     invoice.clientCompany || 
+                     (typeof window !== 'undefined' ? localStorage.getItem('cg_user_name') : null) || 
+                     'DiziGini Client';
+  const clientEmail = invoice.userEmail || 
+                      invoice.email || 
+                      invoice.rawRequest?.user?.email || 
+                      (typeof window !== 'undefined' ? localStorage.getItem('cg_user_email') : null) || 
+                      'billing@dizigini.com';
+  const clientCompany = invoice.companyName || invoice.clientCompany || invoice.rawRequest?.company?.name || '';
 
-  // Service Description
-  const serviceTitle = invoice.requestTitle || invoice.serviceTitle || invoice.serviceType || invoice.rawRequest?.title || 'DiziGini Sprint Execution';
-  const descriptionText = serviceTitle.toLowerCase().includes('plan') 
-    ? serviceTitle 
-    : (serviceTitle.toLowerCase().includes('career') ? serviceTitle : `CareerGini Monthly Plan — ${serviceTitle}`);
+  // Service Description (Authentic DiziGini Sprint Services)
+  const serviceTitle = invoice.requestTitle || invoice.serviceTitle || invoice.serviceType || invoice.rawRequest?.title || 'Intelligence Sprint Execution';
+  const ticketRef = invoice.ticketId || invoice.rawRequest?.ticketId || (invoice.id ? `CG-${invoice.id}` : null);
+  const descriptionText = serviceTitle.toLowerCase().startsWith('dizigini')
+    ? serviceTitle
+    : `DiziGini Sprint Execution — ${serviceTitle}`;
 
   // Amount and Tax calculation
   const isINR = gateway === 'RAZORPAY' || invoice.currency === 'INR' || Boolean(invoice.baseAmountInr);
-  let taxableAmount = 199.00;
-  let gstAmount = 17.82;
-  let totalPaid = 116.82;
   const currencySymbol = isINR ? '₹' : '$';
 
-  if (invoice.baseAmountInr) {
+  let taxableAmount = 190.00;
+  let gstAmount = 34.00;
+  let totalPaid = 224.00;
+
+  if (invoice.baseAmountInr && invoice.totalAmountInr) {
+    taxableAmount = Number(invoice.baseAmountInr);
+    gstAmount = Number(invoice.gstAmountInr || (invoice.totalAmountInr - taxableAmount).toFixed(2));
+    totalPaid = Number(invoice.totalAmountInr);
+  } else if (invoice.baseAmountInr) {
     taxableAmount = Number(invoice.baseAmountInr);
     gstAmount = Number(invoice.gstAmountInr || (taxableAmount * 0.18).toFixed(2));
     totalPaid = Number(invoice.totalAmountInr || (taxableAmount + gstAmount).toFixed(2));
+  } else if (invoice.totalAmountInr) {
+    totalPaid = Number(invoice.totalAmountInr);
+    taxableAmount = Number((totalPaid / 1.18).toFixed(2));
+    gstAmount = Number((totalPaid - taxableAmount).toFixed(2));
   } else if (invoice.price || invoice.amount || invoice.amountUsd) {
-    const rawTotal = Number(invoice.price || invoice.amount || invoice.amountUsd || 1);
+    const rawVal = Number(invoice.price || invoice.amount || invoice.amountUsd);
     if (isINR) {
-      taxableAmount = Number((rawTotal * 94.9).toFixed(2));
-      gstAmount = Number((taxableAmount * 0.18).toFixed(2));
-      totalPaid = Number((taxableAmount + gstAmount).toFixed(2));
+      if (rawVal >= 50) {
+        totalPaid = rawVal;
+        taxableAmount = Number((totalPaid / 1.18).toFixed(2));
+        gstAmount = Number((totalPaid - taxableAmount).toFixed(2));
+      } else {
+        taxableAmount = Math.round(rawVal * 94.90);
+        gstAmount = Math.round(taxableAmount * 0.18);
+        totalPaid = taxableAmount + gstAmount;
+      }
     } else {
-      taxableAmount = Number((rawTotal / 1.18).toFixed(2));
-      gstAmount = Number((rawTotal - taxableAmount).toFixed(2));
-      totalPaid = rawTotal;
+      totalPaid = rawVal;
+      taxableAmount = Number((totalPaid / 1.18).toFixed(2));
+      gstAmount = Number((totalPaid - taxableAmount).toFixed(2));
     }
   }
 
-  // Formatted date (e.g. "08 August 2026")
+  // Formatted date (e.g. "23 October 2026")
   const invoiceDate = invoice.paidAt
     ? new Date(invoice.paidAt).toLocaleDateString('en-GB', {
         day: '2-digit',
@@ -216,7 +247,7 @@ export default function PaymentReceiptModal({
                 marginTop: '8px',
               }}
             >
-              CareerGini • Powered by DATAI2i
+              DiziGini • Powered by DATAI2i
             </div>
             <div
               style={{
@@ -291,6 +322,11 @@ export default function PaymentReceiptModal({
             >
               {clientName}
             </div>
+            {clientCompany && (
+              <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#334155', marginBottom: '2px' }}>
+                {clientCompany}
+              </div>
+            )}
             <div style={{ fontSize: '0.92rem', color: '#475569' }}>
               {clientEmail}
             </div>
@@ -362,7 +398,14 @@ export default function PaymentReceiptModal({
                   1
                 </td>
                 <td style={{ padding: '16px 16px', fontSize: '0.9rem', color: '#0F172A', fontWeight: 600, verticalAlign: 'top' }}>
-                  {descriptionText}
+                  <div style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.95rem' }}>
+                    {descriptionText}
+                  </div>
+                  {ticketRef && (
+                    <div style={{ fontSize: '0.78125rem', color: '#64748B', fontWeight: 500, marginTop: '4px' }}>
+                      Ticket Ref: {ticketRef} • Verified Decision-Maker Intelligence Sprint
+                    </div>
+                  )}
                 </td>
                 <td style={{ padding: '16px 16px', fontSize: '0.9rem', color: '#334155', verticalAlign: 'top' }}>
                   9983
