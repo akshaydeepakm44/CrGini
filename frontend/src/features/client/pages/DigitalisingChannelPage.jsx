@@ -21,12 +21,14 @@ import {
   ExternalLink,
   ChevronRight,
   Plus,
-  CreditCard
+  CreditCard,
+  Receipt
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import StatusBadge from '../../../components/tickets/StatusBadge';
 import Button from '../../../components/common/Button';
 import PaymentCheckoutModal from '../../payment/PaymentCheckoutModal';
+import PaymentReceiptModal from '../../payment/PaymentReceiptModal';
 
 // Digitalising Service Catalog Definitions
 const DIGITALISING_SERVICES = {
@@ -136,14 +138,30 @@ export default function DigitalisingChannelPage({
   const validInitial = DIGITALISING_SERVICES[initialServiceFromUrl] ? initialServiceFromUrl : 'lead-research';
   const [activeServiceId, setActiveServiceId] = useState(validInitial);
 
-  // Synchronize when query param or route slug changes
+  // Synchronize cleanly when query param or route slug changes
   useEffect(() => {
-    const q = serviceSlug || searchParams.get('service') || searchParams.get('slug');
-    if (q && DIGITALISING_SERVICES[q]) {
-      setActiveServiceId(q);
+    if (serviceSlug && DIGITALISING_SERVICES[serviceSlug]) {
+      setActiveServiceId(serviceSlug);
       setViewMode('form');
+    } else {
+      const q = searchParams.get('service') || searchParams.get('slug');
+      if (q && DIGITALISING_SERVICES[q]) {
+        setActiveServiceId(q);
+        setViewMode('form');
+      }
     }
   }, [serviceSlug, searchParams]);
+
+  const handleSelectService = (slug) => {
+    if (!DIGITALISING_SERVICES[slug]) return;
+    setActiveServiceId(slug);
+    setErrors({});
+    if (onSelectService) {
+      onSelectService(slug);
+    } else {
+      navigate(`/portal/digitalising/${slug}`);
+    }
+  };
 
   // Lead Research Form State
   const [leadForm, setLeadForm] = useState({
@@ -197,6 +215,9 @@ export default function DigitalisingChannelPage({
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccessTicket, setSubmitSuccessTicket] = useState(null);
+  const [draftTicketForPayment, setDraftTicketForPayment] = useState(null);
+  const [paidInvoiceData, setPaidInvoiceData] = useState(null);
+  const [showFormalReceipt, setShowFormalReceipt] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
 
@@ -302,8 +323,9 @@ export default function DigitalisingChannelPage({
     return Object.keys(errs).length === 0;
   };
 
-  // Submit Handler
-  const handleSubmitRequest = async (e) => {
+  // Submit Handler - Prepares Draft Ticket and Opens Payment Checkout Modal
+  // Real ticket is created ONLY after successful payment confirmation!
+  const handleSubmitRequest = (e) => {
     e.preventDefault();
     setSubmitError('');
 
@@ -311,8 +333,6 @@ export default function DigitalisingChannelPage({
       window.scrollTo({ top: 120, behavior: 'smooth' });
       return;
     }
-
-    setIsSubmitting(true);
 
     try {
       let title = '';
@@ -373,19 +393,36 @@ export default function DigitalisingChannelPage({
         selectedServices: [subService]
       };
 
-      const newTicket = await api.createRequest(payload);
-      setSubmitSuccessTicket(newTicket);
-      if (onReload) onReload();
+      // Construct Draft Ticket for Checkout (Zero DB tickets created until payment settles!)
+      const draftTicket = {
+        id: `DRAFT-${Date.now()}`,
+        ticketId: 'PENDING-PAYMENT',
+        title,
+        description,
+        serviceType: 'COMPANY_LEAD',
+        subService,
+        channel: 'digitalising',
+        priority: 'MEDIUM',
+        price: estimatedPrice,
+        isDraft: true,
+        serviceLabel: currentService.title,
+        requirements,
+        payload,
+      };
+
+      setDraftTicketForPayment(draftTicket);
+      setIsPayModalOpen(true);
     } catch (err) {
-      console.error('Failed to submit digitalising request:', err);
-      setSubmitError(err.message || 'Failed to submit digitalising request. Please verify fields and try again.');
-    } finally {
-      setIsSubmitting(false);
+      console.error('Failed to prepare digitalising checkout:', err);
+      setSubmitError(err.message || 'Failed to prepare digitalising checkout. Please verify fields and try again.');
     }
   };
 
   const handleResetForm = () => {
     setSubmitSuccessTicket(null);
+    setDraftTicketForPayment(null);
+    setPaidInvoiceData(null);
+    setShowFormalReceipt(false);
     setErrors({});
     setSubmitError('');
   };
@@ -546,11 +583,11 @@ export default function DigitalisingChannelPage({
                 margin: '0 0 10px 0',
               }}
             >
-              Digitalising Request Submitted!
+              Digitalising Request Activated &amp; Confirmed!
             </h2>
 
             <p style={{ color: '#4B5563', fontSize: '0.9375rem', lineHeight: 1.6, margin: '0 0 24px 0' }}>
-              Your intelligence ticket has been assigned to the DiziGini specialist queue. Our team is already verifying the scope and data points.
+              Your intelligence sprint has been secured and paid in full. Our specialist pod has been assigned to verify and deliver your verified telemetry.
             </p>
 
             <div
@@ -567,11 +604,16 @@ export default function DigitalisingChannelPage({
                 minWidth: '280px',
               }}
             >
-              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', fontWeight: 700 }}>
-                Ticket ID Reference
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', fontWeight: 700 }}>
+                  Ticket ID Reference
+                </span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#059669', backgroundColor: '#ECFDF5', padding: '2px 8px', borderRadius: '4px' }}>
+                  PAID IN FULL
+                </span>
               </div>
               <div style={{ fontSize: '1.125rem', fontWeight: 800, color: '#0284C7' }}>
-                {submitSuccessTicket.ticketId || `REQ-${submitSuccessTicket.id}`}
+                {submitSuccessTicket.ticketId || `CG-${submitSuccessTicket.id}`}
               </div>
               <div style={{ fontSize: '0.8125rem', color: '#374151', fontWeight: 600 }}>
                 {submitSuccessTicket.title}
@@ -579,27 +621,29 @@ export default function DigitalisingChannelPage({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={() => setIsPayModalOpen(true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '10px 22px',
-                  fontSize: '0.875rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(124, 58, 237, 0.25)',
-                }}
-              >
-                <CreditCard size={16} />
-                <span>Settle Payment (${submitSuccessTicket.price || estimatedPrice}.00)</span>
-              </button>
+              {paidInvoiceData && (
+                <button
+                  type="button"
+                  onClick={() => setShowFormalReceipt(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    backgroundColor: '#65A30D',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px 22px',
+                    fontSize: '0.875rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(101, 163, 13, 0.3)',
+                  }}
+                >
+                  <Receipt size={16} />
+                  <span>View Official Payment Receipt</span>
+                </button>
+              )}
 
               <Button
                 variant="outline"
@@ -651,10 +695,14 @@ export default function DigitalisingChannelPage({
                   return (
                     <div
                       key={svc.id}
-                      onClick={() => {
-                        setActiveServiceId(svc.id);
-                        setSearchParams({ service: svc.id });
-                        setErrors({});
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleSelectService(svc.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSelectService(svc.id);
+                        }
                       }}
                       style={{
                         backgroundColor: '#FFFFFF',
@@ -1310,7 +1358,8 @@ export default function DigitalisingChannelPage({
                       transition: 'all 0.15s ease',
                     }}
                   >
-                    <span>{isSubmitting ? 'Submitting Request...' : `Submit Request ($${estimatedPrice})`}</span>
+                    <CreditCard size={18} />
+                    <span>{isSubmitting ? 'Opening Secure Checkout...' : `Proceed to Secure Payment ($${estimatedPrice}.00 USD)`}</span>
                     <ArrowRight size={16} />
                   </button>
                 </div>
@@ -1568,16 +1617,27 @@ export default function DigitalisingChannelPage({
           )}
         </div>
       )}
-      {/* Settle Payment Modal */}
-      {isPayModalOpen && submitSuccessTicket && (
+      {/* Secure Payment Modal */}
+      {isPayModalOpen && (draftTicketForPayment || submitSuccessTicket) && (
         <PaymentCheckoutModal
           isOpen={isPayModalOpen}
-          ticket={submitSuccessTicket}
+          ticket={draftTicketForPayment || submitSuccessTicket}
           onClose={() => setIsPayModalOpen(false)}
-          onPaymentSuccess={(payRes) => {
+          onPaymentSuccess={(payRes, finalTicket, invoiceData) => {
+            setSubmitSuccessTicket(finalTicket || draftTicketForPayment);
+            setPaidInvoiceData(invoiceData);
             setIsPayModalOpen(false);
             if (onReload) onReload();
           }}
+        />
+      )}
+
+      {/* Formal Jobber-Style Payment Receipt Modal */}
+      {showFormalReceipt && paidInvoiceData && (
+        <PaymentReceiptModal
+          isOpen={showFormalReceipt}
+          onClose={() => setShowFormalReceipt(false)}
+          invoice={paidInvoiceData}
         />
       )}
     </div>

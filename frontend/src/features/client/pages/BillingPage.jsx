@@ -16,6 +16,7 @@ import MetricCard from '../../../components/cards/MetricCard';
 import StatusBadge from '../../../components/tickets/StatusBadge';
 import { api } from '../../../services/api';
 import PaymentCheckoutModal from '../../payment/PaymentCheckoutModal';
+import PaymentReceiptModal from '../../payment/PaymentReceiptModal';
 
 export default function BillingPage({
   requests = [],
@@ -384,143 +385,12 @@ export default function BillingPage({
         </div>
       </div>
 
-      {/* Invoice Receipt Modal */}
-      {selectedInvoice && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(17, 24, 39, 0.45)',
-            backdropFilter: 'blur(4px)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-          }}
-          onClick={() => setSelectedInvoice(null)}
-        >
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '24px',
-              width: '100%',
-              maxWidth: '520px',
-              padding: '32px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              border: '1px solid #E5E7EB',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#7C3AED', backgroundColor: '#EDE9FE', padding: '2px 8px', borderRadius: '6px' }}>
-                    {selectedInvoice.invoiceNumber || 'INV-OFFICIAL'}
-                  </span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#047857', backgroundColor: '#ECFDF5', padding: '2px 8px', borderRadius: '9999px' }}>
-                    SETTLED
-                  </span>
-                </div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#111827', margin: 0 }}>
-                  Sprint Invoice Receipt
-                </h3>
-                <p style={{ fontSize: '0.8125rem', color: '#6B7280', margin: '4px 0 0' }}>
-                  DiziGini Technologies Inc.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedInvoice(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#9CA3AF',
-                  cursor: 'pointer',
-                  padding: '4px',
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Line items */}
-            <div style={{ borderTop: '1px solid #F3F4F6', borderBottom: '1px solid #F3F4F6', padding: '16px 0', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.84375rem' }}>
-                <span style={{ color: '#6B7280' }}>Ticket Reference:</span>
-                <span style={{ fontWeight: 700, color: '#0284C7' }}>{selectedInvoice.ticketId}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.84375rem' }}>
-                <span style={{ color: '#6B7280' }}>Service Sprint:</span>
-                <span style={{ fontWeight: 600, color: '#111827' }}>{selectedInvoice.requestTitle || selectedInvoice.serviceType}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.84375rem' }}>
-                <span style={{ color: '#6B7280' }}>Payment Gateway:</span>
-                <span style={{ color: '#111827', fontWeight: 600 }}>{selectedInvoice.gateway || 'Razorpay Live'}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.84375rem' }}>
-                <span style={{ color: '#6B7280' }}>Transaction ID:</span>
-                <span style={{ color: '#4B5563', fontFamily: 'monospace', fontSize: '0.78125rem' }}>{selectedInvoice.transactionId || 'pay_verified'}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.84375rem' }}>
-                <span style={{ color: '#6B7280' }}>Date Paid:</span>
-                <span style={{ color: '#111827' }}>
-                  {selectedInvoice.paidAt ? new Date(selectedInvoice.paidAt).toLocaleString() : 'Recent'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 800, marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed #E5E7EB' }}>
-                <span>Total Settled:</span>
-                <span style={{ color: '#7C3AED' }}>${selectedInvoice.amount || 1}.00 USD</span>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={handlePrintReceipt}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '9px 18px',
-                  borderRadius: '10px',
-                  border: '1px solid #D1D5DB',
-                  backgroundColor: '#FFFFFF',
-                  color: '#374151',
-                  fontWeight: 600,
-                  fontSize: '0.84375rem',
-                  cursor: 'pointer',
-                }}
-              >
-                <Printer size={15} />
-                Print / Save PDF
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedInvoice(null)}
-                style={{
-                  padding: '9px 20px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  backgroundColor: '#7C3AED',
-                  color: '#FFFFFF',
-                  fontWeight: 700,
-                  fontSize: '0.84375rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Formal Invoice Receipt Modal Matching Specifications */}
+      <PaymentReceiptModal
+        isOpen={Boolean(selectedInvoice)}
+        invoice={selectedInvoice}
+        onClose={() => setSelectedInvoice(null)}
+      />
 
       {/* Settle Payment Modal (Razorpay & PayPal) */}
       {selectedTicketForPayment && (

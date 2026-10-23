@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { loadRazorpaySdk, loadPayPalSdk } from '../../utils/paymentSdkLoader';
+import PaymentReceiptModal from './PaymentReceiptModal';
 
 export default function PaymentCheckoutModal({
   isOpen,
@@ -34,11 +35,15 @@ export default function PaymentCheckoutModal({
   const [processingStatus, setProcessingStatus] = useState('');
   const [error, setError] = useState(null);
   const [paymentSuccessData, setPaymentSuccessData] = useState(null);
+  const [receiptData, setReceiptData] = useState(null);
+  const [showFormalReceipt, setShowFormalReceipt] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
       setError(null);
       setPaymentSuccessData(null);
+      setReceiptData(null);
+      setShowFormalReceipt(false);
       setIsProcessing(false);
       setProcessingStatus('');
       return;
@@ -143,8 +148,20 @@ export default function PaymentCheckoutModal({
         handler: async (response) => {
           setProcessingStatus('Verifying payment signature with Razorpay...');
           try {
+            let finalTicket = ticket;
+            // If this is a draft ticket, create the actual DB ticket ONLY now after payment is confirmed
+            if (ticket.isDraft && ticket.payload) {
+              setProcessingStatus('Securing sprint intelligence & creating ticket...');
+              const createRes = await api.createRequest({
+                ...ticket.payload,
+                paymentStatus: 'PAID',
+              });
+              finalTicket = createRes;
+            }
+
+            setProcessingStatus('Verifying payment signature with Razorpay...');
             const verifyRes = await api.verifyRazorpayPayment({
-              ticketId: ticket.id || ticket.ticketId,
+              ticketId: finalTicket.id || finalTicket.ticketId,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
@@ -153,6 +170,24 @@ export default function PaymentCheckoutModal({
             });
 
             if (verifyRes.success) {
+              const invoiceData = {
+                id: verifyRes.payment?.id,
+                invoiceNumber: verifyRes.payment?.invoiceNumber || `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+                transactionId: response.razorpay_payment_id,
+                gateway: 'RAZORPAY',
+                paymentMethod: 'Razorpay (Credit / Debit Card, UPI, NetBanking)',
+                amountUsd: ticketPriceUsd,
+                amount: ticketPriceUsd,
+                paidAt: new Date().toISOString(),
+                requestTitle: finalTicket.title || ticket.title,
+                ticketId: finalTicket.ticketId || (finalTicket.id ? `CG-${finalTicket.id}` : 'CG-SPRINT'),
+                userName: ticket.contactName || finalTicket.user?.name,
+                companyName: ticket.clientCompany || finalTicket.company?.name,
+                userEmail: ticket.userEmail || finalTicket.user?.email,
+                requirements: finalTicket.requirements || ticket.requirements,
+                rawRequest: finalTicket,
+              };
+              setReceiptData(invoiceData);
               setPaymentSuccessData({
                 gateway: 'Razorpay',
                 method: 'Razorpay Live (Card / UPI / NetBanking)',
@@ -161,11 +196,11 @@ export default function PaymentCheckoutModal({
                 gstAmountInr: `₹${gstAmountInr.toLocaleString()} INR (18% GST)`,
                 amountUsd: `$${ticketPriceUsd}.00 USD`,
                 exchangeRate: exchangeRate,
-                invoiceNumber: verifyRes.payment?.invoiceNumber || `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+                invoiceNumber: invoiceData.invoiceNumber,
                 transactionId: response.razorpay_payment_id,
                 isSimulated: false,
               });
-              if (onPaymentSuccess) onPaymentSuccess(verifyRes);
+              if (onPaymentSuccess) onPaymentSuccess(verifyRes, finalTicket, invoiceData);
             }
           } catch (verErr) {
             setError(verErr.message || 'Signature verification failed.');
@@ -248,26 +283,53 @@ export default function PaymentCheckoutModal({
         const timer = setInterval(async () => {
           if (paypalWindow.closed) {
             clearInterval(timer);
-            setProcessingStatus('Capturing and confirming PayPal transaction...');
+            setProcessingStatus('Securing sprint intelligence & confirming PayPal transaction...');
             try {
+              let finalTicket = ticket;
+              if (ticket.isDraft && ticket.payload) {
+                const createRes = await api.createRequest({
+                  ...ticket.payload,
+                  paymentStatus: 'PAID',
+                });
+                finalTicket = createRes;
+              }
+
               const captureRes = await api.capturePayPalPayment({
-                ticketId: ticket.id || ticket.ticketId,
+                ticketId: finalTicket.id || finalTicket.ticketId,
                 orderId: orderRes.order.id,
                 isSimulated: false,
                 paymentMethod: 'PayPal Express',
               });
 
               if (captureRes.success) {
+                const invoiceData = {
+                  id: captureRes.payment?.id,
+                  invoiceNumber: captureRes.payment?.invoiceNumber || `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+                  transactionId: captureRes.payment?.transactionId || orderRes.order.id,
+                  gateway: 'PAYPAL',
+                  paymentMethod: 'PayPal Express (Global Credit Card / Balance)',
+                  amountUsd: ticketPriceUsd,
+                  amount: ticketPriceUsd,
+                  paidAt: new Date().toISOString(),
+                  requestTitle: finalTicket.title || ticket.title,
+                  ticketId: finalTicket.ticketId || (finalTicket.id ? `CG-${finalTicket.id}` : 'CG-SPRINT'),
+                  userName: ticket.contactName || finalTicket.user?.name,
+                  companyName: ticket.clientCompany || finalTicket.company?.name,
+                  userEmail: ticket.userEmail || finalTicket.user?.email,
+                  requirements: finalTicket.requirements || ticket.requirements,
+                  rawRequest: finalTicket,
+                };
+                setReceiptData(invoiceData);
                 setPaymentSuccessData({
                   gateway: 'PayPal',
                   method: 'PayPal Express',
                   amount: `$${ticketPriceUsd}.00 USD`,
                   amountUsd: `$${ticketPriceUsd}.00 USD`,
-                  invoiceNumber: captureRes.payment?.invoiceNumber || `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-                  transactionId: captureRes.payment?.transactionId || orderRes.order.id,
+                  invoiceNumber: invoiceData.invoiceNumber,
+                  transactionId: invoiceData.transactionId,
                   isSimulated: false,
                 });
-                if (onPaymentSuccess) onPaymentSuccess(captureRes);
+                if (onPaymentSuccess) onPaymentSuccess(captureRes, finalTicket, invoiceData);
               }
             } catch (capErr) {
               console.warn('PayPal capture status check:', capErr.message);
@@ -278,24 +340,51 @@ export default function PaymentCheckoutModal({
         }, 1000);
       } else {
         // Fallback capture
+        let finalTicket = ticket;
+        if (ticket.isDraft && ticket.payload) {
+          const createRes = await api.createRequest({
+            ...ticket.payload,
+            paymentStatus: 'PAID',
+          });
+          finalTicket = createRes;
+        }
+
         const captureRes = await api.capturePayPalPayment({
-          ticketId: ticket.id || ticket.ticketId,
+          ticketId: finalTicket.id || finalTicket.ticketId,
           orderId: orderRes.order.id,
           isSimulated: false,
           paymentMethod: 'PayPal Checkout',
         });
 
         if (captureRes.success) {
+          const invoiceData = {
+            id: captureRes.payment?.id,
+            invoiceNumber: captureRes.payment?.invoiceNumber || `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+            transactionId: captureRes.payment?.transactionId || orderRes.order.id,
+            gateway: 'PAYPAL',
+            paymentMethod: 'PayPal Checkout (Global Credit Card / Balance)',
+            amountUsd: ticketPriceUsd,
+            amount: ticketPriceUsd,
+            paidAt: new Date().toISOString(),
+            requestTitle: finalTicket.title || ticket.title,
+            ticketId: finalTicket.ticketId || (finalTicket.id ? `CG-${finalTicket.id}` : 'CG-SPRINT'),
+            userName: ticket.contactName || finalTicket.user?.name,
+            companyName: ticket.clientCompany || finalTicket.company?.name,
+            userEmail: ticket.userEmail || finalTicket.user?.email,
+            requirements: finalTicket.requirements || ticket.requirements,
+            rawRequest: finalTicket,
+          };
+          setReceiptData(invoiceData);
           setPaymentSuccessData({
             gateway: 'PayPal',
             method: 'PayPal Checkout',
             amount: `$${ticketPriceUsd}.00 USD`,
             amountUsd: `$${ticketPriceUsd}.00 USD`,
-            invoiceNumber: captureRes.payment?.invoiceNumber,
-            transactionId: captureRes.payment?.transactionId || orderRes.order.id,
+            invoiceNumber: invoiceData.invoiceNumber,
+            transactionId: invoiceData.transactionId,
             isSimulated: false,
           });
-          if (onPaymentSuccess) onPaymentSuccess(captureRes);
+          if (onPaymentSuccess) onPaymentSuccess(captureRes, finalTicket, invoiceData);
         }
       }
     } catch (err) {
@@ -513,23 +602,24 @@ export default function PaymentCheckoutModal({
               <div style={{ display: 'flex', gap: '12px', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => setShowFormalReceipt(true)}
                   style={{
-                    backgroundColor: '#F3F4F6',
-                    color: '#374151',
-                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#65A30D',
+                    color: '#FFFFFF',
+                    border: 'none',
                     borderRadius: '10px',
                     padding: '11px 24px',
                     fontSize: '0.92rem',
-                    fontWeight: 600,
+                    fontWeight: 700,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
+                    boxShadow: '0 4px 12px rgba(101, 163, 13, 0.3)',
                   }}
                 >
-                  <FileText size={16} />
-                  Print / Save Invoice
+                  <Receipt size={16} />
+                  View & Print Official Receipt
                 </button>
                 <button
                   type="button"
@@ -958,6 +1048,14 @@ export default function PaymentCheckoutModal({
           to { transform: rotate(360deg); }
         }
       `}</style>
+
+      {showFormalReceipt && receiptData && (
+        <PaymentReceiptModal
+          isOpen={showFormalReceipt}
+          onClose={() => setShowFormalReceipt(false)}
+          invoice={receiptData}
+        />
+      )}
     </div>
   );
 }

@@ -412,7 +412,7 @@ export const createRequest = async (req, res) => {
           assignedTeam: teamMap[serviceType] || 'DiziGini Core Team',
           notes: finalNotes,
           status: 'REQUEST_CREATED',
-          paymentStatus: 'PENDING'
+          paymentStatus: req.body.paymentStatus || 'PENDING'
         });
       } catch (insertErr) {
         lastInsertError = insertErr;

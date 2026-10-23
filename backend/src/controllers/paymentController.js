@@ -228,7 +228,7 @@ export const createOrder = async (req, res) => {
     }
 
     const request = await resolveRequest(ticketId);
-    if (!request && !String(ticketId).startsWith('TKT') && !String(ticketId).startsWith('CG-')) {
+    if (!request && !String(ticketId).startsWith('TKT') && !String(ticketId).startsWith('CG-') && !String(ticketId).startsWith('DRAFT-')) {
       return res.status(404).json({ success: false, message: 'Sprint ticket not found.' });
     }
 

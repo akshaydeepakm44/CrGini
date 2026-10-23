@@ -839,11 +839,25 @@ export default function NewRequestModal({
         selectedServices: getActiveSelectedServices(),
       };
 
-      const newTicket = await api.createRequest(payload);
-      // Immediately open the Payment Gateway Checkout modal
-      setCreatedTicketForPayment(newTicket);
+      // Construct Draft ticket (Zero DB insertion until payment is settled!)
+      const draftTicket = {
+        id: `DRAFT-${Date.now()}`,
+        ticketId: 'PENDING-PAYMENT',
+        title: payload.title,
+        description: payload.description,
+        serviceType: payload.serviceType,
+        subService: payload.subService,
+        priority: payload.priority,
+        price: lockedPrice,
+        isDraft: true,
+        serviceLabel: displayLabel,
+        requirements: payload.requirements,
+        payload,
+      };
+
+      setCreatedTicketForPayment(draftTicket);
     } catch (err) {
-      setSubmitError(err.message || 'Failed to submit sprint request. Please try again.');
+      setSubmitError(err.message || 'Failed to prepare sprint checkout. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -3708,13 +3722,11 @@ export default function NewRequestModal({
           isOpen={Boolean(createdTicketForPayment)}
           ticket={createdTicketForPayment}
           onClose={() => {
-            const tkt = createdTicketForPayment;
+            // Cancelled without paying: clear draft, no ticket created
             setCreatedTicketForPayment(null);
-            if (onSuccess) onSuccess(tkt);
-            onClose();
           }}
-          onPaymentSuccess={(payRes) => {
-            const updatedTkt = payRes.request || createdTicketForPayment;
+          onPaymentSuccess={(payRes, finalTicket) => {
+            const updatedTkt = finalTicket || payRes.request || createdTicketForPayment;
             setCreatedTicketForPayment(null);
             if (onSuccess) onSuccess(updatedTkt);
             onClose();
