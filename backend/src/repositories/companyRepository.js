@@ -718,19 +718,27 @@ export const updateCompanyLead = async (leadId, updates = {}) => {
     website: 'website'
   };
 
+  const colMap = new Map();
+  for (const [key, val] of Object.entries(updates)) {
+    const col = allowed[key];
+    if (col !== undefined && val !== undefined) {
+      if (!colMap.has(col) || (val !== null && val !== '')) {
+        colMap.set(col, val);
+      }
+    }
+  }
+
+  if (colMap.size === 0) return findLeadById(leadId);
+
   const setClauses = [];
   const values = [];
   let paramIdx = 1;
 
-  for (const [key, val] of Object.entries(updates)) {
-    if (allowed[key] !== undefined && val !== undefined) {
-      setClauses.push(`${allowed[key]} = $${paramIdx}`);
-      values.push(val);
-      paramIdx++;
-    }
+  for (const [col, val] of colMap.entries()) {
+    setClauses.push(`${col} = $${paramIdx}`);
+    values.push(val);
+    paramIdx++;
   }
-
-  if (setClauses.length === 0) return findLeadById(leadId);
 
   setClauses.push(`updated_at = NOW()`);
   values.push(leadId);

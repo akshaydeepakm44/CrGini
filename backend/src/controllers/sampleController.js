@@ -1308,9 +1308,10 @@ export const updateAdminSample = async (req, res) => {
     }
 
     body.logoUrl = effectiveLogoUrl;
+    delete body.logo_url;
     if (logoAssetKey) {
       body.logoAssetKey = logoAssetKey;
-      body.logo_asset_key = logoAssetKey;
+      delete body.logo_asset_key;
       if (body.companyStudy) {
         body.companyStudy.logoAssetKey = logoAssetKey;
       }

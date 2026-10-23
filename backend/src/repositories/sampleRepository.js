@@ -293,18 +293,27 @@ export const updateSampleShowcase = async (id, updates = {}) => {
     pitch_deck: 'pitch_deck',
   };
 
-  const setClauses = [];
-  const values = [];
+  // Map target DB column -> resolved value to ensure each column is updated only once
+  const colMap = new Map();
 
   for (const [key, val] of Object.entries(updates)) {
     const col = allowed[key];
-    if (col) {
-      values.push(typeof val === 'object' && val !== null ? JSON.stringify(val) : val);
-      setClauses.push(`${col} = $${values.length}`);
+    if (col && val !== undefined) {
+      if (!colMap.has(col) || (val !== null && val !== '')) {
+        colMap.set(col, val);
+      }
     }
   }
 
-  if (setClauses.length === 0) return findSampleById(id);
+  if (colMap.size === 0) return findSampleById(id);
+
+  const setClauses = [];
+  const values = [];
+
+  for (const [col, val] of colMap.entries()) {
+    values.push(typeof val === 'object' && val !== null ? JSON.stringify(val) : val);
+    setClauses.push(`${col} = $${values.length}`);
+  }
 
   values.push(id);
   const sql = `
