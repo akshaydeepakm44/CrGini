@@ -600,13 +600,32 @@ Best regards,
 
   // Resolve best logo for any lead (uploaded logo -> lead's own company domain favicon -> null)
   // Ensures leads ONLY show their own uploaded logo and NEVER duplicate the main company logo
-  // Resolve best logo for any lead (uploaded logo -> lead's own company domain favicon -> fallback)
+  // Resolve best logo for any lead (uploaded lead logo -> lead's own company domain favicon -> fallback initial)
+  // CRITICAL: Guarantees lead logo NEVER replicates the showcase company logo
   const resolveLeadLogo = (lead, isFeatured = false) => {
     if (!lead) return null;
     const isPlatformLogo = (url) => {
       if (!url || typeof url !== 'string') return true;
       const clean = url.trim().toLowerCase();
       return clean === '/logo.png' || clean.includes('dizigini') || clean.includes('creativegini');
+    };
+
+    // Helper to verify if candidate URL belongs to the showcase client company
+    const isShowcaseCompanyLogo = (candUrl) => {
+      if (!candUrl || typeof candUrl !== 'string') return false;
+      const cleanCand = candUrl.trim();
+      if (companyLogo && cleanCand === companyLogo) return true;
+      if (sample?.logoUrl && cleanCand === sample.logoUrl) return true;
+      if (sample?.companyStudy?.logoUrl && cleanCand === sample.companyStudy.logoUrl) return true;
+      if (sample?.slug && cleanCand.includes(`/samples/${sample.slug}/logo`)) return true;
+      if (companyName) {
+        const cleanComp = companyName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (cleanComp.length >= 3 && cleanCand.toLowerCase().includes(`${cleanComp}.com`)) {
+          const leadComp = (lead.company || lead.leadCompany || lead.targetCompany || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (leadComp && leadComp !== cleanComp) return true;
+        }
+      }
+      return false;
     };
 
     // 1. Direct lead logo uploaded specifically for this lead (all alias fields)
@@ -619,16 +638,16 @@ Best regards,
       lead.companyLogoUrl ||
       lead.avatarUrl;
 
-    if (directLogo && !isPlatformLogo(directLogo)) {
+    if (directLogo && !isPlatformLogo(directLogo) && !isShowcaseCompanyLogo(directLogo)) {
       return directLogo.trim();
     }
 
-    // 1b. If lead has an object asset key uploaded to storage
+    // 1b. If lead has an object asset key uploaded specifically to storage for this lead
     if (lead.logoAssetKey && sample?.slug && lead.id) {
       return `/api/samples/${sample.slug}/leads/${lead.id}/logo`;
     }
 
-    // 2. Lead's own company website domain favicon
+    // 2. Lead's own company website domain favicon (e.g. dallah.com for Dallah Medical Group)
     const rawLink =
       lead.companyLink ||
       lead.website ||
@@ -645,24 +664,26 @@ Best regards,
         .split('/')[0]
         .split('?')[0]
         .trim();
-      if (cleanDomain && cleanDomain.includes('.') && cleanDomain.length >= 4) {
+      const compWebsite = (sample?.companyStudy?.website || '').toLowerCase();
+      if (cleanDomain && cleanDomain.includes('.') && cleanDomain.length >= 4 && !compWebsite.includes(cleanDomain)) {
         return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain.toLowerCase()}&size=128`;
       }
     }
 
-    // 3. Inferred company domain favicon fallback for this specific lead's own account
+    // 3. Inferred company domain favicon fallback for this specific lead's own account (NOT the showcase company)
     let candidateName = '';
-    if (lead.company && lead.company.toLowerCase() !== companyName?.toLowerCase()) {
+    const cleanCompTarget = (companyName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (lead.company && lead.company.toLowerCase().replace(/[^a-z0-9]/g, '') !== cleanCompTarget) {
       candidateName = lead.company;
-    } else if (lead.targetCompany && lead.targetCompany.toLowerCase() !== companyName?.toLowerCase()) {
+    } else if (lead.targetCompany && lead.targetCompany.toLowerCase().replace(/[^a-z0-9]/g, '') !== cleanCompTarget) {
       candidateName = lead.targetCompany;
-    } else if (lead.leadCompany && lead.leadCompany.toLowerCase() !== companyName?.toLowerCase()) {
+    } else if (lead.leadCompany && lead.leadCompany.toLowerCase().replace(/[^a-z0-9]/g, '') !== cleanCompTarget) {
       candidateName = lead.leadCompany;
     }
 
     if (candidateName && typeof candidateName === 'string') {
       const cleanComp = candidateName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (cleanComp.length >= 3) {
+      if (cleanComp.length >= 3 && cleanComp !== cleanCompTarget) {
         return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanComp}.com&size=128`;
       }
     }

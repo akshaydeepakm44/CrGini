@@ -17,6 +17,9 @@ import {
   Building,
   QrCode,
   Lock,
+  Coins,
+  Percent,
+  Check,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { loadRazorpaySdk, loadPayPalSdk } from '../../utils/paymentSdkLoader';
@@ -487,28 +490,61 @@ export default function PaymentCheckoutModal({
             </div>
           </div>
 
-          {!isProcessing && (
-            <button
-              onClick={onClose}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
               style={{
-                background: '#FFFFFF',
-                border: '1px solid #E5E7EB',
-                borderRadius: '8px',
-                width: '34px',
-                height: '34px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                color: '#6B7280',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
+                gap: '8px',
+                background: '#F0FDF4',
+                padding: '6px 14px',
+                borderRadius: '10px',
+                border: '1px solid #DCFCE7',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F3F4F6')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
             >
-              <X size={18} />
-            </button>
-          )}
+              <div
+                style={{
+                  width: '26px',
+                  height: '26px',
+                  borderRadius: '50%',
+                  background: '#10B981',
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <ShieldCheck size={15} />
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#065F46', lineHeight: 1.2 }}>Your payment is secure</div>
+                <div style={{ fontSize: '0.7rem', color: '#059669', lineHeight: 1.2 }}>256-bit SSL encryption</div>
+              </div>
+            </div>
+
+            {!isProcessing && (
+              <button
+                onClick={onClose}
+                style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '8px',
+                  width: '34px',
+                  height: '34px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6B7280',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F3F4F6')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ============================================================
@@ -655,102 +691,140 @@ export default function PaymentCheckoutModal({
             </div>
           ) : (
             <>
-              {/* Fee & Price Summary Showcase Box */}
+              {/* 1. TOP SUMMARY BANNER (EXACT REPLICA OF IMAGE 1) */}
               <div
                 style={{
-                  backgroundColor: '#FAF8FF',
-                  border: '1px solid #DDD4FA',
+                  border: '1px solid #E2E8F0',
                   borderRadius: '16px',
-                  padding: '1.25rem 1.5rem',
-                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'stretch',
+                  overflow: 'hidden',
+                  backgroundColor: '#FFFFFF',
+                  marginBottom: '1.5rem',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                  flexWrap: 'wrap',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '10px' }}>
-                  <div>
-                    <span style={{ fontSize: '0.72rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
-                      {selectedGateway === 'RAZORPAY' ? 'Total Payable with 18% GST (INR)' : 'Total Payable (USD)'}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
-                      {selectedGateway === 'RAZORPAY' ? (
-                        <>
-                          <span style={{ fontSize: '2rem', fontWeight: 900, color: '#3B2874', fontFamily: 'monospace' }}>
-                            ₹{totalRazorpayInr.toLocaleString()}
-                          </span>
-                          <span style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 600 }}>INR</span>
-                          <span style={{ color: '#9CA3AF' }}>•</span>
-                          <span style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 500 }}>
-                            Base ${ticketPriceUsd}.00 USD + 18% GST
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span style={{ fontSize: '2rem', fontWeight: 900, color: '#0070BA', fontFamily: 'monospace' }}>
-                            ${ticketPriceUsd}.00
-                          </span>
-                          <span style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 600 }}>USD</span>
-                          <span style={{ color: '#9CA3AF' }}>•</span>
-                          <span style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 500 }}>
-                            Global International Checkout
-                          </span>
-                        </>
-                      )}
+                {/* Dark Navy Total Payable Box (Left) */}
+                <div
+                  style={{
+                    backgroundColor: '#1E1B4B',
+                    color: '#FFFFFF',
+                    padding: '1.25rem 1.75rem',
+                    minWidth: '240px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontWeight: 600, letterSpacing: '0.02em' }}>
+                    Total Payable
+                  </span>
+                  <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#FFFFFF', lineHeight: 1.1, margin: '4px 0' }}>
+                    ₹{totalRazorpayInr.toLocaleString()} <span style={{ fontSize: '1rem', fontWeight: 700, color: '#E2E8F0' }}>INR</span>
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: '#CBD5E1' }}>
+                    Base ${ticketPriceUsd}.00 USD + 18% GST
+                  </span>
+                </div>
+
+                {/* Middle 4-Factor Metric Strip */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flex: 1,
+                    padding: '0.85rem 1.25rem',
+                    justifyContent: 'space-around',
+                    gap: '12px',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {/* 1. Sprint Base */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: '95px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#EDE9FE', color: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Coins size={15} />
                     </div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>Sprint Base</span>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A' }}>₹{basePriceInr.toLocaleString()}</span>
+                    <span style={{ fontSize: '0.7rem', color: '#64748B' }}>(${ticketPriceUsd} USD)</span>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                    <div
-                      style={{
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #DDD4FA',
-                        borderRadius: '10px',
-                        padding: '6px 12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '0.75rem',
-                        color: '#059669',
-                        fontWeight: 700,
-                      }}
-                    >
-                      <ShieldCheck size={14} />
-                      <span>256-Bit SSL Encrypted</span>
+                  <div style={{ width: '1px', height: '44px', background: '#E2E8F0' }} />
+
+                  {/* 2. Forex Rate */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: '95px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#E0F2FE', color: '#0284C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Percent size={15} />
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: '#6B7280', fontWeight: 600 }}>
-                      Live Daily Rate: 1 USD = ₹{exchangeRate.toFixed(2)} INR
+                    <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>Forex Rate</span>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A' }}>₹{exchangeRate.toFixed(2)}</span>
+                    <span style={{ fontSize: '0.7rem', color: '#64748B' }}>/ USD</span>
+                  </div>
+
+                  <div style={{ width: '1px', height: '44px', background: '#E2E8F0' }} />
+
+                  {/* 3. GST (18%) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: '95px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#FEF3C7', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Percent size={15} />
                     </div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>GST (18%)</span>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#D97706' }}>+ ₹{gstAmountInr.toLocaleString()}</span>
+                    <span style={{ fontSize: '0.7rem', color: '#64748B' }}>&nbsp;</span>
+                  </div>
+
+                  <div style={{ width: '1px', height: '44px', background: '#E2E8F0' }} />
+
+                  {/* 4. Total Payable */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: '95px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#EDE9FE', color: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <CreditCard size={15} />
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>Total Payable</span>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1E1B4B' }}>₹{totalRazorpayInr.toLocaleString()} INR</span>
+                    <span style={{ fontSize: '0.7rem', color: '#64748B' }}>&nbsp;</span>
                   </div>
                 </div>
 
-                {/* Detailed Tax Breakdown Card for Razorpay */}
-                {selectedGateway === 'RAZORPAY' && (
+                {/* Far Right: 256-Bit SSL Encrypted & Live Daily Rate */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    padding: '1rem 1.25rem',
+                    borderLeft: '1px solid #F1F5F9',
+                    backgroundColor: '#FAFAFD',
+                    gap: '8px',
+                    minWidth: '180px',
+                  }}
+                >
                   <div
                     style={{
-                      borderTop: '1px solid #E9D5FF',
-                      paddingTop: '10px',
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                      gap: '8px',
-                      fontSize: '0.78rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      backgroundColor: '#ECFDF5',
+                      border: '1px solid #A7F3D0',
+                      borderRadius: '8px',
+                      padding: '5px 10px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      color: '#059669',
                     }}
                   >
-                    <div style={{ background: '#FFFFFF', padding: '6px 10px', borderRadius: '8px', border: '1px solid #E9D5FF' }}>
-                      <span style={{ color: '#6B7280', display: 'block', fontSize: '0.7rem' }}>Sprint Base:</span>
-                      <strong style={{ color: '#111827' }}>₹{basePriceInr.toLocaleString()}</strong> (${ticketPriceUsd} USD)
-                    </div>
-                    <div style={{ background: '#FFFFFF', padding: '6px 10px', borderRadius: '8px', border: '1px solid #E9D5FF' }}>
-                      <span style={{ color: '#6B7280', display: 'block', fontSize: '0.7rem' }}>Forex Rate:</span>
-                      <strong style={{ color: '#111827' }}>₹{exchangeRate.toFixed(2)} / USD</strong>
-                    </div>
-                    <div style={{ background: '#FFFBEB', padding: '6px 10px', borderRadius: '8px', border: '1px solid #FDE68A' }}>
-                      <span style={{ color: '#B45309', display: 'block', fontSize: '0.7rem' }}>GST (18%):</span>
-                      <strong style={{ color: '#B45309' }}>+₹{gstAmountInr.toLocaleString()}</strong>
-                    </div>
-                    <div style={{ background: '#EDE9FE', padding: '6px 10px', borderRadius: '8px', border: '1px solid #DDD4FA' }}>
-                      <span style={{ color: '#3B2874', display: 'block', fontSize: '0.7rem' }}>Total Payable:</span>
-                      <strong style={{ color: '#3B2874' }}>₹{totalRazorpayInr.toLocaleString()} INR</strong>
+                    <Check size={14} />
+                    <span>256-bit SSL Encrypted</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#475569' }}>
+                    <Zap size={14} color="#3B82F6" />
+                    <div>
+                      <div style={{ fontWeight: 600 }}>Live Daily Rate</div>
+                      <div style={{ color: '#64748B' }}>1 USD = ₹{exchangeRate.toFixed(2)} INR</div>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Status or Error Banner */}
@@ -774,39 +848,69 @@ export default function PaymentCheckoutModal({
                 </div>
               )}
 
-              {/* Gateway Selection Cards */}
+              {/* 2. SELECT REAL PAYMENT METHOD SECTION */}
               <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#374151', marginBottom: '8px' }}>
-                  Select Real Payment Method
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                      Select Real Payment Method
+                    </h4>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.8125rem', color: '#64748B' }}>
+                      Choose your preferred payment option for a secure and seamless checkout.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
+                    <Lock size={12} />
+                    <span>100% Secure | PCI DSS Compliant</span>
+                  </div>
+                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  {/* Option 1: Razorpay (Real Screen: Credit Card, UPI QR, NetBanking) */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginTop: '10px' }}>
+                  {/* Option 1: Razorpay Card */}
                   <div
                     onClick={() => !isProcessing && setSelectedGateway('RAZORPAY')}
                     style={{
-                      border: selectedGateway === 'RAZORPAY' ? '2px solid #3B2874' : '1px solid #E5E7EB',
-                      backgroundColor: selectedGateway === 'RAZORPAY' ? '#FAF8FF' : '#FFFFFF',
+                      border: selectedGateway === 'RAZORPAY' ? '2px solid #6366F1' : '1px solid #E2E8F0',
+                      backgroundColor: selectedGateway === 'RAZORPAY' ? '#FAF5FF' : '#FFFFFF',
                       borderRadius: '16px',
-                      padding: '16px',
+                      padding: '18px 20px',
                       cursor: isProcessing ? 'not-allowed' : 'pointer',
                       transition: 'all 0.15s ease',
-                      boxShadow: selectedGateway === 'RAZORPAY' ? '0 6px 18px rgba(59, 40, 116, 0.14)' : 'none',
+                      boxShadow: selectedGateway === 'RAZORPAY' ? '0 6px 20px rgba(99, 102, 241, 0.12)' : 'none',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '1rem', fontWeight: 800, color: '#111827' }}>
-                          Razorpay
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {/* Radio indicator */}
+                        <div
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            border: `2px solid ${selectedGateway === 'RAZORPAY' ? '#6366F1' : '#CBD5E1'}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {selectedGateway === 'RAZORPAY' && (
+                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#6366F1' }} />
+                          )}
+                        </div>
+
+                        {/* Razorpay Brand with lightning flash */}
+                        <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0F172A', fontStyle: 'italic', letterSpacing: '-0.02em' }}>
+                          ⚡ Razorpay
                         </span>
                       </div>
+
                       <span
                         style={{
                           backgroundColor: '#EDE9FE',
-                          color: '#3B2874',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.7rem',
+                          color: '#4F46E5',
+                          padding: '3px 10px',
+                          borderRadius: '12px',
+                          fontSize: '0.72rem',
                           fontWeight: 700,
                         }}
                       >
@@ -814,43 +918,62 @@ export default function PaymentCheckoutModal({
                       </span>
                     </div>
 
-                    <p style={{ margin: '0 0 10px 0', fontSize: '0.78125rem', color: '#4B5563', lineHeight: 1.45 }}>
+                    <p style={{ margin: '0 0 12px 30px', fontSize: '0.8rem', color: '#4B5563', lineHeight: 1.45 }}>
                       Official Razorpay Checkout with Credit Card, Debit Card, UPI QR, & NetBanking.
                     </p>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.7rem', background: '#F3F4F6', color: '#374151', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>💳 Cards</span>
-                      <span style={{ fontSize: '0.7rem', background: '#F3F4F6', color: '#374151', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>⚡ UPI QR</span>
-                      <span style={{ fontSize: '0.7rem', background: '#F3F4F6', color: '#374151', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>🏦 NetBanking</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: '30px' }}>
+                      <span style={{ fontSize: '0.72rem', background: '#F1F5F9', color: '#334155', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>💳 Cards</span>
+                      <span style={{ fontSize: '0.72rem', background: '#F1F5F9', color: '#334155', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>⚡ UPI QR</span>
+                      <span style={{ fontSize: '0.72rem', background: '#F1F5F9', color: '#334155', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>🏦 NetBanking</span>
                     </div>
                   </div>
 
-                  {/* Option 2: PayPal (Real Screen: Credit Card & PayPal) */}
+                  {/* Option 2: PayPal Card */}
                   <div
                     onClick={() => !isProcessing && setSelectedGateway('PAYPAL')}
                     style={{
-                      border: selectedGateway === 'PAYPAL' ? '2px solid #0070BA' : '1px solid #E5E7EB',
+                      border: selectedGateway === 'PAYPAL' ? '2px solid #0070BA' : '1px solid #E2E8F0',
                       backgroundColor: selectedGateway === 'PAYPAL' ? '#F0F9FF' : '#FFFFFF',
                       borderRadius: '16px',
-                      padding: '16px',
+                      padding: '18px 20px',
                       cursor: isProcessing ? 'not-allowed' : 'pointer',
                       transition: 'all 0.15s ease',
-                      boxShadow: selectedGateway === 'PAYPAL' ? '0 6px 18px rgba(0, 112, 186, 0.14)' : 'none',
+                      boxShadow: selectedGateway === 'PAYPAL' ? '0 6px 20px rgba(0, 112, 186, 0.12)' : 'none',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '1rem', fontWeight: 800, color: '#111827' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {/* Radio indicator */}
+                        <div
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            border: `2px solid ${selectedGateway === 'PAYPAL' ? '#0070BA' : '#CBD5E1'}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {selectedGateway === 'PAYPAL' && (
+                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0070BA' }} />
+                          )}
+                        </div>
+
+                        {/* PayPal Brand */}
+                        <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#003087', fontStyle: 'italic', letterSpacing: '-0.02em' }}>
                           PayPal
                         </span>
                       </div>
+
                       <span
                         style={{
                           backgroundColor: '#E0F2FE',
                           color: '#0070BA',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.7rem',
+                          padding: '3px 10px',
+                          borderRadius: '12px',
+                          fontSize: '0.72rem',
                           fontWeight: 700,
                         }}
                       >
@@ -858,76 +981,93 @@ export default function PaymentCheckoutModal({
                       </span>
                     </div>
 
-                    <p style={{ margin: '0 0 10px 0', fontSize: '0.78125rem', color: '#4B5563', lineHeight: 1.45 }}>
+                    <p style={{ margin: '0 0 12px 30px', fontSize: '0.8rem', color: '#4B5563', lineHeight: 1.45 }}>
                       Official PayPal Checkout with International Credit Cards and PayPal Balances.
                     </p>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.7rem', background: '#F3F4F6', color: '#374151', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>💳 International Cards</span>
-                      <span style={{ fontSize: '0.7rem', background: '#F3F4F6', color: '#374151', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>🌍 PayPal Account</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: '30px' }}>
+                      <span style={{ fontSize: '0.72rem', background: '#F1F5F9', color: '#334155', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>💳 International Cards</span>
+                      <span style={{ fontSize: '0.72rem', background: '#F1F5F9', color: '#334155', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>🅿 PayPal Account</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Factors Breakdown Card - Credit Card, UPI, Netbanking Details */}
+              {/* 3. AVAILABLE PAYMENT FACTORS BANNER (MATCHING IMAGE 1) */}
               <div
                 style={{
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #E5E7EB',
+                  backgroundColor: '#F0FDF4',
+                  border: '1px solid #DCFCE7',
                   borderRadius: '16px',
-                  padding: '14px 16px',
+                  padding: '16px 20px',
                   marginBottom: '1.25rem',
                 }}
               >
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <ShieldCheck size={16} color="#059669" />
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0F172A', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '6px', background: '#DCFCE7', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ShieldCheck size={15} />
+                  </div>
                   <span>Available Payment Factors in {selectedGateway === 'RAZORPAY' ? 'Razorpay' : 'PayPal'}</span>
                 </div>
 
                 {selectedGateway === 'RAZORPAY' ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.78rem', color: '#4B5563' }}>
-                      <CreditCard size={16} color="#3B2874" style={{ marginTop: '2px', flexShrink: 0 }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#EDE9FE', color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <CreditCard size={18} />
+                      </div>
                       <div>
-                        <strong style={{ color: '#111827', display: 'block' }}>Credit & Debit Cards</strong>
-                        <span>Visa, Mastercard, RuPay, Maestro with 3D Secure OTP & EMI options.</span>
+                        <strong style={{ color: '#0F172A', display: 'block', fontSize: '0.85rem' }}>Credit & Debit Cards</strong>
+                        <span style={{ fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>Visa, Mastercard, RuPay, Maestro with 3D Secure OTP & EMI options.</span>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.78rem', color: '#4B5563' }}>
-                      <QrCode size={16} color="#059669" style={{ marginTop: '2px', flexShrink: 0 }} />
+
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#DCFCE7', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <QrCode size={18} />
+                      </div>
                       <div>
-                        <strong style={{ color: '#111827', display: 'block' }}>UPI QR & Apps</strong>
-                        <span>Scan dynamic QR or pay via PhonePe, Google Pay, Paytm, CRED.</span>
+                        <strong style={{ color: '#0F172A', display: 'block', fontSize: '0.85rem' }}>UPI QR & Apps</strong>
+                        <span style={{ fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>Scan dynamic QR or pay via PhonePe, Google Pay, Paytm, CRED.</span>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.78rem', color: '#4B5563' }}>
-                      <Building size={16} color="#2563EB" style={{ marginTop: '2px', flexShrink: 0 }} />
+
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#E0F2FE', color: '#0284C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Building size={18} />
+                      </div>
                       <div>
-                        <strong style={{ color: '#111827', display: 'block' }}>NetBanking & Wallets</strong>
-                        <span>50+ Indian banks (HDFC, ICICI, SBI, Axis) & popular wallets.</span>
+                        <strong style={{ color: '#0F172A', display: 'block', fontSize: '0.85rem' }}>NetBanking & Wallets</strong>
+                        <span style={{ fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>50+ Indian banks (HDFC, ICICI, SBI, Axis) & popular wallets.</span>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.78rem', color: '#4B5563' }}>
-                      <CreditCard size={16} color="#0070BA" style={{ marginTop: '2px', flexShrink: 0 }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#E0F2FE', color: '#0070BA', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <CreditCard size={18} />
+                      </div>
                       <div>
-                        <strong style={{ color: '#111827', display: 'block' }}>Credit & Debit Cards</strong>
-                        <span>Visa, Mastercard, American Express, Discover (No PayPal account required).</span>
+                        <strong style={{ color: '#0F172A', display: 'block', fontSize: '0.85rem' }}>Credit & Debit Cards</strong>
+                        <span style={{ fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>Visa, Mastercard, American Express, Discover (No PayPal account required).</span>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.78rem', color: '#4B5563' }}>
-                      <Globe size={16} color="#0070BA" style={{ marginTop: '2px', flexShrink: 0 }} />
+
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#E0F2FE', color: '#0070BA', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Globe size={18} />
+                      </div>
                       <div>
-                        <strong style={{ color: '#111827', display: 'block' }}>PayPal Account</strong>
-                        <span>Pay with PayPal balance, linked bank account, or Pay in 4 installments.</span>
+                        <strong style={{ color: '#0F172A', display: 'block', fontSize: '0.85rem' }}>PayPal Account</strong>
+                        <span style={{ fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>Pay with PayPal balance, linked bank account, or Pay in 4 installments.</span>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
+
+
 
               {/* Processing Progress Feedback */}
               {isProcessing && (
@@ -1005,21 +1145,22 @@ export default function PaymentCheckoutModal({
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '10px',
-                  padding: '12px 28px',
-                  fontSize: '0.92rem',
-                  fontWeight: 700,
+                  padding: '10px 24px',
                   cursor: isProcessing ? 'not-allowed' : 'pointer',
                   opacity: isProcessing ? 0.75 : 1,
                   boxShadow: '0 4px 14px rgba(59, 40, 116, 0.3)',
                 }}
               >
                 <Lock size={16} />
-                <span>
-                  {isProcessing
-                    ? 'Launching Razorpay...'
-                    : `Pay ₹${totalRazorpayInr.toLocaleString()} with Razorpay (Cards, UPI, NetBanking · Incl. 18% GST)`}
-                </span>
-                <ArrowRight size={16} />
+                <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
+                  <span style={{ fontSize: '0.92rem', fontWeight: 800 }}>
+                    {isProcessing ? 'Launching Razorpay...' : `Pay ₹${totalRazorpayInr.toLocaleString()} with Razorpay`}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: '#DDD4FA', fontWeight: 500 }}>
+                    (Cards, UPI, NetBanking • 18% GST)
+                  </span>
+                </div>
+                <ArrowRight size={16} style={{ marginLeft: '8px' }} />
               </button>
             ) : (
               <button

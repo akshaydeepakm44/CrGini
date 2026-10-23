@@ -537,7 +537,10 @@ support@dizigini.com`;
       pitchDeckPdfName: leadForm.pitchDeckPdfName || existing?.pitchDeckPdfName || '',
       pitchDeckAssetKey: existing?.pitchDeckAssetKey || existing?.pitchDeck?.assetKey || '',
       logo: (() => {
-        const directLogo = leadForm.logo || existing?.logo || existing?.companyLogo || existing?.logoUrl || existing?.company_logo;
+        let directLogo = leadForm.logo || existing?.logo || existing?.companyLogo || existing?.logoUrl || existing?.company_logo;
+        if (directLogo && formData.logoUrl && directLogo.trim() === formData.logoUrl.trim()) {
+          directLogo = '';
+        }
         if (directLogo) return directLogo;
         const link = leadForm.companyLink?.trim() || existing?.companyLink;
         if (link) {
@@ -546,7 +549,8 @@ support@dizigini.com`;
             return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
           }
         }
-        if (effectiveLeadCompany && effectiveLeadCompany.length >= 3) {
+        const cleanCompTarget = (formData.companyName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (effectiveLeadCompany && effectiveLeadCompany.length >= 3 && effectiveLeadCompany.toLowerCase().replace(/[^a-z0-9]/g, '') !== cleanCompTarget) {
           const cleanComp = effectiveLeadCompany.toLowerCase().replace(/[^a-z0-9]/g, '');
           if (cleanComp.length >= 3) {
             return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanComp}.com&size=128`;
@@ -555,7 +559,10 @@ support@dizigini.com`;
         return '';
       })(),
       companyLogo: (() => {
-        const directLogo = leadForm.logo || existing?.companyLogo || existing?.logo || existing?.logoUrl || existing?.company_logo;
+        let directLogo = leadForm.logo || existing?.companyLogo || existing?.logo || existing?.logoUrl || existing?.company_logo;
+        if (directLogo && formData.logoUrl && directLogo.trim() === formData.logoUrl.trim()) {
+          directLogo = '';
+        }
         if (directLogo) return directLogo;
         const link = leadForm.companyLink?.trim() || existing?.companyLink;
         if (link) {
@@ -564,7 +571,8 @@ support@dizigini.com`;
             return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
           }
         }
-        if (effectiveLeadCompany && effectiveLeadCompany.length >= 3) {
+        const cleanCompTarget = (formData.companyName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (effectiveLeadCompany && effectiveLeadCompany.length >= 3 && effectiveLeadCompany.toLowerCase().replace(/[^a-z0-9]/g, '') !== cleanCompTarget) {
           const cleanComp = effectiveLeadCompany.toLowerCase().replace(/[^a-z0-9]/g, '');
           if (cleanComp.length >= 3) {
             return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanComp}.com&size=128`;
@@ -572,7 +580,11 @@ support@dizigini.com`;
         }
         return '';
       })(),
-      logoUrl: leadForm.logo || existing?.logoUrl || existing?.logo || existing?.companyLogo || '',
+      logoUrl: (() => {
+        const cand = leadForm.logo || existing?.logoUrl || existing?.logo || existing?.companyLogo || '';
+        if (cand && formData.logoUrl && cand.trim() === formData.logoUrl.trim()) return '';
+        return cand;
+      })(),
       logoAssetKey: existing?.logoAssetKey || '',
       title: leadForm.title?.trim() || 'Executive Decision Maker',
       company: effectiveLeadCompany,

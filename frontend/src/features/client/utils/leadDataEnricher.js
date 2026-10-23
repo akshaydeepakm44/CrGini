@@ -136,11 +136,8 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
   // 7. Verification Status
   let verificationStatus = getField(['verificationstatus', 'verifystatus', 'verification', 'status', 'verified']) || 'VERIFIED_100_PERCENT';
 
-  // 8. Logo URL
-  let logo = getField(['companylogourl', 'companylogo', 'logourl', 'logolink', 'logo', 'imageurl', 'avatar']);
-  if (!logo) {
-    logo = context.logoUrl || context.batchLogoUrl || '';
-  }
+  // 8. Logo URL (Ensure lead gets its OWN logo, NEVER the showcase/client company logo)
+  let logo = getField(['companylogourl', 'companylogo', 'logourl', 'logolink', 'logo', 'imageurl', 'avatar']) || '';
   if (!logo && companyLink) {
     const cleanDomain = companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
     if (cleanDomain && cleanDomain.includes('.') && cleanDomain.length >= 4) {
