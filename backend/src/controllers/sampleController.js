@@ -215,9 +215,25 @@ export const getPublicSampleBySlug = async (req, res) => {
 
       // Direct email: Open & unmasked for the first lead if present
       const unmaskedEmail = l.email || l.directWorkEmail || l.workEmail || '';
-      const emailForFirst = unmaskedEmail || (l.maskedEmail ? l.maskedEmail.replace('••••', 'contact') : '');
+      const emailForFirst = unmaskedEmail || '';
 
-      let leadLogo = l.logo || l.companyLogo || l.avatarUrl || null;
+      // Check if candidate logo matches the showcase company's logo
+      const isShowcaseLogo = (cand) => {
+        if (!cand || typeof cand !== 'string') return false;
+        const clean = cand.trim();
+        if (sample.logoUrl && clean === sample.logoUrl.trim()) return true;
+        if (sample.companyLogo && clean === sample.companyLogo.trim()) return true;
+        if (sample.companyStudy?.logoUrl && clean === sample.companyStudy.logoUrl.trim()) return true;
+        if (sample.slug && clean.includes(`/samples/${sample.slug}/logo`)) return true;
+        return false;
+      };
+
+      let rawCandidateLogo = l.logo || l.companyLogo || l.logoUrl || l.company_logo || l.avatarUrl || null;
+      if (rawCandidateLogo && isShowcaseLogo(rawCandidateLogo)) {
+        rawCandidateLogo = null;
+      }
+
+      let leadLogo = rawCandidateLogo;
       if (!leadLogo && companyLink) {
         const cleanDomain = String(companyLink)
           .replace(/^https?:\/\//i, '')
@@ -244,8 +260,9 @@ export const getPublicSampleBySlug = async (req, res) => {
       return {
         id: leadId,
         name: leadName,
-        title: l.title || 'Executive Decision Maker',
+        title: l.title || '',
         company: safeLeadCompany,
+        companyContactEmail: l.companyContactEmail || l.companyContact || l.companyEmail || '',
         companyLink: companyLink,
         companyLinkedin: companyLinkedinUrl,
         logo: leadLogo,
@@ -282,7 +299,7 @@ export const getPublicSampleBySlug = async (req, res) => {
         },
         pitchDeck: hasLeadPitch ? {
           title: l.pitchDeck?.title || `${leadName} Proposal Pitch Deck`,
-          summary: l.pitchDeck?.summary || 'Strategic presentation proposal designed to convert this stakeholder.',
+          summary: l.pitchDeck?.summary || '',
           streamUrl: leadPitchUrl,
           downloadUrl: `${leadPitchUrl}?download=true`,
           fileName: l.pitchDeck?.fileName || l.pitchDeckPdfName || `${leadName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
@@ -1864,6 +1881,13 @@ export const streamLeadLogo = async (req, res) => {
     }
 
     const candidate = lead.logo || lead.companyLogo || lead.logoUrl || lead.company_logo || lead.companyLogoUrl || lead.avatarUrl;
+    
+    // SAFETY: If candidate is the showcase company logo, reject it!
+    const showcaseCandidate = sample.logoUrl || sample.companyLogo || sample.companyStudy?.logoUrl;
+    if (candidate && showcaseCandidate && candidate.trim() === showcaseCandidate.trim()) {
+      return res.status(404).send('Showcase logo cannot be used for lead');
+    }
+
     if (candidate && isDataUrl(candidate)) {
       const matches = candidate.match(/^data:([A-Za-z0-9-+/]+);base64,(.+)$/);
       if (matches && matches.length === 3) {

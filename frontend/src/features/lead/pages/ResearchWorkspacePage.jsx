@@ -365,7 +365,7 @@ export default function ResearchWorkspacePage({ onNavigate }) {
   const handleAddPerson = () => {
     setKeyPeople([
       ...keyPeople,
-      { name: '', company: selectedTicket?.clientCompany || '', designation: '', email: '', linkedin: '', logo: batchCompanyLogoUrl || null, logoName: '' }
+      { name: '', company: selectedTicket?.clientCompany || '', designation: '', email: '', linkedin: '', logo: null, logoName: '' }
     ]);
   };
 
@@ -500,7 +500,7 @@ export default function ResearchWorkspacePage({ onNavigate }) {
         designation: p.designation?.trim() || 'Executive',
         email: p.email?.trim() || '',
         linkedin: p.linkedin?.trim() || '',
-        logo: p.logo || batchCompanyLogoUrl || null,
+        logo: p.logo || null,
         logoName: p.logoName || null,
       }));
 
@@ -510,7 +510,6 @@ export default function ResearchWorkspacePage({ onNavigate }) {
         try {
           finalLeads = await parseLeadsFile(leadListFile, {
             companyName: selectedTicket?.clientCompany,
-            batchLogoUrl: batchCompanyLogoUrl
           });
         } catch (e) {
           console.warn('Could not parse leadListFile during submit:', e);

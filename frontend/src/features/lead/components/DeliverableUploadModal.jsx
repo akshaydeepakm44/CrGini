@@ -115,7 +115,7 @@ export default function DeliverableUploadModal({
   const handleAddPerson = () => {
     setKeyPeople([
       ...keyPeople,
-      { name: '', company: clientCompany || '', designation: '', email: '', linkedin: '', logo: batchCompanyLogoUrl || null, logoName: '' }
+      { name: '', company: clientCompany || '', designation: '', email: '', linkedin: '', logo: null, logoName: '' }
     ]);
   };
 
@@ -230,7 +230,7 @@ export default function DeliverableUploadModal({
     try {
       const validPeople = keyPeople.filter(p => p.name.trim()).map(p => ({
         ...p,
-        logo: p.logo || batchCompanyLogoUrl || '',
+        logo: p.logo || '',
       }));
 
       setSubmitProgress('Packaging deliverables and preparing cloud uploads...');
@@ -258,7 +258,6 @@ export default function DeliverableUploadModal({
         try {
           finalLeads = await parseLeadsFile(leadListFile, {
             companyName: clientCompany,
-            batchLogoUrl: batchCompanyLogoUrl
           });
         } catch (err) {
           console.warn('Could not parse leadListFile:', err);

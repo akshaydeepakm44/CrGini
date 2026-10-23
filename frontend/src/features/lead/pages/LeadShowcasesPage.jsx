@@ -151,6 +151,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
   const [leadForm, setLeadForm] = useState({
     name: '',
     phone: '',
+    companyContactEmail: '',
     companyLink: '',
     companyLinkedin: '',
     email: '',
@@ -518,13 +519,15 @@ support@dizigini.com`;
     }
 
     const effectiveLeadCompany = rawComp;
-    const effectiveLeadName = rawName || rawComp || 'Executive Decision Maker';
+    const effectiveLeadName = rawName || rawComp || '';
 
     const existing = editingLeadIndex !== null ? formData.leads[editingLeadIndex] : null;
     const newLead = {
       ...(existing || {}),
       id: existing?.id || `lead-${Date.now()}`,
       name: effectiveLeadName,
+      companyContactEmail: leadForm.companyContactEmail ? leadForm.companyContactEmail.trim() : (existing?.companyContactEmail || existing?.companyContact || ''),
+      companyContact: leadForm.companyContactEmail ? leadForm.companyContactEmail.trim() : (existing?.companyContactEmail || existing?.companyContact || ''),
       phone: leadForm.phone ? leadForm.phone.trim() : '',
       companyLink: leadForm.companyLink?.trim() || '',
       companyLinkedin: leadForm.companyLinkedin?.trim() || '',
@@ -537,7 +540,7 @@ support@dizigini.com`;
       pitchDeckPdfName: leadForm.pitchDeckPdfName || existing?.pitchDeckPdfName || '',
       pitchDeckAssetKey: existing?.pitchDeckAssetKey || existing?.pitchDeck?.assetKey || '',
       logo: (() => {
-        let directLogo = leadForm.logo || existing?.logo || existing?.companyLogo || existing?.logoUrl || existing?.company_logo;
+        let directLogo = leadForm.logo || existing?.logo || existing?.logoUrl || '';
         if (directLogo && formData.logoUrl && directLogo.trim() === formData.logoUrl.trim()) {
           directLogo = '';
         }
@@ -547,19 +550,12 @@ support@dizigini.com`;
           const cd = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
           if (cd.includes('.') && cd.length >= 4) {
             return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
-          }
-        }
-        const cleanCompTarget = (formData.companyName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (effectiveLeadCompany && effectiveLeadCompany.length >= 3 && effectiveLeadCompany.toLowerCase().replace(/[^a-z0-9]/g, '') !== cleanCompTarget) {
-          const cleanComp = effectiveLeadCompany.toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (cleanComp.length >= 3) {
-            return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanComp}.com&size=128`;
           }
         }
         return '';
       })(),
       companyLogo: (() => {
-        let directLogo = leadForm.logo || existing?.companyLogo || existing?.logo || existing?.logoUrl || existing?.company_logo;
+        let directLogo = leadForm.logo || existing?.logo || existing?.logoUrl || '';
         if (directLogo && formData.logoUrl && directLogo.trim() === formData.logoUrl.trim()) {
           directLogo = '';
         }
@@ -569,13 +565,6 @@ support@dizigini.com`;
           const cd = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
           if (cd.includes('.') && cd.length >= 4) {
             return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
-          }
-        }
-        const cleanCompTarget = (formData.companyName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (effectiveLeadCompany && effectiveLeadCompany.length >= 3 && effectiveLeadCompany.toLowerCase().replace(/[^a-z0-9]/g, '') !== cleanCompTarget) {
-          const cleanComp = effectiveLeadCompany.toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (cleanComp.length >= 3) {
-            return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanComp}.com&size=128`;
           }
         }
         return '';
@@ -586,20 +575,20 @@ support@dizigini.com`;
         return cand;
       })(),
       logoAssetKey: existing?.logoAssetKey || '',
-      title: leadForm.title?.trim() || 'Executive Decision Maker',
+      title: leadForm.title?.trim() || '',
       company: effectiveLeadCompany,
-      aboutCompany: leadForm.aboutCompany?.trim() || (effectiveLeadCompany ? `Enterprise organization ${effectiveLeadCompany}.` : ''),
-      whySuitsBest: leadForm.whySuitsBest?.trim() || 'Strategic decision maker aligned with key pain points.',
+      aboutCompany: leadForm.aboutCompany?.trim() || '',
+      whySuitsBest: leadForm.whySuitsBest?.trim() || '',
       leadStudy: {
         ...(existing?.leadStudy || {}),
-        whyRelevant: leadForm.whyRelevant?.trim() || 'Direct decision authority and strategic alignment.',
-        observedContext: leadForm.observedContext?.trim() || 'Observed growth and strategic expansion.',
-        suggestedApproach: leadForm.suggestedApproach?.trim() || 'Lead with verifiable outcomes and SLA guarantees.',
+        whyRelevant: leadForm.whyRelevant?.trim() || '',
+        observedContext: leadForm.observedContext?.trim() || '',
+        suggestedApproach: leadForm.suggestedApproach?.trim() || '',
       },
       pitchDeck: leadForm.pitchDeckPdf ? {
         ...(existing?.pitchDeck || {}),
         title: existing?.pitchDeck?.title || `${leadForm.name.trim()} Proposal Pitch Deck`,
-        summary: existing?.pitchDeck?.summary || 'Targeted strategic pitch deck prepared for client leadership.',
+        summary: existing?.pitchDeck?.summary || '',
         streamUrl: leadForm.pitchDeckPdf,
         downloadUrl: leadForm.pitchDeckPdf,
         fileName: leadForm.pitchDeckPdfName || existing?.pitchDeck?.fileName || `${leadForm.name.trim().replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
@@ -618,6 +607,7 @@ support@dizigini.com`;
     setLeadForm({
       name: '',
       phone: '',
+      companyContactEmail: '',
       companyLink: '',
       companyLinkedin: '',
       email: '',
@@ -1929,24 +1919,24 @@ support@dizigini.com`;
                         />
                       </div>
 
-                      {/* 7. Phone Number */}
+                      {/* 6. Company Contact Email */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          7. Direct Phone / Mobile Number (Masked on public view)
+                          6. Company Contact Email (Under Company Specific)
                         </label>
                         <input
-                          type="text"
-                          placeholder="e.g. +1 (415) 890-1234 or leave blank"
-                          value={leadForm.phone}
-                          onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
+                          type="email"
+                          placeholder="e.g. contact@target.com or info@company.com"
+                          value={leadForm.companyContactEmail}
+                          onChange={(e) => setLeadForm({ ...leadForm, companyContactEmail: e.target.value })}
                           style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
                         />
                       </div>
 
-                      {/* 8. Lead Person LinkedIn Profile URL */}
+                      {/* 7. Lead Person LinkedIn Profile URL */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          8. Lead Person LinkedIn Profile URL
+                          7. Lead Person LinkedIn Profile URL (Under Lead Specific)
                         </label>
                         <input
                           type="text"
@@ -2326,6 +2316,7 @@ support@dizigini.com`;
                               setLeadForm({
                                 name: l.name || '',
                                 phone: l.phone || '',
+                                companyContactEmail: l.companyContactEmail || l.companyContact || '',
                                 companyLink: l.companyLink || '',
                                 companyLinkedin: l.companyLinkedin || '',
                                 email: l.email || '',
@@ -2334,7 +2325,7 @@ support@dizigini.com`;
                                 leadStudyPdfName: l.leadStudyPdfName || '',
                                 pitchDeckPdf: l.pitchDeckPdf || l.pitchDeck?.streamUrl || '',
                                 pitchDeckPdfName: l.pitchDeckPdfName || l.pitchDeck?.fileName || '',
-                                logo: l.logo || l.companyLogo || l.avatarUrl || '',
+                                logo: l.logo || l.avatarUrl || '',
                                 title: l.title || '',
                                 company: l.company || '',
                                 aboutCompany: l.aboutCompany || '',

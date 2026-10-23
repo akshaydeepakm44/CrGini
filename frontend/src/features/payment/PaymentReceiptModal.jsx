@@ -5,17 +5,22 @@ import {
   Download,
   CheckCircle2,
   ShieldCheck,
+  Clock,
+  FileText,
 } from 'lucide-react';
+import { BRAND_LOGO, BRAND_NAME } from '../../assets/branding';
 
 /**
  * PaymentReceiptModal
  * Matches the official TAX INVOICE format (DATAI2i Pvt. Ltd. / DiziGini)
- * Displays authentic DiziGini transaction details in the corporate Tax Invoice layout.
+ * Displays authentic DiziGini transaction details in the corporate Tax Invoice layout for Admin,
+ * and holds invoice with 24-hr notice in Client Portal.
  */
 export default function PaymentReceiptModal({
   isOpen,
   onClose,
   invoice,
+  isAdmin = false,
 }) {
   if (!isOpen || !invoice) return null;
 
@@ -140,6 +145,188 @@ export default function PaymentReceiptModal({
   const handlePrint = () => {
     window.print();
   };
+
+  const userRole = typeof window !== 'undefined' ? (localStorage.getItem('cg_user_role') || '').toUpperCase() : '';
+  const isSuperAdmin = isAdmin || userRole === 'SUPER_ADMIN';
+
+  // Client Portal Notice: Invoice is held with Super Admin, client sees 24-hr delivery notification
+  if (!isSuperAdmin) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.72)',
+          backdropFilter: 'blur(6px)',
+          zIndex: 1300,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px 16px',
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div
+          style={{
+            width: '100%',
+            maxWidth: '520px',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            padding: '32px 28px',
+            textAlign: 'center',
+            position: 'relative',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Close button */}
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '16px',
+              right: '16px',
+              background: '#F1F5F9',
+              border: 'none',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#64748B',
+              cursor: 'pointer',
+            }}
+          >
+            <X size={16} />
+          </button>
+
+          {/* DiziGini Brand Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
+            <img src={BRAND_LOGO} alt={BRAND_NAME} style={{ height: '32px', width: 'auto', objectFit: 'contain' }} />
+          </div>
+
+          {/* Clock / Processing Icon */}
+          <div style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+            border: '2px solid #BFDBFE',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px auto',
+            color: '#2563EB',
+          }}>
+            <Clock size={30} />
+          </div>
+
+          {/* Heading */}
+          <h2 style={{
+            fontSize: '1.35rem',
+            fontWeight: 800,
+            color: '#0F172A',
+            letterSpacing: '-0.02em',
+            margin: '0 0 10px 0',
+          }}>
+            You will get the invoice within next 24 hrs
+          </h2>
+
+          <p style={{
+            fontSize: '0.88rem',
+            color: '#64748B',
+            lineHeight: 1.55,
+            margin: '0 0 22px 0',
+          }}>
+            Your payment has been successfully received and verified. The formal Tax Invoice is generated and currently held with our Super Admin finance desk for statutory review. It will be delivered directly to your registered email address within the next 24 hours.
+          </p>
+
+          {/* Transaction Summary Card */}
+          <div style={{
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '12px',
+            padding: '16px 18px',
+            textAlign: 'left',
+            marginBottom: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            fontSize: '0.86rem',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#64748B', fontWeight: 600 }}>Invoice Ref:</span>
+              <span style={{ color: '#0F172A', fontWeight: 700, fontFamily: 'monospace' }}>{invoiceNumber}</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#64748B', fontWeight: 600 }}>Service:</span>
+              <span style={{ color: '#0F172A', fontWeight: 600 }}>{ticketRef ? `${ticketRef} — ` : ''}{serviceTitle}</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#64748B', fontWeight: 600 }}>Amount Paid:</span>
+              <span style={{ color: '#16A34A', fontWeight: 800 }}>{currencySymbol}{totalPaid.toFixed(2)}</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#64748B', fontWeight: 600 }}>Status:</span>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: '#ECFDF5',
+                color: '#059669',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+              }}>
+                <CheckCircle2 size={13} />
+                Payment Verified
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#64748B', fontWeight: 600 }}>Registered Email:</span>
+              <span style={{ color: '#334155', fontWeight: 600 }}>{clientEmail}</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #E2E8F0', paddingTop: '8px', marginTop: '2px' }}>
+              <span style={{ color: '#64748B', fontWeight: 600 }}>Hold Desk:</span>
+              <span style={{ color: '#2563EB', fontWeight: 700, fontSize: '0.8rem' }}>Super Admin Finance Desk</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              width: '100%',
+              padding: '12px 24px',
+              borderRadius: '10px',
+              background: '#2563EB',
+              color: '#FFFFFF',
+              fontWeight: 700,
+              fontSize: '0.92rem',
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
+              transition: 'background 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#1D4ED8')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#2563EB')}
+          >
+            Understood
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

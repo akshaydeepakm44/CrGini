@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Target,
   Download,
+  Eye,
   Linkedin,
   Mail,
   Phone,
@@ -140,8 +141,8 @@ function resolveLeadPresentation(lead, clientCompanyName = '') {
     return {
       leadCompany: '',
       leadPersonName: '',
-      role: 'Executive Decision Maker',
-      subtitle: 'Executive Decision Maker',
+      role: '',
+      subtitle: '',
     };
   }
 
@@ -160,7 +161,7 @@ function resolveLeadPresentation(lead, clientCompanyName = '') {
   }
 
   let leadPersonName = (lead.name || '').trim();
-  const role = (lead.title || 'Executive Decision Maker').trim();
+  const role = (lead.title || '').trim();
 
   // If leadCompany was not explicitly set, extract domain from lead company link
   if (!leadCompany && lead.companyLink) {
@@ -181,12 +182,12 @@ function resolveLeadPresentation(lead, clientCompanyName = '') {
 
   let subtitle = role;
   if (leadCompany && !isSame) {
-    subtitle = `${role} · ${leadCompany}`;
+    subtitle = role ? `${role} · ${leadCompany}` : leadCompany;
   }
 
   return {
     leadCompany: isSame ? '' : leadCompany,
-    leadPersonName: leadPersonName || leadCompany || 'Executive Decision Maker',
+    leadPersonName: leadPersonName || leadCompany || 'Target Contact',
     role,
     subtitle,
   };
@@ -300,14 +301,15 @@ export default function PublicSampleDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedLead, setSelectedLead] = useState(null);
+  const [pdfPreviewModal, setPdfPreviewModal] = useState(null);
 
-  // Smooth scroll handler to Next Steps & Collaboration section
+  // Smooth scroll handler to contact/feedback section
   const scrollToNextSteps = (e) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    const el = document.getElementById('contact-feedback') || document.getElementById('next-steps-collaboration');
+    const el = document.getElementById('contact-feedback') || document.getElementById('prospect-feedback');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
@@ -516,26 +518,6 @@ Best regards,
 
     // 1. Direct showcase logo uploaded in the prospect showcase
     let raw = sample?.logoUrl || sample?.companyLogo;
-    
-    // Safety check: Ensure raw does not belong to any lead
-    if (raw && !isPlatformLogo(raw) && Array.isArray(sample?.leads) && sample.leads.length > 0) {
-      const isLeadLogo = sample.leads.some((l) => {
-        const leadLogoCand = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
-        if (leadLogoCand && typeof leadLogoCand === 'string' && leadLogoCand === raw) return true;
-        if (l.companyLink && typeof l.companyLink === 'string') {
-          const lDomain = l.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim().toLowerCase();
-          if (lDomain && lDomain.length >= 4 && raw.toLowerCase().includes(lDomain)) {
-            const compWebsite = (sample?.companyStudy?.website || '').toLowerCase();
-            if (!compWebsite.includes(lDomain)) return true;
-          }
-        }
-        return false;
-      });
-      if (isLeadLogo) {
-        raw = null;
-      }
-    }
-
     if (raw && !isPlatformLogo(raw)) {
       return raw.trim();
     }
@@ -598,8 +580,6 @@ Best regards,
     );
   };
 
-  // Resolve best logo for any lead (uploaded logo -> lead's own company domain favicon -> null)
-  // Ensures leads ONLY show their own uploaded logo and NEVER duplicate the main company logo
   // Resolve best logo for any lead (uploaded lead logo -> lead's own company domain favicon -> fallback initial)
   // CRITICAL: Guarantees lead logo NEVER replicates the showcase company logo
   const resolveLeadLogo = (lead, isFeatured = false) => {
@@ -616,8 +596,20 @@ Best regards,
       const cleanCand = candUrl.trim();
       if (companyLogo && cleanCand === companyLogo) return true;
       if (sample?.logoUrl && cleanCand === sample.logoUrl) return true;
+      if (sample?.companyLogo && cleanCand === sample.companyLogo) return true;
       if (sample?.companyStudy?.logoUrl && cleanCand === sample.companyStudy.logoUrl) return true;
       if (sample?.slug && cleanCand.includes(`/samples/${sample.slug}/logo`)) return true;
+
+      // Match base64 data URLs if identical to showcase logo
+      if (sample?.logoUrl && sample.logoUrl.startsWith('data:') && cleanCand === sample.logoUrl) return true;
+      if (sample?.companyLogo && sample.companyLogo.startsWith('data:') && cleanCand === sample.companyLogo) return true;
+      if (sample?.companyStudy?.logoUrl && sample.companyStudy.logoUrl.startsWith('data:') && cleanCand === sample.companyStudy.logoUrl) return true;
+
+      // Reject generic lead logo route if lead has no distinct asset key
+      if (sample?.slug && cleanCand.includes(`/api/samples/${sample.slug}/leads/`) && !lead.logoAssetKey) {
+        return true;
+      }
+
       if (companyName) {
         const cleanComp = companyName.toLowerCase().replace(/[^a-z0-9]/g, '');
         if (cleanComp.length >= 3 && cleanCand.toLowerCase().includes(`${cleanComp}.com`)) {
@@ -647,7 +639,7 @@ Best regards,
       return `/api/samples/${sample.slug}/leads/${lead.id}/logo`;
     }
 
-    // 2. Lead's own company website domain favicon (e.g. dallah.com for Dallah Medical Group)
+    // 2. Lead's own company website domain favicon (e.g. crazygames.com for CrazyGames)
     const rawLink =
       lead.companyLink ||
       lead.website ||
@@ -941,7 +933,7 @@ Best regards,
                 {companyName}
               </div>
 
-              {/* Study Document Box: Paragraph + Download Button */}
+              {/* Study Document Box: Paragraph + Preview & Download Button */}
               <div style={{
                 marginTop: '16px',
                 width: '100%',
@@ -967,43 +959,86 @@ Best regards,
                   }}>
                     What we understood from your company
                   </p>
+                  <div style={{
+                    fontSize: '0.74rem',
+                    color: '#16A34A',
+                    fontWeight: 700,
+                    marginTop: '3px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span>💡 On an avg lead identification and study costs $2</span>
+                  </div>
                 </div>
 
                 {companyStudy?.hasPdf ? (
-                  <a
-                    href={companyStudy.pdfUrl || `/api/samples/${sample.slug}/company-study-pdf`}
-                    target="_blank"
-                    rel="noreferrer"
-                    download={`${companyName.replace(/\s+/g, '_')}_Company_Study.pdf`}
-                    className="sample-download-study-btn"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '7px',
-                      background: '#2563EB',
-                      color: '#FFFFFF',
-                      padding: '8px 14px',
-                      borderRadius: '8px',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      textDecoration: 'none',
-                      boxShadow: '0 2px 8px rgba(37,99,235,0.22)',
-                      transition: 'all 0.15s ease',
-                      flexShrink: 0,
-                      cursor: 'pointer'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#1D4ED8';
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#2563EB';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    <Download size={14} />
-                    <span>Download the company study</span>
-                  </a>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const studyUrl = companyStudy.pdfUrl || `/api/samples/${sample.slug}/company-study-pdf`;
+                        setPdfPreviewModal({
+                          url: studyUrl,
+                          title: `${companyName} — Comprehensive Company Study`,
+                          downloadUrl: `${studyUrl}?download=true`,
+                          fileName: `${companyName.replace(/\s+/g, '_')}_Company_Study.pdf`,
+                        });
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#EFF6FF',
+                        color: '#2563EB',
+                        border: '1px solid #BFDBFE',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <Eye size={14} />
+                      <span>Preview Study</span>
+                    </button>
+
+                    <a
+                      href={companyStudy.pdfUrl || `/api/samples/${sample.slug}/company-study-pdf`}
+                      target="_blank"
+                      rel="noreferrer"
+                      download={`${companyName.replace(/\s+/g, '_')}_Company_Study.pdf`}
+                      className="sample-download-study-btn"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '7px',
+                        background: '#2563EB',
+                        color: '#FFFFFF',
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        textDecoration: 'none',
+                        boxShadow: '0 2px 8px rgba(37,99,235,0.22)',
+                        transition: 'all 0.15s ease',
+                        flexShrink: 0,
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#1D4ED8';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#2563EB';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      <Download size={14} />
+                      <span>Download the company study</span>
+                    </a>
+                  </div>
                 ) : (
                   <div
                     style={{
@@ -1044,9 +1079,25 @@ Best regards,
                 1
               </div>
               <div>
-                <h2 className="sample-section-title">
-                  Decision-maker intelligence
-                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <h2 className="sample-section-title" style={{ margin: 0 }}>
+                    Decision-maker intelligence
+                  </h2>
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    background: '#F0FDF4',
+                    border: '1px solid #BBF7D0',
+                    color: '#15803D',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                  }}>
+                    <span>💡 On an avg lead identification and study costs $2</span>
+                  </div>
+                </div>
                 <p className="sample-section-subtitle">
                   A preview of the people relevant to your target account.
                 </p>
@@ -1093,7 +1144,10 @@ Best regards,
                   border: '2px solid #E2E8F0',
                   flexShrink: 0
                 }}>
-                  {featuredLead.name?.charAt(0) || 'L'}
+                  {(() => {
+                    const leadPres = resolveLeadPresentation(featuredLead, companyName);
+                    return (leadPres.leadCompany || leadPres.leadPersonName || 'L').charAt(0).toUpperCase();
+                  })()}
                 </div>
 
                 {(() => {
@@ -1125,39 +1179,73 @@ Best regards,
                 })()}
               </div>
 
-              {/* Action Button: Download Pitch Deck directly instead of inspecting full dossier */}
+              {/* Action Buttons: Preview Pitch Deck & Download Pitch Deck */}
               {(() => {
                 const leadPitchUrl = featuredLead.pitchDeck?.downloadUrl ||
                                      featuredLead.pitchDeckPdf ||
                                      (sample?.pitchDeck?.downloadUrl || (sample?.pitchDeck ? `/api/samples/${sample.slug}/pitch-deck?download=true` : null));
+                const leadPitchStreamUrl = featuredLead.pitchDeck?.streamUrl ||
+                                           featuredLead.pitchDeckPdf ||
+                                           (sample?.pitchDeck?.streamUrl || (sample?.pitchDeck ? `/api/samples/${sample.slug}/pitch-deck` : leadPitchUrl));
                 const leadPitchName = featuredLead.pitchDeck?.fileName || featuredLead.pitchDeckPdfName || sample?.pitchDeck?.fileName || `${(featuredLead.name || 'Prospect').replace(/\s+/g, '_')}_Pitch_Deck.pdf`;
 
                 if (leadPitchUrl) {
                   return (
-                    <a
-                      href={leadPitchUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      download={leadPitchName}
-                      className="featured-lead-btn"
-                      style={{
-                        textDecoration: 'none',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        background: '#2563EB',
-                        color: '#FFFFFF',
-                        padding: '11px 20px',
-                        borderRadius: '10px',
-                        fontWeight: 700,
-                        fontSize: '0.88rem',
-                        boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <Download size={17} />
-                      <span>Download Pitch Deck</span>
-                    </a>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPdfPreviewModal({
+                            url: leadPitchStreamUrl,
+                            title: `${featuredLead.name || 'Prospect'} — Pitch Deck`,
+                            downloadUrl: leadPitchUrl,
+                            fileName: leadPitchName,
+                          });
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#EFF6FF',
+                          color: '#2563EB',
+                          border: '1px solid #BFDBFE',
+                          padding: '10px 18px',
+                          borderRadius: '10px',
+                          fontWeight: 700,
+                          fontSize: '0.88rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Eye size={16} />
+                        <span>Preview Pitch Deck</span>
+                      </button>
+
+                      <a
+                        href={leadPitchUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={leadPitchName}
+                        className="featured-lead-btn"
+                        style={{
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          background: '#2563EB',
+                          color: '#FFFFFF',
+                          padding: '10px 18px',
+                          borderRadius: '10px',
+                          fontWeight: 700,
+                          fontSize: '0.88rem',
+                          boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Download size={16} />
+                        <span>Download Pitch Deck</span>
+                      </a>
+                    </div>
                   );
                 }
 
@@ -1184,13 +1272,11 @@ Best regards,
 
               {/* All Details Displayed Directly on the Container */}
               {(() => {
-                const leadCompanyDomain = (featuredLead.companyLink || '').replace(/^https?:\/\/(www\.)?/, '').split('/')[0] || '';
-                const leadMail = featuredLead.email || (leadCompanyDomain ? `contact@${leadCompanyDomain}` : null);
-                const rawPhone = featuredLead.phone || featuredLead.maskedPhone;
-                const isFakePhone = rawPhone && (rawPhone.includes('555') || rawPhone.includes('234-8900') || rawPhone.includes('(xxx)'));
-                const leadPhone = isFakePhone ? null : (featuredLead.phone || null);
+                const leadMail = featuredLead.email || null;
                 const companyWeb = featuredLead.companyLink || null;
                 const companyLinkedin = featuredLead.companyLinkedin || null;
+                const companyContact = featuredLead.companyContactEmail || featuredLead.companyContact || featuredLead.companyEmail || null;
+                const leadLinkedin = featuredLead.linkedin || null;
 
                 return (
                   <div style={{
@@ -1264,6 +1350,22 @@ Best regards,
                               <span style={{ color: '#94A3B8' }}>Not specified</span>
                             )}
                           </div>
+
+                          {/* Company Contact Email (uploaded by lead specialists) */}
+                          <div className="dossier-info-row">
+                            <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Company Contact:</span>
+                            {companyContact ? (
+                              <a
+                                href={`mailto:${companyContact}`}
+                                style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
+                              >
+                                <Mail size={14} color="#2563EB" style={{ flexShrink: 0 }} />
+                                <span>{companyContact}</span>
+                              </a>
+                            ) : (
+                              <span style={{ color: '#94A3B8' }}>Not uploaded</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1311,14 +1413,20 @@ Best regards,
                             )}
                           </div>
 
-                          {/* Lead Phone */}
+                          {/* Lead LinkedIn (Replaces Lead Phone) */}
                           <div className="dossier-info-row">
-                            <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead Phone:</span>
-                            {leadPhone ? (
-                              <span style={{ color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}>
-                                <Phone size={14} color="#059669" style={{ flexShrink: 0 }} />
-                                <span>{leadPhone}</span>
-                              </span>
+                            <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead LinkedIn:</span>
+                            {leadLinkedin ? (
+                              <a
+                                href={leadLinkedin.startsWith('http') ? leadLinkedin : `https://${leadLinkedin}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: '#0A66C2', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
+                              >
+                                <Linkedin size={14} color="#0A66C2" style={{ flexShrink: 0 }} />
+                                <span>{shortenUrl(leadLinkedin, 32)}</span>
+                                <ExternalLink size={12} style={{ flexShrink: 0 }} />
+                              </a>
                             ) : (
                               <span style={{ color: '#94A3B8' }}>Not uploaded</span>
                             )}
@@ -1328,26 +1436,9 @@ Best regards,
                           <div className="dossier-info-row">
                             <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead Role:</span>
                             <span style={{ color: '#0F172A', fontWeight: 800, wordBreak: 'break-word' }}>
-                              {featuredLead.title?.trim() || 'Executive Decision Maker'}
+                              {featuredLead.title?.trim() || 'Not specified'}
                             </span>
                           </div>
-
-                          {/* Lead LinkedIn */}
-                          {featuredLead.linkedin && !featuredLead.linkedin.includes('/company/') && (
-                            <div className="dossier-info-row">
-                              <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead LinkedIn:</span>
-                              <a
-                                href={featuredLead.linkedin.startsWith('http') ? featuredLead.linkedin : `https://${featuredLead.linkedin}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{ color: '#0A66C2', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
-                              >
-                                <Linkedin size={14} color="#0A66C2" style={{ flexShrink: 0 }} />
-                                <span>{shortenUrl(featuredLead.linkedin, 32)}</span>
-                                <ExternalLink size={12} style={{ flexShrink: 0 }} />
-                              </a>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -1940,25 +2031,6 @@ Best regards,
               background: 'linear-gradient(90deg, #2563EB 0%, #7C3AED 50%, #10B981 100%)'
             }} />
 
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              background: '#EFF6FF',
-              border: '1px solid #DBEAFE',
-              color: '#2563EB',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              marginBottom: '16px'
-            }}>
-              <Sparkles size={14} />
-              <span>Next Steps & Collaboration</span>
-            </div>
-
             <h2 style={{
               fontSize: 'clamp(1.35rem, 4vw, 1.85rem)',
               fontWeight: 800,
@@ -2176,24 +2248,23 @@ Best regards,
             {(() => {
               const isLeadUnlocked = Boolean(selectedLead.isUnlocked || (featuredLead && (selectedLead.id === featuredLead.id || selectedLead.name === featuredLead.name)));
               const leadMail = isLeadUnlocked
-                ? (selectedLead.email || featuredLead?.email || 'contact@' + ((sample?.companyStudy?.website || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || 'company.com'))
-                : (selectedLead.maskedEmail || '••••••••@' + ((sample?.companyStudy?.website || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || 'company.com'));
-              const rawPhone = selectedLead.phone || selectedLead.maskedPhone;
-              const isFakePhone = rawPhone && (rawPhone.includes('555') || rawPhone.includes('234-8900') || rawPhone.includes('(xxx)'));
-              const leadPhone = isFakePhone ? null : (isLeadUnlocked ? (selectedLead.phone || null) : (selectedLead.maskedPhone ? formatMaskedPhone(selectedLead.maskedPhone) : null));
+                ? (selectedLead.email || featuredLead?.email || null)
+                : (selectedLead.maskedEmail || null);
 
               return (
                 <div style={{ padding: 'clamp(16px, 3.5vw, 22px) clamp(16px, 4vw, 28px)', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                  <div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
-                      EXECUTIVE PROFILE
+                  {(selectedLead.whySuitsBest || selectedLead.shortSummary) && (
+                    <div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
+                        EXECUTIVE PROFILE
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.6, margin: 0, wordBreak: 'break-word' }}>
+                        {selectedLead.whySuitsBest || selectedLead.shortSummary}
+                      </p>
                     </div>
-                    <p style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.6, margin: 0, wordBreak: 'break-word' }}>
-                      {selectedLead.whySuitsBest || selectedLead.shortSummary || 'Direct budget decision maker aligned with key pain points and strategic initiatives.'}
-                    </p>
-                  </div>
+                  )}
 
-                  {/* 1. Company Specific Container (Image 2) */}
+                  {/* 1. Company Specific Container */}
                   <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px 18px' }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Building2 size={16} color="#2563EB" />
@@ -2236,10 +2307,26 @@ Best regards,
                           <span style={{ color: '#94A3B8' }}>Not specified</span>
                         )}
                       </div>
+
+                      {/* Company Contact Email */}
+                      <div className="dossier-info-row">
+                        <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Company Contact:</span>
+                        {(selectedLead.companyContactEmail || selectedLead.companyContact || selectedLead.companyEmail) ? (
+                          <a
+                            href={`mailto:${selectedLead.companyContactEmail || selectedLead.companyContact || selectedLead.companyEmail}`}
+                            style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}
+                          >
+                            <Mail size={14} color="#2563EB" style={{ flexShrink: 0 }} />
+                            <span>{selectedLead.companyContactEmail || selectedLead.companyContact || selectedLead.companyEmail}</span>
+                          </a>
+                        ) : (
+                          <span style={{ color: '#94A3B8' }}>Not uploaded</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* 2. Lead Specific Container (Image 2) */}
+                  {/* 2. Lead Specific Container */}
                   <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px 18px' }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Users size={16} color="#7C3AED" />
@@ -2270,31 +2357,10 @@ Best regards,
                         )}
                       </div>
 
-                      {/* Lead Phone */}
+                      {/* Lead LinkedIn (Replaces Lead Phone) */}
                       <div className="dossier-info-row">
-                        <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead Phone:</span>
-                        {leadPhone ? (
-                          <span style={{ color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px', wordBreak: 'break-all' }}>
-                            <Phone size={14} color="#059669" style={{ flexShrink: 0 }} />
-                            <span>{leadPhone}</span>
-                          </span>
-                        ) : (
-                          <span style={{ color: '#94A3B8' }}>Not uploaded</span>
-                        )}
-                      </div>
-
-                      {/* Lead Role */}
-                      <div className="dossier-info-row">
-                        <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead Role:</span>
-                        <span style={{ color: '#0F172A', fontWeight: 800, wordBreak: 'break-word' }}>
-                          {selectedLead.title?.trim() || 'Executive Decision Maker'}
-                        </span>
-                      </div>
-
-                      {/* Lead LinkedIn URL */}
-                      {selectedLead.linkedin && !selectedLead.linkedin.includes('/company/') && (
-                        <div className="dossier-info-row">
-                          <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead LinkedIn:</span>
+                        <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead LinkedIn:</span>
+                        {selectedLead.linkedin && !selectedLead.linkedin.includes('/company/') ? (
                           <a
                             href={selectedLead.linkedin.startsWith('http') ? selectedLead.linkedin : `https://${selectedLead.linkedin}`}
                             target="_blank"
@@ -2305,8 +2371,18 @@ Best regards,
                             <span>{shortenUrl(selectedLead.linkedin, 32)}</span>
                             <ExternalLink size={12} style={{ flexShrink: 0 }} />
                           </a>
-                        </div>
-                      )}
+                        ) : (
+                          <span style={{ color: '#94A3B8' }}>Not uploaded</span>
+                        )}
+                      </div>
+
+                      {/* Lead Role */}
+                      <div className="dossier-info-row">
+                        <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>Lead Role:</span>
+                        <span style={{ color: '#0F172A', fontWeight: 800, wordBreak: 'break-word' }}>
+                          {selectedLead.title?.trim() || 'Not specified'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -2330,10 +2406,17 @@ Best regards,
                   </div>
 
                   {(selectedLead.pitchDeck || pitchDeck) && (
-                    <a
-                      href={selectedLead.pitchDeck?.streamUrl || selectedLead.pitchDeck?.downloadUrl || `/api/samples/${sample.slug}/leads/${selectedLead.id}/pitch-deck`}
-                      target="_blank"
-                      rel="noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const deckUrl = selectedLead.pitchDeck?.streamUrl || selectedLead.pitchDeck?.downloadUrl || `/api/samples/${sample.slug}/leads/${selectedLead.id}/pitch-deck`;
+                        setPdfPreviewModal({
+                          url: deckUrl,
+                          title: selectedLead.pitchDeck?.title || `${selectedLead.name} Proposal Pitch Deck`,
+                          downloadUrl: `${deckUrl}?download=true`,
+                          fileName: `${(selectedLead.name || 'Lead').replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
+                        });
+                      }}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -2344,12 +2427,14 @@ Best regards,
                         borderRadius: '8px',
                         fontSize: '0.825rem',
                         fontWeight: 700,
-                        textDecoration: 'none'
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'opacity 0.15s ease'
                       }}
                     >
                       <Presentation size={14} />
                       <span>Preview Deck PDF</span>
-                    </a>
+                    </button>
                   )}
                 </div>
               )}
@@ -2808,6 +2893,133 @@ Best regards,
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* IN-PAGE PDF PREVIEW MODAL (PREVIEW WITHOUT DOWNLOADING) */}
+      {pdfPreviewModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.78)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 1400,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPdfPreviewModal(null);
+          }}
+        >
+          <div
+            style={{
+              width: '95vw',
+              maxWidth: '1100px',
+              height: '90vh',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '14px 20px',
+                background: '#0F172A',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+                borderBottom: '1px solid #1E293B',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                <FileText size={18} color="#60A5FA" />
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '480px' }}>
+                  {pdfPreviewModal.title || 'Document Preview'}
+                </span>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  color: '#93C5FD',
+                  background: 'rgba(37,99,235,0.25)',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(147,197,253,0.3)',
+                }}>
+                  In-Page Preview
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {pdfPreviewModal.downloadUrl && (
+                  <a
+                    href={pdfPreviewModal.downloadUrl}
+                    download={pdfPreviewModal.fileName || 'Document.pdf'}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#2563EB',
+                      color: '#FFFFFF',
+                      padding: '7px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <Download size={14} />
+                    <span>Download</span>
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setPdfPreviewModal(null)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.12)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#FFFFFF',
+                    cursor: 'pointer',
+                  }}
+                  title="Close preview"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Inline PDF Frame */}
+            <div style={{ flex: 1, width: '100%', background: '#F1F5F9', position: 'relative' }}>
+              <iframe
+                src={pdfPreviewModal.url}
+                title={pdfPreviewModal.title}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
 
