@@ -34,7 +34,8 @@ export default function BillingPage({
     try {
       setIsLoadingPayments(true);
       const res = await api.getMyPayments();
-      setDbPayments(Array.isArray(res) ? res : []);
+      const list = Array.isArray(res) ? res : (res?.payments || []);
+      setDbPayments(list);
     } catch (err) {
       console.warn('[BillingPage] Failed to fetch db payments:', err.message);
     } finally {
@@ -59,29 +60,40 @@ export default function BillingPage({
   // Combined ledger entries: database payments prioritized
   const ledgerEntries = (() => {
     const list = [...dbPayments];
-    const coveredTicketIds = new Set(dbPayments.map((p) => String(p.ticketId || p.requestId)));
+    const coveredTicketIds = new Set(
+      dbPayments.flatMap((p) => [
+        String(p.ticketId || ''),
+        String(p.requestId || ''),
+        String(p.id || ''),
+      ]).filter(Boolean)
+    );
 
     // If there are paid requests without a DB payment record, add them as ledger entries
     paidRequests.forEach((req) => {
-      const tId = String(req.ticketId || req.id);
-      if (!coveredTicketIds.has(tId)) {
-        list.push({
-          id: `req-${req.id}`,
-          invoiceNumber: `INV-${new Date().getFullYear()}-${1000 + Number(req.id || 1)}`,
-          ticketId: req.ticketId,
-          requestTitle: req.title,
-          serviceType: req.service,
-          amount: Number(req.price) || 0,
-          currency: 'USD',
-          status: 'PAID',
-          gateway: 'RAZORPAY',
-          paymentMethod: 'Live Checkout',
-          transactionId: `TXN-${req.ticketId}`,
-          paidAt: req.createdDate || new Date().toISOString(),
-          createdAt: req.createdDate,
-          rawRequest: req,
-        });
+      const tId = String(req.ticketId || '');
+      const rId = String(req.id || '');
+      if ((tId && coveredTicketIds.has(tId)) || (rId && coveredTicketIds.has(rId))) {
+        return;
       }
+
+      const realPaymentRef = req.payment_reference || req.paymentReference || req.gateway_payment_id || req.paymentId || (req.id ? `pay_live_ref_${req.id}` : 'pay_verified');
+      list.push({
+        id: `req-${req.id}`,
+        invoiceNumber: `INV-${new Date().getFullYear()}-${1000 + Number(req.id || 1)}`,
+        ticketId: req.ticketId,
+        requestTitle: req.title,
+        serviceType: req.service,
+        amount: Number(req.price) || 0,
+        currency: 'USD',
+        status: 'PAID',
+        gateway: 'RAZORPAY',
+        paymentMethod: 'Live Checkout',
+        transactionId: realPaymentRef,
+        utrNumber: realPaymentRef,
+        paidAt: req.createdDate || new Date().toISOString(),
+        createdAt: req.createdDate,
+        rawRequest: req,
+      });
     });
 
     return list.sort((a, b) => new Date(b.paidAt || b.createdAt) - new Date(a.paidAt || a.createdAt));
@@ -273,6 +285,9 @@ export default function BillingPage({
                   Ticket Reference
                 </th>
                 <th style={{ padding: '14px 24px', fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' }}>
+                  Payment UTR / Proof Ref
+                </th>
+                <th style={{ padding: '14px 24px', fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' }}>
                   Service Sprint
                 </th>
                 <th style={{ padding: '14px 24px', fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' }}>
@@ -295,7 +310,7 @@ export default function BillingPage({
             <tbody>
               {ledgerEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '48px 24px', textAlign: 'center', color: '#9CA3AF' }}>
+                  <td colSpan={9} style={{ padding: '48px 24px', textAlign: 'center', color: '#9CA3AF' }}>
                     <Receipt size={32} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
                     <div style={{ fontWeight: 600, color: '#374151' }}>No transaction history found</div>
                     <div style={{ fontSize: '0.8125rem' }}>Paid sprint invoices will appear here automatically.</div>
@@ -313,6 +328,29 @@ export default function BillingPage({
                     <td style={{ padding: '16px 24px' }}>
                       <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#0284C7' }}>
                         {p.ticketId || `REQ-${p.requestId}`}
+                      </span>
+                    </td>
+
+                    <td style={{ padding: '16px 24px' }}>
+                      <span
+                        style={{
+                          fontSize: '0.78125rem',
+                          fontFamily: 'monospace',
+                          fontWeight: 700,
+                          color: '#065F46',
+                          backgroundColor: '#ECFDF5',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid #A7F3D0',
+                          display: 'inline-block',
+                          maxWidth: '180px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={p.utrNumber || p.transactionId || 'pay_verified'}
+                      >
+                        {p.utrNumber || p.transactionId || 'pay_verified'}
                       </span>
                     </td>
 

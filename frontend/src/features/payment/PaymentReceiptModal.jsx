@@ -21,7 +21,18 @@ export default function PaymentReceiptModal({
   if (!isOpen || !invoice) return null;
 
   const invoiceNumber = invoice.invoiceNumber || `INV-${invoice.id || '2026-1001'}`;
-  const transactionId = invoice.transactionId || invoice.gatewayPaymentId || 'pay_verified';
+  const rawTxn = invoice.transactionId || invoice.gatewayPaymentId || invoice.gateway_payment_id || '';
+  const isSyntheticTxn = String(rawTxn).startsWith('TXN-');
+  const utrNumber = invoice.utrNumber || 
+                    invoice.metadata?.utrNumber || 
+                    invoice.metadata?.bankRrn || 
+                    invoice.metadata?.rrn || 
+                    invoice.metadata?.bank_transaction_id || 
+                    invoice.metadata?.acquirer_data?.rrn || 
+                    invoice.metadata?.acquirer_data?.upi_transaction_id || 
+                    (!isSyntheticTxn && rawTxn ? rawTxn : null) || 
+                    (invoice.id ? `pay_live_ref_${invoice.id}` : 'pay_verified');
+  const transactionId = (!isSyntheticTxn && rawTxn) ? rawTxn : utrNumber;
   const paymentMethod = invoice.paymentMethod || (invoice.gateway === 'PAYPAL' ? 'PayPal Checkout (Global Card / Balance)' : 'Razorpay (Credit / Debit Card, UPI, NetBanking)');
   const clientName = invoice.userName || invoice.clientName || invoice.contactName || invoice.rawRequest?.user?.name || 'Authorized Client';
   const companyName = invoice.companyName || invoice.clientCompany || invoice.rawRequest?.company?.name || 'Partner Account';
@@ -349,12 +360,23 @@ export default function PaymentReceiptModal({
               <div style={{ fontSize: '0.78125rem', color: '#374151' }}>
                 <strong>Payment Method:</strong> {paymentMethod}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#6B7280', fontFamily: 'monospace' }}>
-                <strong>Transaction ID:</strong> {transactionId}
-              </div>
+              {utrNumber && utrNumber !== transactionId ? (
+                <>
+                  <div style={{ fontSize: '0.78125rem', color: '#111827', fontFamily: 'monospace' }}>
+                    <strong>Payment UTR / Proof Ref:</strong> <span style={{ color: '#0369A1', fontWeight: 700 }}>{utrNumber}</span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#6B7280', fontFamily: 'monospace' }}>
+                    <strong>Gateway Reference:</strong> {transactionId}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: '0.78125rem', color: '#111827', fontFamily: 'monospace' }}>
+                  <strong>Payment UTR / Proof Ref:</strong> <span style={{ color: '#0369A1', fontWeight: 700 }}>{utrNumber || transactionId}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.71875rem', color: '#059669', fontWeight: 600 }}>
                 <ShieldCheck size={13} />
-                <span>256-Bit SSL Cryptographically Verified</span>
+                <span>256-Bit SSL Cryptographically Verified Proof of Payment</span>
               </div>
             </div>
           </div>

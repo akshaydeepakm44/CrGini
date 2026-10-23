@@ -170,10 +170,14 @@ export default function PaymentCheckoutModal({
             });
 
             if (verifyRes.success) {
+              const utr = verifyRes.payment?.utrNumber || response.razorpay_payment_id;
               const invoiceData = {
                 id: verifyRes.payment?.id,
                 invoiceNumber: verifyRes.payment?.invoiceNumber || `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
                 transactionId: response.razorpay_payment_id,
+                gatewayPaymentId: response.razorpay_payment_id,
+                utrNumber: utr,
+                metadata: verifyRes.payment?.metadata,
                 gateway: 'RAZORPAY',
                 paymentMethod: 'Razorpay (Credit / Debit Card, UPI, NetBanking)',
                 amountUsd: ticketPriceUsd,
@@ -198,6 +202,7 @@ export default function PaymentCheckoutModal({
                 exchangeRate: exchangeRate,
                 invoiceNumber: invoiceData.invoiceNumber,
                 transactionId: response.razorpay_payment_id,
+                utrNumber: utr,
                 isSimulated: false,
               });
               if (onPaymentSuccess) onPaymentSuccess(verifyRes, finalTicket, invoiceData);
@@ -566,11 +571,19 @@ export default function PaymentCheckoutModal({
                   <span style={{ fontWeight: 700, color: '#111827' }}>{paymentSuccessData.invoiceNumber}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.875rem' }}>
-                  <span style={{ color: '#6B7280' }}>Transaction Reference:</span>
-                  <span style={{ fontWeight: 600, color: '#3B2874', fontFamily: 'monospace' }}>
-                    {paymentSuccessData.transactionId}
+                  <span style={{ color: '#6B7280' }}>Payment UTR / Proof Ref:</span>
+                  <span style={{ fontWeight: 700, color: '#047857', fontFamily: 'monospace' }}>
+                    {paymentSuccessData.utrNumber || paymentSuccessData.transactionId}
                   </span>
                 </div>
+                {paymentSuccessData.utrNumber && paymentSuccessData.transactionId && paymentSuccessData.utrNumber !== paymentSuccessData.transactionId && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.875rem' }}>
+                    <span style={{ color: '#6B7280' }}>Gateway Payment ID:</span>
+                    <span style={{ fontWeight: 600, color: '#4B5563', fontFamily: 'monospace' }}>
+                      {paymentSuccessData.transactionId}
+                    </span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.875rem' }}>
                   <span style={{ color: '#6B7280' }}>Gateway & Channel:</span>
                   <span style={{ fontWeight: 700, color: '#111827' }}>{paymentSuccessData.gateway} ({paymentSuccessData.method})</span>

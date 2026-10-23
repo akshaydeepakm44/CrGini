@@ -1038,7 +1038,10 @@ export const processPayment = async (req, res) => {
       currency: 'USD',
       status: 'PAID',
       paidAt: new Date(),
-      paymentMethod: req.body.paymentMethod || 'Stripe Corporate Card'
+      paymentMethod: req.body.paymentMethod || 'Stripe Corporate Card',
+      gateway: req.body.gateway || 'RAZORPAY',
+      gatewayPaymentId: req.body.gatewayPaymentId || req.body.transactionId || null,
+      metadata: req.body.metadata || null,
     });
 
     await createActivityLog({

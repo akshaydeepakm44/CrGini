@@ -159,6 +159,21 @@ export const verifyRazorpaySignature = ({
 };
 
 /**
+ * Fetch authoritative payment details directly from Razorpay (includes Bank UTR / RRN)
+ */
+export const fetchRazorpayPayment = async (paymentId) => {
+  try {
+    const rzp = getRazorpayInstance();
+    if (!rzp || !paymentId || String(paymentId).startsWith('pay_sim')) return null;
+    const payment = await rzp.payments.fetch(paymentId);
+    return payment;
+  } catch (err) {
+    console.warn('[Fetch Razorpay Payment Telemetry Warn]:', err.message);
+    return null;
+  }
+};
+
+/**
  * -------------------------------------------------------------
  * PAYPAL METHODS (REST API v2)
  * -------------------------------------------------------------

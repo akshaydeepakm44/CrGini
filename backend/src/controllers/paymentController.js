@@ -19,6 +19,7 @@ import {
   isPayPalConfigured,
   createRazorpayOrder,
   verifyRazorpaySignature,
+  fetchRazorpayPayment,
   createPayPalOrder,
   capturePayPalOrder,
 } from '../services/paymentGatewayService.js';
@@ -386,6 +387,19 @@ export const verifyRazorpay = async (req, res) => {
     const priceUsd = Number(request.price || 0);
     const pricing = await calculateTicketPricing(priceUsd);
 
+    // Fetch authoritative telemetry directly from Razorpay (captures Bank RRN / UPI UTR)
+    let paymentDetails = null;
+    let bankUtr = null;
+    try {
+      paymentDetails = await fetchRazorpayPayment(razorpay_payment_id);
+      if (paymentDetails) {
+        bankUtr = paymentDetails.acquirer_data?.rrn ||
+                  paymentDetails.acquirer_data?.upi_transaction_id ||
+                  paymentDetails.acquirer_data?.bank_transaction_id ||
+                  null;
+      }
+    } catch (_) {}
+
     const { updatedRequest, paymentRecord } = await finalizeTicketPayment({
       request,
       user: req.user,
@@ -398,6 +412,9 @@ export const verifyRazorpay = async (req, res) => {
       paymentMethod,
       metadata: {
         isSimulated: verification.isSimulated,
+        utrNumber: bankUtr || razorpay_payment_id,
+        bankRrn: bankUtr || null,
+        acquirerData: paymentDetails?.acquirer_data || null,
         priceUsd: pricing.priceUsd,
         baseAmountInr: pricing.baseAmountInr,
         gstRate: pricing.gstRate,
@@ -549,40 +566,59 @@ export const getMyPayments = async (req, res) => {
       `);
       payments = allRes.rows;
     } else {
+      const conditions = [];
+      const params = [];
+      if (userId) {
+        params.push(userId);
+        conditions.push(`p.user_id = $${params.length}`);
+      }
+      if (companyId) {
+        params.push(companyId);
+        conditions.push(`p.company_id = $${params.length}`);
+      }
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' OR ')}` : '';
       const clientRes = await query(`
         SELECT p.*, r.ticket_id, r.title as request_title, r.service_type, u.name as user_name, u.email as user_email, c.name as company_name
         FROM payments p
         LEFT JOIN requests r ON r.id = p.request_id
         LEFT JOIN users u ON u.id = p.user_id
         LEFT JOIN companies c ON c.id = p.company_id
-        WHERE ($1::int IS NOT NULL AND p.company_id = $1::int) OR p.user_id = $2::int
+        ${whereClause}
         ORDER BY p.created_at DESC
         LIMIT 100
-      `, [companyId, userId]);
+      `, params);
       payments = clientRes.rows;
     }
 
     return res.json({
       success: true,
       count: payments.length,
-      payments: payments.map((p) => ({
-        id: p.id,
-        invoiceNumber: p.invoice_number,
-        ticketId: p.ticket_id,
-        requestTitle: p.request_title,
-        serviceType: p.service_type,
-        amount: Number(p.amount),
-        currency: p.currency,
-        status: p.status,
-        gateway: p.gateway,
-        paymentMethod: p.payment_method,
-        transactionId: p.gateway_payment_id || p.transaction_id,
-        metadata: p.metadata,
-        paidAt: p.paid_at || p.created_at,
-        createdAt: p.created_at,
-        userName: p.user_name,
-        companyName: p.company_name,
-      })),
+      payments: payments.map((p) => {
+        const meta = p.metadata || {};
+        const utr = meta.utrNumber || meta.rrn || meta.bank_transaction_id || meta.acquirer_data?.rrn || meta.acquirer_data?.upi_transaction_id || null;
+        const txnId = p.gateway_payment_id || p.transaction_id || `pay_${p.id}`;
+        return {
+          id: p.id,
+          requestId: p.request_id,
+          invoiceNumber: p.invoice_number,
+          ticketId: p.ticket_id,
+          requestTitle: p.request_title,
+          serviceType: p.service_type,
+          amount: Number(p.amount),
+          currency: p.currency,
+          status: p.status,
+          gateway: p.gateway,
+          paymentMethod: p.payment_method,
+          transactionId: txnId,
+          gatewayPaymentId: p.gateway_payment_id,
+          utrNumber: utr || txnId,
+          metadata: meta,
+          paidAt: p.paid_at || p.created_at,
+          createdAt: p.created_at,
+          userName: p.user_name,
+          companyName: p.company_name,
+        };
+      }),
     });
   } catch (error) {
     console.error('[Get My Payments Error]:', error);
