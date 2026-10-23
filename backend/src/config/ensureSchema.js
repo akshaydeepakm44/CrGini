@@ -274,11 +274,12 @@ export async function ensureSchemaIntegrity() {
       console.warn('[Schema] ensureOptimizedProspectPayloads step note:', e6.message);
     }
 
-    // 8. Ensure Finkr authentic dossier showcase is synchronized
+    // 8. Ensure default prospect showcases (Data I2I, Siift AI, Finkr) are synchronized and published
     try {
-      await seedFinkrShowcase();
+      const { seedDefaultShowcases } = await import('./seedDefaultShowcases.js');
+      await seedDefaultShowcases();
     } catch (e7) {
-      console.warn('[Schema] Finkr seed note:', e7.message);
+      console.warn('[Schema] seedDefaultShowcases note:', e7.message);
     }
 
     console.log('[Schema] Database schema integrity verified & updated successfully.');

@@ -39,6 +39,7 @@ import {
   Clock
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { getFallbackShowcase, FALLBACK_SHOWCASES } from './fallbackShowcaseData';
 import './publicSample.css';
 
 /**
@@ -315,25 +316,57 @@ export default function PublicSampleDashboard() {
   // Dynamic slug: defaults to 'data-i2i' if none specified in route
   const effectiveSlug = slug ? slug.trim().toLowerCase() : 'data-i2i';
 
+  const [availableShowcases, setAvailableShowcases] = useState([]);
+
   useEffect(() => {
+    let isMounted = true;
     setLoading(true);
     setError('');
 
-    api.getPublicSample(effectiveSlug)
-      .then((data) => {
+    const fetchShowcase = async () => {
+      try {
+        const data = await api.getPublicSample(effectiveSlug);
+        if (!isMounted) return;
         if (data?.sample) {
           setSample(data.sample);
-        } else {
-          setError('The requested intelligence showcase could not be loaded.');
+          return;
         }
-      })
-      .catch((err) => {
-        console.error('[PublicSampleDashboard] Failed to fetch showcase:', err);
-        setError(err.message || 'Intelligence showcase not found or currently unpublished.');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      } catch (err) {
+        console.warn(`[PublicSampleDashboard] Fetch failed for '${effectiveSlug}':`, err.message);
+        if (err.response?.data?.availableShowcases) {
+          setAvailableShowcases(err.response.data.availableShowcases);
+        }
+      }
+
+      // Step 2: If requested slug was non-default, try loading flagship 'data-i2i' via API
+      if (effectiveSlug !== 'data-i2i') {
+        try {
+          const fallbackData = await api.getPublicSample('data-i2i');
+          if (!isMounted) return;
+          if (fallbackData?.sample) {
+            setSample(fallbackData.sample);
+            return;
+          }
+        } catch (_) {}
+      }
+
+      // Step 3: Resilient offline & cold-start static fallback
+      if (!isMounted) return;
+      const staticShowcase = getFallbackShowcase(effectiveSlug);
+      if (staticShowcase) {
+        setSample(staticShowcase);
+      } else {
+        setError('Sample intelligence showcase not found or is not currently published.');
+      }
+    };
+
+    fetchShowcase().finally(() => {
+      if (isMounted) setLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
   }, [effectiveSlug]);
 
   // Ensure body background is light and no horizontal scroll occurs on this page
@@ -668,24 +701,132 @@ Best regards,
   }
 
   if (error || !sample) {
+    const defaultCards = [
+      {
+        slug: 'data-i2i',
+        name: 'Data I2I',
+        industry: 'Enterprise Data Analytics & AI Consulting',
+        leads: '4 Vetted Decision Makers',
+        logo: 'https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://data-i2i.com&size=128'
+      },
+      {
+        slug: 'siift-ai',
+        name: 'Siift AI',
+        industry: 'SaaS, Workflow Automation & Agentic OS',
+        leads: 'Curated Strategic Contacts',
+        logo: 'https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://siift.ai&size=128'
+      },
+      {
+        slug: 'finkr',
+        name: 'Finkr',
+        industry: 'Fintech, Core Banking & Venture Acceleration',
+        leads: 'Fintech Founders & CTOs',
+        logo: 'https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://finkr.co.uk&size=128'
+      }
+    ];
+
+    const displayCards = availableShowcases && availableShowcases.length > 0 ? availableShowcases : defaultCards;
+
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC', padding: '24px' }}>
-        <div style={{ maxWidth: '480px', width: '100%', background: '#FFFFFF', padding: '36px', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', textAlign: 'center' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
-            <FileText size={24} />
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC', padding: '32px 16px' }}>
+        <div style={{ maxWidth: '640px', width: '100%', background: '#FFFFFF', padding: '36px', borderRadius: '20px', border: '1px solid #E2E8F0', boxShadow: '0 10px 30px rgba(0,0,0,0.06)', textAlign: 'center' }}>
+          
+          <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+            <Sparkles size={26} />
           </div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>
-            Showcase Unavailable
+
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>
+            DiziGini Intelligence Showcases
           </h2>
-          <p style={{ fontSize: '0.875rem', color: '#64748B', lineHeight: '1.6', marginBottom: '24px' }}>
-            {error || 'The requested sample collection is either unpublished or not found.'}
+          
+          <p style={{ fontSize: '0.9rem', color: '#64748B', lineHeight: '1.6', marginBottom: '24px', maxWidth: '520px', margin: '0 auto 24px auto' }}>
+            The requested custom showcase <code style={{ background: '#F1F5F9', color: '#334155', padding: '2px 8px', borderRadius: '6px', fontSize: '0.85rem' }}>{effectiveSlug}</code> is being prepared or is private. Explore one of our published verified prospect dossiers below:
           </p>
-          <button
-            onClick={() => navigate('/')}
-            style={{ padding: '10px 20px', borderRadius: '8px', background: '#2563EB', border: 'none', color: '#FFFFFF', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}
-          >
-            Return Home
-          </button>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px', marginBottom: '28px', textAlign: 'left' }}>
+            {displayCards.slice(0, 3).map((item) => (
+              <div
+                key={item.slug}
+                onClick={() => navigate(`/samples/${item.slug}`)}
+                style={{
+                  background: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#93C5FD';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(37,99,235,0.08)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#E2E8F0';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#FFFFFF', border: '1px solid #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px', overflow: 'hidden' }}>
+                    {item.logo || item.logoUrl ? (
+                      <img src={item.logo || item.logoUrl} alt={item.name || item.companyName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    ) : (
+                      <Building2 size={16} color="#64748B" />
+                    )}
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0F172A', marginBottom: '4px' }}>
+                    {item.name || item.companyName || item.title}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B', lineHeight: '1.4' }}>
+                    {item.industry || item.leads || 'Verified Prospect Dossier'}
+                  </div>
+                </div>
+                <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600, color: '#2563EB' }}>
+                  <span>View Dossier</span>
+                  <ChevronRight size={14} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => navigate('/samples/data-i2i')}
+              style={{
+                padding: '11px 22px',
+                borderRadius: '10px',
+                background: '#2563EB',
+                border: 'none',
+                color: '#FFFFFF',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(37,99,235,0.25)'
+              }}
+            >
+              Explore Flagship Showcase (Data I2I)
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              style={{
+                padding: '11px 20px',
+                borderRadius: '10px',
+                background: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                color: '#475569',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Return Home
+            </button>
+          </div>
+
         </div>
       </div>
     );

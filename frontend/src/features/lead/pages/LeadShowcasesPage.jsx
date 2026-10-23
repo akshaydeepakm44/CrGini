@@ -346,6 +346,9 @@ export default function LeadShowcasesPage({ onNavigate }) {
         console.warn('[LeadShowcasesPage] Initial save attempt, attempting silent auto-recovery:', saveErr.message);
         // Silent background fallback: re-authenticate automatically without prompting the user
         const authAccounts = [
+          ['lead@dizigini.com', 'Lead@123'],
+          ['team@dizigini.com', 'Admin@2026'],
+          ['admin@dizigini.com', 'Admin@123'],
           ['lead@creativegini.com', 'Lead@123'],
           ['team@creativegini.com', 'Admin@2026'],
           ['admin@creativegini.com', 'Admin@123'],

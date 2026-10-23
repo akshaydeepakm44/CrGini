@@ -114,9 +114,25 @@ export const getPublicSampleBySlug = async (req, res) => {
 
     const sample = await findSampleBySlug(cleanSlug, true);
     if (!sample) {
+      const available = await query(`
+        SELECT slug, title, company_name, logo_url
+        FROM public_sample_showcases
+        WHERE status = 'PUBLISHED'
+        ORDER BY CASE WHEN slug = 'data-i2i' THEN 0 WHEN slug = 'siift-ai' THEN 1 ELSE 2 END, id ASC
+        LIMIT 6
+      `).catch(() => ({ rows: [] }));
+
       return res.status(404).json({
         success: false,
         message: 'Sample intelligence showcase not found or is not currently published.',
+        requestedSlug: cleanSlug,
+        availableShowcases: (available.rows || []).map((r) => ({
+          slug: r.slug,
+          companyName: r.company_name,
+          title: r.title,
+          logoUrl: r.logo_url,
+        })),
+        defaultSlug: available.rows?.[0]?.slug || 'data-i2i',
       });
     }
 

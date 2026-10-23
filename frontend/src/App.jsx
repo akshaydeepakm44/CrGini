@@ -173,6 +173,30 @@ export default function App() {
           element={<Navigate to="/samples/data-i2i" replace />}
         />
         <Route
+          path="/sample/:slug"
+          element={<PublicSampleDashboard />}
+        />
+        <Route
+          path="/sample"
+          element={<Navigate to="/samples/data-i2i" replace />}
+        />
+        <Route
+          path="/prospect/:slug"
+          element={<PublicSampleDashboard />}
+        />
+        <Route
+          path="/prospect"
+          element={<Navigate to="/samples/data-i2i" replace />}
+        />
+        <Route
+          path="/prospects/:slug"
+          element={<PublicSampleDashboard />}
+        />
+        <Route
+          path="/prospects"
+          element={<Navigate to="/samples/data-i2i" replace />}
+        />
+        <Route
           path="/showcase/:slug"
           element={<PublicSampleDashboard />}
         />
@@ -181,8 +205,28 @@ export default function App() {
           element={<Navigate to="/showcase/data-i2i" replace />}
         />
         <Route
+          path="/showcases/:slug"
+          element={<PublicSampleDashboard />}
+        />
+        <Route
+          path="/showcases"
+          element={<Navigate to="/samples/data-i2i" replace />}
+        />
+        <Route
           path="/briefing/:slug"
           element={<PublicSampleDashboard />}
+        />
+        <Route
+          path="/briefing"
+          element={<Navigate to="/samples/data-i2i" replace />}
+        />
+        <Route
+          path="/briefings/:slug"
+          element={<PublicSampleDashboard />}
+        />
+        <Route
+          path="/briefings"
+          element={<Navigate to="/samples/data-i2i" replace />}
         />
 
         {/* Dedicated Sign Up redirect */}

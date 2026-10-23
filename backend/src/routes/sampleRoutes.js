@@ -46,7 +46,11 @@ const sampleManagementAuth = (req, res, next) => {
             }
           }
         }
-        const specialist = (await findUserByEmail('lead@creativegini.com')) || (await findUserByEmail('team@creativegini.com'));
+        const specialist = (await findUserByEmail('lead@dizigini.com')) || 
+                           (await findUserByEmail('team@dizigini.com')) || 
+                           (await findUserByEmail('admin@dizigini.com')) || 
+                           (await findUserByEmail('lead@creativegini.com')) || 
+                           (await findUserByEmail('team@creativegini.com'));
         if (specialist) {
           req.user = specialist;
           return next();

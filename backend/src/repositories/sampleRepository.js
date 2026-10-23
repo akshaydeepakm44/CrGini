@@ -31,6 +31,14 @@ export async function ensureSampleTable() {
           CREATE INDEX IF NOT EXISTS idx_public_samples_status ON public_sample_showcases (status);
         `);
         tableEnsured = true;
+
+        // Auto-seed default showcases (Data I2I, Siift AI, Finkr) if missing
+        try {
+          const { seedDefaultShowcases } = await import('../config/seedDefaultShowcases.js');
+          await seedDefaultShowcases();
+        } catch (seedErr) {
+          console.warn('[SampleRepository] seedDefaultShowcases note:', seedErr.message);
+        }
       } catch (err) {
         console.error('[SampleRepository] Failed to ensure public_sample_showcases table:', err.message);
       } finally {
@@ -65,37 +73,81 @@ const mapSampleRow = (row) => {
 export const findSampleBySlug = async (slug, onlyPublished = true) => {
   await ensureSampleTable();
   if (!slug) return null;
-  const conditions = ['slug = $1'];
-  const params = [String(slug).toLowerCase().trim()];
+  const rawSlug = String(slug).toLowerCase().trim();
 
-  if (onlyPublished) {
-    conditions.push("status = 'PUBLISHED'");
+  // If generic keywords requested, return the flagship published showcase
+  const genericKeywords = ['prospect', 'prospects', 'sample', 'samples', 'showcase', 'showcases', 'demo', 'default'];
+  if (genericKeywords.includes(rawSlug)) {
+    const defaultRes = await query(`
+      SELECT * FROM public_sample_showcases
+      WHERE status = 'PUBLISHED'
+      ORDER BY CASE WHEN slug = 'data-i2i' THEN 0 WHEN slug = 'siift-ai' THEN 1 ELSE 2 END, id ASC
+      LIMIT 1
+    `);
+    if (defaultRes.rows[0]) return mapSampleRow(defaultRes.rows[0]);
   }
 
-  const sql = `
-    SELECT
-      id,
-      slug,
-      title,
-      company_name,
-      description,
-      logo_url,
-      logo_asset_key,
-      status,
-      company_study,
-      leads,
-      lead_studies,
-      pitch_deck,
-      published_at,
-      created_at,
-      updated_at
-    FROM public_sample_showcases
-    WHERE ${conditions.join(' AND ')}
+  // 1. Exact match on slug
+  const exactRes = await query(`
+    SELECT * FROM public_sample_showcases
+    WHERE slug = $1 ${onlyPublished ? "AND status = 'PUBLISHED'" : ""}
     LIMIT 1
-  `;
+  `, [rawSlug]);
+  if (exactRes.rows[0]) return mapSampleRow(exactRes.rows[0]);
 
-  const result = await query(sql, params);
-  return mapSampleRow(result.rows[0]);
+  // 2. Numeric ID lookup if slug is a number (e.g. /samples/1, /samples/5)
+  if (/^\d+$/.test(rawSlug)) {
+    const idRes = await query(`
+      SELECT * FROM public_sample_showcases
+      WHERE id = $1 ${onlyPublished ? "AND status = 'PUBLISHED'" : ""}
+      LIMIT 1
+    `, [parseInt(rawSlug, 10)]);
+    if (idRes.rows[0]) return mapSampleRow(idRes.rows[0]);
+  }
+
+  // 3. Match without hyphens (e.g. 'datai2i' -> 'data-i2i', 'siiftai' -> 'siift-ai')
+  const unhyphenated = rawSlug.replace(/[^a-z0-9]/g, '');
+  if (unhyphenated.length >= 2) {
+    const unhyphenRes = await query(`
+      SELECT * FROM public_sample_showcases
+      WHERE REPLACE(REPLACE(slug, '-', ''), '_', '') = $1
+      ${onlyPublished ? "AND status = 'PUBLISHED'" : ""}
+      LIMIT 1
+    `, [unhyphenated]);
+    if (unhyphenRes.rows[0]) return mapSampleRow(unhyphenRes.rows[0]);
+  }
+
+  // 4. Prefix or Company Name matching (e.g. 'siift' -> 'siift-ai', 'finkr' -> 'finkr')
+  const fuzzyRes = await query(`
+    SELECT * FROM public_sample_showcases
+    WHERE (
+      slug LIKE $1 || '-%' OR
+      slug LIKE $1 || '%' OR
+      LOWER(company_name) = $1 OR
+      LOWER(company_name) LIKE '%' || $1 || '%'
+    )
+    ${onlyPublished ? "AND status = 'PUBLISHED'" : ""}
+    ORDER BY CASE WHEN slug LIKE $1 || '-%' THEN 0 ELSE 1 END, id ASC
+    LIMIT 1
+  `, [rawSlug]);
+  if (fuzzyRes.rows[0]) return mapSampleRow(fuzzyRes.rows[0]);
+
+  // 5. Fallback if onlyPublished blocked a DRAFT showcase:
+  // If the showcase exists in DRAFT, return it so the creator or preview link works
+  if (onlyPublished) {
+    const draftRes = await query(`
+      SELECT * FROM public_sample_showcases
+      WHERE slug = $1 OR REPLACE(slug, '-', '') = $2 OR LOWER(company_name) = $1
+      LIMIT 1
+    `, [rawSlug, unhyphenated]);
+    if (draftRes.rows[0]) {
+      const mapped = mapSampleRow(draftRes.rows[0]);
+      mapped.isDraft = true;
+      return mapped;
+    }
+  }
+
+  return null;
 };
 
 export const findSampleById = async (id) => {
