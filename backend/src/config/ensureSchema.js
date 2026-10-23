@@ -282,6 +282,14 @@ export async function ensureSchemaIntegrity() {
       console.warn('[Schema] seedDefaultShowcases note:', e7.message);
     }
 
+    // 9. Ensure database payments are cleanly aligned with tickets and authentic amounts
+    try {
+      const { alignDatabasePayments } = await import('../align-payments.js');
+      await alignDatabasePayments();
+    } catch (e8) {
+      console.warn('[Schema] alignDatabasePayments note:', e8.message);
+    }
+
     console.log('[Schema] Database schema integrity verified & updated successfully.');
     return true;
   } catch (err) {

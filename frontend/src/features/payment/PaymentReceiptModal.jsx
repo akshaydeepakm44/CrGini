@@ -70,8 +70,9 @@ export default function PaymentReceiptModal({
     : `DiziGini Sprint Execution — ${serviceTitle}`;
 
   // Amount and Tax calculation
-  const isINR = gateway === 'RAZORPAY' || invoice.currency === 'INR' || Boolean(invoice.baseAmountInr);
-  const currencySymbol = isINR ? '₹' : '$';
+  // Check if this payment was settled in INR or USD
+  const isUSD = (invoice.currency === 'USD' && gateway === 'PAYPAL') || (invoice.currency === 'USD' && !invoice.baseAmountInr && !invoice.totalAmountInr && gateway !== 'RAZORPAY');
+  const currencySymbol = isUSD ? '$' : '₹';
 
   let taxableAmount = 190.00;
   let gstAmount = 34.00;
@@ -81,6 +82,10 @@ export default function PaymentReceiptModal({
     taxableAmount = Number(invoice.baseAmountInr);
     gstAmount = Number(invoice.gstAmountInr || (invoice.totalAmountInr - taxableAmount).toFixed(2));
     totalPaid = Number(invoice.totalAmountInr);
+  } else if (invoice.metadata?.baseAmountInr && invoice.metadata?.totalAmountInr) {
+    taxableAmount = Number(invoice.metadata.baseAmountInr);
+    gstAmount = Number(invoice.metadata.gstAmountInr || (invoice.metadata.totalAmountInr - taxableAmount).toFixed(2));
+    totalPaid = Number(invoice.metadata.totalAmountInr);
   } else if (invoice.baseAmountInr) {
     taxableAmount = Number(invoice.baseAmountInr);
     gstAmount = Number(invoice.gstAmountInr || (taxableAmount * 0.18).toFixed(2));
@@ -91,11 +96,22 @@ export default function PaymentReceiptModal({
     gstAmount = Number((totalPaid - taxableAmount).toFixed(2));
   } else if (invoice.price || invoice.amount || invoice.amountUsd) {
     const rawVal = Number(invoice.price || invoice.amount || invoice.amountUsd);
-    if (isINR) {
-      if (rawVal >= 50) {
+    if (!isUSD) {
+      if (invoice.currency === 'INR' && rawVal >= 50) {
         totalPaid = rawVal;
-        taxableAmount = Number((totalPaid / 1.18).toFixed(2));
-        gstAmount = Number((totalPaid - taxableAmount).toFixed(2));
+        if (Math.round(totalPaid) === 112) {
+          taxableAmount = 95.00;
+          gstAmount = 17.00;
+        } else if (Math.round(totalPaid) === 224) {
+          taxableAmount = 190.00;
+          gstAmount = 34.00;
+        } else if (Math.round(totalPaid) === 11198) {
+          taxableAmount = 9490.00;
+          gstAmount = 1708.00;
+        } else {
+          taxableAmount = Math.round(totalPaid / 1.18);
+          gstAmount = Number((totalPaid - taxableAmount).toFixed(2));
+        }
       } else {
         taxableAmount = Math.round(rawVal * 94.90);
         gstAmount = Math.round(taxableAmount * 0.18);

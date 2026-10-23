@@ -57,29 +57,25 @@ export default function BillingPage({
     (r) => String(r.paymentStatus || r.payment_status).toUpperCase() === 'PAID'
   );
 
-  // Combined ledger entries: database payments prioritized
+  // Authentic database payments prioritized directly from PostgreSQL
   const ledgerEntries = (() => {
-    const list = [...dbPayments];
-    const coveredTicketIds = new Set(
-      dbPayments.flatMap((p) => [
-        String(p.ticketId || ''),
-        String(p.requestId || ''),
-        String(p.id || ''),
-      ]).filter(Boolean)
-    );
+    if (dbPayments && dbPayments.length > 0) {
+      return [...dbPayments].sort((a, b) => {
+        const numA = parseInt(String(a.invoiceNumber || '').replace(/[^0-9]/g, ''), 10) || 0;
+        const numB = parseInt(String(b.invoiceNumber || '').replace(/[^0-9]/g, ''), 10) || 0;
+        return numB - numA;
+      });
+    }
 
-    // If there are paid requests without a DB payment record, add them as ledger entries
+    // Only if dbPayments is empty (e.g. before initial fetch or local fallback), map from paid requests
+    const list = [];
     paidRequests.forEach((req) => {
-      const tId = String(req.ticketId || '');
-      const rId = String(req.id || '');
-      if ((tId && coveredTicketIds.has(tId)) || (rId && coveredTicketIds.has(rId))) {
-        return;
-      }
-
-      const realPaymentRef = req.payment_reference || req.paymentReference || req.gateway_payment_id || req.paymentId || (req.id ? `pay_live_ref_${req.id}` : 'pay_verified');
+      const realPaymentRef = req.payment_reference || req.paymentReference || req.gateway_payment_id || req.paymentId || (req.id ? `pay_${req.id}` : 'pay_verified');
+      const ticketNum = String(req.ticketId || '').replace(/[^0-9]/g, '');
+      const invNum = ticketNum ? `INV-${new Date().getFullYear()}-${ticketNum}` : `INV-${new Date().getFullYear()}-${req.id}`;
       list.push({
         id: `req-${req.id}`,
-        invoiceNumber: `INV-${new Date().getFullYear()}-${1000 + Number(req.id || 1)}`,
+        invoiceNumber: invNum,
         ticketId: req.ticketId,
         requestTitle: req.title,
         serviceType: req.service,
@@ -87,7 +83,7 @@ export default function BillingPage({
         currency: 'USD',
         status: 'PAID',
         gateway: 'RAZORPAY',
-        paymentMethod: 'Live Checkout',
+        paymentMethod: 'Razorpay Live Checkout',
         transactionId: realPaymentRef,
         utrNumber: realPaymentRef,
         paidAt: req.createdDate || new Date().toISOString(),
@@ -96,10 +92,33 @@ export default function BillingPage({
       });
     });
 
-    return list.sort((a, b) => new Date(b.paidAt || b.createdAt) - new Date(a.paidAt || a.createdAt));
+    return list.sort((a, b) => {
+      const numA = parseInt(String(a.invoiceNumber || '').replace(/[^0-9]/g, ''), 10) || 0;
+      const numB = parseInt(String(b.invoiceNumber || '').replace(/[^0-9]/g, ''), 10) || 0;
+      return numB - numA;
+    });
   })();
 
-  const totalPaidAmount = ledgerEntries.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+  const totalPaidInr = ledgerEntries.reduce((acc, p) => {
+    if (p.totalAmountInr) return acc + Number(p.totalAmountInr);
+    const num = Number(p.amount || 0);
+    const isINR = (p.gateway || '').toUpperCase() === 'RAZORPAY' || p.currency === 'INR';
+    if (isINR) {
+      return acc + (num >= 50 ? num : Math.round(num * 94.90 * 1.18));
+    }
+    return acc + Math.round(num * 94.90 * 1.18);
+  }, 0);
+
+  const totalPaidUsd = ledgerEntries.reduce((acc, p) => {
+    if (p.priceUsd) return acc + Number(p.priceUsd);
+    const num = Number(p.amount || 0);
+    const isINR = (p.gateway || '').toUpperCase() === 'RAZORPAY' || p.currency === 'INR';
+    if (isINR && num >= 50) {
+      return acc + (num <= 120 ? 1 : (num <= 250 ? 2 : Math.round(num / 112)));
+    }
+    return acc + num;
+  }, 0);
+
   const totalPendingAmount = pendingRequests.reduce((acc, r) => acc + (Number(r.price) || 0), 0);
 
   const handlePayNow = (ticket) => {
@@ -150,11 +169,11 @@ export default function BillingPage({
         />
 
         <MetricCard
-          value={`$${totalPaidAmount.toLocaleString()}`}
+          value={`₹${totalPaidInr.toLocaleString()} INR`}
           label="Total Settled"
           icon={CheckCircle2}
           variant="mint"
-          trend={`${ledgerEntries.length} sprint(s) funded`}
+          trend={`$${totalPaidUsd}.00 USD • ${ledgerEntries.length} sprint(s)`}
           trendDirection="up"
         />
 
@@ -374,8 +393,36 @@ export default function BillingPage({
                       </span>
                     </td>
 
-                    <td style={{ padding: '16px 24px', fontSize: '0.90625rem', fontWeight: 800, color: '#111827' }}>
-                      ${p.amount || 1}.00
+                    <td style={{ padding: '16px 24px' }}>
+                      {(() => {
+                        const isINR = (p.gateway || '').toUpperCase() === 'RAZORPAY' || p.currency === 'INR';
+                        const num = Number(p.amount || 0);
+                        if (isINR) {
+                          if (num >= 50) {
+                            return (
+                              <div style={{ fontSize: '0.90625rem', fontWeight: 800, color: '#111827' }}>
+                                ₹{num.toLocaleString()} INR
+                              </div>
+                            );
+                          }
+                          const totalInr = Math.round(num * 94.90 * 1.18);
+                          return (
+                            <div>
+                              <div style={{ fontSize: '0.90625rem', fontWeight: 800, color: '#111827' }}>
+                                ₹{totalInr} INR
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: '#6B7280', fontWeight: 500 }}>
+                                (${num}.00 USD)
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div style={{ fontSize: '0.90625rem', fontWeight: 800, color: '#111827' }}>
+                            ${num}.00 USD
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     <td style={{ padding: '16px 24px' }}>

@@ -597,6 +597,11 @@ export const getMyPayments = async (req, res) => {
         const meta = p.metadata || {};
         const utr = meta.utrNumber || meta.rrn || meta.bank_transaction_id || meta.acquirer_data?.rrn || meta.acquirer_data?.upi_transaction_id || null;
         const txnId = p.gateway_payment_id || p.transaction_id || `pay_${p.id}`;
+        const baseAmountInr = meta.baseAmountInr || (p.currency === 'INR' ? Math.round(Number(p.amount) / 1.18) : Math.round(Number(p.amount) * 94.90));
+        const totalAmountInr = meta.totalAmountInr || (p.currency === 'INR' ? Number(p.amount) : Math.round(Number(p.amount) * 94.90 * 1.18));
+        const gstAmountInr = meta.gstAmountInr || Number((totalAmountInr - baseAmountInr).toFixed(2));
+        const priceUsd = meta.priceUsd || (p.currency === 'USD' ? Number(p.amount) : (Number(p.amount) <= 120 ? 1 : (Number(p.amount) <= 250 ? 2 : Math.round(Number(p.amount) / 112))));
+
         return {
           id: p.id,
           requestId: p.request_id,
@@ -606,6 +611,10 @@ export const getMyPayments = async (req, res) => {
           serviceType: p.service_type,
           amount: Number(p.amount),
           currency: p.currency,
+          baseAmountInr,
+          gstAmountInr,
+          totalAmountInr,
+          priceUsd,
           status: p.status,
           gateway: p.gateway,
           paymentMethod: p.payment_method,
@@ -616,6 +625,7 @@ export const getMyPayments = async (req, res) => {
           paidAt: p.paid_at || p.created_at,
           createdAt: p.created_at,
           userName: p.user_name,
+          userEmail: p.user_email,
           companyName: p.company_name,
         };
       }),
