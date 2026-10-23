@@ -396,12 +396,16 @@ export const listRequests = async ({
   const conditions = [];
   const values = [];
 
-  if (userId) {
+  if (userId && companyId) {
+    values.push(userId);
+    const uIdx = values.length;
+    values.push(companyId);
+    const cIdx = values.length;
+    conditions.push(`(r.user_id = $${uIdx} OR r.company_id = $${cIdx})`);
+  } else if (userId) {
     values.push(userId);
     conditions.push(`r.user_id = $${values.length}`);
-  }
-
-  if (companyId) {
+  } else if (companyId) {
     values.push(companyId);
     conditions.push(`r.company_id = $${values.length}`);
   }

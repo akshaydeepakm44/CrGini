@@ -153,6 +153,9 @@ export const adaptRequest = (raw) => {
   const rawPayStatus = String(raw.paymentStatus || raw.payment_status || '').toUpperCase();
   const paymentStatus = rawPayStatus === 'PAID' ? 'PAID' : 'PENDING';
 
+  const rawPrice = Number(raw.price ?? raw.totalPrice ?? raw.requirements?.totalPrice ?? 0);
+  const price = isNaN(rawPrice) ? 0 : rawPrice;
+
   return {
     id: raw.id || ticketId,
     ticketId,

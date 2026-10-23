@@ -412,7 +412,7 @@ export const createRequest = async (req, res) => {
           assignedTeam: teamMap[serviceType] || 'DiziGini Core Team',
           notes: finalNotes,
           status: 'REQUEST_CREATED',
-          paymentStatus: 'PAID'
+          paymentStatus: 'PENDING'
         });
       } catch (insertErr) {
         lastInsertError = insertErr;
@@ -503,11 +503,12 @@ export const getRequests = async (req, res) => {
     const { role } = req.user;
     let queryParams = {};
 
-    if (role === 'USER') {
+    if (role === 'USER' || role === 'CLIENT') {
       const companyId = req.user.companyId
         ? (req.user.companyId.id || req.user.companyId._id || req.user.companyId)
         : null;
-      queryParams = { companyId };
+      const userId = req.user.id || req.user._id;
+      queryParams = { companyId, userId };
     } else if (isAdmin(req.user)) {
       queryParams = {};
     } else {

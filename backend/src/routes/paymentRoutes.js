@@ -6,12 +6,16 @@ import {
   verifyRazorpay,
   capturePayPal,
   handleWebhook,
+  getMyPayments,
 } from '../controllers/paymentController.js';
 
 const router = express.Router();
 
 // Configuration & Public key discovery
 router.get('/config', optionalProtect, getGatewayConfig);
+
+// Invoices & Payment Ledger for Authenticated Client
+router.get('/my-payments', protect, getMyPayments);
 
 // Unified Order Creation
 router.post('/create-order', protect, createOrder);

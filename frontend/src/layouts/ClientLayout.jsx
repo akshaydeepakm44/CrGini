@@ -95,6 +95,13 @@ export default function ClientLayout({
       icon: Package,
     },
     {
+      sectionTitle: 'FINANCE & BILLING',
+      id: 'billing',
+      label: 'Billing & Invoices',
+      path: '/portal/billing',
+      icon: CreditCard,
+    },
+    {
       sectionTitle: 'ACCOUNT',
       id: 'profile',
       label: 'Profile',

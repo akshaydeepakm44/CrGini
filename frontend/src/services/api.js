@@ -432,6 +432,17 @@ export const api = {
     return data;
   },
 
+  async getMyPayments() {
+    const res = await fetch(`${API_BASE}/payments/my-payments`, {
+      headers: getHeaders(true)
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to load invoices');
+    }
+    return data.payments || [];
+  },
+
   async getMessages(requestId) {
     const res = await fetch(`${API_BASE}/requests/${requestId}/messages`, {
       headers: getHeaders(true)

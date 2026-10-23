@@ -48,19 +48,54 @@ function ServiceDetailWrapper({ onOpenNewRequest, channel }) {
 }
 
 /**
- * Request Detail Router Helper
+ * Request Detail Router Helper with Direct API Fallback
  */
 function RequestDetailWrapper({ requests, onBack, onReload }) {
   const { ticketId } = useParams();
   const navigate = useNavigate();
+  const [directTicket, setDirectTicket] = useState(null);
+  const [isFetchingDirect, setIsFetchingDirect] = useState(false);
 
-  const ticket = requests.find(
+  const matchedTicket = requests.find(
     (r) => String(r.ticketId).toLowerCase() === String(ticketId).toLowerCase() || String(r.id) === String(ticketId)
-  ) || requests[0];
+  );
+
+  useEffect(() => {
+    if (!matchedTicket && ticketId) {
+      let isMounted = true;
+      setIsFetchingDirect(true);
+      api.getRequest(ticketId)
+        .then((res) => {
+          if (isMounted && res) {
+            setDirectTicket(adaptRequest(res));
+          }
+        })
+        .catch((err) => {
+          console.warn('[RequestDetailWrapper] Direct fetch fallback failed:', err.message);
+        })
+        .finally(() => {
+          if (isMounted) setIsFetchingDirect(false);
+        });
+
+      return () => { isMounted = false; };
+    }
+  }, [ticketId, matchedTicket]);
+
+  const activeTicket = matchedTicket || directTicket;
+
+  if (isFetchingDirect && !activeTicket) {
+    return (
+      <div style={{ padding: '60px 24px', textAlign: 'center', maxWidth: '600px', margin: '40px auto' }}>
+        <div style={{ width: '36px', height: '36px', border: '3px solid #E2E8F0', borderTopColor: '#7C3AED', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#111827', margin: '0 0 6px' }}>Loading Sprint Ticket...</h3>
+        <p style={{ color: '#6B7280', fontSize: '0.875rem', margin: 0 }}>Fetching intelligence details and specialist telemetry.</p>
+      </div>
+    );
+  }
 
   return (
     <RequestDetailPage
-      ticket={ticket}
+      ticket={activeTicket}
       onBack={onBack || (() => navigate('/portal/requests'))}
       onStatusUpdated={onReload}
     />

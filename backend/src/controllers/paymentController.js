@@ -363,14 +363,21 @@ export const verifyRazorpay = async (req, res) => {
       });
     }
 
-    if (request.paymentStatus === 'PAID') {
+    const existingPayments = await query('SELECT * FROM payments WHERE request_id = $1 ORDER BY id DESC LIMIT 1', [request.id]);
+    if (request.paymentStatus === 'PAID' && existingPayments.rows.length > 0) {
+      const p = existingPayments.rows[0];
       return res.json({
         success: true,
-        message: 'Razorpay payment verified successfully!',
+        message: 'Razorpay payment already verified!',
         isSimulated: verification.isSimulated,
         payment: {
-          transactionId: razorpay_payment_id,
-          invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+          id: p.id,
+          invoiceNumber: p.invoice_number,
+          transactionId: p.gateway_payment_id || razorpay_payment_id,
+          amount: Number(p.amount),
+          currency: p.currency,
+          status: p.status,
+          paidAt: p.paid_at || p.created_at,
         },
         request,
       });
@@ -446,14 +453,21 @@ export const capturePayPal = async (req, res) => {
     // Capture payment
     const captureResult = await capturePayPalOrder({ orderId, isSimulated });
 
-    if (request.paymentStatus === 'PAID') {
+    const existingPayments = await query('SELECT * FROM payments WHERE request_id = $1 ORDER BY id DESC LIMIT 1', [request.id]);
+    if (request.paymentStatus === 'PAID' && existingPayments.rows.length > 0) {
+      const p = existingPayments.rows[0];
       return res.json({
         success: true,
         message: 'PayPal payment confirmed successfully!',
         isSimulated: captureResult.isSimulated,
         payment: {
-          transactionId: captureResult.id || orderId,
-          invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+          id: p.id,
+          invoiceNumber: p.invoice_number,
+          transactionId: p.gateway_payment_id || orderId,
+          amount: Number(p.amount),
+          currency: p.currency,
+          status: p.status,
+          paidAt: p.paid_at || p.created_at,
         },
         request,
       });
@@ -509,3 +523,70 @@ export const handleWebhook = async (req, res) => {
     res.status(400).json({ received: false, error: error.message });
   }
 };
+
+/**
+ * @desc    Get Invoices & Payment Ledger for Authenticated Client
+ * @route   GET /api/payments/my-payments
+ * @access  Private (USER / CLIENT / ADMIN)
+ */
+export const getMyPayments = async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const companyId = req.user.companyId
+      ? (req.user.companyId.id || req.user.companyId._id || req.user.companyId)
+      : null;
+
+    let payments = [];
+    if (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN') {
+      const allRes = await query(`
+        SELECT p.*, r.ticket_id, r.title as request_title, r.service_type, u.name as user_name, u.email as user_email, c.name as company_name
+        FROM payments p
+        LEFT JOIN requests r ON r.id = p.request_id
+        LEFT JOIN users u ON u.id = p.user_id
+        LEFT JOIN companies c ON c.id = p.company_id
+        ORDER BY p.created_at DESC
+        LIMIT 200
+      `);
+      payments = allRes.rows;
+    } else {
+      const clientRes = await query(`
+        SELECT p.*, r.ticket_id, r.title as request_title, r.service_type, u.name as user_name, u.email as user_email, c.name as company_name
+        FROM payments p
+        LEFT JOIN requests r ON r.id = p.request_id
+        LEFT JOIN users u ON u.id = p.user_id
+        LEFT JOIN companies c ON c.id = p.company_id
+        WHERE ($1::int IS NOT NULL AND p.company_id = $1::int) OR p.user_id = $2::int
+        ORDER BY p.created_at DESC
+        LIMIT 100
+      `, [companyId, userId]);
+      payments = clientRes.rows;
+    }
+
+    return res.json({
+      success: true,
+      count: payments.length,
+      payments: payments.map((p) => ({
+        id: p.id,
+        invoiceNumber: p.invoice_number,
+        ticketId: p.ticket_id,
+        requestTitle: p.request_title,
+        serviceType: p.service_type,
+        amount: Number(p.amount),
+        currency: p.currency,
+        status: p.status,
+        gateway: p.gateway,
+        paymentMethod: p.payment_method,
+        transactionId: p.gateway_payment_id || p.transaction_id,
+        metadata: p.metadata,
+        paidAt: p.paid_at || p.created_at,
+        createdAt: p.created_at,
+        userName: p.user_name,
+        companyName: p.company_name,
+      })),
+    });
+  } catch (error) {
+    console.error('[Get My Payments Error]:', error);
+    return res.status(500).json({ success: false, message: 'Failed to retrieve invoice ledger.' });
+  }
+};
+

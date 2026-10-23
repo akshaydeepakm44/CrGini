@@ -255,7 +255,37 @@ export default function RequestDetailPage({
     setTimeout(() => setCopiedEmail(false), 2000);
   };
 
-  if (!ticket) return null;
+  if (!ticket) {
+    return (
+      <div style={{ padding: '60px 24px', textAlign: 'center', maxWidth: '540px', margin: '40px auto', backgroundColor: '#FFFFFF', borderRadius: '20px', border: '1px solid #E5E7EB', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
+        <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#F3F4F6', color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+          <FileText size={24} />
+        </div>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#111827', margin: '0 0 8px' }}>
+          Ticket Not Found
+        </h2>
+        <p style={{ color: '#6B7280', fontSize: '0.875rem', lineHeight: 1.5, margin: '0 0 24px' }}>
+          This sprint request ticket could not be loaded or may belong to another client account.
+        </p>
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            padding: '10px 22px',
+            borderRadius: '10px',
+            backgroundColor: '#7C3AED',
+            color: '#FFFFFF',
+            border: 'none',
+            fontSize: '0.875rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          Back to My Requests
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '32px 36px 60px', maxWidth: '1300px', margin: '0 auto' }}>
