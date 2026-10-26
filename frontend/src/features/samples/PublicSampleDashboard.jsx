@@ -1480,27 +1480,7 @@ Best regards,
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') scrollToNextSteps(e); }}
-                      style={{
-                        background: '#FFFFFF',
-                        borderRadius: '16px',
-                        border: '1px solid #E2E8F0',
-                        padding: '22px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        boxShadow: '0 2px 8px rgba(15,23,42,0.03)',
-                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                        position: 'relative',
-                        cursor: 'pointer'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(15,23,42,0.07)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.03)';
-                      }}
+                      className="sample-lead-card"
                     >
                       <div>
                         {/* Top Row: Company Logo & Locked Badge */}
@@ -2116,17 +2096,17 @@ Best regards,
       </main>
 
       {/* 5. CONTACT SIGNATURE FOOTER */}
-      <footer style={{ background: '#FFFFFF', borderTop: '1px solid #E2E8F0', padding: '44px 20px 28px 20px', width: '100%', boxSizing: 'border-box' }}>
+      <footer className="sample-public-footer">
         <div style={{ maxWidth: '980px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
           
           {/* Main 3-Column Signature Block (Matches Reference Signature) */}
           <div className="sample-signature-card">
             {/* Column 1: Contact Details */}
-            <div style={{ flex: '1 1 260px', minWidth: '220px', textAlign: 'left' }}>
+            <div className="signature-col-contact">
               <div style={{ fontSize: '0.92rem', color: '#64748B', marginBottom: '4px', fontWeight: 500 }}>
                 Regards,
               </div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1.25, marginBottom: '4px' }}>
+              <div className="signature-name">
                 Akshay Deepak
               </div>
               <div style={{ fontSize: '0.92rem', color: '#475569', fontWeight: 600, marginBottom: '8px' }}>
@@ -2144,6 +2124,7 @@ Best regards,
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
+                    wordBreak: 'break-all',
                   }}
                 >
                   team@datai2i.com
@@ -2167,27 +2148,20 @@ Best regards,
               </div>
             </div>
 
-            {/* Vertical Divider 1 */}
+            {/* Vertical Divider 1 (Desktop) */}
             <div className="signature-divider" />
+            {/* Horizontal Divider 1 (Mobile) */}
+            <div className="signature-divider-h" />
 
             {/* Column 2: DiziGini Brand Logo (Replaces Creative Gini) */}
-            <div
-              style={{
-                flex: '1 1 260px',
-                minWidth: '210px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '6px 14px',
-              }}
-            >
+            <div className="signature-col-brand">
               <a href="https://www.dizigini.com" target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                 <img
                   src={BRAND_LOGO_STACKED || BRAND_LOGO || '/logo.png'}
                   alt="DiziGini"
                   style={{
                     maxHeight: '74px',
-                    maxWidth: '260px',
+                    maxWidth: '100%',
                     width: 'auto',
                     objectFit: 'contain',
                   }}
@@ -2198,22 +2172,13 @@ Best regards,
               </a>
             </div>
 
-            {/* Vertical Divider 2 */}
+            {/* Vertical Divider 2 (Desktop) */}
             <div className="signature-divider" />
+            {/* Horizontal Divider 2 (Mobile) */}
+            <div className="signature-divider-h" />
 
             {/* Column 3: Powered by DATAI2I */}
-            <div
-              style={{
-                flex: '0 1 190px',
-                minWidth: '150px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                justifyContent: 'center',
-                textAlign: 'left',
-                gap: '8px',
-              }}
-            >
+            <div className="signature-col-powered">
               <span style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 500, letterSpacing: '0.01em' }}>
                 Powered by
               </span>
