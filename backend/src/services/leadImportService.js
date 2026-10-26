@@ -80,16 +80,34 @@ export function autoDetectColumnMapping(headers = []) {
     lower: String(h).trim().toLowerCase().replace(/[^a-z0-9]/g, ''),
   }));
 
-  const findHeader = (patterns) => {
+  const findHeader = (patterns, exclude = []) => {
+    // 1. Exact match pass
     for (const pat of patterns) {
-      const match = headerNorm.find(h => h.lower === pat || h.lower.includes(pat));
+      const match = headerNorm.find(h => {
+        if (exclude.some(ex => h.lower.includes(ex))) return false;
+        return h.lower === pat;
+      });
+      if (match) return match.original;
+    }
+    // 2. Partial match pass
+    for (const pat of patterns) {
+      const match = headerNorm.find(h => {
+        if (exclude.some(ex => h.lower.includes(ex))) return false;
+        return h.lower.includes(pat);
+      });
       if (match) return match.original;
     }
     return null;
   };
 
-  mapping.company = findHeader(['companyname', 'company', 'organization', 'account', 'business', 'firm', 'leadcompany']);
-  mapping.name = findHeader(['contactperson', 'contactname', 'fullname', 'personname', 'leadname', 'contact', 'name', 'decisionmaker']);
+  mapping.company = findHeader(
+    ['companyname', 'targetcompany', 'leadcompany', 'organization', 'account', 'business', 'firm', 'company'],
+    ['website', 'weburl', 'domain', 'url', 'site', 'logo', 'email', 'person', 'contact', 'maker']
+  );
+  mapping.name = findHeader(
+    ['decisionmaker', 'contactperson', 'contactname', 'leadname', 'fullname', 'personname', 'contact', 'name'],
+    ['company', 'account', 'org', 'firm', 'business', 'website', 'domain', 'url', 'site', 'logo', 'email', 'phone', 'title', 'role']
+  );
   mapping.title = findHeader(['jobtitle', 'title', 'role', 'position', 'designation', 'seniority']);
   mapping.email = findHeader(['workemail', 'emailaddress', 'contactemail', 'directemail', 'email']);
   mapping.website = findHeader(['companywebsite', 'website', 'domain', 'weburl', 'site', 'url']);

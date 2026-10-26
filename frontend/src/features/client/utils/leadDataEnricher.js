@@ -58,13 +58,26 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
     rawRow = { name: `Executive Lead ${index + 1}` };
   }
 
-  // Find value from multiple possible case-insensitive keys
-  const getField = (patterns) => {
+  // Find value from multiple possible case-insensitive keys with exclusion support
+  const getField = (patterns, exclude = []) => {
     const keys = Object.keys(rawRow);
+    // 1. First pass: exact normalized match (highest precision)
     for (const pat of patterns) {
       const foundKey = keys.find(k => {
         const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return norm === pat || norm.includes(pat);
+        if (exclude.some(ex => norm.includes(ex))) return false;
+        return norm === pat;
+      });
+      if (foundKey && rawRow[foundKey] !== undefined && rawRow[foundKey] !== null && String(rawRow[foundKey]).trim() !== '') {
+        return String(rawRow[foundKey]).trim();
+      }
+    }
+    // 2. Second pass: partial / includes match
+    for (const pat of patterns) {
+      const foundKey = keys.find(k => {
+        const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (exclude.some(ex => norm.includes(ex))) return false;
+        return norm.includes(pat);
       });
       if (foundKey && rawRow[foundKey] !== undefined && rawRow[foundKey] !== null && String(rawRow[foundKey]).trim() !== '') {
         return String(rawRow[foundKey]).trim();
@@ -73,37 +86,60 @@ export function enrichLeadRow(rawRow, index = 0, context = {}) {
     return '';
   };
 
-  // 1. Executive Lead Name
-  let name = getField(['executiveleadname', 'leadname', 'executivename', 'contactperson', 'contactname', 'fullname', 'personname', 'contact', 'name', 'decisionmaker']);
+  // 1. Target Company (MUST exclude website, domain, url, logo, contact, person, email)
+  let company = getField(
+    [
+      'targetaccountleadcompanyname', 'targetaccountcompanyname', 'targetaccountname', 'targetaccount',
+      'leadcompanyname', 'leadcompany', 'companyname', 'targetcompany', 'organizationname', 'organization',
+      'accountname', 'account', 'firmname', 'firm', 'businessname', 'business', 'company'
+    ],
+    ['website', 'weburl', 'domain', 'url', 'site', 'logo', 'email', 'mail', 'linkedin', 'phone', 'person', 'contact', 'maker', 'decision', 'study', 'deck', 'pdf', 'title', 'role']
+  );
+
+  // 2. Executive Decision Maker / Contact Name (MUST strictly exclude company, account, org, firm columns)
+  let name = getField(
+    [
+      'decisionmakercontactname', 'decisionmakername', 'decisionmaker',
+      'contactpersonname', 'contactperson', 'contactname',
+      'executiveleadname', 'executivename',
+      'leadpersonname', 'leadname', 'personname', 'fullname',
+      'contact', 'name'
+    ],
+    ['company', 'account', 'org', 'firm', 'business', 'website', 'domain', 'url', 'site', 'logo', 'email', 'mail', 'linkedin', 'phone', 'title', 'role', 'notes', 'study', 'deck', 'pdf']
+  );
+
   if (!name) {
-    // If rawRow is a string or has only one property
-    const firstVal = Object.values(rawRow)[0];
-    if (typeof firstVal === 'string' && firstVal.trim()) {
-      name = firstVal.trim();
-    } else {
-      name = index === 0 ? 'Sarah Jenkins' : index === 1 ? 'Marcus Vance' : `Executive Lead ${index + 1}`;
+    const keys = Object.keys(rawRow);
+    if (keys.length === 1 && !company) {
+      const firstVal = Object.values(rawRow)[0];
+      if (typeof firstVal === 'string' && firstVal.trim()) {
+        name = firstVal.trim();
+      }
     }
   }
 
-  const nameSlug = slugify(name);
-  const nameParts = name.split(' ');
+  // Safety: NEVER allow company name to contaminate or replace person name
+  if (name && company && name.trim().toLowerCase() === company.trim().toLowerCase()) {
+    name = '';
+  }
+
+  if (!company) {
+    company = context.companyName || 'Target Enterprise';
+  }
+
+  const nameSlug = name ? slugify(name) : slugify(company);
+  const nameParts = name ? name.split(' ') : [];
   const firstName = nameParts[0] || 'lead';
   const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : 'exec';
 
-  // 2. Title / Role
+  // 3. Title / Role
   let title = getField(['titlerole', 'jobtitle', 'title', 'role', 'position', 'designation', 'seniority']);
   if (!title) {
-    if (index === 0 && name.toLowerCase().includes('sarah')) {
+    if (name && name.toLowerCase().includes('sarah')) {
       title = 'VP of Global Enterprise Architecture';
     } else {
       title = EXECUTIVE_TITLES[index % EXECUTIVE_TITLES.length];
     }
-  }
-
-  // 3. Target Company
-  let company = getField(['targetcompany', 'companyname', 'company', 'organization', 'account', 'firm', 'business', 'leadcompany']);
-  if (!company) {
-    company = context.companyName || (index === 0 ? 'Acme Global Systems' : index === 1 ? 'Snowflake Labs' : index === 2 ? 'Veloce Data' : 'NexaScale Global');
   }
 
   const companyDomain = inferCompanyDomain(company);

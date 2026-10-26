@@ -519,7 +519,7 @@ support@dizigini.com`;
     }
 
     const effectiveLeadCompany = rawComp;
-    const effectiveLeadName = rawName || rawComp || '';
+    const effectiveLeadName = (rawName && rawName.toLowerCase() !== rawComp.toLowerCase()) ? rawName : (rawName || '');
 
     const existing = editingLeadIndex !== null ? formData.leads[editingLeadIndex] : null;
     const newLead = {
@@ -2257,9 +2257,18 @@ support@dizigini.com`;
                           </div>
 
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <strong style={{ fontSize: '0.92rem', color: '#111827' }}>{l.name}</strong>
-                              <span style={{ fontSize: '0.78rem', color: '#6B7280' }}>• {l.title || 'Decision Maker'}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <strong style={{ fontSize: '0.92rem', color: '#111827' }}>
+                                {l.company || l.name || 'Target Account'}
+                              </strong>
+                              {l.name && l.company && l.name.trim().toLowerCase() !== l.company.trim().toLowerCase() && (
+                                <span style={{ fontSize: '0.84rem', color: '#2563EB', fontWeight: 600 }}>
+                                  • {l.name}
+                                </span>
+                              )}
+                              <span style={{ fontSize: '0.78rem', color: '#6B7280' }}>
+                                • {l.title || 'Decision Maker'}
+                              </span>
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '3px' }}>

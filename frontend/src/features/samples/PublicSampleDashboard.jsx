@@ -173,22 +173,29 @@ function resolveLeadPresentation(lead, clientCompanyName = '') {
     } catch (_) {}
   }
 
-  // If leadCompany is still empty and leadPersonName is present
-  if (!leadCompany && leadPersonName) {
-    leadCompany = leadPersonName;
-  }
-
   const isSame = leadCompany && leadPersonName && leadCompany.toLowerCase() === leadPersonName.toLowerCase();
 
-  let subtitle = role;
-  if (leadCompany && !isSame) {
-    subtitle = role ? `${role} · ${leadCompany}` : leadCompany;
+  // If person name was mistakenly saved as company name, do not treat company as person
+  const effectivePersonName = (!isSame && leadPersonName) ? leadPersonName : '';
+
+  const finalCompany = leadCompany || (isSame ? leadPersonName : 'Target Enterprise');
+
+  // Blue Subtitle structure: e.g. "Field IT Engineer · Jeffery Fenn" or "Chief Operating Officer · Cristina Cordova"
+  let subtitle = '';
+  if (role && effectivePersonName) {
+    subtitle = `${role} · ${effectivePersonName}`;
+  } else if (effectivePersonName) {
+    subtitle = effectivePersonName;
+  } else if (role) {
+    subtitle = role;
+  } else {
+    subtitle = 'Verified Decision Maker';
   }
 
   return {
-    leadCompany: isSame ? '' : leadCompany,
-    leadPersonName: leadPersonName || leadCompany || 'Target Contact',
-    role,
+    leadCompany: finalCompany,
+    leadPersonName: effectivePersonName,
+    role: role || (effectivePersonName ? 'Executive Decision Maker' : ''),
     subtitle,
   };
 }
@@ -1154,18 +1161,13 @@ Best regards,
                   const leadPres = resolveLeadPresentation(featuredLead, companyName);
                   return (
                     <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-                      {leadPres.leadCompany ? (
-                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h3 style={{ fontSize: 'clamp(1.15rem, 3.5vw, 1.35rem)', fontWeight: 800, color: '#0F172A', margin: 0, wordBreak: 'break-word', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                           {leadPres.leadCompany}
-                        </div>
-                      ) : null}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                        <h3 style={{ fontSize: 'clamp(1.15rem, 3.5vw, 1.3rem)', fontWeight: 800, color: '#0F172A', margin: 0, wordBreak: 'break-word' }}>
-                          {leadPres.leadPersonName}
                         </h3>
                         <CheckCircle2 size={18} color="#10B981" />
                       </div>
-                      <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#2563EB', marginTop: '2px', wordBreak: 'break-word' }}>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#2563EB', marginTop: '4px', wordBreak: 'break-word' }}>
                         {leadPres.subtitle}
                       </div>
 
@@ -1590,25 +1592,22 @@ Best regards,
 
                         {/* Company Name & Lead Details */}
                         <div style={{ marginBottom: '16px' }}>
-                          <div style={{
-                            fontSize: '1.05rem',
-                            fontWeight: 800,
-                            color: '#0F172A',
-                            lineHeight: 1.3,
-                            marginBottom: '4px',
-                            letterSpacing: '-0.01em'
-                          }}>
-                            {effectiveCompany}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                            <div style={{
+                              fontSize: '1.05rem',
+                              fontWeight: 800,
+                              color: '#0F172A',
+                              lineHeight: 1.3,
+                              letterSpacing: '0.01em',
+                              textTransform: 'uppercase'
+                            }}>
+                              {effectiveCompany}
+                            </div>
+                            <CheckCircle2 size={15} color="#10B981" />
                           </div>
 
-                          {effectiveLeadPerson && effectiveLeadPerson.toLowerCase() !== effectiveCompany.toLowerCase() && (
-                            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155', marginBottom: '2px' }}>
-                              {effectiveLeadPerson}
-                            </div>
-                          )}
-
-                          <div style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.4 }}>
-                            {effectiveRole}
+                          <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#2563EB', lineHeight: 1.4 }}>
+                            {leadPres.subtitle}
                           </div>
                         </div>
                       </div>
@@ -2209,19 +2208,27 @@ Best regards,
                   fontSize: '1.3rem',
                   border: '1.5px solid #E2E8F0'
                 }}>
-                  {selectedLead.name?.charAt(0) || 'L'}
+                  {(() => {
+                    const selPres = resolveLeadPresentation(selectedLead, companyName);
+                    return selPres.leadCompany?.charAt(0).toUpperCase() || 'L';
+                  })()}
                 </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
-                      {selectedLead.name}
-                    </h3>
-                    <CheckCircle2 size={16} color="#10B981" />
-                  </div>
-                  <div style={{ fontSize: '0.84rem', color: '#64748B', fontWeight: 600, marginTop: '2px' }}>
-                    {selectedLead.title || 'Executive Decision Maker'} · {selectedLead.company || companyName}
-                  </div>
-                </div>
+                {(() => {
+                  const selPres = resolveLeadPresentation(selectedLead, companyName);
+                  return (
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0F172A', margin: 0, textTransform: 'uppercase', letterSpacing: '0.01em' }}>
+                          {selPres.leadCompany}
+                        </h3>
+                        <CheckCircle2 size={16} color="#10B981" />
+                      </div>
+                      <div style={{ fontSize: '0.88rem', color: '#2563EB', fontWeight: 600, marginTop: '2px' }}>
+                        {selPres.subtitle}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               <button
