@@ -2134,7 +2134,7 @@ Best regards,
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <a
-                  href="mailto:akshay.m@datai2i.com"
+                  href="mailto:team@datai2i.com"
                   style={{
                     fontSize: '0.94rem',
                     color: '#2563EB',
@@ -2146,7 +2146,7 @@ Best regards,
                     gap: '6px',
                   }}
                 >
-                  akshay.m@datai2i.com
+                  team@datai2i.com
                 </a>
                 <a
                   href="https://www.dizigini.com"

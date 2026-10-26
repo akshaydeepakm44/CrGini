@@ -452,7 +452,7 @@ Feel free to inspect the sample data. Whenever you are ready to unlock direct co
 Regards,
 Akshay Deepak
 Ai Engineer
-akshay.m@datai2i.com
+team@datai2i.com
 www.dizigini.com
 
 Powered by DATAI2I
