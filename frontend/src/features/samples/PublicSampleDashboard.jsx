@@ -625,7 +625,10 @@ Best regards,
       lead.avatarUrl;
 
     if (directLogo && !isPlatformLogo(directLogo) && !isShowcaseCompanyLogo(directLogo)) {
-      return directLogo.trim();
+      // If directLogo is a legacy Google favicon URL with a dead/generic fallback, avoid returning it blindly
+      if (!directLogo.includes('t3.gstatic.com/faviconV2') && !directLogo.includes('google.com/s2/favicons')) {
+        return directLogo.trim();
+      }
     }
 
     // 1b. If lead has an object asset key uploaded specifically to storage for this lead
@@ -633,7 +636,7 @@ Best regards,
       return `/api/samples/${sample.slug}/leads/${lead.id}/logo`;
     }
 
-    // 2. Lead's own company website domain favicon (e.g. crazygames.com for CrazyGames)
+    // 2. Lead's own company website domain favicon using DuckDuckGo
     const rawLink =
       lead.companyLink ||
       lead.website ||
@@ -644,33 +647,14 @@ Best regards,
       lead.company_link;
 
     if (rawLink && typeof rawLink === 'string') {
-      let cleanDomain = rawLink
+      const parsedHost = rawLink
         .replace(/^https?:\/\//i, '')
-        .replace(/^www\./i, '')
         .split('/')[0]
         .split('?')[0]
         .trim();
       const compWebsite = (sample?.companyStudy?.website || '').toLowerCase();
-      if (cleanDomain && cleanDomain.includes('.') && cleanDomain.length >= 4 && !compWebsite.includes(cleanDomain)) {
-        return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain.toLowerCase()}&size=128`;
-      }
-    }
-
-    // 3. Inferred company domain favicon fallback for this specific lead's own account (NOT the showcase company)
-    let candidateName = '';
-    const cleanCompTarget = (companyName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (lead.company && lead.company.toLowerCase().replace(/[^a-z0-9]/g, '') !== cleanCompTarget) {
-      candidateName = lead.company;
-    } else if (lead.targetCompany && lead.targetCompany.toLowerCase().replace(/[^a-z0-9]/g, '') !== cleanCompTarget) {
-      candidateName = lead.targetCompany;
-    } else if (lead.leadCompany && lead.leadCompany.toLowerCase().replace(/[^a-z0-9]/g, '') !== cleanCompTarget) {
-      candidateName = lead.leadCompany;
-    }
-
-    if (candidateName && typeof candidateName === 'string') {
-      const cleanComp = candidateName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (cleanComp.length >= 3 && cleanComp !== cleanCompTarget) {
-        return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanComp}.com&size=128`;
+      if (parsedHost && parsedHost.includes('.') && parsedHost.length >= 4 && !compWebsite.includes(parsedHost.toLowerCase())) {
+        return `https://icons.duckduckgo.com/ip3/${parsedHost.toLowerCase()}.ico`;
       }
     }
 
@@ -1116,6 +1100,14 @@ Best regards,
                       border: '2px solid #E2E8F0',
                       flexShrink: 0
                     }}
+                    onLoad={(e) => {
+                      if (e.currentTarget.naturalWidth <= 16 && e.currentTarget.naturalHeight <= 16) {
+                        e.currentTarget.style.display = 'none';
+                        if (e.currentTarget.nextSibling) {
+                          e.currentTarget.nextSibling.style.display = 'flex';
+                        }
+                      }
+                    }}
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
                       if (e.currentTarget.nextSibling) {
@@ -1534,6 +1526,14 @@ Best regards,
                                   height: '100%',
                                   objectFit: 'contain',
                                   padding: '4px'
+                                }}
+                                onLoad={(e) => {
+                                  if (e.currentTarget.naturalWidth <= 16 && e.currentTarget.naturalHeight <= 16) {
+                                    e.currentTarget.style.display = 'none';
+                                    if (e.currentTarget.nextSibling) {
+                                      e.currentTarget.nextSibling.style.display = 'flex';
+                                    }
+                                  }
                                 }}
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none';
@@ -2134,7 +2134,7 @@ Best regards,
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <a
-                  href="tel:+916301902632"
+                  href="mailto:akshay.m@datai2i.com"
                   style={{
                     fontSize: '0.94rem',
                     color: '#2563EB',
@@ -2146,7 +2146,7 @@ Best regards,
                     gap: '6px',
                   }}
                 >
-                  +91 6301902632
+                  akshay.m@datai2i.com
                 </a>
                 <a
                   href="https://www.dizigini.com"
@@ -2314,6 +2314,14 @@ Best regards,
                     src={resolveLeadLogo(selectedLead)}
                     alt={selectedLead.name}
                     style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #E2E8F0' }}
+                    onLoad={(e) => {
+                      if (e.currentTarget.naturalWidth <= 16 && e.currentTarget.naturalHeight <= 16) {
+                        e.currentTarget.style.display = 'none';
+                        if (e.currentTarget.nextSibling) {
+                          e.currentTarget.nextSibling.style.display = 'flex';
+                        }
+                      }
+                    }}
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
                       if (e.currentTarget.nextSibling) {

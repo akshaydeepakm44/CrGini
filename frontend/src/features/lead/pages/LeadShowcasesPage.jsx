@@ -452,7 +452,7 @@ Feel free to inspect the sample data. Whenever you are ready to unlock direct co
 Regards,
 Akshay Deepak
 Ai Engineer
-+91 6301902632
+akshay.m@datai2i.com
 www.dizigini.com
 
 Powered by DATAI2I
@@ -556,37 +556,49 @@ Thanks for your time. If you'd like to discuss this, just reply to this email.`;
       pitchDeckPdfName: form.pitchDeckPdfName || existing?.pitchDeckPdfName || '',
       pitchDeckAssetKey: existing?.pitchDeckAssetKey || existing?.pitchDeck?.assetKey || '',
       logo: (() => {
-        let directLogo = form.logo || existing?.logo || existing?.logoUrl || '';
-        if (directLogo && formData.logoUrl && directLogo.trim() === formData.logoUrl.trim()) {
-          directLogo = '';
+        let directLogo = form.logo ? form.logo.trim() : '';
+        if (directLogo) {
+          if (formData.logoUrl && directLogo === formData.logoUrl.trim()) return '';
+          return directLogo;
         }
-        if (directLogo) return directLogo;
-        const link = form.companyLink?.trim() || existing?.companyLink;
+        // If editing and existing had a custom direct logo, keep it
+        const existingLogo = existing?.logo || existing?.companyLogo || existing?.logoUrl || '';
+        if (existingLogo && !existingLogo.includes('t3.gstatic.com') && !existingLogo.includes('icons.duckduckgo.com')) {
+          if (formData.logoUrl && existingLogo.trim() === formData.logoUrl.trim()) return '';
+          return existingLogo.trim();
+        }
+        // If companyLink is provided, construct DuckDuckGo icon URL
+        const link = form.companyLink?.trim() || existing?.companyLink?.trim();
         if (link) {
-          const cd = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+          const cd = link.replace(/^https?:\/\//i, '').split('/')[0].split('?')[0].trim();
           if (cd.includes('.') && cd.length >= 4) {
-            return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
+            return `https://icons.duckduckgo.com/ip3/${cd.toLowerCase()}.ico`;
           }
         }
         return '';
       })(),
       companyLogo: (() => {
-        let directLogo = form.logo || existing?.logo || existing?.logoUrl || '';
-        if (directLogo && formData.logoUrl && directLogo.trim() === formData.logoUrl.trim()) {
-          directLogo = '';
+        let directLogo = form.logo ? form.logo.trim() : '';
+        if (directLogo) {
+          if (formData.logoUrl && directLogo === formData.logoUrl.trim()) return '';
+          return directLogo;
         }
-        if (directLogo) return directLogo;
-        const link = form.companyLink?.trim() || existing?.companyLink;
+        const existingLogo = existing?.companyLogo || existing?.logo || existing?.logoUrl || '';
+        if (existingLogo && !existingLogo.includes('t3.gstatic.com') && !existingLogo.includes('icons.duckduckgo.com')) {
+          if (formData.logoUrl && existingLogo.trim() === formData.logoUrl.trim()) return '';
+          return existingLogo.trim();
+        }
+        const link = form.companyLink?.trim() || existing?.companyLink?.trim();
         if (link) {
-          const cd = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+          const cd = link.replace(/^https?:\/\//i, '').split('/')[0].split('?')[0].trim();
           if (cd.includes('.') && cd.length >= 4) {
-            return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
+            return `https://icons.duckduckgo.com/ip3/${cd.toLowerCase()}.ico`;
           }
         }
         return '';
       })(),
       logoUrl: (() => {
-        const cand = form.logo || existing?.logoUrl || existing?.logo || existing?.companyLogo || '';
+        const cand = form.logo ? form.logo.trim() : (existing?.logoUrl || existing?.logo || existing?.companyLogo || '');
         if (cand && formData.logoUrl && cand.trim() === formData.logoUrl.trim()) return '';
         return cand;
       })(),
@@ -691,18 +703,18 @@ Thanks for your time. If you'd like to discuss this, just reply to this email.`;
             pitchDeckPdfName: '',
             logo: (() => {
               if (companyLink) {
-                const cd = companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+                const cd = companyLink.replace(/^https?:\/\//i, '').split('/')[0].split('?')[0].trim();
                 if (cd.includes('.') && cd.length >= 4) {
-                  return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
+                  return `https://icons.duckduckgo.com/ip3/${cd.toLowerCase()}.ico`;
                 }
               }
               return '';
             })(),
             companyLogo: (() => {
               if (companyLink) {
-                const cd = companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+                const cd = companyLink.replace(/^https?:\/\//i, '').split('/')[0].split('?')[0].trim();
                 if (cd.includes('.') && cd.length >= 4) {
-                  return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
+                  return `https://icons.duckduckgo.com/ip3/${cd.toLowerCase()}.ico`;
                 }
               }
               return '';
@@ -2015,15 +2027,65 @@ Thanks for your time. If you'd like to discuss this, just reply to this email.`;
                         />
                       </div>
 
-                      {/* 5. Company Logo Upload */}
+                      {/* 5. Company Logo Upload / URL */}
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                          5. Company Logo (Image)
-                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#374151' }}>
+                            5. Company Logo
+                          </label>
+                          {leadForm.companyLink && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const raw = leadForm.companyLink.trim();
+                                const host = raw.replace(/^https?:\/\//i, '').split('/')[0].split('?')[0].trim();
+                                if (host && host.includes('.')) {
+                                  setLeadForm((prev) => ({
+                                    ...prev,
+                                    logo: `https://icons.duckduckgo.com/ip3/${host.toLowerCase()}.ico`
+                                  }));
+                                }
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#7C3AED',
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                textDecoration: 'underline',
+                                padding: 0
+                              }}
+                            >
+                              Auto-fetch from link
+                            </button>
+                          )}
+                        </div>
+
                         {leadForm.logo ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#FFFFFF', padding: '6px 12px', borderRadius: '7px', border: '1px solid #D1D5DB' }}>
-                            <img src={leadForm.logo} alt="Lead Logo" style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'contain', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF' }} />
-                            <span style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Logo Attached</span>
+                            <img
+                              src={leadForm.logo}
+                              alt="Lead Logo"
+                              style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'contain', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF' }}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                            <input
+                              type="text"
+                              value={leadForm.logo}
+                              onChange={(e) => setLeadForm((prev) => ({ ...prev, logo: e.target.value }))}
+                              placeholder="Image URL or data URL"
+                              style={{
+                                flex: 1,
+                                fontSize: '0.75rem',
+                                color: '#374151',
+                                border: 'none',
+                                outline: 'none',
+                                background: 'transparent'
+                              }}
+                            />
                             <button
                               type="button"
                               onClick={() => setLeadForm((prev) => ({ ...prev, logo: '' }))}
@@ -2034,39 +2096,55 @@ Thanks for your time. If you'd like to discuss this, just reply to this email.`;
                             </button>
                           </div>
                         ) : (
-                          <label
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px',
-                              padding: '9px 12px',
-                              borderRadius: '7px',
-                              border: '1px dashed #7C3AED',
-                              background: '#FFFFFF',
-                              color: '#7C3AED',
-                              fontSize: '0.8rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <Image size={15} color="#7C3AED" />
-                            <span>Upload Company Logo</span>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <label
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                padding: '8px 12px',
+                                borderRadius: '7px',
+                                border: '1px dashed #7C3AED',
+                                background: '#FFFFFF',
+                                color: '#7C3AED',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              <Image size={14} color="#7C3AED" />
+                              <span>Upload</span>
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                                style={{ display: 'none' }}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const reader = new FileReader();
+                                  reader.onload = (ev) => {
+                                    setLeadForm((prev) => ({ ...prev, logo: ev.target.result }));
+                                  };
+                                  reader.readAsDataURL(file);
+                                }}
+                              />
+                            </label>
                             <input
-                              type="file"
-                              accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
-                              style={{ display: 'none' }}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const reader = new FileReader();
-                                reader.onload = (ev) => {
-                                  setLeadForm((prev) => ({ ...prev, logo: ev.target.result }));
-                                };
-                                reader.readAsDataURL(file);
+                              type="text"
+                              placeholder="Or paste image URL (https://...)"
+                              value={leadForm.logo || ''}
+                              onChange={(e) => setLeadForm((prev) => ({ ...prev, logo: e.target.value }))}
+                              style={{
+                                flex: 1,
+                                padding: '8px 10px',
+                                border: '1px solid #D1D5DB',
+                                borderRadius: '7px',
+                                fontSize: '0.78rem'
                               }}
                             />
-                          </label>
+                          </div>
                         )}
                       </div>
 
@@ -2456,9 +2534,9 @@ Thanks for your time. If you'd like to discuss this, just reply to this email.`;
                                 leadStudyPdfName: l.leadStudyPdfName || '',
                                 pitchDeckPdf: l.pitchDeckPdf || l.pitchDeck?.streamUrl || '',
                                 pitchDeckPdfName: l.pitchDeckPdfName || l.pitchDeck?.fileName || '',
-                                logo: l.logo || l.avatarUrl || '',
+                                logo: l.logo || l.companyLogo || l.logoUrl || l.company_logo || l.avatarUrl || '',
                                 title: l.title || '',
-                                company: l.company || '',
+                                company: l.company || l.targetCompany || l.leadCompany || '',
                                 aboutCompany: l.aboutCompany || '',
                                 whySuitsBest: l.whySuitsBest || '',
                                 whyRelevant: l.leadStudy?.whyRelevant || '',

@@ -865,7 +865,12 @@ const processLeadsPayload = async (leads, slug, existingLeads = []) => {
     }
 
     // Auto-upload lead company logo if provided as a Data URL
-    const rawLogoDataUrl = (l.logo && isDataUrl(l.logo)) ? l.logo : ((l.companyLogo && isDataUrl(l.companyLogo)) ? l.companyLogo : null);
+    const rawLogoDataUrl = (l.logo && isDataUrl(l.logo))
+      ? l.logo
+      : ((l.companyLogo && isDataUrl(l.companyLogo))
+      ? l.companyLogo
+      : ((l.logoUrl && isDataUrl(l.logoUrl)) ? l.logoUrl : null));
+
     if (rawLogoDataUrl) {
       try {
         const uploadRes = await uploadFile({
@@ -877,11 +882,14 @@ const processLeadsPayload = async (leads, slug, existingLeads = []) => {
         l.logoAssetKey = uploadRes.objectKey;
         l.logo = `/api/samples/${slug}/leads/${leadId}/logo`;
         l.companyLogo = l.logo;
+        l.logoUrl = l.logo;
       } catch (err) {
         console.error(`[processLeadsPayload] Failed to upload logo for ${l.name}:`, err.message);
       }
     } else if (l.logoAssetKey && (!l.logo || l.logo.startsWith('data:'))) {
       l.logo = `/api/samples/${slug}/leads/${leadId}/logo`;
+      l.companyLogo = l.logo;
+      l.logoUrl = l.logo;
     }
 
     processed.push(l);
@@ -1927,31 +1935,11 @@ export const streamLeadLogo = async (req, res) => {
     if (companyLink) {
       const cleanDomain = String(companyLink)
         .replace(/^https?:\/\//i, '')
-        .replace(/^www\./i, '')
         .split('/')[0]
         .split('?')[0]
         .trim();
       if (cleanDomain && cleanDomain.includes('.')) {
-        return res.redirect(`https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`);
-      }
-    }
-
-    // Fallback: Use prospect's target account company name
-    let candidateName = '';
-    if (lead.company && lead.company.toLowerCase() !== sample.companyName?.toLowerCase()) {
-      candidateName = lead.company;
-    } else if (lead.targetCompany) {
-      candidateName = lead.targetCompany;
-    } else if (lead.name) {
-      candidateName = lead.name;
-    } else {
-      candidateName = lead.company;
-    }
-
-    if (candidateName && typeof candidateName === 'string') {
-      const cleanComp = candidateName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (cleanComp.length >= 2) {
-        return res.redirect(`https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanComp}.com&size=128`);
+        return res.redirect(`https://icons.duckduckgo.com/ip3/${cleanDomain.toLowerCase()}.ico`);
       }
     }
 
