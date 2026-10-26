@@ -77,7 +77,7 @@ export const isMockDummyLead = (l) => {
  * In-memory high performance cache for public showcases
  */
 const showcaseCache = new Map();
-const CACHE_TTL_MS = 60 * 1000; // 60s TTL
+const CACHE_TTL_MS = 5 * 1000; // 5s short TTL
 
 export const invalidateShowcaseCache = (slug) => {
   if (!slug) {
@@ -103,13 +103,18 @@ export const getPublicSampleBySlug = async (req, res) => {
     }
 
     const cleanSlug = String(slug).toLowerCase().trim();
+    const bypassCache = req.query?._t || req.headers['cache-control']?.includes('no-cache');
 
-    // Fast memory cache hit check (sub-2ms response)
-    const cached = showcaseCache.get(cleanSlug);
-    if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
-      res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
-      res.setHeader('X-Cache', 'HIT');
-      return res.status(200).json(cached.data);
+    // Fast memory cache hit check
+    if (!bypassCache) {
+      const cached = showcaseCache.get(cleanSlug);
+      if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('X-Cache', 'HIT');
+        return res.status(200).json(cached.data);
+      }
     }
 
     const sample = await findSampleBySlug(cleanSlug, true);
@@ -251,11 +256,8 @@ export const getPublicSampleBySlug = async (req, res) => {
         leadLogo = `/api/samples/${sample.slug}/leads/${leadId}/logo`;
       }
 
-      const clientCompName = (sample.companyName || '').toLowerCase().trim();
       const rawLeadCompany = (l.company || l.lead_company || l.targetCompany || '').trim();
-      const safeLeadCompany = (rawLeadCompany && rawLeadCompany.toLowerCase() !== clientCompName)
-        ? rawLeadCompany
-        : (l.lead_company || l.targetCompany || '');
+      const safeLeadCompany = rawLeadCompany || l.company || l.lead_company || l.targetCompany || sample.companyName || '';
 
       return {
         id: leadId,
@@ -410,7 +412,9 @@ export const getPublicSampleBySlug = async (req, res) => {
 
     // Cache response for sub-2ms subsequent requests
     showcaseCache.set(cleanSlug, { timestamp: Date.now(), data: responsePayload });
-    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.setHeader('X-Cache', 'MISS');
 
     return res.status(200).json(responsePayload);
@@ -1126,7 +1130,7 @@ export const createAdminSample = async (req, res) => {
       pitchDeck: initialPitchDeck,
     });
 
-    invalidateShowcaseCache(effectiveSlug);
+    invalidateShowcaseCache();
 
     return res.status(201).json({
       success: true,
@@ -1236,6 +1240,16 @@ export const updateAdminSample = async (req, res) => {
     if (Array.isArray(body.leads)) {
       const cleanLeadsInput = body.leads.filter((l) => !isMockDummyLead(l));
       body.leads = await processLeadsPayload(cleanLeadsInput, body.slug || sample.slug, sample.leads || []);
+      body.leadStudies = body.leads.map((l, index) => ({
+        id: l.leadStudy?.id || `study-${index + 1}`,
+        leadName: l.name || '',
+        role: l.title || '',
+        company: l.company || body.companyName || sample.companyName || '',
+        whyRelevant: l.leadStudy?.whyRelevant || l.whyRelevant || '',
+        observedContext: l.leadStudy?.observedContext || l.observedContext || '',
+        potentialOpportunity: l.leadStudy?.potentialOpportunity || l.potentialOpportunity || '',
+        suggestedApproach: l.leadStudy?.suggestedApproach || l.suggestedApproach || '',
+      }));
     }
 
     let logoAssetKey = sample.logoAssetKey || sample.logo_asset_key || sample.companyStudy?.logoAssetKey || null;
@@ -1283,8 +1297,8 @@ export const updateAdminSample = async (req, res) => {
           domain = `${targetSlug.replace(/-io$/, '')}.io`;
         } else if (targetSlug === 'finkr') {
           domain = 'finkr.co.uk';
-        } else if (sample.companyName) {
-          domain = `${sample.companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+        } else if (body.companyName || sample.companyName) {
+          domain = `${(body.companyName || sample.companyName).toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
         }
       }
       if (domain && domain.includes('.')) {
@@ -1318,10 +1332,7 @@ export const updateAdminSample = async (req, res) => {
     }
 
     const updated = await updateSampleShowcase(id, body);
-    invalidateShowcaseCache(sample.slug);
-    if (body.slug && body.slug !== sample.slug) {
-      invalidateShowcaseCache(body.slug);
-    }
+    invalidateShowcaseCache(); // Purge all cached showcase variants immediately
     return res.status(200).json({
       success: true,
       sample: updated,
@@ -1357,7 +1368,7 @@ export const deleteAdminSample = async (req, res) => {
     }
 
     await deleteSampleShowcase(id);
-    invalidateShowcaseCache(sample.slug);
+    invalidateShowcaseCache();
     return res.status(200).json({
       success: true,
       message: 'Sample showcase deleted successfully.',

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { BRAND_LOGO, BRAND_NAME } from '../../assets/branding';
+import { BRAND_LOGO, BRAND_LOGO_STACKED, BRAND_NAME } from '../../assets/branding';
 import {
   Building2,
   Users,
@@ -146,20 +146,7 @@ function resolveLeadPresentation(lead, clientCompanyName = '') {
     };
   }
 
-  const isClientCompany = (c) => {
-    if (!c || !clientCompanyName) return false;
-    return c.trim().toLowerCase() === clientCompanyName.trim().toLowerCase();
-  };
-
-  let leadCompany = '';
-  if (lead.company && !isClientCompany(lead.company)) {
-    leadCompany = lead.company.trim();
-  } else if (lead.leadCompany && !isClientCompany(lead.leadCompany)) {
-    leadCompany = lead.leadCompany.trim();
-  } else if (lead.targetCompany && !isClientCompany(lead.targetCompany)) {
-    leadCompany = lead.targetCompany.trim();
-  }
-
+  let leadCompany = (lead.company || lead.leadCompany || lead.targetCompany || '').trim();
   let leadPersonName = (lead.name || '').trim();
   const role = (lead.title || '').trim();
 
@@ -167,7 +154,7 @@ function resolveLeadPresentation(lead, clientCompanyName = '') {
   if (!leadCompany && lead.companyLink) {
     try {
       const host = lead.companyLink.replace(/^https?:\/\/(www\.)?/, '').split('/')[0].split('.')[0];
-      if (host && !isClientCompany(host) && host.length >= 2) {
+      if (host && host.length >= 2) {
         leadCompany = host.charAt(0).toUpperCase() + host.slice(1);
       }
     } catch (_) {}
@@ -176,9 +163,9 @@ function resolveLeadPresentation(lead, clientCompanyName = '') {
   const isSame = leadCompany && leadPersonName && leadCompany.toLowerCase() === leadPersonName.toLowerCase();
 
   // If person name was mistakenly saved as company name, do not treat company as person
-  const effectivePersonName = (!isSame && leadPersonName) ? leadPersonName : '';
+  const effectivePersonName = (!isSame && leadPersonName) ? leadPersonName : (leadPersonName || '');
 
-  const finalCompany = leadCompany || (isSame ? leadPersonName : 'Target Enterprise');
+  const finalCompany = leadCompany || (isSame ? leadPersonName : (clientCompanyName || 'Target Enterprise'));
 
   // Blue Subtitle structure: e.g. "Field IT Engineer · Jeffery Fenn" or "Chief Operating Officer · Cristina Cordova"
   let subtitle = '';
@@ -2128,13 +2115,153 @@ Best regards,
 
       </main>
 
-      {/* 5. TRUST FOOTER */}
-      <footer style={{ background: '#FFFFFF', borderTop: '1px solid #E2E8F0', padding: '24px 16px', textAlign: 'center', width: '100%' }}>
-        <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '6px', fontSize: '0.8rem', color: '#64748B' }}>
-            <ShieldCheck size={16} color="#10B981" style={{ flexShrink: 0 }} />
-            <span style={{ wordBreak: 'break-word', lineHeight: 1.45 }}>{BRAND_NAME} Protected Intelligence Showcase · Enterprise SLA & Tenant Isolation</span>
+      {/* 5. CONTACT SIGNATURE FOOTER */}
+      <footer style={{ background: '#FFFFFF', borderTop: '1px solid #E2E8F0', padding: '44px 20px 28px 20px', width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ maxWidth: '980px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+          
+          {/* Main 3-Column Signature Block (Matches Reference Signature) */}
+          <div className="sample-signature-card">
+            {/* Column 1: Contact Details */}
+            <div style={{ flex: '1 1 260px', minWidth: '220px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.92rem', color: '#64748B', marginBottom: '4px', fontWeight: 500 }}>
+                Regards,
+              </div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1.25, marginBottom: '4px' }}>
+                Akshay Deepak
+              </div>
+              <div style={{ fontSize: '0.92rem', color: '#475569', fontWeight: 600, marginBottom: '8px' }}>
+                Ai Engineer
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <a
+                  href="tel:+916301902632"
+                  style={{
+                    fontSize: '0.94rem',
+                    color: '#2563EB',
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    textUnderlineOffset: '3px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  +91 6301902632
+                </a>
+                <a
+                  href="https://www.dizigini.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontSize: '0.94rem',
+                    color: '#1E40AF',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  www.dizigini.com
+                </a>
+              </div>
+            </div>
+
+            {/* Vertical Divider 1 */}
+            <div className="signature-divider" />
+
+            {/* Column 2: DiziGini Brand Logo (Replaces Creative Gini) */}
+            <div
+              style={{
+                flex: '1 1 260px',
+                minWidth: '210px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '6px 14px',
+              }}
+            >
+              <a href="https://www.dizigini.com" target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img
+                  src={BRAND_LOGO_STACKED || BRAND_LOGO || '/logo.png'}
+                  alt="DiziGini"
+                  style={{
+                    maxHeight: '74px',
+                    maxWidth: '260px',
+                    width: 'auto',
+                    objectFit: 'contain',
+                  }}
+                  onError={(e) => {
+                    e.currentTarget.src = '/logo.png';
+                  }}
+                />
+              </a>
+            </div>
+
+            {/* Vertical Divider 2 */}
+            <div className="signature-divider" />
+
+            {/* Column 3: Powered by DATAI2I */}
+            <div
+              style={{
+                flex: '0 1 190px',
+                minWidth: '150px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                justifyContent: 'center',
+                textAlign: 'left',
+                gap: '8px',
+              }}
+            >
+              <span style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 500, letterSpacing: '0.01em' }}>
+                Powered by
+              </span>
+              <a
+                href="https://datai2i.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: '#FFFFFF',
+                  padding: '2px 4px',
+                  borderRadius: '6px',
+                }}
+              >
+                <img
+                  src="/datai2i-logo.png"
+                  alt="DATA I2I"
+                  style={{
+                    height: '28px',
+                    width: 'auto',
+                    objectFit: 'contain',
+                  }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    if (e.currentTarget.nextSibling) {
+                      e.currentTarget.nextSibling.style.display = 'inline-block';
+                    }
+                  }}
+                />
+                <span style={{ display: 'none', fontWeight: 800, fontSize: '0.9rem', color: '#1E1B4B' }}>
+                  DATA I2I
+                </span>
+              </a>
+            </div>
           </div>
+
+          {/* Subtext: Thanks for your time */}
+          <div style={{ textAlign: 'center', fontSize: '0.86rem', color: '#64748B', lineHeight: 1.5 }}>
+            Thanks for your time. If you&apos;d like to discuss this, feel free to reach out directly or reply to this email.
+          </div>
+
+          {/* SLA & Security Trust */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '6px', fontSize: '0.78rem', color: '#94A3B8', marginTop: '4px' }}>
+            <ShieldCheck size={14} color="#10B981" style={{ flexShrink: 0 }} />
+            <span>{BRAND_NAME} Protected Intelligence Showcase · Enterprise SLA & Tenant Isolation</span>
+          </div>
+
         </div>
       </footer>
 

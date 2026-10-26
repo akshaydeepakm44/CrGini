@@ -179,6 +179,7 @@ export default function LeadShowcasesPage({ onNavigate }) {
   // Upload state
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const [uploadStatusMsg, setUploadStatusMsg] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadShowcases();
@@ -280,11 +281,14 @@ export default function LeadShowcasesPage({ onNavigate }) {
   };
 
   const handleSaveShowcase = async () => {
+    if (isSaving) return;
     try {
       if (!formData.companyName.trim()) {
         alert('Please enter target company name.');
         return;
       }
+
+      setIsSaving(true);
 
       const formatSlug = (input) => {
         if (!input) return '';
@@ -301,8 +305,19 @@ export default function LeadShowcasesPage({ onNavigate }) {
 
       const generatedSlug = formatSlug(formData.slug) || formatSlug(formData.companyName) || `showcase-${Date.now()}`;
 
+      // Check if user has pending, uncommitted lead edits in leadForm
+      let currentLeads = [...(formData.leads || [])];
+      const hasPendingLeadText = Boolean(leadForm.company?.trim() || leadForm.name?.trim());
+      if (editingLeadIndex !== null && editingLeadIndex >= 0 && editingLeadIndex < currentLeads.length) {
+        if (hasPendingLeadText) {
+          currentLeads[editingLeadIndex] = buildLeadFromForm(leadForm, currentLeads[editingLeadIndex]);
+        }
+      } else if (hasPendingLeadText) {
+        currentLeads.push(buildLeadFromForm(leadForm, null));
+      }
+
       // Filter out any mock dummy leads from payload
-      const sanitizedLeads = (formData.leads || []).filter(
+      const sanitizedLeads = currentLeads.filter(
         (l) => !(l.email === 's.jenkins@acmeglobal.com' || (l.name === 'Sarah Jenkins' && l.company === 'Acme Global Systems'))
       );
 
@@ -390,6 +405,8 @@ export default function LeadShowcasesPage({ onNavigate }) {
       } catch (_) {}
 
       alert(`Failed to save showcase: ${err.message}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -432,9 +449,15 @@ Key deliverables included inside your showcase:
 
 Feel free to inspect the sample data. Whenever you are ready to unlock direct contact details and scale with our specialist team, click "More Leads" on the dashboard.
 
-Best regards,
-DiziGini Lead Intelligence Team
-support@dizigini.com`;
+Regards,
+Akshay Deepak
+Ai Engineer
++91 6301902632
+www.dizigini.com
+
+Powered by DATAI2I
+
+Thanks for your time. If you'd like to discuss this, just reply to this email.`;
 
     navigator.clipboard.writeText(emailTemplate);
     setCopiedEmailSlug(showcase.slug);
@@ -508,6 +531,88 @@ support@dizigini.com`;
     }
   };
 
+  // Helper to build a clean lead object from leadForm
+  const buildLeadFromForm = (form, existing = null) => {
+    const rawComp = form.company?.trim() || '';
+    const rawName = form.name?.trim() || '';
+    const effectiveLeadCompany = rawComp;
+    const effectiveLeadName = (rawName && rawName.toLowerCase() !== rawComp.toLowerCase()) ? rawName : (rawName || '');
+
+    return {
+      ...(existing || {}),
+      id: existing?.id || `lead-${Date.now()}`,
+      name: effectiveLeadName,
+      companyContactEmail: form.companyContactEmail ? form.companyContactEmail.trim() : (existing?.companyContactEmail || existing?.companyContact || ''),
+      companyContact: form.companyContactEmail ? form.companyContactEmail.trim() : (existing?.companyContactEmail || existing?.companyContact || ''),
+      phone: form.phone ? form.phone.trim() : (existing?.phone || ''),
+      companyLink: form.companyLink?.trim() || existing?.companyLink || '',
+      companyLinkedin: form.companyLinkedin?.trim() || existing?.companyLinkedin || '',
+      email: form.email?.trim() || existing?.email || '',
+      linkedin: form.linkedin?.trim() || existing?.linkedin || '',
+      leadStudyPdf: form.leadStudyPdf || existing?.leadStudyPdf || '',
+      leadStudyPdfName: form.leadStudyPdfName || existing?.leadStudyPdfName || '',
+      leadStudyPdfAssetKey: existing?.leadStudyPdfAssetKey || '',
+      pitchDeckPdf: form.pitchDeckPdf || existing?.pitchDeckPdf || '',
+      pitchDeckPdfName: form.pitchDeckPdfName || existing?.pitchDeckPdfName || '',
+      pitchDeckAssetKey: existing?.pitchDeckAssetKey || existing?.pitchDeck?.assetKey || '',
+      logo: (() => {
+        let directLogo = form.logo || existing?.logo || existing?.logoUrl || '';
+        if (directLogo && formData.logoUrl && directLogo.trim() === formData.logoUrl.trim()) {
+          directLogo = '';
+        }
+        if (directLogo) return directLogo;
+        const link = form.companyLink?.trim() || existing?.companyLink;
+        if (link) {
+          const cd = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+          if (cd.includes('.') && cd.length >= 4) {
+            return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
+          }
+        }
+        return '';
+      })(),
+      companyLogo: (() => {
+        let directLogo = form.logo || existing?.logo || existing?.logoUrl || '';
+        if (directLogo && formData.logoUrl && directLogo.trim() === formData.logoUrl.trim()) {
+          directLogo = '';
+        }
+        if (directLogo) return directLogo;
+        const link = form.companyLink?.trim() || existing?.companyLink;
+        if (link) {
+          const cd = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+          if (cd.includes('.') && cd.length >= 4) {
+            return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
+          }
+        }
+        return '';
+      })(),
+      logoUrl: (() => {
+        const cand = form.logo || existing?.logoUrl || existing?.logo || existing?.companyLogo || '';
+        if (cand && formData.logoUrl && cand.trim() === formData.logoUrl.trim()) return '';
+        return cand;
+      })(),
+      logoAssetKey: existing?.logoAssetKey || '',
+      title: form.title?.trim() || existing?.title || '',
+      company: effectiveLeadCompany,
+      aboutCompany: form.aboutCompany?.trim() || existing?.aboutCompany || '',
+      whySuitsBest: form.whySuitsBest?.trim() || existing?.whySuitsBest || '',
+      leadStudy: {
+        ...(existing?.leadStudy || {}),
+        whyRelevant: form.whyRelevant?.trim() || existing?.leadStudy?.whyRelevant || '',
+        observedContext: form.observedContext?.trim() || existing?.leadStudy?.observedContext || '',
+        suggestedApproach: form.suggestedApproach?.trim() || existing?.leadStudy?.suggestedApproach || '',
+      },
+      pitchDeck: form.pitchDeckPdf ? {
+        ...(existing?.pitchDeck || {}),
+        title: existing?.pitchDeck?.title || `${(form.name || form.company || 'Prospect').trim()} Proposal Pitch Deck`,
+        summary: existing?.pitchDeck?.summary || '',
+        streamUrl: form.pitchDeckPdf,
+        downloadUrl: form.pitchDeckPdf,
+        fileName: form.pitchDeckPdfName || existing?.pitchDeck?.fileName || `${(form.name || form.company || 'Prospect').trim().replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
+        assetKey: existing?.pitchDeck?.assetKey || existing?.pitchDeckAssetKey || '',
+      } : (existing?.pitchDeck || null),
+    };
+  };
+
   // Add / Edit Lead in Form
   const handleSaveLead = () => {
     const rawComp = leadForm.company?.trim() || '';
@@ -518,83 +623,8 @@ support@dizigini.com`;
       return;
     }
 
-    const effectiveLeadCompany = rawComp;
-    const effectiveLeadName = (rawName && rawName.toLowerCase() !== rawComp.toLowerCase()) ? rawName : (rawName || '');
-
     const existing = editingLeadIndex !== null ? formData.leads[editingLeadIndex] : null;
-    const newLead = {
-      ...(existing || {}),
-      id: existing?.id || `lead-${Date.now()}`,
-      name: effectiveLeadName,
-      companyContactEmail: leadForm.companyContactEmail ? leadForm.companyContactEmail.trim() : (existing?.companyContactEmail || existing?.companyContact || ''),
-      companyContact: leadForm.companyContactEmail ? leadForm.companyContactEmail.trim() : (existing?.companyContactEmail || existing?.companyContact || ''),
-      phone: leadForm.phone ? leadForm.phone.trim() : '',
-      companyLink: leadForm.companyLink?.trim() || '',
-      companyLinkedin: leadForm.companyLinkedin?.trim() || '',
-      email: leadForm.email?.trim() || '',
-      linkedin: leadForm.linkedin?.trim() || '',
-      leadStudyPdf: leadForm.leadStudyPdf || existing?.leadStudyPdf || '',
-      leadStudyPdfName: leadForm.leadStudyPdfName || existing?.leadStudyPdfName || '',
-      leadStudyPdfAssetKey: existing?.leadStudyPdfAssetKey || '',
-      pitchDeckPdf: leadForm.pitchDeckPdf || existing?.pitchDeckPdf || '',
-      pitchDeckPdfName: leadForm.pitchDeckPdfName || existing?.pitchDeckPdfName || '',
-      pitchDeckAssetKey: existing?.pitchDeckAssetKey || existing?.pitchDeck?.assetKey || '',
-      logo: (() => {
-        let directLogo = leadForm.logo || existing?.logo || existing?.logoUrl || '';
-        if (directLogo && formData.logoUrl && directLogo.trim() === formData.logoUrl.trim()) {
-          directLogo = '';
-        }
-        if (directLogo) return directLogo;
-        const link = leadForm.companyLink?.trim() || existing?.companyLink;
-        if (link) {
-          const cd = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
-          if (cd.includes('.') && cd.length >= 4) {
-            return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
-          }
-        }
-        return '';
-      })(),
-      companyLogo: (() => {
-        let directLogo = leadForm.logo || existing?.logo || existing?.logoUrl || '';
-        if (directLogo && formData.logoUrl && directLogo.trim() === formData.logoUrl.trim()) {
-          directLogo = '';
-        }
-        if (directLogo) return directLogo;
-        const link = leadForm.companyLink?.trim() || existing?.companyLink;
-        if (link) {
-          const cd = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
-          if (cd.includes('.') && cd.length >= 4) {
-            return `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cd.toLowerCase()}&size=128`;
-          }
-        }
-        return '';
-      })(),
-      logoUrl: (() => {
-        const cand = leadForm.logo || existing?.logoUrl || existing?.logo || existing?.companyLogo || '';
-        if (cand && formData.logoUrl && cand.trim() === formData.logoUrl.trim()) return '';
-        return cand;
-      })(),
-      logoAssetKey: existing?.logoAssetKey || '',
-      title: leadForm.title?.trim() || '',
-      company: effectiveLeadCompany,
-      aboutCompany: leadForm.aboutCompany?.trim() || '',
-      whySuitsBest: leadForm.whySuitsBest?.trim() || '',
-      leadStudy: {
-        ...(existing?.leadStudy || {}),
-        whyRelevant: leadForm.whyRelevant?.trim() || '',
-        observedContext: leadForm.observedContext?.trim() || '',
-        suggestedApproach: leadForm.suggestedApproach?.trim() || '',
-      },
-      pitchDeck: leadForm.pitchDeckPdf ? {
-        ...(existing?.pitchDeck || {}),
-        title: existing?.pitchDeck?.title || `${leadForm.name.trim()} Proposal Pitch Deck`,
-        summary: existing?.pitchDeck?.summary || '',
-        streamUrl: leadForm.pitchDeckPdf,
-        downloadUrl: leadForm.pitchDeckPdf,
-        fileName: leadForm.pitchDeckPdfName || existing?.pitchDeck?.fileName || `${leadForm.name.trim().replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
-        assetKey: existing?.pitchDeck?.assetKey || existing?.pitchDeckAssetKey || '',
-      } : (existing?.pitchDeck || null),
-    };
+    const newLead = buildLeadFromForm(leadForm, existing);
 
     const updatedLeads = [...formData.leads];
     if (editingLeadIndex !== null) {
@@ -1742,6 +1772,30 @@ support@dizigini.com`;
                       }}
                     />
                   </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                      Recommended Commercial Strategy & Focus (Potential Opportunities)
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Strategic recommendations, potential quick-wins, high-yield opportunity angles..."
+                      value={formData.companyStudy.potentialOpportunity || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          companyStudy: { ...formData.companyStudy, potentialOpportunity: e.target.value },
+                        })
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                      }}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -1873,6 +1927,20 @@ support@dizigini.com`;
                           placeholder="e.g. Executive Decision Maker / CTO"
                           value={leadForm.title}
                           onChange={(e) => setLeadForm({ ...leadForm, title: e.target.value })}
+                          style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
+                        />
+                      </div>
+
+                      {/* Direct Phone Number */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                          Direct Phone Number
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. +1 555-0199 or +91 9876543210"
+                          value={leadForm.phone || ''}
+                          onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
                           style={{ width: '100%', padding: '9px 12px', border: '1px solid #D1D5DB', borderRadius: '7px', fontSize: '0.84rem' }}
                         />
                       </div>
@@ -2126,17 +2194,71 @@ support@dizigini.com`;
                     </div>
 
                     {/* Secondary Context Fields */}
-                    <div style={{ marginBottom: '14px' }}>
-                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#4B5563', marginBottom: '4px' }}>
-                        Why This Lead Suits Best (Fit Rationale)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Leading platform overhaul with active budget..."
-                        value={leadForm.whySuitsBest}
-                        onChange={(e) => setLeadForm({ ...leadForm, whySuitsBest: e.target.value })}
-                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8rem' }}
-                      />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#4B5563', marginBottom: '4px' }}>
+                          Why This Lead Suits Best (Fit Rationale)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Leading platform overhaul with active budget..."
+                          value={leadForm.whySuitsBest}
+                          onChange={(e) => setLeadForm({ ...leadForm, whySuitsBest: e.target.value })}
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#4B5563', marginBottom: '4px' }}>
+                          About Lead&apos;s Company
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. High-growth fintech specializing in credit infrastructure..."
+                          value={leadForm.aboutCompany || ''}
+                          onChange={(e) => setLeadForm({ ...leadForm, aboutCompany: e.target.value })}
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.8rem' }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Lead Deep Dive Context */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', marginBottom: '14px', background: '#FFFFFF', padding: '12px', borderRadius: '8px', border: '1px solid #E9D5FF' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#6D28D9', marginBottom: '3px' }}>
+                          Strategic Fit / Why Relevant
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Evaluating AI automation suites"
+                          value={leadForm.whyRelevant || ''}
+                          onChange={(e) => setLeadForm({ ...leadForm, whyRelevant: e.target.value })}
+                          style={{ width: '100%', padding: '7px 10px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.78rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#6D28D9', marginBottom: '3px' }}>
+                          Observed Context & Triggers
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Recent executive hiring in tech"
+                          value={leadForm.observedContext || ''}
+                          onChange={(e) => setLeadForm({ ...leadForm, observedContext: e.target.value })}
+                          style={{ width: '100%', padding: '7px 10px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.78rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#6D28D9', marginBottom: '3px' }}>
+                          Suggested Outreach Angle
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Present customized architecture blueprint"
+                          value={leadForm.suggestedApproach || ''}
+                          onChange={(e) => setLeadForm({ ...leadForm, suggestedApproach: e.target.value })}
+                          style={{ width: '100%', padding: '7px 10px', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '0.78rem' }}
+                        />
+                      </div>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
@@ -2459,18 +2581,17 @@ support@dizigini.com`;
                       setActiveTab('study');
                     }}
                     style={{
-                      background: '#7C3AED',
-                      border: 'none',
-                      color: '#FFFFFF',
-                      padding: '9px 22px',
+                      background: '#F3F4F6',
+                      border: '1px solid #D1D5DB',
+                      color: '#374151',
+                      padding: '9px 18px',
                       borderRadius: '8px',
-                      fontWeight: 700,
+                      fontWeight: 600,
                       fontSize: '0.875rem',
                       cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
                     }}
                   >
-                    Save & Next: Company Study →
+                    Next: Company Study →
                   </button>
                 )}
 
@@ -2480,45 +2601,44 @@ support@dizigini.com`;
                     type="button"
                     onClick={() => setActiveTab('leads')}
                     style={{
-                      background: '#7C3AED',
-                      border: 'none',
-                      color: '#FFFFFF',
-                      padding: '9px 22px',
+                      background: '#F3F4F6',
+                      border: '1px solid #D1D5DB',
+                      color: '#374151',
+                      padding: '9px 18px',
                       borderRadius: '8px',
-                      fontWeight: 700,
+                      fontWeight: 600,
                       fontSize: '0.875rem',
                       cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
                     }}
                   >
-                    Save & Next: Curated Leads →
+                    Next: Curated Leads →
                   </button>
                 )}
 
-                {/* Step 3 Final Submission */}
-                {activeTab === 'leads' && (
-                  <button
-                    type="button"
-                    onClick={handleSaveShowcase}
-                    style={{
-                      background: '#059669',
-                      border: 'none',
-                      color: '#FFFFFF',
-                      padding: '9px 24px',
-                      borderRadius: '8px',
-                      fontWeight: 700,
-                      fontSize: '0.875rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    <CheckCircle size={16} />
-                    <span>Save Showcase</span>
-                  </button>
-                )}
+                {/* Save Showcase Button (Available on ALL tabs!) */}
+                <button
+                  type="button"
+                  onClick={handleSaveShowcase}
+                  disabled={isSaving}
+                  style={{
+                    background: '#059669',
+                    border: 'none',
+                    color: '#FFFFFF',
+                    padding: '9px 24px',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '0.875rem',
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                    opacity: isSaving ? 0.75 : 1,
+                    boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <CheckCircle size={16} />
+                  <span>{isSaving ? 'Saving Showcase...' : 'Save Showcase'}</span>
+                </button>
               </div>
             </div>
 

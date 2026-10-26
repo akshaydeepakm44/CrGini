@@ -1201,8 +1201,13 @@ export const api = {
 
   // Public Sample Showcase
   async getPublicSample(slug) {
-    const res = await fetch(`${API_BASE}/samples/${encodeURIComponent(slug)}`, {
-      headers: getHeaders(false)
+    const res = await fetch(`${API_BASE}/samples/${encodeURIComponent(slug)}?_t=${Date.now()}`, {
+      headers: {
+        ...getHeaders(false),
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+      cache: 'no-store'
     });
     return parseApiResponse(res, 'Failed to load public sample showcase');
   },

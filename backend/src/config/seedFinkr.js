@@ -133,21 +133,7 @@ export async function seedFinkrShowcase() {
   ];
 
   const existing = await query("SELECT id FROM public_sample_showcases WHERE slug = 'finkr'");
-  if (existing.rows.length > 0) {
-    await query(`
-      UPDATE public_sample_showcases
-      SET company_name = 'Finkr',
-          title = 'Finkr - Practitioner-Led Fintech Consultancy & Venture Partner',
-          description = 'London-based, practitioner-led fintech consultancy and venture funding partner helping financial services and tech companies scale through strategy, product, and technology transformation.',
-          logo_url = $1,
-          status = 'PUBLISHED',
-          company_study = $2,
-          leads = $3,
-          updated_at = NOW()
-      WHERE slug = 'finkr'
-    `, [finkrLogo, JSON.stringify(finkrStudy), JSON.stringify(finkrLeads)]);
-    console.log('[Seed] Finkr showcase updated successfully in PostgreSQL.');
-  } else {
+  if (existing.rows.length === 0) {
     await query(`
       INSERT INTO public_sample_showcases (
         slug, title, company_name, description, logo_url, status, company_study, leads, lead_studies, pitch_deck, published_at
@@ -166,6 +152,8 @@ export async function seedFinkrShowcase() {
       )
     `, [finkrLogo, JSON.stringify(finkrStudy), JSON.stringify(finkrLeads)]);
     console.log('[Seed] Finkr showcase inserted successfully in PostgreSQL.');
+  } else {
+    // Showcase already exists; preserve user edits and do not overwrite
   }
 }
 
