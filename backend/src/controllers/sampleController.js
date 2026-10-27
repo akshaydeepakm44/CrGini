@@ -234,7 +234,7 @@ export const getPublicSampleBySlug = async (req, res) => {
       };
 
       let rawCandidateLogo = l.logo || l.companyLogo || l.logoUrl || l.company_logo || l.avatarUrl || null;
-      if (rawCandidateLogo && isShowcaseLogo(rawCandidateLogo)) {
+      if (rawCandidateLogo && !isFirstLead && isShowcaseLogo(rawCandidateLogo)) {
         rawCandidateLogo = null;
       }
 
@@ -1264,26 +1264,6 @@ export const updateAdminSample = async (req, res) => {
     let effectiveLogoUrl = body.logoUrl !== undefined ? (body.logoUrl ? String(body.logoUrl).trim() : null) : sample.logoUrl;
     if (effectiveLogoUrl === '/logo.png') effectiveLogoUrl = null;
 
-    // Safety check: Don't allow a lead logo or lead website favicon to persist as the showcase company logo
-    if (effectiveLogoUrl) {
-      const allLeads = Array.isArray(body.leads) ? body.leads : (Array.isArray(sample.leads) ? sample.leads : []);
-      const isLeadContaminated = allLeads.some((l) => {
-        const leadLogoCand = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
-        if (leadLogoCand && typeof leadLogoCand === 'string' && leadLogoCand === effectiveLogoUrl) return true;
-        if (l.companyLink && typeof l.companyLink === 'string') {
-          const lDomain = l.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim().toLowerCase();
-          if (lDomain && lDomain.length >= 4 && effectiveLogoUrl.toLowerCase().includes(lDomain)) {
-            const compWebsite = (body.companyStudy?.website || sample.companyStudy?.website || '').toLowerCase();
-            if (!compWebsite.includes(lDomain)) return true;
-          }
-        }
-        return false;
-      });
-      if (isLeadContaminated) {
-        effectiveLogoUrl = null;
-      }
-    }
-
     if (!effectiveLogoUrl && body.companyStudy?.logoUrl && body.companyStudy.logoUrl !== '/logo.png') {
       effectiveLogoUrl = body.companyStudy.logoUrl;
     }
@@ -1902,9 +1882,10 @@ export const streamLeadLogo = async (req, res) => {
 
     const candidate = lead.logo || lead.companyLogo || lead.logoUrl || lead.company_logo || lead.companyLogoUrl || lead.avatarUrl;
     
-    // SAFETY: If candidate is the showcase company logo, reject it!
+    // SAFETY: If candidate is the showcase company logo and not the first featured lead, reject it!
+    const isFirst = (sample.leads || []).findIndex(l => String(l.id) === String(lead.id)) === 0;
     const showcaseCandidate = sample.logoUrl || sample.companyLogo || sample.companyStudy?.logoUrl;
-    if (candidate && showcaseCandidate && candidate.trim() === showcaseCandidate.trim()) {
+    if (!isFirst && candidate && showcaseCandidate && candidate.trim() === showcaseCandidate.trim()) {
       return res.status(404).send('Showcase logo cannot be used for lead');
     }
 

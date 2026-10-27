@@ -136,7 +136,7 @@ function getCardHeadline(customTitle, text, fallback) {
  * Resolves clean presentation data for a lead without ever polluting or defaulting
  * to the client's company name (the organization for whom the showcase is created).
  */
-function resolveLeadPresentation(lead, clientCompanyName = '') {
+function resolveLeadPresentation(lead, clientCompanyName = '', isFeatured = false) {
   if (!lead) {
     return {
       leadCompany: '',
@@ -150,24 +150,56 @@ function resolveLeadPresentation(lead, clientCompanyName = '') {
   let leadPersonName = (lead.name || '').trim();
   const role = (lead.title || '').trim();
 
-  // If leadCompany was not explicitly set, extract domain from lead company link
-  if (!leadCompany && lead.companyLink) {
+  // Helper to extract clean domain brand
+  const extractDomainBrand = (url) => {
+    if (!url || typeof url !== 'string') return '';
     try {
-      const host = lead.companyLink.replace(/^https?:\/\/(www\.)?/, '').split('/')[0].split('.')[0];
-      if (host && host.length >= 2) {
-        leadCompany = host.charAt(0).toUpperCase() + host.slice(1);
+      const clean = url.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+      if (!clean || !clean.includes('.')) return '';
+      const parts = clean.split('.');
+      const brand = parts[0];
+      if (brand && brand.length >= 2) {
+        const tld = parts.slice(1).join('.');
+        if (['ai', 'io', 'co', 'app', 'dev', 'tech'].includes(tld)) {
+          return `${brand.charAt(0).toUpperCase() + brand.slice(1)}.${tld}`;
+        }
+        return brand.charAt(0).toUpperCase() + brand.slice(1);
       }
     } catch (_) {}
+    return '';
+  };
+
+  const domainFromLink = extractDomainBrand(lead.companyLink || lead.website || lead.companyWebsite);
+
+  const cleanClient = (clientCompanyName || '').trim().toLowerCase();
+  const isClientCompanyMatch = leadCompany && cleanClient && (
+    leadCompany.toLowerCase() === cleanClient ||
+    leadCompany.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanClient.replace(/[^a-z0-9]/g, '')
+  );
+
+  let finalCompany = leadCompany;
+  let effectivePersonName = leadPersonName;
+
+  // If leadCompany is missing, or was accidentally saved as clientCompanyName (e.g. "SUNSAMA" or "ANSWER.AI"):
+  if (!finalCompany || isClientCompanyMatch) {
+    if (domainFromLink) {
+      finalCompany = domainFromLink;
+    } else if (leadPersonName && (!cleanClient || leadPersonName.toLowerCase() !== cleanClient)) {
+      finalCompany = leadPersonName.charAt(0).toUpperCase() + leadPersonName.slice(1);
+      if (!role) {
+        effectivePersonName = '';
+      }
+    } else {
+      finalCompany = isFeatured ? (clientCompanyName || 'Target Organization') : 'Target Organization';
+    }
   }
 
-  const isSame = leadCompany && leadPersonName && leadCompany.toLowerCase() === leadPersonName.toLowerCase();
+  const isSame = finalCompany && effectivePersonName && finalCompany.toLowerCase() === effectivePersonName.toLowerCase();
+  if (isSame) {
+    effectivePersonName = '';
+  }
 
-  // If person name was mistakenly saved as company name, do not treat company as person
-  const effectivePersonName = (!isSame && leadPersonName) ? leadPersonName : (leadPersonName || '');
-
-  const finalCompany = leadCompany || (isSame ? leadPersonName : (clientCompanyName || 'Target Enterprise'));
-
-  // Blue Subtitle structure: e.g. "Field IT Engineer · Jeffery Fenn" or "Chief Operating Officer · Cristina Cordova"
+  // Subtitle structure
   let subtitle = '';
   if (role && effectivePersonName) {
     subtitle = `${role} · ${effectivePersonName}`;
@@ -176,7 +208,7 @@ function resolveLeadPresentation(lead, clientCompanyName = '') {
   } else if (role) {
     subtitle = role;
   } else {
-    subtitle = 'Verified Decision Maker';
+    subtitle = 'Target Account · Verified Prospect';
   }
 
   return {
@@ -593,24 +625,6 @@ Best regards,
       if (sample?.companyLogo && cleanCand === sample.companyLogo) return true;
       if (sample?.companyStudy?.logoUrl && cleanCand === sample.companyStudy.logoUrl) return true;
       if (sample?.slug && cleanCand.includes(`/samples/${sample.slug}/logo`)) return true;
-
-      // Match base64 data URLs if identical to showcase logo
-      if (sample?.logoUrl && sample.logoUrl.startsWith('data:') && cleanCand === sample.logoUrl) return true;
-      if (sample?.companyLogo && sample.companyLogo.startsWith('data:') && cleanCand === sample.companyLogo) return true;
-      if (sample?.companyStudy?.logoUrl && sample.companyStudy.logoUrl.startsWith('data:') && cleanCand === sample.companyStudy.logoUrl) return true;
-
-      // Reject generic lead logo route if lead has no distinct asset key
-      if (sample?.slug && cleanCand.includes(`/api/samples/${sample.slug}/leads/`) && !lead.logoAssetKey) {
-        return true;
-      }
-
-      if (companyName) {
-        const cleanComp = companyName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (cleanComp.length >= 3 && cleanCand.toLowerCase().includes(`${cleanComp}.com`)) {
-          const leadComp = (lead.company || lead.leadCompany || lead.targetCompany || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (leadComp && leadComp !== cleanComp) return true;
-        }
-      }
       return false;
     };
 
@@ -624,9 +638,11 @@ Best regards,
       lead.companyLogoUrl ||
       lead.avatarUrl;
 
-    if (directLogo && !isPlatformLogo(directLogo) && !isShowcaseCompanyLogo(directLogo)) {
-      // If directLogo is a legacy Google favicon URL with a dead/generic fallback, avoid returning it blindly
-      if (!directLogo.includes('t3.gstatic.com/faviconV2') && !directLogo.includes('google.com/s2/favicons')) {
+    if (directLogo && !isPlatformLogo(directLogo)) {
+      if (isFeatured) {
+        return directLogo.trim();
+      }
+      if (!isShowcaseCompanyLogo(directLogo)) {
         return directLogo.trim();
       }
     }
@@ -652,10 +668,22 @@ Best regards,
         .split('/')[0]
         .split('?')[0]
         .trim();
-      const compWebsite = (sample?.companyStudy?.website || '').toLowerCase();
-      if (parsedHost && parsedHost.includes('.') && parsedHost.length >= 4 && !compWebsite.includes(parsedHost.toLowerCase())) {
+      if (parsedHost && parsedHost.includes('.') && parsedHost.length >= 4) {
         return `https://icons.duckduckgo.com/ip3/${parsedHost.toLowerCase()}.ico`;
       }
+    }
+
+    // 3. Fallback: If lead has an email with a corporate domain
+    if (lead.email && typeof lead.email === 'string' && lead.email.includes('@')) {
+      const emailDomain = lead.email.split('@')[1]?.toLowerCase().trim();
+      if (emailDomain && emailDomain.includes('.') && !['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'].includes(emailDomain)) {
+        return `https://icons.duckduckgo.com/ip3/${emailDomain}.ico`;
+      }
+    }
+
+    // 4. For featured lead, fall back to showcase company logo if available
+    if (isFeatured && companyLogo) {
+      return companyLogo;
     }
 
     return null;
@@ -1101,7 +1129,7 @@ Best regards,
                       flexShrink: 0
                     }}
                     onLoad={(e) => {
-                      if (e.currentTarget.naturalWidth <= 16 && e.currentTarget.naturalHeight <= 16) {
+                      if (e.currentTarget.naturalWidth === 0) {
                         e.currentTarget.style.display = 'none';
                         if (e.currentTarget.nextSibling) {
                           e.currentTarget.nextSibling.style.display = 'flex';
@@ -1131,13 +1159,13 @@ Best regards,
                   flexShrink: 0
                 }}>
                   {(() => {
-                    const leadPres = resolveLeadPresentation(featuredLead, companyName);
+                    const leadPres = resolveLeadPresentation(featuredLead, companyName, true);
                     return (leadPres.leadCompany || leadPres.leadPersonName || 'L').charAt(0).toUpperCase();
                   })()}
                 </div>
 
                 {(() => {
-                  const leadPres = resolveLeadPresentation(featuredLead, companyName);
+                  const leadPres = resolveLeadPresentation(featuredLead, companyName, true);
                   return (
                     <div style={{ flex: '1 1 auto', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1468,7 +1496,7 @@ Best regards,
               <div className="sample-grid-4">
                 {lockedLeads.map((item, idx) => {
                   const leadLogoUrl = resolveLeadLogo(item, false);
-                  const leadPres = resolveLeadPresentation(item, companyName);
+                  const leadPres = resolveLeadPresentation(item, companyName, false);
                   const effectiveCompany = leadPres.leadCompany || leadPres.leadPersonName || 'Target Organization';
                   const effectiveLeadPerson = leadPres.leadPersonName;
                   const effectiveRole = leadPres.role || 'Executive Decision Maker';
@@ -1508,7 +1536,7 @@ Best regards,
                                   padding: '4px'
                                 }}
                                 onLoad={(e) => {
-                                  if (e.currentTarget.naturalWidth <= 16 && e.currentTarget.naturalHeight <= 16) {
+                                  if (e.currentTarget.naturalWidth === 0) {
                                     e.currentTarget.style.display = 'none';
                                     if (e.currentTarget.nextSibling) {
                                       e.currentTarget.nextSibling.style.display = 'flex';
@@ -2275,7 +2303,7 @@ Best regards,
                     alt={selectedLead.name}
                     style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #E2E8F0' }}
                     onLoad={(e) => {
-                      if (e.currentTarget.naturalWidth <= 16 && e.currentTarget.naturalHeight <= 16) {
+                      if (e.currentTarget.naturalWidth === 0) {
                         e.currentTarget.style.display = 'none';
                         if (e.currentTarget.nextSibling) {
                           e.currentTarget.nextSibling.style.display = 'flex';
@@ -2304,12 +2332,12 @@ Best regards,
                   border: '1.5px solid #E2E8F0'
                 }}>
                   {(() => {
-                    const selPres = resolveLeadPresentation(selectedLead, companyName);
+                    const selPres = resolveLeadPresentation(selectedLead, companyName, selectedLead === featuredLead);
                     return selPres.leadCompany?.charAt(0).toUpperCase() || 'L';
                   })()}
                 </div>
                 {(() => {
-                  const selPres = resolveLeadPresentation(selectedLead, companyName);
+                  const selPres = resolveLeadPresentation(selectedLead, companyName, selectedLead === featuredLead);
                   return (
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

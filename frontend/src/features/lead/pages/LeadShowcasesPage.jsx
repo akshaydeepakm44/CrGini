@@ -47,21 +47,7 @@ export const resolveShowcaseLogo = (showcase) => {
 
   // 1. Explicit showcase logo if valid and not platform default
   if (showcase.logoUrl && !isPlatformLogo(showcase.logoUrl)) {
-    const isLeadContaminated = Array.isArray(showcase.leads) && showcase.leads.some((l) => {
-      const cand = l.companyLogo || l.logo || l.company_logo || l.avatarUrl;
-      if (cand && typeof cand === 'string' && cand === showcase.logoUrl) return true;
-      if (l.companyLink && typeof l.companyLink === 'string') {
-        const lDomain = l.companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim().toLowerCase();
-        if (lDomain && lDomain.length >= 4 && showcase.logoUrl.toLowerCase().includes(lDomain)) {
-          const compWebsite = (showcase.companyStudy?.website || '').toLowerCase();
-          if (!compWebsite.includes(lDomain)) return true;
-        }
-      }
-      return false;
-    });
-    if (!isLeadContaminated) {
-      return showcase.logoUrl.trim();
-    }
+    return showcase.logoUrl.trim();
   }
 
   // 2. Company study logo
@@ -558,13 +544,11 @@ Thanks for your time. If you'd like to discuss this, just reply to this email.`;
       logo: (() => {
         let directLogo = form.logo ? form.logo.trim() : '';
         if (directLogo) {
-          if (formData.logoUrl && directLogo === formData.logoUrl.trim()) return '';
           return directLogo;
         }
         // If editing and existing had a custom direct logo, keep it
         const existingLogo = existing?.logo || existing?.companyLogo || existing?.logoUrl || '';
-        if (existingLogo && !existingLogo.includes('t3.gstatic.com') && !existingLogo.includes('icons.duckduckgo.com')) {
-          if (formData.logoUrl && existingLogo.trim() === formData.logoUrl.trim()) return '';
+        if (existingLogo) {
           return existingLogo.trim();
         }
         // If companyLink is provided, construct DuckDuckGo icon URL
@@ -580,12 +564,10 @@ Thanks for your time. If you'd like to discuss this, just reply to this email.`;
       companyLogo: (() => {
         let directLogo = form.logo ? form.logo.trim() : '';
         if (directLogo) {
-          if (formData.logoUrl && directLogo === formData.logoUrl.trim()) return '';
           return directLogo;
         }
         const existingLogo = existing?.companyLogo || existing?.logo || existing?.logoUrl || '';
-        if (existingLogo && !existingLogo.includes('t3.gstatic.com') && !existingLogo.includes('icons.duckduckgo.com')) {
-          if (formData.logoUrl && existingLogo.trim() === formData.logoUrl.trim()) return '';
+        if (existingLogo) {
           return existingLogo.trim();
         }
         const link = form.companyLink?.trim() || existing?.companyLink?.trim();
@@ -599,8 +581,7 @@ Thanks for your time. If you'd like to discuss this, just reply to this email.`;
       })(),
       logoUrl: (() => {
         const cand = form.logo ? form.logo.trim() : (existing?.logoUrl || existing?.logo || existing?.companyLogo || '');
-        if (cand && formData.logoUrl && cand.trim() === formData.logoUrl.trim()) return '';
-        return cand;
+        return cand ? cand.trim() : '';
       })(),
       logoAssetKey: existing?.logoAssetKey || '',
       title: form.title?.trim() || existing?.title || '',
@@ -688,6 +669,21 @@ Thanks for your time. If you'd like to discuss this, just reply to this email.`;
         const whySuitsBest = parts[5]?.trim() || 'Vetted prospect with immediate relevance to strategic offering.';
 
         if (name && name.toLowerCase() !== 'name') {
+          let targetCompany = '';
+          if (companyLink) {
+            try {
+              const host = companyLink.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+              if (host && host.includes('.')) {
+                const b = host.split('.')[0];
+                targetCompany = b.charAt(0).toUpperCase() + b.slice(1);
+              }
+            } catch (_) {}
+          }
+          if (!targetCompany && name && name.toLowerCase() !== (formData.companyName || '').toLowerCase()) {
+            targetCompany = name.charAt(0).toUpperCase() + name.slice(1);
+          }
+          const finalLeadComp = targetCompany || 'Target Organization';
+
           imported.push({
             id: `lead-${Date.now()}-${idx}`,
             name,
@@ -695,8 +691,8 @@ Thanks for your time. If you'd like to discuss this, just reply to this email.`;
             email,
             linkedin,
             title,
-            company: formData.companyName || 'Target Enterprise',
-            aboutCompany: `Leading corporate enterprise operating in ${formData.companyStudy.industry}.`,
+            company: finalLeadComp,
+            aboutCompany: `Leading corporate enterprise operating in ${formData.companyStudy?.industry || 'enterprise tech'}.`,
             leadStudyPdf: '',
             leadStudyPdfName: '',
             pitchDeckPdf: '',
