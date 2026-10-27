@@ -2109,12 +2109,9 @@ Best regards,
               <div className="signature-name">
                 Akshay Deepak
               </div>
-              <div style={{ fontSize: '0.92rem', color: '#475569', fontWeight: 600, marginBottom: '8px' }}>
-                Ai Engineer
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
                 <a
-                  href="mailto:team@datai2i.com"
+                  href="mailto:akshay@dizitalgini.com"
                   style={{
                     fontSize: '0.94rem',
                     color: '#2563EB',
@@ -2127,7 +2124,7 @@ Best regards,
                     wordBreak: 'break-all',
                   }}
                 >
-                  team@datai2i.com
+                  akshay@dizitalgini.com
                 </a>
                 <a
                   href="https://www.dizigini.com"
