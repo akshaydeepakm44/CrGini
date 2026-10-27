@@ -2103,7 +2103,7 @@ Best regards,
           <div className="sample-signature-card">
             {/* Column 1: Contact Details */}
             <div className="signature-col-contact">
-              <div style={{ fontSize: '0.92rem', color: '#64748B', marginBottom: '4px', fontWeight: 500 }}>
+              <div style={{ fontSize: '0.88rem', color: '#64748B', marginBottom: '2px', fontWeight: 500 }}>
                 Regards,
               </div>
               <div className="signature-name">
@@ -2145,71 +2145,66 @@ Best regards,
               </div>
             </div>
 
-            {/* Vertical Divider 1 (Desktop) */}
+            {/* Desktop Vertical Divider 1 */}
             <div className="signature-divider" />
-            {/* Horizontal Divider 1 (Mobile) */}
+            {/* Mobile Horizontal Divider */}
             <div className="signature-divider-h" />
 
-            {/* Column 2: DiziGini Brand Logo (Replaces Creative Gini) */}
-            <div className="signature-col-brand">
-              <a href="https://www.dizigini.com" target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img
-                  src={BRAND_LOGO_STACKED || BRAND_LOGO || '/logo.png'}
-                  alt="DiziGini"
-                  style={{
-                    maxHeight: '74px',
-                    maxWidth: '100%',
-                    width: 'auto',
-                    objectFit: 'contain',
-                  }}
-                  onError={(e) => {
-                    e.currentTarget.src = '/logo.png';
-                  }}
-                />
-              </a>
-            </div>
+            {/* Brand Wrap: In Desktop acts as direct flex columns, in Mobile sits side-by-side on bottom row */}
+            <div className="signature-brands-wrap">
+              {/* Column 2: DiziGini Brand Logo */}
+              <div className="signature-col-brand">
+                <a href="https://www.dizigini.com" target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                  <img
+                    src={BRAND_LOGO_STACKED || BRAND_LOGO || '/logo.png'}
+                    alt="DiziGini"
+                    onError={(e) => {
+                      e.currentTarget.src = '/logo.png';
+                    }}
+                  />
+                </a>
+              </div>
 
-            {/* Vertical Divider 2 (Desktop) */}
-            <div className="signature-divider" />
-            {/* Horizontal Divider 2 (Mobile) */}
-            <div className="signature-divider-h" />
+              {/* Desktop Vertical Divider 2 */}
+              <div className="signature-divider" />
 
-            {/* Column 3: Powered by DATAI2I */}
-            <div className="signature-col-powered">
-              <span style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 500, letterSpacing: '0.01em' }}>
-                Powered by
-              </span>
-              <a
-                href="https://datai2i.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  background: '#FFFFFF',
-                  padding: '2px 4px',
-                  borderRadius: '6px',
-                }}
-              >
-                <img
-                  src="/datai2i-logo.png"
-                  alt="DATA I2I"
-                  style={{
-                    height: '28px',
-                    width: 'auto',
-                    objectFit: 'contain',
-                  }}
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    if (e.currentTarget.nextSibling) {
-                      e.currentTarget.nextSibling.style.display = 'inline-block';
-                    }
-                  }}
-                />
-                <span style={{ display: 'none', fontWeight: 800, fontSize: '0.9rem', color: '#1E1B4B' }}>
-                  DATA I2I
+              {/* Column 3: Powered by DATAI2I */}
+              <div className="signature-col-powered">
+                <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 500, letterSpacing: '0.01em' }}>
+                  Powered by
                 </span>
-              </a>
+                <a
+                  href="https://datai2i.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    background: '#FFFFFF',
+                    padding: '2px 4px',
+                    borderRadius: '6px',
+                  }}
+                >
+                  <img
+                    src="/datai2i-logo.png"
+                    alt="DATA I2I"
+                    style={{
+                      height: '26px',
+                      width: 'auto',
+                      objectFit: 'contain',
+                    }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      if (e.currentTarget.nextSibling) {
+                        e.currentTarget.nextSibling.style.display = 'inline-block';
+                      }
+                    }}
+                  />
+                  <span style={{ display: 'none', fontWeight: 800, fontSize: '0.9rem', color: '#1E1B4B' }}>
+                    DATA I2I
+                  </span>
+                </a>
+              </div>
             </div>
           </div>
 
