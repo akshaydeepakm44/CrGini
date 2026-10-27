@@ -2109,6 +2109,9 @@ Best regards,
               <div className="signature-name">
                 Akshay Deepak
               </div>
+              <div style={{ fontSize: '0.92rem', color: '#475569', fontWeight: 600, letterSpacing: '-0.01em', marginTop: '1px' }}>
+                Lead Research Manager
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
                 <a
                   href="mailto:akshay@dizitalgini.com"
