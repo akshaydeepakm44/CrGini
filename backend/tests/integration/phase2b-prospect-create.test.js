@@ -202,7 +202,9 @@ test('Phase 2B Single Prospect Create & Idempotency Suite', async (t) => {
     assert.equal(json.status, 'DRAFT', 'Default status must be DRAFT');
     assert.equal(json.campaignId, campaignId1);
     assert.equal(json.prospectId, prospectId1);
-    assert.equal(json.publicUrl, `/samples/${json.slug}`);
+    const expectedPortalBase = (process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/+$/, '');
+    assert.equal(json.publicUrl, `${expectedPortalBase}/samples/${json.slug}`);
+    assert.equal(json.previewUrl, `${expectedPortalBase}/api/samples/manage/preview/${json.slug}`);
 
     // Verify row in database has sourcePlatform DIZITALGINI
     const dbRes = await query('SELECT * FROM public_sample_showcases WHERE id = $1', [json.id]);

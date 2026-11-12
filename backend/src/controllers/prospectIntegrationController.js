@@ -5,6 +5,7 @@ import { relocateStagedAsset } from '../services/prospectRelocationService.js';
 import { createNotification } from '../repositories/notificationRepository.js';
 import { generateOutreachMailTemplate } from '../services/mailTemplateService.js';
 import { validateExternalUrl } from '../services/ssrfFilter.js';
+import { getPortalBaseUrl } from '../config/portalConfig.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_BATCH_PROSPECTS = 20;
@@ -244,13 +245,15 @@ export async function createIntegrationProspectBatch(req, res) {
         // Check if identical or conflicting
         if (payloadSnapshot === existingSnapshot || existingRow.slug.startsWith(cleanSlug(p.companyName))) {
           successCount++;
+          const portalBase = getPortalBaseUrl();
           results.push({
             index: idx,
             externalProspectId: p.externalProspectId.trim(),
             status: 'EXISTING',
             id: existingRow.id,
             slug: existingRow.slug,
-            publicUrl: existingRow.status === 'PUBLISHED' ? `/samples/${existingRow.slug}` : null,
+            publicUrl: existingRow.status === 'PUBLISHED' ? `${portalBase}/samples/${existingRow.slug}` : null,
+            previewUrl: `${portalBase}/api/samples/manage/preview/${existingRow.slug}`,
           });
           continue;
         } else {
@@ -408,6 +411,8 @@ export async function createIntegrationProspectBatch(req, res) {
         companyName: p.companyName.trim(),
         lead: primaryLead,
         showcaseSlug: targetSlug,
+        baseUrl: getPortalBaseUrl(),
+        companyStudy: updatedCompanyStudy,
         sender: {
           name: p.mailOptions.senderName,
           title: p.mailOptions.senderTitle,
@@ -467,13 +472,15 @@ export async function createIntegrationProspectBatch(req, res) {
       ).catch(() => {});
 
       successCount++;
+      const portalBase = getPortalBaseUrl();
       results.push({
         index: idx,
         externalProspectId: p.externalProspectId.trim(),
         status: 'CREATED',
         id: created.id,
         slug: created.slug,
-        publicUrl: `/samples/${created.slug}`,
+        publicUrl: `${portalBase}/samples/${created.slug}`,
+        previewUrl: `${portalBase}/api/samples/manage/preview/${created.slug}`,
         showcaseStatus: created.status,
         warnings,
       });
@@ -614,6 +621,7 @@ export async function createIntegrationProspect(req, res) {
           id: item.id,
           slug: item.slug,
           publicUrl: item.publicUrl,
+          previewUrl: item.previewUrl,
           status: item.showcaseStatus,
           campaignId: payload.externalCampaignId,
           prospectId: payload.externalProspectId,
@@ -660,6 +668,13 @@ export async function getIntegrationBatch(req, res) {
       [batchId]
     );
 
+    const portalBase = getPortalBaseUrl();
+    const formattedShowcases = showcasesRes.rows.map((s) => ({
+      ...s,
+      publicUrl: s.status === 'PUBLISHED' ? `${portalBase}/samples/${s.slug}` : null,
+      previewUrl: `${portalBase}/api/samples/manage/preview/${s.slug}`,
+    }));
+
     const eventsRes = await query(
       `SELECT event_type, payload, created_at
        FROM integration_events
@@ -682,7 +697,7 @@ export async function getIntegrationBatch(req, res) {
         createdAt: batch.created_at,
         completedAt: batch.completed_at,
       },
-      showcases: showcasesRes.rows,
+      showcases: formattedShowcases,
       events: eventsRes.rows,
     });
   } catch (err) {
@@ -736,6 +751,7 @@ export async function getIntegrationProspect(req, res) {
     }
 
     const row = dbRes.rows[0];
+    const portalBase = getPortalBaseUrl();
 
     return res.status(200).json({
       success: true,
@@ -743,7 +759,8 @@ export async function getIntegrationProspect(req, res) {
       slug: row.slug,
       status: row.status,
       companyName: row.company_name,
-      publicUrl: row.status === 'PUBLISHED' ? `/samples/${row.slug}` : null,
+      publicUrl: row.status === 'PUBLISHED' ? `${portalBase}/samples/${row.slug}` : null,
+      previewUrl: `${portalBase}/api/samples/manage/preview/${row.slug}`,
       viewCount: row.view_count || 0,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -814,7 +831,7 @@ export async function regenerateProspectMailTemplate(req, res) {
 
   try {
     const dbRes = await query(
-      `SELECT p.id, p.slug, p.company_name, p.leads
+      `SELECT p.id, p.slug, p.company_name, p.leads, p.company_study
        FROM public_sample_showcases p
        JOIN integration_batches b ON p.batch_id = b.id
        WHERE b.client_id = $1 AND (p.id::text = $2 OR p.slug = $2)`,
@@ -837,6 +854,8 @@ export async function regenerateProspectMailTemplate(req, res) {
       companyName: row.company_name,
       lead,
       showcaseSlug: row.slug,
+      baseUrl: getPortalBaseUrl(),
+      companyStudy: row.company_study,
       sender: {
         name: senderName,
         title: senderTitle,

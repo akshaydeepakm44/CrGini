@@ -191,11 +191,11 @@ class LocalDiskStorageDriver {
   async removeObject(bucket, objectKey) {
     const { targetPath } = this._resolveSafePath(bucket, objectKey);
     if (fs.existsSync(targetPath)) {
-      await fs.promises.unlink(targetPath).catch(() => {});
+      await fs.promises.unlink(targetPath).catch(() => { });
     }
     const metaPath = `${targetPath}.meta.json`;
     if (fs.existsSync(metaPath)) {
-      await fs.promises.unlink(metaPath).catch(() => {});
+      await fs.promises.unlink(metaPath).catch(() => { });
     }
   }
 }
@@ -513,7 +513,7 @@ const findLocalFileForObjectKey = (objectKey, bucket = getBucketName()) => {
       if (fs.existsSync(p) && fs.statSync(p).isFile()) {
         return p;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   return null;
 };
@@ -754,5 +754,5 @@ export const isMinioObjectKey = (url) => {
   if (url.startsWith('/uploads/')) return false;
   // Standard object key patterns
   return /^[a-zA-Z0-9_\-\/]+\/[0-9a-fA-F-]{36}-.+$/.test(url) ||
-         /^(companies|submissions|leads|onboarding|assets|public-samples)\//i.test(url);
+    /^(companies|submissions|leads|onboarding|assets|public-samples)\//i.test(url);
 };

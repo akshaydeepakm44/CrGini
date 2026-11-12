@@ -24,7 +24,8 @@
     "test:phase2a": "node --test tests/integration/phase2a-api-client-assets.test.js",
     "test:phase2b": "node --test tests/integration/phase2b-prospect-create.test.js",
     "test:phase2c": "node --test tests/integration/phase2c-batch-tracker.test.js",
-    "test:integration-core": "node --test tests/integration/phase0-security-published.test.js && node --test tests/integration/phase1-prospect-service.test.js && node --test tests/integration/phase2a-api-client-assets.test.js && node --test tests/integration/phase2b-prospect-create.test.js && node --test tests/integration/phase2c-batch-tracker.test.js"
+    "test:final-pass": "node --test tests/integration/final-pass-validation.test.js",
+    "test:integration-core": "node --test tests/integration/phase0-security-published.test.js && node --test tests/integration/phase1-prospect-service.test.js && node --test tests/integration/phase2a-api-client-assets.test.js && node --test tests/integration/phase2b-prospect-create.test.js && node --test tests/integration/phase2c-batch-tracker.test.js && node --test tests/integration/final-pass-validation.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

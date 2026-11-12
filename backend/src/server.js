@@ -16,11 +16,14 @@ import integrationRoutes from './routes/integrationRoutes.js';
 import { startAssetCleanupJob, stopAssetCleanupJob } from './services/assetCleanupService.js';
 import { apiLimiter, authLimiter, paymentLimiter } from './middleware/rateLimiter.js';
 import { enforceServerJwtConfig } from './middleware/auth.js';
+import { enforcePortalBaseUrlConfig } from './config/portalConfig.js';
 
 dotenv.config();
 
 // Enforce mandatory JWT_SECRET: fails closed outside explicit "development" or "test"
 enforceServerJwtConfig();
+// Enforce mandatory PORTAL_BASE_URL: fails closed outside explicit "development" or "test"
+enforcePortalBaseUrlConfig();
 
 const app = express();
 app.set('trust proxy', 1);
@@ -91,13 +94,36 @@ app.use(cors({
   credentials: true
 }));
 
-// Strict 2MB JSON body limit for Integration API, evaluated before global 150MB parser
+// Strict 2MB body limit for all non-multipart content types on Integration API, evaluated before global parser & auth
 app.use('/api/integration', (req, res, next) => {
-  const contentType = req.headers['content-type'] || '';
+  const contentType = (req.headers['content-type'] || '').toLowerCase();
+
+  // Multipart asset uploads (up to 25MB) are streamed directly to Busboy in uploadIntegrationAsset
+  if (contentType.includes('multipart/')) {
+    return next();
+  }
+
+  // Fast Content-Length rejection for non-multipart requests > 2MB before streaming bytes
+  const contentLength = parseInt(req.headers['content-length'] || '0', 10);
+  if (contentLength > 2 * 1024 * 1024) {
+    return res.status(413).json({
+      success: false,
+      error: 'PAYLOAD_TOO_LARGE',
+      message: 'Upload payload is too large. Please reduce the payload size and try again.'
+    });
+  }
+
   if (contentType.includes('application/json')) {
     return express.json({ limit: '2mb' })(req, res, next);
   }
-  next();
+  if (contentType.includes('application/x-www-form-urlencoded')) {
+    return express.urlencoded({ extended: true, limit: '2mb' })(req, res, next);
+  }
+  if (contentType.includes('text/')) {
+    return express.text({ limit: '2mb' })(req, res, next);
+  }
+  // Any other non-multipart body (octet-stream, custom binary, etc.)
+  return express.raw({ limit: '2mb', type: '*/*' })(req, res, next);
 });
 
 app.use(express.json({ limit: '150mb' }));

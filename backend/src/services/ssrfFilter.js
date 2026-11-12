@@ -94,18 +94,22 @@ export function isPrivateOrReservedIp(rawIp) {
   const lower = ip.toLowerCase();
 
   // IPv6 Checks
-  if (
-    lower === '::1' ||
-    lower === '::' ||
-    lower.startsWith('fe80:') || // Link-local
-    lower.startsWith('fe9') ||
-    lower.startsWith('fea') ||
-    lower.startsWith('feb') ||
-    lower.startsWith('fc00:') || // Unique local (fc00::/7)
-    lower.startsWith('fd') ||
-    lower.startsWith('ff') // Multicast
-  ) {
-    return true;
+  if (net.isIPv6(lower)) {
+    if (
+      lower === '::1' ||
+      lower === '::' ||
+      lower.startsWith('fe80:') || // Link-local
+      lower.startsWith('fe9') ||
+      lower.startsWith('fea') ||
+      lower.startsWith('feb') ||
+      lower.startsWith('fc00:') || // Unique local (fc00::/7)
+      lower.startsWith('fd') ||
+      lower.startsWith('ff') // Multicast
+    ) {
+      return true;
+    }
+    // Public IPv6 address
+    return false;
   }
 
   const parts = lower.split('.').map((p) => parseInt(p, 10));

@@ -21,7 +21,7 @@ export async function requireIdempotency(req, res, next) {
     return res.status(400).json({
       success: false,
       error: 'MISSING_IDEMPOTENCY_KEY',
-      message: 'Idempotency-Key header is required for mutating integration endpoints.',
+      message: 'Idempotency-Key (or X-Idempotency-Key) header is required for mutating integration endpoints.',
     });
   }
 
