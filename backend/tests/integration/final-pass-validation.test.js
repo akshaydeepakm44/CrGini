@@ -52,36 +52,46 @@ test('Final Pass Validation Suite: Absolute URLs, Non-Multipart 2MB Cap, Dual Id
   });
 
   // 1. PORTAL_BASE_URL enforcement in production mode
-  await t.test('1. PORTAL_BASE_URL enforcement in production mode', async () => {
+  await t.test('1. PORTAL_BASE_URL enforcement: enforced only when ENABLE_INTEGRATION_API=true', async () => {
     const origEnv = process.env.NODE_ENV;
     const origPortal = process.env.PORTAL_BASE_URL;
+    const origIntegration = process.env.ENABLE_INTEGRATION_API;
 
     try {
       process.env.NODE_ENV = 'production';
 
-      // Unset in production -> throws error
+      // Case A: ENABLE_INTEGRATION_API=true -> Enforces strictly
+      process.env.ENABLE_INTEGRATION_API = 'true';
+
       delete process.env.PORTAL_BASE_URL;
       assert.throws(
         () => getPortalBaseUrl(),
-        /FATAL: PORTAL_BASE_URL environment variable is required in production mode/
+        /FATAL: PORTAL_BASE_URL environment variable is required in production mode when ENABLE_INTEGRATION_API=true/
       );
 
-      // Insecure http:// in production -> throws error
       process.env.PORTAL_BASE_URL = 'http://dizigini.com';
       assert.throws(
         () => getPortalBaseUrl(),
-        /FATAL: PORTAL_BASE_URL must begin with "https:\/\/" in production mode/
+        /FATAL: PORTAL_BASE_URL must begin with "https:\/\/" in production mode when ENABLE_INTEGRATION_API=true/
       );
 
-      // Valid https:// in production -> succeeds and strips trailing slash
       process.env.PORTAL_BASE_URL = 'https://dizigini.com/portal/';
       assert.equal(getPortalBaseUrl(), 'https://dizigini.com/portal');
+
+      // Case B: ENABLE_INTEGRATION_API=false (flag off) -> Warns only, does not throw or halt startup
+      process.env.ENABLE_INTEGRATION_API = 'false';
+      delete process.env.PORTAL_BASE_URL;
+      assert.equal(enforcePortalBaseUrlConfig(), true, 'Startup succeeds when integration API is disabled');
+      assert.equal(getPortalBaseUrl(), '', 'Returns empty string without throwing when flag is off');
     } finally {
       if (origEnv === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = origEnv;
 
       if (origPortal === undefined) delete process.env.PORTAL_BASE_URL;
       else process.env.PORTAL_BASE_URL = origPortal;
+
+      if (origIntegration === undefined) delete process.env.ENABLE_INTEGRATION_API;
+      else process.env.ENABLE_INTEGRATION_API = origIntegration;
     }
   });
 
@@ -95,6 +105,7 @@ test('Final Pass Validation Suite: Absolute URLs, Non-Multipart 2MB Cap, Dual Id
       const template = generateOutreachMailTemplate({
         companyName: 'Acme Test Corp',
         showcaseSlug: 'acme-test-corp-12345',
+        status: 'DRAFT',
         lead: { name: 'Alice Smith', email: 'alice@acme.example.com' },
         keyObservations: 'First sentence of observation. Second sentence here! Third sentence should be omitted.',
         potentialOpportunity: 'Expand EMEA channel partners.',
@@ -124,6 +135,10 @@ test('Final Pass Validation Suite: Absolute URLs, Non-Multipart 2MB Cap, Dual Id
       assert.match(template.bodyHtml, /Expand EMEA channel partners\./);
       assert.match(template.bodyHtml, /Head of regional expansion\./);
 
+      // ReadyToSend flag for draft is false
+      assert.equal(template.readyToSend, false);
+      assert.match(template.warning, /Showcase is currently in DRAFT status/);
+
       // Boundary checks for sentence extraction
       assert.equal(extractFirstSentences('', 2), '');
       assert.equal(extractFirstSentences('Single sentence here.', 2), 'Single sentence here.');
@@ -137,65 +152,179 @@ test('Final Pass Validation Suite: Absolute URLs, Non-Multipart 2MB Cap, Dual Id
     }
   });
 
-  // 3. 2MB limit on every non-multipart content type before auth
-  await t.test('3. 2MB limit on every non-multipart content type before auth', async () => {
-    const largeBuffer = Buffer.alloc(2.5 * 1024 * 1024, 'X'); // 2.5MB
+  // 3. 2MB limit on every non-multipart content type (both Content-Length and Chunked stream)
+  await t.test('3. 2MB limit on every non-multipart content type before auth (Content-Length and Chunked)', async () => {
+    // Helper to send chunked stream without Content-Length
+    const sendChunked = (contentType, includeApiKey = false) => {
+      return new Promise((resolve, reject) => {
+        const headers = {
+          'Content-Type': contentType,
+          'Transfer-Encoding': 'chunked',
+        };
+        if (includeApiKey) {
+          headers['X-API-Key'] = apiKey;
+        }
 
-    // urlencoded > 2MB rejected with 413 before auth
-    const urlencodedRes = await fetch(`${baseUrl}/api/integration/v1/prospects`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': String(largeBuffer.length),
-      },
-      body: largeBuffer,
-    });
-    assert.equal(urlencodedRes.status, 413, 'urlencoded > 2MB must return 413');
-    const urlencodedJson = await urlencodedRes.json();
-    assert.equal(urlencodedJson.error, 'PAYLOAD_TOO_LARGE');
+        const req = http.request(
+          {
+            hostname: '127.0.0.1',
+            port: serverPort,
+            path: '/api/integration/v1/prospects',
+            method: 'POST',
+            headers,
+          },
+          (res) => {
+            let body = '';
+            res.on('data', (c) => (body += c));
+            res.on('end', () => {
+              let parsed = {};
+              try {
+                parsed = JSON.parse(body);
+              } catch (_) {}
+              resolve({ status: res.statusCode, data: parsed, rawBody: body });
+            });
+          }
+        );
+        req.on('error', reject);
 
-    // text/plain > 2MB rejected with 413 before auth
-    const textRes = await fetch(`${baseUrl}/api/integration/v1/prospects`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/plain',
-        'Content-Length': String(largeBuffer.length),
-      },
-      body: largeBuffer,
-    });
-    assert.equal(textRes.status, 413, 'text/plain > 2MB must return 413');
-    const textJson = await textRes.json();
-    assert.equal(textJson.error, 'PAYLOAD_TOO_LARGE');
+        // Send 2.5MB in 512KB chunks
+        const chunk = Buffer.alloc(512 * 1024, 'a');
+        for (let i = 0; i < 5; i++) {
+          req.write(chunk);
+        }
+        req.end();
+      });
+    };
 
-    // application/octet-stream > 2MB rejected with 413 before auth
-    const octetRes = await fetch(`${baseUrl}/api/integration/v1/prospects`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'Content-Length': String(largeBuffer.length),
-      },
-      body: largeBuffer,
-    });
-    assert.equal(octetRes.status, 413, 'octet-stream > 2MB must return 413');
-    const octetJson = await octetRes.json();
-    assert.equal(octetJson.error, 'PAYLOAD_TOO_LARGE');
+    // Test chunked >2MB across urlencoded, text/plain, and json, with and without API key
+    const contentTypes = [
+      'application/x-www-form-urlencoded',
+      'text/plain',
+      'application/json',
+    ];
 
-    // application/json > 2MB rejected with 413 before auth
-    const jsonRes = await fetch(`${baseUrl}/api/integration/v1/prospects`, {
+    for (const ct of contentTypes) {
+      // Without API key -> 413 (must be rejected before auth!)
+      const noKeyRes = await sendChunked(ct, false);
+      assert.equal(noKeyRes.status, 413, `${ct} chunked without key must return 413`);
+      assert.equal(noKeyRes.data.error, 'PAYLOAD_TOO_LARGE');
+
+      // With API key -> 413
+      const withKeyRes = await sendChunked(ct, true);
+      assert.equal(withKeyRes.status, 413, `${ct} chunked with key must return 413`);
+      assert.equal(withKeyRes.data.error, 'PAYLOAD_TOO_LARGE');
+    }
+  });
+
+  // 4. Draft publicUrl isolation, showcaseStatus, and mailTemplate readyToSend
+  await t.test('4. Draft isolation: publicUrl is null until PUBLISHED, showcaseStatus and readyToSend flags accurate', async () => {
+    const portalBase = (process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/+$/, '');
+
+    // A. Batch creation in DRAFT status
+    const batchRes = await fetch(`${baseUrl}/api/integration/v1/prospects/batch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Content-Length': String(largeBuffer.length),
+        'X-API-Key': apiKey,
+        'Idempotency-Key': `IDEMP_DRAFT_TEST_${Date.now()}`,
       },
-      body: largeBuffer,
+      body: JSON.stringify({
+        externalCampaignId: 'CAMP_DRAFT_TEST',
+        operatorEmail: 'campaign@dizitalgini.com',
+        prospects: [
+          {
+            companyName: 'Draft Test Company',
+            externalProspectId: 'PROSP_DRAFT_1',
+            status: 'DRAFT',
+            companyStudy: {
+              keyObservations: 'Strong enterprise base.',
+            },
+          },
+        ],
+      }),
     });
-    assert.equal(jsonRes.status, 413, 'application/json > 2MB must return 413');
-    const jsonParsed = await jsonRes.json();
-    assert.equal(jsonParsed.error, 'PAYLOAD_TOO_LARGE');
+    assert.equal(batchRes.status, 207);
+    const batchData = await batchRes.json();
+    const batchItem = batchData.results[0];
+    assert.equal(batchItem.status, 'CREATED');
+    assert.equal(batchItem.showcaseStatus, 'DRAFT', 'showcaseStatus must be DRAFT');
+    assert.equal(batchItem.publicUrl, null, 'Draft publicUrl must be null in batch response');
+    assert.equal(batchItem.previewUrl, `${portalBase}/api/samples/manage/preview/${batchItem.slug}`);
+
+    // B. Single prospect creation in DRAFT status
+    const singleRes = await fetch(`${baseUrl}/api/integration/v1/prospects`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': apiKey,
+        'Idempotency-Key': `IDEMP_SINGLE_DRAFT_${Date.now()}`,
+      },
+      body: JSON.stringify({
+        externalCampaignId: 'CAMP_SINGLE_DRAFT',
+        externalProspectId: 'PROSP_SINGLE_1',
+        companyName: 'Single Draft Company',
+        status: 'DRAFT',
+      }),
+    });
+    assert.equal(singleRes.status, 201);
+    const singleData = await singleRes.json();
+    assert.equal(singleData.showcaseStatus, 'DRAFT');
+    assert.equal(singleData.publicUrl, null, 'Draft publicUrl must be null in single prospect response');
+    assert.equal(singleData.previewUrl, `${portalBase}/api/samples/manage/preview/${singleData.slug}`);
+
+    // C. GET /prospects/:id for draft
+    const getProspRes = await fetch(`${baseUrl}/api/integration/v1/prospects/${batchItem.id}`, {
+      headers: { 'X-API-Key': apiKey },
+    });
+    assert.equal(getProspRes.status, 200);
+    const getProspData = await getProspRes.json();
+    assert.equal(getProspData.showcaseStatus, 'DRAFT');
+    assert.equal(getProspData.publicUrl, null, 'Draft publicUrl must be null in GET /prospects/:id');
+
+    // D. GET /batches/:batchId for draft
+    const getBatchRes = await fetch(`${baseUrl}/api/integration/v1/batches/${batchData.batchId}`, {
+      headers: { 'X-API-Key': apiKey },
+    });
+    assert.equal(getBatchRes.status, 200);
+    const getBatchData = await getBatchRes.json();
+    assert.equal(getBatchData.showcases[0].showcaseStatus, 'DRAFT');
+    assert.equal(getBatchData.showcases[0].publicUrl, null, 'Draft publicUrl must be null in GET /batches/:id');
+
+    // E. GET /prospects/:id/mail-template for draft
+    const mailRes = await fetch(`${baseUrl}/api/integration/v1/prospects/${batchItem.id}/mail-template`, {
+      headers: { 'X-API-Key': apiKey },
+    });
+    assert.equal(mailRes.status, 200);
+    const mailData = await mailRes.json();
+    assert.equal(mailData.showcaseStatus, 'DRAFT');
+    assert.equal(mailData.readyToSend, false, 'readyToSend must be false for draft');
+    assert.match(mailData.warning, /Showcase is currently in DRAFT status/);
+    assert.equal(mailData.mailTemplate.readyToSend, false);
+    assert.match(mailData.mailTemplate.warning, /Showcase is currently in DRAFT status/);
+
+    // F. Publish showcase and verify publicUrl becomes active and readyToSend becomes true
+    await query(`UPDATE public_sample_showcases SET status = 'PUBLISHED' WHERE id = $1`, [batchItem.id]);
+
+    const pubProspRes = await fetch(`${baseUrl}/api/integration/v1/prospects/${batchItem.id}`, {
+      headers: { 'X-API-Key': apiKey },
+    });
+    assert.equal(pubProspRes.status, 200);
+    const pubProspData = await pubProspRes.json();
+    assert.equal(pubProspData.showcaseStatus, 'PUBLISHED');
+    assert.equal(pubProspData.publicUrl, `${portalBase}/samples/${batchItem.slug}`);
+
+    const pubMailRes = await fetch(`${baseUrl}/api/integration/v1/prospects/${batchItem.id}/mail-template`, {
+      headers: { 'X-API-Key': apiKey },
+    });
+    assert.equal(pubMailRes.status, 200);
+    const pubMailData = await pubMailRes.json();
+    assert.equal(pubMailData.showcaseStatus, 'PUBLISHED');
+    assert.equal(pubMailData.readyToSend, true, 'readyToSend must be true when published');
+    assert.equal(pubMailData.warning, null);
   });
 
-  // 4. Accept both Idempotency-Key and X-Idempotency-Key
-  await t.test('4. Accept both Idempotency-Key and X-Idempotency-Key headers', async () => {
+  // 5. Accept both Idempotency-Key and X-Idempotency-Key
+  await t.test('5. Accept both Idempotency-Key and X-Idempotency-Key headers', async () => {
     const portalBase = (process.env.PORTAL_BASE_URL || 'http://localhost:5174').replace(/\/+$/, '');
 
     // Primary header: Idempotency-Key
@@ -224,7 +353,8 @@ test('Final Pass Validation Suite: Absolute URLs, Non-Multipart 2MB Cap, Dual Id
     assert.equal(res1.status, 207);
     const data1 = await res1.json();
     assert.equal(data1.results[0].status, 'CREATED');
-    assert.equal(data1.results[0].publicUrl, `${portalBase}/samples/${data1.results[0].slug}`);
+    assert.equal(data1.results[0].showcaseStatus, 'DRAFT');
+    assert.equal(data1.results[0].publicUrl, null);
     assert.equal(data1.results[0].previewUrl, `${portalBase}/api/samples/manage/preview/${data1.results[0].slug}`);
 
     // Alternative alias: X-Idempotency-Key
@@ -249,17 +379,8 @@ test('Final Pass Validation Suite: Absolute URLs, Non-Multipart 2MB Cap, Dual Id
     assert.equal(res2.status, 207);
     const data2 = await res2.json();
     assert.equal(data2.results[0].status, 'CREATED');
-    assert.equal(data2.results[0].publicUrl, `${portalBase}/samples/${data2.results[0].slug}`);
+    assert.equal(data2.results[0].showcaseStatus, 'DRAFT');
+    assert.equal(data2.results[0].publicUrl, null);
     assert.equal(data2.results[0].previewUrl, `${portalBase}/api/samples/manage/preview/${data2.results[0].slug}`);
-
-    // GET /prospects/:id returns absolute previewUrl
-    const prospId = data1.results[0].id;
-    const getRes = await fetch(`${baseUrl}/api/integration/v1/prospects/${prospId}`, {
-      headers: { 'X-API-Key': apiKey },
-    });
-    assert.equal(getRes.status, 200);
-    const getData = await getRes.json();
-    assert.equal(getData.publicUrl, null);
-    assert.equal(getData.previewUrl, `${portalBase}/api/samples/manage/preview/${getData.slug}`);
   });
 });

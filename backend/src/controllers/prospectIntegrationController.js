@@ -246,14 +246,16 @@ export async function createIntegrationProspectBatch(req, res) {
         if (payloadSnapshot === existingSnapshot || existingRow.slug.startsWith(cleanSlug(p.companyName))) {
           successCount++;
           const portalBase = getPortalBaseUrl();
+          const isPublished = existingRow.status === 'PUBLISHED';
           results.push({
             index: idx,
             externalProspectId: p.externalProspectId.trim(),
             status: 'EXISTING',
             id: existingRow.id,
             slug: existingRow.slug,
-            publicUrl: existingRow.status === 'PUBLISHED' ? `${portalBase}/samples/${existingRow.slug}` : null,
+            publicUrl: isPublished ? `${portalBase}/samples/${existingRow.slug}` : null,
             previewUrl: `${portalBase}/api/samples/manage/preview/${existingRow.slug}`,
+            showcaseStatus: existingRow.status,
           });
           continue;
         } else {
@@ -413,6 +415,8 @@ export async function createIntegrationProspectBatch(req, res) {
         showcaseSlug: targetSlug,
         baseUrl: getPortalBaseUrl(),
         companyStudy: updatedCompanyStudy,
+        status: effectiveStatus,
+        showcaseStatus: effectiveStatus,
         sender: {
           name: p.mailOptions.senderName,
           title: p.mailOptions.senderTitle,
@@ -473,13 +477,14 @@ export async function createIntegrationProspectBatch(req, res) {
 
       successCount++;
       const portalBase = getPortalBaseUrl();
+      const isPublished = created.status === 'PUBLISHED';
       results.push({
         index: idx,
         externalProspectId: p.externalProspectId.trim(),
         status: 'CREATED',
         id: created.id,
         slug: created.slug,
-        publicUrl: `${portalBase}/samples/${created.slug}`,
+        publicUrl: isPublished ? `${portalBase}/samples/${created.slug}` : null,
         previewUrl: `${portalBase}/api/samples/manage/preview/${created.slug}`,
         showcaseStatus: created.status,
         warnings,
@@ -623,6 +628,7 @@ export async function createIntegrationProspect(req, res) {
           publicUrl: item.publicUrl,
           previewUrl: item.previewUrl,
           status: item.showcaseStatus,
+          showcaseStatus: item.showcaseStatus,
           campaignId: payload.externalCampaignId,
           prospectId: payload.externalProspectId,
         });
@@ -671,6 +677,7 @@ export async function getIntegrationBatch(req, res) {
     const portalBase = getPortalBaseUrl();
     const formattedShowcases = showcasesRes.rows.map((s) => ({
       ...s,
+      showcaseStatus: s.status,
       publicUrl: s.status === 'PUBLISHED' ? `${portalBase}/samples/${s.slug}` : null,
       previewUrl: `${portalBase}/api/samples/manage/preview/${s.slug}`,
     }));
@@ -752,14 +759,16 @@ export async function getIntegrationProspect(req, res) {
 
     const row = dbRes.rows[0];
     const portalBase = getPortalBaseUrl();
+    const isPublished = row.status === 'PUBLISHED';
 
     return res.status(200).json({
       success: true,
       id: row.id,
       slug: row.slug,
       status: row.status,
+      showcaseStatus: row.status,
       companyName: row.company_name,
-      publicUrl: row.status === 'PUBLISHED' ? `${portalBase}/samples/${row.slug}` : null,
+      publicUrl: isPublished ? `${portalBase}/samples/${row.slug}` : null,
       previewUrl: `${portalBase}/api/samples/manage/preview/${row.slug}`,
       viewCount: row.view_count || 0,
       createdAt: row.created_at,
@@ -786,7 +795,7 @@ export async function getProspectMailTemplate(req, res) {
 
   try {
     const dbRes = await query(
-      `SELECT p.id, p.slug, p.company_name, p.outreach_mail_template
+      `SELECT p.id, p.slug, p.company_name, p.status, p.outreach_mail_template
        FROM public_sample_showcases p
        JOIN integration_batches b ON p.batch_id = b.id
        WHERE b.client_id = $1 AND (p.id::text = $2 OR p.slug = $2)`,
@@ -802,12 +811,28 @@ export async function getProspectMailTemplate(req, res) {
     }
 
     const row = dbRes.rows[0];
+    const isPublished = row.status === 'PUBLISHED';
+    const warning = isPublished
+      ? null
+      : 'Showcase is currently in DRAFT status. Links will 404 for recipients until the showcase is reviewed and published in DiziGini.';
+
+    const storedMailTemplate = row.outreach_mail_template || {};
+    const mailTemplateResponse = {
+      ...storedMailTemplate,
+      showcaseStatus: row.status,
+      readyToSend: isPublished,
+      warning,
+    };
+
     return res.status(200).json({
       success: true,
       id: row.id,
       slug: row.slug,
       companyName: row.company_name,
-      mailTemplate: row.outreach_mail_template,
+      showcaseStatus: row.status,
+      readyToSend: isPublished,
+      warning,
+      mailTemplate: mailTemplateResponse,
     });
   } catch (err) {
     console.error('[getProspectMailTemplate] Error:', err.message);
@@ -831,7 +856,7 @@ export async function regenerateProspectMailTemplate(req, res) {
 
   try {
     const dbRes = await query(
-      `SELECT p.id, p.slug, p.company_name, p.leads, p.company_study
+      `SELECT p.id, p.slug, p.company_name, p.status, p.leads, p.company_study
        FROM public_sample_showcases p
        JOIN integration_batches b ON p.batch_id = b.id
        WHERE b.client_id = $1 AND (p.id::text = $2 OR p.slug = $2)`,
@@ -849,6 +874,10 @@ export async function regenerateProspectMailTemplate(req, res) {
     const row = dbRes.rows[0];
     const leads = Array.isArray(row.leads) ? row.leads : [];
     const lead = leads[0] || {};
+    const isPublished = row.status === 'PUBLISHED';
+    const warning = isPublished
+      ? null
+      : 'Showcase is currently in DRAFT status. Links will 404 for recipients until the showcase is reviewed and published in DiziGini.';
 
     const freshTemplate = generateOutreachMailTemplate({
       companyName: row.company_name,
@@ -856,6 +885,8 @@ export async function regenerateProspectMailTemplate(req, res) {
       showcaseSlug: row.slug,
       baseUrl: getPortalBaseUrl(),
       companyStudy: row.company_study,
+      status: row.status,
+      showcaseStatus: row.status,
       sender: {
         name: senderName,
         title: senderTitle,
@@ -875,6 +906,10 @@ export async function regenerateProspectMailTemplate(req, res) {
       success: true,
       id: row.id,
       slug: row.slug,
+      companyName: row.company_name,
+      showcaseStatus: row.status,
+      readyToSend: isPublished,
+      warning,
       mailTemplate: freshTemplate,
     });
   } catch (err) {

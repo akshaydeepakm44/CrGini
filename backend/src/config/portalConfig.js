@@ -10,27 +10,33 @@ export function isExplicitDevOrTest() {
   return env === 'development' || env === 'test';
 }
 
+export function isIntegrationApiEnabled() {
+  return process.env.ENABLE_INTEGRATION_API === 'true';
+}
+
 /**
  * Returns the normalized PORTAL_BASE_URL (trailing slashes stripped).
- * In production mode, fails closed if unset or not using HTTPS.
+ * In production mode, fails closed if unset or not using HTTPS ONLY when ENABLE_INTEGRATION_API=true.
  */
 export function getPortalBaseUrl() {
-  const portalBase = process.env.PORTAL_BASE_URL;
+  const portalBase = (process.env.PORTAL_BASE_URL || '').trim();
+  const isProd = !isExplicitDevOrTest();
+  const integrationEnabled = isIntegrationApiEnabled();
 
-  if (!portalBase || !portalBase.trim()) {
-    if (!isExplicitDevOrTest()) {
+  if (!portalBase) {
+    if (isProd && integrationEnabled) {
       const msg =
-        'FATAL: PORTAL_BASE_URL environment variable is required in production mode. Refusing to start.';
+        'FATAL: PORTAL_BASE_URL environment variable is required in production mode when ENABLE_INTEGRATION_API=true. Refusing to start.';
       console.error(`[FATAL] ${msg}`);
       throw new Error(msg);
     }
-    return 'http://localhost:5174';
+    return isProd ? '' : 'http://localhost:5174';
   }
 
-  const normalized = portalBase.trim().replace(/\/+$/, '');
+  const normalized = portalBase.replace(/\/+$/, '');
 
-  if (!isExplicitDevOrTest() && !normalized.startsWith('https://')) {
-    const msg = `FATAL: PORTAL_BASE_URL must begin with "https://" in production mode (got "${normalized}"). Refusing to start.`;
+  if (isProd && integrationEnabled && !normalized.startsWith('https://')) {
+    const msg = `FATAL: PORTAL_BASE_URL must begin with "https://" in production mode when ENABLE_INTEGRATION_API=true (got "${normalized}"). Refusing to start.`;
     console.error(`[FATAL] ${msg}`);
     throw new Error(msg);
   }
@@ -40,9 +46,21 @@ export function getPortalBaseUrl() {
 
 /**
  * Enforces PORTAL_BASE_URL configuration at application startup.
- * Halts server boot in production if invalid.
+ * Halts server boot in production ONLY when ENABLE_INTEGRATION_API=true; otherwise warns and continues.
  */
 export function enforcePortalBaseUrlConfig() {
+  if (isExplicitDevOrTest()) return true;
+
+  if (!isIntegrationApiEnabled()) {
+    const portalBase = (process.env.PORTAL_BASE_URL || '').trim();
+    if (!portalBase || !portalBase.startsWith('https://')) {
+      console.warn(
+        `[WARN] PORTAL_BASE_URL is ${!portalBase ? 'unset' : 'insecure ("' + portalBase + '")'}. Continuing startup because ENABLE_INTEGRATION_API is not enabled.`
+      );
+    }
+    return true;
+  }
+
   try {
     getPortalBaseUrl();
     return true;
@@ -65,3 +83,4 @@ export function buildAbsolutePortalUrl(relativeOrAbsolute) {
   const cleanPath = str.startsWith('/') ? str : `/${str}`;
   return `${base}${cleanPath}`;
 }
+

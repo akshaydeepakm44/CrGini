@@ -42,6 +42,8 @@ export function generateOutreachMailTemplate({
   keyObservations,
   potentialOpportunity,
   whyRelevant,
+  status,
+  showcaseStatus,
 } = {}) {
   const cleanCompanyName = (companyName || 'your company').trim();
   const recipientName = (lead.name || 'there').trim();
@@ -193,6 +195,12 @@ ${highlightsHtml}
   const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodedTo}&su=${encodedSub}&body=${encodedBody}`;
   const outlookComposeUrl = `https://outlook.office.com/mail/deeplink/compose?to=${encodedTo}&subject=${encodedSub}&body=${encodedBody}`;
 
+  const effectiveStatus = showcaseStatus || status || 'DRAFT';
+  const readyToSend = effectiveStatus === 'PUBLISHED';
+  const warning = readyToSend
+    ? null
+    : 'Showcase is currently in DRAFT status. Links will 404 for recipients until the showcase is reviewed and published in DiziGini.';
+
   return {
     subject: primarySubject,
     subjects,
@@ -203,5 +211,8 @@ ${highlightsHtml}
     senderEmail: effectiveSender.email,
     gmailComposeUrl,
     outlookComposeUrl,
+    showcaseStatus: effectiveStatus,
+    readyToSend,
+    warning,
   };
 }

@@ -3,18 +3,18 @@
 **Version:** 1.0.0  
 **Target Audience:** DizitalGini Backend Engineering Team  
 **Scope:** Server-to-Server REST Endpoints for Campaign Prospect Ingestion & Outreach Automation  
-**Environment:** HTTPS Only in Production (`https://dizigini.com/api/integration/v1`)
+**Environment:** HTTPS is strictly required in production (`https://<domain>/api/integration/v1`). The server refuses to boot in production mode when `ENABLE_INTEGRATION_API=true` if `PORTAL_BASE_URL` is unset or does not begin with `https://`.
 
 ---
 
 ## 1. Overview & Architecture
 
-The DiziGini Integration API provides a secure, server-to-server gateway allowing DizitalGini to push finalized campaign prospects directly into DiziGini. 
+The DiziGini Integration API provides a secure, server-to-server gateway allowing DizitalGini's backend to push finalized campaign prospects directly into DiziGini.
 
 For each ingested prospect, DiziGini:
 1. Validates and stages binary assets (Company Studies, Pitch Decks, Lead Dossiers).
-2. Generates an isolated `DRAFT` showcase in Object Storage and PostgreSQL.
-3. Generates high-converting outreach email templates (Plain Text & HTML with embedded absolute links and strategic research highlights).
+2. Generates an isolated `DRAFT` showcase in storage and the PostgreSQL database.
+3. Generates high-converting outreach email templates with embedded absolute links and strategic research highlights.
 4. Tracks batch and event progress with full audit logging.
 5. Emits in-app notifications for DiziGini review operators.
 
@@ -36,17 +36,51 @@ For each ingested prospect, DiziGini:
                                               │  │ • Staged Asset Relocation          │  │
                                               │  │ • Strict DRAFT Showcase Status     │  │
                                               │  │ • Pluggable Mail Template Engine   │  │
-                                              │  │ • PostgreSQL 16 / MinIO (S3)       │  │
+                                              │  │ • PostgreSQL & Storage Driver      │  │
                                               │  └────────────────────────────────────┘  │
                                               └──────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Authentication & Security
+## 2. Ingestion & Publishing Workflow (DRAFT -> Review -> Publish -> Poll)
 
-### 2.1 API Key Headers
-All integration endpoints require an authenticated API client key. You may provide the key via either of the following standard HTTP headers:
+All integration-created showcases follow a strict draft isolation and review lifecycle to prevent unverified links or incomplete dossiers from reaching clients.
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                               SHOWCASE LIFECYCLE                                       │
+│                                                                                        │
+│   1. PUSH (DizitalGini)          2. OPERATOR REVIEW (DiziGini)   3. DISPATCH (Outreach)│
+│   ┌────────────────────┐         ┌─────────────────────────┐     ┌───────────────────┐ │
+│   │ POST /prospects    │         │ Operator opens          │     │ Poll indicates    │ │
+│   │ Status: DRAFT      │────────►│ previewUrl in Admin UI  │────►│ PUBLISHED.        │ │
+│   │ publicUrl: null    │         │ (Admin JWT required)    │     │ readyToSend: true │ │
+│   │ readyToSend: false │         │                         │     │ Links now active! │ │
+│   └────────────────────┘         └────────────┬────────────┘     └───────────────────┘ │
+│                                               │                                        │
+│                                               ▼                                        │
+│                                  Operator clicks "Publish"                             │
+│                                  (Status -> PUBLISHED)                                 │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Workflow Rules:
+1. **Creation as DRAFT:** Ingested prospects are created in `DRAFT` status by default.
+2. **`publicUrl` is `null` while in DRAFT:** In all API responses (`batch`, `single`, `GET /prospects/:id`, `GET /batches/:batchId`), `publicUrl` is strictly `null` while the showcase is a `DRAFT`.
+3. **`previewUrl` is Admin-Only:** The returned `previewUrl` (`/api/samples/manage/preview/:slug`) is strictly protected and requires internal DiziGini Admin authentication (JWT session with `ADMIN` or `COMPANY_LEAD` role). Unauthenticated access or access by standard users returns HTTP 401/403. **Never send `previewUrl` to prospects.**
+4. **Email Links Only Work After Publishing:** Public showcase links (`/samples/:slug`) return HTTP 404 until the showcase status is updated to `PUBLISHED`. 
+5. **`readyToSend` Flag:** In `GET /api/integration/v1/prospects/:id/mail-template`, the template includes:
+   - `readyToSend: false` while in `DRAFT` status, accompanied by a warning message.
+   - `readyToSend: true` once the showcase is `PUBLISHED`.
+6. **Polling:** DizitalGini backend should poll `GET /api/integration/v1/prospects/:id` or `GET /api/integration/v1/batches/:batchId`. Once `showcaseStatus === 'PUBLISHED'`, retrieve the final mail template and dispatch the outreach email.
+
+---
+
+## 3. Authentication & Security
+
+### 3.1 API Key Headers
+All integration endpoints require an authenticated API client key. Pass the key in either of the following HTTP headers:
 
 ```http
 X-API-Key: dzg_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -58,31 +92,45 @@ Authorization: Bearer dzg_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 > [!CAUTION]
 > **Query String & Body Prohibition**  
-> API keys provided via URL query strings (e.g., `?apiKey=...`, `?token=...`) or JSON request bodies (`apiKey`, `_token`) are **strictly prohibited** and will return HTTP `401 Unauthorized` (`CREDENTIALS_IN_URL_OR_BODY_FORBIDDEN`). This prevents secrets from leaking into access logs, web proxies, or browser histories.
+> API keys provided via URL query strings (e.g., `?apiKey=...`, `?token=...`) or JSON request bodies (`apiKey`, `_token`) are **strictly prohibited** and return HTTP `401 Unauthorized` (`CREDENTIALS_IN_URL_OR_BODY_FORBIDDEN`). This prevents secrets from leaking into access logs, web proxies, or browser histories.
 
-### 2.2 Storage & Hashing
-DiziGini never stores or logs plaintext API keys. Keys are hashed using SHA-256 before verification against the `api_clients` registry. 
+### 3.2 Storage & Hashing
+DiziGini never stores or logs plaintext API keys. Keys are hashed using SHA-256 before verification against the `api_clients` registry.
 
-### 2.3 Key Rotation Procedure
-To rotate an API key without service interruption:
-1. **DiziGini Admin** issues a secondary key for your client:
+### 3.3 Key Rotation Procedure
+API keys are tied to individual client records. To rotate a key without service downtime:
+
+1. **Issue a new client record and API key:**
    ```bash
-   node backend/scripts/issue-api-key.js "DizitalGini Production" --allowed-senders "campaign@dizitalgini.com,operator@dizitalgini.com"
+   node backend/scripts/issue-api-key.js --client-name "DizitalGini Production (Rotated)" --allowed-sender-emails "campaign@dizitalgini.com,operator@dizitalgini.com"
    ```
-2. **DizitalGini Team** updates their backend environment variable (`DIZIGINI_API_KEY`) to the new key.
-3. **Verify Connectivity** by calling `GET /api/integration/v1/health`.
-4. **DiziGini Admin** revokes the old key securely via stdin:
+   *Output displays the new `Client ID` (e.g. `client_a1b2c3d4e5f60718`) and plain `API Key` (e.g. `dzg_live_...`).*
+
+2. **Update the DizitalGini backend:** Update `DIZIGINI_API_KEY` in DizitalGini's environment configuration to the new key.
+
+3. **Verify connectivity:**
    ```bash
-   node backend/scripts/revoke-api-key.js
+   curl -X GET "https://<domain>/api/integration/v1/health" \
+     -H "X-API-Key: dzg_live_new_key_value"
+   ```
+
+4. **Revoke the old key:**
+   Revoke using the old Client ID:
+   ```bash
+   node backend/scripts/revoke-api-key.js --client-id client_old_id
+   ```
+   *or securely pipe the old API key through stdin:*
+   ```bash
+   echo "dzg_live_old_key_value" | node backend/scripts/revoke-api-key.js
    ```
 
 ---
 
-## 3. Operational Limits & Rate Limiting
+## 4. Operational Limits & Rate Limiting
 
 | Policy | Limit | Behavior on Exceeded |
 | :--- | :--- | :--- |
-| **Non-Multipart Request Body Size** | **2 MB** | HTTP `413 Payload Too Large` (enforced across JSON, urlencoded, text, and raw binary before authentication) |
+| **Non-Multipart Request Body Size** | **2 MB** | HTTP `413 Payload Too Large` (enforced on both Content-Length and chunked stream bytes across JSON, urlencoded, text, and raw binary before authentication) |
 | **Asset Upload File Size** | **25 MB** per PDF | HTTP `413 Payload Too Large` (enforced via streaming Busboy parser) |
 | **Client Staged Asset Quota** | **500 MB** total active unexpired assets | HTTP `413 Staged Quota Exceeded` |
 | **Standard Endpoints Rate** | **60 requests / minute** per client | HTTP `429 Too Many Requests` |
@@ -93,17 +141,17 @@ To rotate an API key without service interruption:
 
 ---
 
-## 4. Idempotency Specification
+## 5. Idempotency Specification
 
 All mutating endpoints (`POST /api/integration/v1/prospects/batch` and `POST /api/integration/v1/prospects`) require an idempotency header.
 
-### 4.1 Header Requirements
+### 5.1 Header Requirements
 - **Primary Header Name:** `Idempotency-Key`
 - **Accepted Alias:** `X-Idempotency-Key` (both headers are accepted interchangeably)
 - **Format:** 1 to 128 characters consisting of `[A-Za-z0-9_-]`
 - **Scope:** Scoped per API Client ID.
 
-### 4.2 Behavior
+### 5.2 Behavior
 1. **First Request:** The key is locked as `IN_PROGRESS` and the SHA-256 hash of the request body is recorded.
 2. **Identical Replay (Success):** If the exact same body is submitted with the same key, DiziGini skips execution and replays the cached HTTP status code and response body with the response header:
    ```http
@@ -123,9 +171,9 @@ All mutating endpoints (`POST /api/integration/v1/prospects/batch` and `POST /ap
 
 ---
 
-## 5. API Endpoints Specification
+## 6. API Endpoints Specification
 
-### 5.1 System & Schema Endpoints
+### 6.1 System & Schema Endpoints
 
 #### `GET /api/integration/v1/health`
 Verifies API gateway health and authenticates client credentials.
@@ -136,7 +184,7 @@ Verifies API gateway health and authenticates client credentials.
 {
   "success": true,
   "status": "ok",
-  "clientId": "client_8f4a1b2c",
+  "clientId": "client_8f4a1b2c3d4e5f60",
   "clientName": "DizitalGini Production",
   "scopes": ["prospects:write", "assets:write"],
   "timestamp": "2026-11-12T10:30:00.000Z"
@@ -254,7 +302,7 @@ Returns the complete JSON schema contract and accepted fields for prospect paylo
 
 ---
 
-### 5.2 Binary Asset Staging Endpoints
+### 6.2 Binary Asset Staging Endpoints
 
 #### `POST /api/integration/v1/assets`
 Uploads a binary PDF file into temporary staging storage. Returns an ephemeral `assetKey` valid for 24 hours.
@@ -275,14 +323,10 @@ Uploads a binary PDF file into temporary staging storage. Returns an ephemeral `
   "expiresAt": "2026-11-13T10:30:00.000Z"
 }
 ```
-- **Error Responses:**
-  - `400 Bad Request`: `INVALID_FILE_TYPE` (File is not a valid PDF).
-  - `413 Payload Too Large`: File exceeds 25MB or client staged quota (500MB) exceeded.
-  - `429 Too Many Requests`: Upload rate exceeded (10 uploads/min).
 
 ---
 
-### 5.3 Prospect Ingestion Endpoints
+### 6.3 Prospect Ingestion Endpoints
 
 #### `POST /api/integration/v1/prospects/batch`
 Ingests an array of up to 20 campaign prospects. Uses HTTP 207 Multi-Status to report per-item results while preventing all-or-nothing failures.
@@ -356,7 +400,7 @@ Ingests an array of up to 20 campaign prospects. Uses HTTP 207 Multi-Status to r
       "status": "CREATED",
       "id": 142,
       "slug": "acme-technologies-7a8f9c",
-      "publicUrl": "https://dizigini.com/samples/acme-technologies-7a8f9c",
+      "publicUrl": null,
       "previewUrl": "https://dizigini.com/api/samples/manage/preview/acme-technologies-7a8f9c",
       "showcaseStatus": "DRAFT",
       "warnings": []
@@ -365,10 +409,8 @@ Ingests an array of up to 20 campaign prospects. Uses HTTP 207 Multi-Status to r
 }
 ```
 
-- **Item Status Values:**
-  - `CREATED`: Showcase successfully created as a new prospect record.
-  - `EXISTING`: Identical prospect was already ingested under this campaign.
-  - `FAILED`: Ingestion failed for this item (validation error, asset key not found, or conflicting duplicate payload).
+> [!NOTE]
+> `publicUrl` is `null` because the showcase is created in `DRAFT` status. Once published, it resolves to `https://<domain>/samples/<slug>`. `previewUrl` requires DiziGini Admin authentication.
 
 ---
 
@@ -377,16 +419,17 @@ Convenience endpoint for ingesting a single prospect.
 
 - **Authentication:** Required (`prospects:write` scope)
 - **Headers:** `Idempotency-Key` *(or `X-Idempotency-Key`)*, `Content-Type: application/json`
-- **Request Body:** Flat prospect object (same fields as batch item, with `externalCampaignId` at the root).
+- **Request Body:** Flat prospect object (same fields as batch item, with `externalCampaignId` at root).
 - **Response (201 Created):**
 ```json
 {
   "success": true,
   "id": 142,
   "slug": "acme-technologies-7a8f9c",
-  "publicUrl": "https://dizigini.com/samples/acme-technologies-7a8f9c",
+  "publicUrl": null,
   "previewUrl": "https://dizigini.com/api/samples/manage/preview/acme-technologies-7a8f9c",
   "status": "DRAFT",
+  "showcaseStatus": "DRAFT",
   "campaignId": "camp_tech_q4_2026",
   "prospectId": "prosp_acme_001"
 }
@@ -394,12 +437,12 @@ Convenience endpoint for ingesting a single prospect.
 
 ---
 
-### 5.4 Polling & Prospect Inquiry Endpoints
+### 6.4 Polling & Prospect Inquiry Endpoints
 
 #### `GET /api/integration/v1/batches/:batchId`
 Polls the execution status, created showcases, and event history for a batch.
 
-- **Authentication:** Required (Scoped strictly to the calling client's batches)
+- **Authentication:** Required (Scoped strictly to calling client's batches)
 - **Response (200 OK):**
 ```json
 {
@@ -422,6 +465,7 @@ Polls the execution status, created showcases, and event history for a batch.
       "slug": "acme-technologies-7a8f9c",
       "company_name": "Acme Technologies",
       "status": "DRAFT",
+      "showcaseStatus": "DRAFT",
       "external_prospect_id": "prosp_acme_001",
       "publicUrl": null,
       "previewUrl": "https://dizigini.com/api/samples/manage/preview/acme-technologies-7a8f9c",
@@ -454,19 +498,37 @@ Polls the execution status, created showcases, and event history for a batch.
 Inquires about a prospect showcase by integer ID or slug.
 
 - **Authentication:** Required (Scoped to calling client; manual showcases return 404)
-- **Response (200 OK):**
+- **Response (200 OK - when DRAFT):**
 ```json
 {
   "success": true,
   "id": 142,
   "slug": "acme-technologies-7a8f9c",
   "status": "DRAFT",
+  "showcaseStatus": "DRAFT",
   "companyName": "Acme Technologies",
   "publicUrl": null,
   "previewUrl": "https://dizigini.com/api/samples/manage/preview/acme-technologies-7a8f9c",
   "viewCount": 0,
   "createdAt": "2026-11-12T10:31:01.000Z",
   "updatedAt": "2026-11-12T10:31:01.000Z"
+}
+```
+
+- **Response (200 OK - when PUBLISHED):**
+```json
+{
+  "success": true,
+  "id": 142,
+  "slug": "acme-technologies-7a8f9c",
+  "status": "PUBLISHED",
+  "showcaseStatus": "PUBLISHED",
+  "companyName": "Acme Technologies",
+  "publicUrl": "https://dizigini.com/samples/acme-technologies-7a8f9c",
+  "previewUrl": "https://dizigini.com/api/samples/manage/preview/acme-technologies-7a8f9c",
+  "viewCount": 0,
+  "createdAt": "2026-11-12T10:31:01.000Z",
+  "updatedAt": "2026-11-12T10:35:00.000Z"
 }
 ```
 
@@ -480,25 +542,22 @@ Inquires about a prospect by campaign and prospect external identifiers.
 
 ---
 
-### 5.5 Outreach Mail Template Endpoints
+### 6.5 Outreach Mail Template Endpoints
 
 #### `GET /api/integration/v1/prospects/:id/mail-template`
-Retrieves the auto-generated outreach email template for an ingested prospect.
-
-When `keyObservations`, `potentialOpportunity`, and the lead's `whyRelevant` are provided in the ingestion payload, they are automatically parsed and embedded into both the plain-text body and HTML email highlights block:
-- **`keyObservations`**: Automatically extracts the first 1-2 sentences.
-- **`potentialOpportunity`**: Highlighted as the recommended growth lever.
-- **`whyRelevant`**: Highlighted as the specific alignment for the recipient lead.
-- **`showcaseUrl`**: Always an absolute URL built from `PORTAL_BASE_URL`.
+Retrieves the outreach email template for an ingested prospect.
 
 - **Authentication:** Required (Scoped to calling client)
-- **Response (200 OK):**
+- **Response (200 OK - DRAFT Showcase):**
 ```json
 {
   "success": true,
   "id": 142,
   "slug": "acme-technologies-7a8f9c",
   "companyName": "Acme Technologies",
+  "showcaseStatus": "DRAFT",
+  "readyToSend": false,
+  "warning": "Showcase is currently in DRAFT status. Links will 404 for recipients until the showcase is reviewed and published in DiziGini.",
   "mailTemplate": {
     "subject": "Bespoke Market Intelligence & Growth Blueprint for Acme Technologies",
     "subjects": [
@@ -509,13 +568,19 @@ When `keyObservations`, `potentialOpportunity`, and the lead's `whyRelevant` are
     "recipientEmail": "jane.doe@acmetechnologies.example.com",
     "senderEmail": "campaign@dizitalgini.com",
     "showcaseUrl": "https://dizigini.com/samples/acme-technologies-7a8f9c",
-    "bodyText": "Subject: Bespoke Market Intelligence & Growth Blueprint for Acme Technologies\n\nHi Jane Doe,\n\nOur research specialists at DiziGini have put together a dedicated intelligence showcase specifically for Acme Technologies.\n\nWe analyzed your current market position, prepared a deep-dive Company Study, mapped key high-fit prospect accounts with strategic fit analyses, and formulated an actionable outreach proposal:\n\nExecutive Research Highlights:\n• Key Strategic Observation: Rapidly growing engineering team. Scaling outbound sales across APAC.\n• Recommended Growth Focus: Cross-border outbound automation pipeline.\n• Strategic Alignment for Jane Doe: Owns sales operations stack modernization.\n\n👉 Explore Your Interactive Showcase: https://dizigini.com/samples/acme-technologies-7a8f9c\n\nKey deliverables included inside your showcase:\n• Company Study: Market positioning and strategic growth levers\n• High-Impact Leads: Vetted stakeholders with tailored \"Why Suits Best\" analysis\n• Lead Deep Dives: Individual trigger events and recommended approach angles\n• Pitch Deck: Turnkey presentation proposal tailored for your brand\n\nFeel free to inspect the sample data. Whenever you are ready to unlock direct contact details and scale with our specialist team, click \"More Leads\" on the dashboard.\n\nRegards,\nAkshay Deepak\nLead Research Manager\ncampaign@dizitalgini.com\nwww.dizigini.com\n\nPowered by DATAI2I\n\nThanks for your time. If you'd like to discuss this, just reply to this email.",
+    "bodyText": "Subject: Bespoke Market Intelligence & Growth Blueprint for Acme Technologies\n\nHi Jane Doe,\n\nOur research specialists at DiziGini have put together a dedicated intelligence showcase specifically for Acme Technologies.\n\nWe analyzed your current market position, prepared a deep-dive Company Study, mapped key high-fit prospect accounts with strategic fit analyses, and formulated an actionable outreach proposal:\n\nExecutive Research Highlights:\n• Key Strategic Observation: Rapidly growing engineering team. Scaling outbound sales across APAC.\n• Recommended Growth Focus: Cross-border outbound automation pipeline.\n• Strategic Alignment for Jane Doe: Owns sales operations stack modernization.\n\n👉 Explore Your Interactive Showcase: https://dizigini.com/samples/acme-technologies-7a8f9c\n\nKey deliverables included inside your showcase:\n• Company Study: Market positioning and strategic growth levers\n• High-Impact Leads: Vetted stakeholders with tailored \"Why Suits Best\" analysis\n• Lead Deep Dives: Individual trigger events and recommended approach angles\n• Pitch Deck: Turnkey presentation proposal tailored for your brand\n\nFeel free to inspect the sample data. Whenever you are ready to unlock direct contact details and scale with our specialist team, reply to this email or click \"More Leads\" on the dashboard.\n\nRegards,\nAkshay Deepak\nLead Research Manager\ncampaign@dizitalgini.com\nwww.dizigini.com\n\nThanks for your time. If you'd like to discuss this, just reply to this email.",
     "bodyHtml": "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;\">...</div>",
     "gmailComposeUrl": "https://mail.google.com/mail/?view=cm&fs=1&to=jane.doe%40acmetechnologies.example.com&su=...",
-    "outlookComposeUrl": "https://outlook.office.com/mail/deeplink/compose?to=jane.doe%40acmetechnologies.example.com&subject=..."
+    "outlookComposeUrl": "https://outlook.office.com/mail/deeplink/compose?to=jane.doe%40acmetechnologies.example.com&subject=...",
+    "showcaseStatus": "DRAFT",
+    "readyToSend": false,
+    "warning": "Showcase is currently in DRAFT status. Links will 404 for recipients until the showcase is reviewed and published in DiziGini."
   }
 }
 ```
+
+- **Response (200 OK - PUBLISHED Showcase):**
+When the showcase is reviewed and published in DiziGini, `showcaseStatus` becomes `"PUBLISHED"`, `readyToSend` becomes `true`, and `warning` becomes `null`. The outreach email is ready for immediate dispatch.
 
 ---
 
@@ -528,7 +593,7 @@ Regenerates an outreach mail template with alternative sender parameters.
 {
   "senderName": "Sarah Jenkins",
   "senderTitle": "Strategic Account Executive",
-  "senderEmail": "sarah.j@dizitalgini.com"
+  "senderEmail": "campaign@dizitalgini.com"
 }
 ```
 - **Response (200 OK):**
@@ -537,59 +602,68 @@ Regenerates an outreach mail template with alternative sender parameters.
   "success": true,
   "id": 142,
   "slug": "acme-technologies-7a8f9c",
+  "companyName": "Acme Technologies",
+  "showcaseStatus": "DRAFT",
+  "readyToSend": false,
+  "warning": "Showcase is currently in DRAFT status. Links will 404 for recipients until the showcase is reviewed and published in DiziGini.",
   "mailTemplate": {
     "subject": "Bespoke Market Intelligence & Growth Blueprint for Acme Technologies",
-    "senderEmail": "sarah.j@dizitalgini.com",
+    "senderEmail": "campaign@dizitalgini.com",
     "showcaseUrl": "https://dizigini.com/samples/acme-technologies-7a8f9c",
     "bodyText": "...",
-    "bodyHtml": "..."
+    "bodyHtml": "...",
+    "showcaseStatus": "DRAFT",
+    "readyToSend": false,
+    "warning": "Showcase is currently in DRAFT status. Links will 404 for recipients until the showcase is reviewed and published in DiziGini."
   }
 }
 ```
 
 ---
 
-## 6. HTTP Status & Error Codes Reference
+## 7. HTTP Status & Error Codes Reference (Verified Live)
 
-| HTTP Code | Error Code | Root Cause & Resolution |
-| :--- | :--- | :--- |
-| **`400 Bad Request`** | `MISSING_CAMPAIGN_ID` | `externalCampaignId` is missing or blank. |
-| **`400 Bad Request`** | `EMPTY_PROSPECTS_ARRAY` | `prospects` array is empty or not provided. |
-| **`400 Bad Request`** | `MAX_BATCH_SIZE_EXCEEDED` | `prospects` array contains more than 20 items. |
-| **`400 Bad Request`** | `SENDER_EMAIL_NOT_ALLOWED` | Provided sender email is not in the client's `allowed_sender_emails` whitelist. |
-| **`400 Bad Request`** | `INVALID_ASSET_KEY` | Asset key does not exist, belongs to another client, is expired, or is already claimed. |
-| **`400 Bad Request`** | `SSRF_PRIVATE_IP_BLOCKED` | `logoUrl` resolves to private, loopback, or cloud metadata IP addresses. |
-| **`400 Bad Request`** | `INVALID_FILE_TYPE` | Uploaded asset does not begin with `%PDF-` header. |
-| **`401 Unauthorized`** | `UNAUTHORIZED` | API key is missing, invalid, or supplied via query parameter / body. |
-| **`401 Unauthorized`** | `CREDENTIALS_IN_URL_OR_BODY_FORBIDDEN` | API key provided in query string or body instead of `X-API-Key` or `Authorization` header. |
-| **`403 Forbidden`** | `CLIENT_REVOKED` | API client record is revoked or marked inactive. |
-| **`403 Forbidden`** | `INSUFFICIENT_SCOPE` | API client key lacks the required scope (e.g. `prospects:write` or `assets:write`). |
-| **`404 Not Found`** | `BATCH_NOT_FOUND` | Batch ID does not exist or belongs to another tenant. |
-| **`404 Not Found`** | `PROSPECT_NOT_FOUND` | Prospect does not exist, belongs to another tenant, or is a manual showcase. |
-| **`409 Conflict`** | `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` | Idempotency key was previously submitted with different payload data. |
-| **`409 Conflict`** | `CONCURRENT_REQUEST_IN_PROGRESS` | Request with this idempotency key is currently executing. Retry shortly. |
-| **`409 Conflict`** | `DUPLICATE_EXTERNAL_PROSPECT` | Prospect already exists under campaign with conflicting data. |
-| **`409 Conflict`** | `SLUG_CONFLICT` | Explicit custom slug specified by client is already taken. |
-| **`413 Payload Too Large`**| `PAYLOAD_TOO_LARGE` | Non-multipart request body exceeds 2MB or asset file exceeds 25MB. |
-| **`413 Payload Too Large`**| `STAGED_QUOTA_EXCEEDED` | Staged assets exceed the 500MB per-client limit. |
-| **`429 Too Many Requests`**| `RATE_LIMIT_EXCEEDED` | Exceeded 60 req/min (standard), 10 uploads/min (assets), or 10 failed auth attempts/15 min. |
-| **`500 Internal Server Error`**| `DATABASE_ERROR` | Unexpected backend or database error. Lock is cleared for safe retry. |
+All error codes, HTTP status codes, and JSON error bodies below have been verified against the live test suite:
+
+| HTTP Code | Error Code (`error`) | Real JSON Error Response (`message`) | Root Cause & Resolution |
+| :--- | :--- | :--- | :--- |
+| **`400 Bad Request`** | `MISSING_IDEMPOTENCY_KEY` | `Idempotency-Key (or X-Idempotency-Key) header is required for mutating integration endpoints.` | Add `Idempotency-Key: <unique-id>` header to mutating POST requests. |
+| **`400 Bad Request`** | `MISSING_CAMPAIGN_ID` | `externalCampaignId is required.` | Provide non-empty `externalCampaignId` in request payload. |
+| **`400 Bad Request`** | `EMPTY_PROSPECTS_ARRAY` | `prospects must be a non-empty array of prospect objects.` | Provide at least one prospect item in `prospects` array. |
+| **`400 Bad Request`** | `MAX_BATCH_SIZE_EXCEEDED` | `Batch size exceeds maximum limit of 20 prospects.` | Split payloads into chunks of 20 or fewer prospects. |
+| **`400 Bad Request`** | `SENDER_EMAIL_NOT_ALLOWED` | `Sender email '<email>' is not in the allowed sender emails list for this API client.` | Use an authorized sender email configured in client registry. |
+| **`400 Bad Request`** | `INVALID_FILE_TYPE` | `Uploaded file is not a valid PDF document (must start with %PDF- header).` | Upload binary documents with `%PDF-` magic header. |
+| **`401 Unauthorized`** | `MISSING_API_KEY` | `API key is required in X-API-Key or Authorization: Bearer header.` | Supply valid API key in header. |
+| **`401 Unauthorized`** | `CREDENTIALS_IN_URL_OR_BODY_FORBIDDEN` | `API credentials must not be passed in URL query parameters or request body. Provide via X-API-Key or Authorization header.` | Remove key/token from query string or request body. |
+| **`401 Unauthorized`** | `INVALID_API_KEY` | `Invalid or revoked API key.` | Verify the API key is active and correctly formatted. |
+| **`403 Forbidden`** | `CLIENT_REVOKED` | `API client has been revoked.` | Re-issue API key; this client was revoked. |
+| **`403 Forbidden`** | `INSUFFICIENT_SCOPE` | `API key lacks required scope: '<scope>'.` | Re-issue API key with required scope (`prospects:write` or `assets:write`). |
+| **`404 Not Found`** | `BATCH_NOT_FOUND` | `Batch '<batchId>' not found.` | Batch ID does not exist or belongs to another API client. |
+| **`404 Not Found`** | `PROSPECT_NOT_FOUND` | `Prospect not found.` | Prospect does not exist, belongs to another API client, or is a manual showcase. |
+| **`409 Conflict`** | `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` | `Idempotency key was previously executed with a different request payload.` | Use a new unique idempotency key when changing request body. |
+| **`409 Conflict`** | `CONCURRENT_REQUEST_IN_PROGRESS` | `A request with this idempotency key is currently executing. Please retry shortly.` | Wait for the original in-flight request to finish. |
+| **`409 Conflict`** | `DUPLICATE_EXTERNAL_PROSPECT` | `Prospect '<id>' already exists under campaign '<id>' with conflicting payload.` | Resending identical prospect returns status `EXISTING`. Changing payload on existing prospect returns 409 conflict. |
+| **`409 Conflict`** | `SLUG_CONFLICT` | `Showcase slug '<slug>' already exists.` | Do not specify manual conflicting slug; omit slug to allow auto-generation. |
+| **`413 Payload Too Large`**| `PAYLOAD_TOO_LARGE` | `Upload payload is too large. Please reduce the payload size and try again.` | Non-multipart body exceeds 2MB (Content-Length or chunked stream), or PDF exceeds 25MB. |
+| **`413 Payload Too Large`**| `STAGED_QUOTA_EXCEEDED` | `Staged assets quota exceeded. Active staged assets cannot exceed 500MB.` | Claim staged assets or wait for 24-hour expiry. |
+| **`429 Too Many Requests`**| `RATE_LIMIT_EXCEEDED` | `Too many integration requests, please try again after 1 minute.` | Standard endpoints capped at 60 req/min per client; upload capped at 10/min. |
+| **`500 Internal Error`** | `DATABASE_ERROR` | `Failed to process integration request.` | Backend database failure. Idempotency lock is cleared automatically for safe retry. |
 
 ---
 
-## 7. Complete Worked End-to-End Example (`curl`)
+## 8. Complete Worked End-to-End Example (`curl`)
 
 Below is a complete, real-world flow illustrating how DizitalGini pushes a campaign.
 
 ### Step 1: Health & Authentication Check
 ```bash
-curl -X GET "https://dizigini.com/api/integration/v1/health" \
+curl -X GET "https://<domain>/api/integration/v1/health" \
   -H "X-API-Key: dzg_live_demo_key_secret_value"
 ```
 
 ### Step 2: Upload Staged Company Study PDF
 ```bash
-curl -X POST "https://dizigini.com/api/integration/v1/assets" \
+curl -X POST "https://<domain>/api/integration/v1/assets" \
   -H "X-API-Key: dzg_live_demo_key_secret_value" \
   -F "file=@/path/to/Acme_Company_Study.pdf;type=application/pdf"
 ```
@@ -597,7 +671,7 @@ curl -X POST "https://dizigini.com/api/integration/v1/assets" \
 
 ### Step 3: Ingest Campaign Prospects Batch
 ```bash
-curl -X POST "https://dizigini.com/api/integration/v1/prospects/batch" \
+curl -X POST "https://<domain>/api/integration/v1/prospects/batch" \
   -H "X-API-Key: dzg_live_demo_key_secret_value" \
   -H "Idempotency-Key: idemp_batch_camp_tech_q4_001" \
   -H "Content-Type: application/json" \
@@ -640,45 +714,46 @@ curl -X POST "https://dizigini.com/api/integration/v1/prospects/batch" \
     ]
   }'
 ```
-*Output returns HTTP 207 Multi-Status with `batchId`, showcase `id` (e.g. `142`), absolute `publicUrl`, and `previewUrl`.*
+*Output returns HTTP 207 Multi-Status with `batchId`, showcase `id` (e.g. `142`), `showcaseStatus: "DRAFT"`, `publicUrl: null`, and admin-only `previewUrl`.*
 
 ### Step 4: Poll Batch Execution Status
 ```bash
-curl -X GET "https://dizigini.com/api/integration/v1/batches/b6a7c8d9-0e1f-2a3b-4c5d-6e7f8a9b0c1d" \
+curl -X GET "https://<domain>/api/integration/v1/batches/b6a7c8d9-0e1f-2a3b-4c5d-6e7f8a9b0c1d" \
   -H "X-API-Key: dzg_live_demo_key_secret_value"
 ```
 
-### Step 5: Fetch Outreach Email Template for Campaign Dispatch
+### Step 5: Check Mail Template Ready Status
 ```bash
-curl -X GET "https://dizigini.com/api/integration/v1/prospects/142/mail-template" \
+curl -X GET "https://<domain>/api/integration/v1/prospects/142/mail-template" \
   -H "X-API-Key: dzg_live_demo_key_secret_value"
 ```
+*Once DiziGini operator reviews and publishes the showcase, `readyToSend` is `true`. Dispatch email to `jane.doe@acmetechnologies.example.com`.*
 
 ---
 
-## 8. Requirements for DizitalGini Engineering Team
+## 9. Requirements for DizitalGini Engineering Team
 
 To complete this integration, DizitalGini must implement the following components within the DizitalGini codebase:
 
-### 8.1 Backend-Enforced Permission Gate ("Service Provider" Module)
+### 9.1 Backend-Enforced Permission Gate ("Service Provider" Module)
 - **Role-Based Access Control (RBAC):** Create a backend permission check (e.g. `CAN_EXPORT_TO_DIZIGINI` or restricted to roles `SUPER_ADMIN`, `CAMPAIGN_MANAGER`).
 - **Security Rule:** Do not rely on hardcoded email addresses or client-side UI flags. Access must be verified on DizitalGini backend endpoints prior to dispatch.
 
-### 8.2 Campaign Picker & Selection UI
+### 9.2 Campaign Picker & Selection UI
 - Provide a UI allowing authorized operators to select a campaign that has passed QA and is ready for showcase generation.
 - Display prospect counts, verified email counts, and asset readiness prior to export.
 
-### 8.3 Lead Standardization Mapper
+### 9.3 Lead Standardization Mapper
 - Implement an adapter in DizitalGini backend that maps internal lead schema into the DiziGini Prospect contract:
   - Normalize company name and clean website URL.
   - Standardize lead arrays (`name`, `title`, `email`, `whySuitsBest`).
   - Stream PDFs to `POST /api/integration/v1/assets` to obtain `pdfAssetKey` prior to batch submission.
 
-### 8.4 Secure Backend Integration Proxy
+### 9.4 Secure Backend Integration Proxy
 - **Strict Prohibition:** The DiziGini API key must **NEVER** be stored in client-side frontends (React/Vue/HTML) or exposed to the browser.
 - DizitalGini backend must store the key in an environment variable (`DIZIGINI_API_KEY`) and provide internal server endpoints (e.g., `POST /api/campaigns/:id/export-dizigini`) that proxy to DiziGini.
 - The backend proxy must generate and maintain unique `Idempotency-Key` UUIDs for all push requests.
 
-### 8.5 Export Results & Status View
+### 9.5 Export Results & Status View
 - Display the returned `batchId`, success/failure breakdown, and generated showcase links directly within the DizitalGini campaign dashboard.
-- Display the generated outreach email templates or supply a one-click "Copy Outreach Email" button for SDRs.
+- Display the generated outreach email templates or supply a one-click "Copy Outreach Email" button for SDRs when `readyToSend` is `true`.
