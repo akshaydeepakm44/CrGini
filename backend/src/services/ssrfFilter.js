@@ -169,7 +169,7 @@ export function isIpLiteral(str) {
  * @param {string} rawUrl - Target URL to inspect
  * @returns {Promise<{ safe: boolean, error?: string, ip?: string, parsedUrl?: URL }>}
  */
-export async function validateExternalUrl(rawUrl) {
+export async function validateExternalUrl(rawUrl, { dnsResolver = null } = {}) {
   if (!rawUrl || typeof rawUrl !== 'string') {
     return { safe: false, error: 'INVALID_URL' };
   }
@@ -193,6 +193,7 @@ export async function validateExternalUrl(rawUrl) {
     if (isPrivateOrReservedIp(normalizedHost)) {
       return { safe: false, error: 'SSRF_PRIVATE_IP_BLOCKED', ip: normalizedHost };
     }
+    return { safe: true, ip: normalizedHost, parsedUrl };
   }
 
   // 2. Check localhost keywords
@@ -200,16 +201,21 @@ export async function validateExternalUrl(rawUrl) {
     return { safe: false, error: 'SSRF_PRIVATE_IP_BLOCKED', ip: '127.0.0.1' };
   }
 
-  // 3. Resolve hostname via DNS
+  // 3. Resolve hostname via DNS (or injected resolver)
   try {
-    const lookupRes = await dns.lookup(hostname, { all: true });
+    const resolver = dnsResolver || ((host) => dns.lookup(host, { all: true }));
+    const rawLookup = await resolver(hostname);
+    const lookupRes = Array.isArray(rawLookup) ? rawLookup : [rawLookup];
+    if (lookupRes.length === 0 || !lookupRes[0]?.address) {
+      return { safe: false, error: 'DNS_RESOLUTION_FAILED', message: 'No IP returned from DNS lookup.' };
+    }
     for (const record of lookupRes) {
       const normAddr = normalizeIpString(record.address);
       if (isPrivateOrReservedIp(normAddr)) {
         return { safe: false, error: 'SSRF_PRIVATE_IP_BLOCKED', ip: record.address };
       }
     }
-    return { safe: true, ip: lookupRes[0]?.address, parsedUrl };
+    return { safe: true, ip: lookupRes[0].address, parsedUrl };
   } catch (err) {
     return { safe: false, error: 'DNS_RESOLUTION_FAILED', message: err.message };
   }
@@ -218,6 +224,7 @@ export async function validateExternalUrl(rawUrl) {
 /**
  * Safely fetches a remote URL with full SSRF protection:
  * - Pre-validates URL
+ * - Pins socket connection to validated IP (no second DNS query, eliminating DNS rebinding / TOCTOU)
  * - Follows up to maxRedirects (default 3), strictly validating every redirect Location
  * - Enforces timeout (default 5s)
  * - Enforces maximum response body size (default 2MB)
@@ -227,6 +234,9 @@ export async function validateExternalUrl(rawUrl) {
  * @param {number} [options.timeoutMs=5000]
  * @param {number} [options.maxSize=2097152]
  * @param {number} [options.maxRedirects=3]
+ * @param {number} [options.currentRedirect=0]
+ * @param {boolean} [options.allowLocalhostInitial=false]
+ * @param {Function} [options.dnsResolver=null]
  * @returns {Promise<{ ok: boolean, status: number, buffer: Buffer, contentType: string }>}
  */
 export async function safeFetchUrl(targetUrl, {
@@ -235,6 +245,7 @@ export async function safeFetchUrl(targetUrl, {
   maxRedirects = 3,
   currentRedirect = 0,
   allowLocalhostInitial = false,
+  dnsResolver = null,
 } = {}) {
   if (currentRedirect > maxRedirects) {
     throw new Error('TOO_MANY_REDIRECTS');
@@ -243,13 +254,16 @@ export async function safeFetchUrl(targetUrl, {
   const isInitialLocalhostAllowed =
     Boolean(allowLocalhostInitial) && currentRedirect === 0 && process.env.NODE_ENV === 'test';
 
+  let validatedIp = null;
+
   if (!isInitialLocalhostAllowed) {
-    const validation = await validateExternalUrl(targetUrl);
+    const validation = await validateExternalUrl(targetUrl, { dnsResolver });
     if (!validation.safe) {
       const err = new Error(`SSRF Blocked: ${validation.error}`);
       err.code = validation.error;
       throw err;
     }
+    validatedIp = validation.ip;
   }
 
   const parsed = new URL(targetUrl);
@@ -266,15 +280,27 @@ export async function safeFetchUrl(targetUrl, {
       if (timer) clearTimeout(timer);
     };
 
+    // To prevent DNS rebinding (TOCTOU) and avoid a second DNS query,
+    // we instruct the client library to resolve directly to the validated IP.
+    const requestOptions = {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'DiziGini-SSRF-Validator/1.0',
+        Accept: '*/*',
+      },
+    };
+
+    if (validatedIp) {
+      const isV6 = net.isIPv6(validatedIp);
+      requestOptions.lookup = (_hostname, _options, callback) => {
+        // Immediately return validated IP, performing NO second DNS query
+        callback(null, validatedIp, isV6 ? 6 : 4);
+      };
+    }
+
     const req = clientLib.request(
       parsed,
-      {
-        method: 'GET',
-        headers: {
-          'User-Agent': 'DiziGini-SSRF-Validator/1.0',
-          Accept: '*/*',
-        },
-      },
+      requestOptions,
       async (res) => {
         // Handle Redirects (301, 302, 303, 307, 308)
         if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {

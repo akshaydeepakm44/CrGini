@@ -134,9 +134,10 @@ Verifies API gateway health and authenticates client credentials.
 ```json
 {
   "success": true,
-  "status": "UP",
+  "status": "ok",
   "clientId": "client_8f4a1b2c",
   "clientName": "DizitalGini Production",
+  "scopes": ["prospects:write", "assets:write"],
   "timestamp": "2026-11-12T10:30:00.000Z"
 }
 ```
@@ -185,14 +186,24 @@ Returns the complete JSON schema contract and accepted fields for prospect paylo
             "companyStudy": {
               "type": "object",
               "properties": {
+                "company": { "type": "string" },
+                "website": { "type": "string" },
+                "linkedin": { "type": "string" },
+                "industry": { "type": "string" },
+                "businessOverview": { "type": "string" },
+                "marketPosition": { "type": "string" },
+                "keyObservations": { "type": "string" },
+                "potentialOpportunity": { "type": "string" },
                 "pdfAssetKey": { "type": "string" }
               }
             },
             "pitchDeck": {
               "type": "object",
               "properties": {
-                "assetKey": { "type": "string" },
-                "pdfAssetKey": { "type": "string" }
+                "title": { "type": "string" },
+                "summary": { "type": "string" },
+                "pdfAssetKey": { "type": "string" },
+                "assetKey": { "type": "string" }
               }
             },
             "leads": {
@@ -200,11 +211,25 @@ Returns the complete JSON schema contract and accepted fields for prospect paylo
               "items": {
                 "type": "object",
                 "properties": {
+                  "id": { "type": "string" },
                   "name": { "type": "string" },
                   "title": { "type": "string" },
                   "email": { "type": "string" },
+                  "phone": { "type": "string" },
                   "company": { "type": "string" },
+                  "companyLink": { "type": "string" },
+                  "companyLinkedin": { "type": "string" },
+                  "linkedin": { "type": "string" },
+                  "aboutCompany": { "type": "string" },
                   "whySuitsBest": { "type": "string" },
+                  "leadStudy": {
+                    "type": "object",
+                    "properties": {
+                      "whyRelevant": { "type": "string" },
+                      "observedContext": { "type": "string" },
+                      "suggestedApproach": { "type": "string" }
+                    }
+                  },
                   "pitchDeckAssetKey": { "type": "string" },
                   "leadStudyPdfAssetKey": { "type": "string" }
                 }
@@ -244,10 +269,12 @@ Uploads a binary PDF asset (Company Study, Pitch Deck, Lead Dossier) into the te
   "success": true,
   "assetKey": "dzg_ast_9f8b7c6d-5e4a-3b2c-1a0f-9e8d7c6b5a4f",
   "fileName": "acme-corp-market-analysis.pdf",
-  "fileSize": 1845200,
+  "sha256": "4cbb814f978922ebda91659795ec3117b8840abcb732553157de98e7d48c2751",
+  "size": 1845200,
   "mimeType": "application/pdf",
   "expiresAt": "2026-11-13T10:30:00.000Z"
 }
+```
 ```
 - **Error Responses:**
   - `400 Bad Request`: `INVALID_FILE_TYPE` (File is not a valid PDF).

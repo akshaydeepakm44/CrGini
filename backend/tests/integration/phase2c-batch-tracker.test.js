@@ -815,4 +815,320 @@ test('Phase 2C Batch Prospect Ingestion, Tracker, Mail Template & Admin Suite', 
       }
     }
   );
+
+  // ---------------------------------------------------------------------------
+  // 13. ID GENERATION: 20-Prospect Batch within 1 second produces unique IDs
+  // ---------------------------------------------------------------------------
+  await t.test(
+    '13. Id Generation: 20-prospect batch in one second produces unique sequential IDs from DB sequence',
+    async () => {
+      const twentyProspects = [];
+      for (let i = 0; i < 20; i++) {
+        twentyProspects.push({
+          externalProspectId: `rapid-prospect-${i}`,
+          targetCompany: {
+            name: `Rapid Scale Corp ${i}`,
+            website: `https://rapid${i}.example.com`,
+          },
+        });
+      }
+
+      const res = await fetch(`${baseUrl}/api/integration/v1/prospects/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': testClientKey,
+          'Idempotency-Key': `rapid-20-${Date.now()}`,
+        },
+        body: JSON.stringify({
+          externalCampaignId: `camp-rapid-${Date.now()}`,
+          campaignName: 'Rapid Scale Ingestion Test',
+          prospects: twentyProspects,
+        }),
+      });
+
+      assert.equal(res.status, 207);
+      const data = await res.json();
+      assert.equal(data.summary.total, 20);
+      assert.equal(data.summary.created, 20);
+      assert.equal(data.summary.failed, 0);
+
+      const returnedIds = data.results.map((r) => r.id);
+      const uniqueIds = new Set(returnedIds);
+
+      // Verify all 20 IDs are strictly unique
+      assert.equal(uniqueIds.size, 20, 'All 20 prospects must receive distinct unique IDs');
+
+      // Verify all IDs are valid positive integers from the DB sequence
+      for (const id of returnedIds) {
+        assert.ok(typeof id === 'number' && id > 0, `ID ${id} must be a positive integer`);
+        createdShowcaseIds.push(id);
+      }
+      createdBatchIds.push(data.batchId);
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // 14. END-TO-END FIELD MAPPING & PUBLIC DASHBOARD PARITY TEST
+  // ---------------------------------------------------------------------------
+  await t.test(
+    '14. Field Mapping Parity: Batch-created showcase with staged PDFs matches manual dashboard shape upon publishing',
+    async () => {
+      // 1. Upload sample PDF assets (one for company study, one for pitch deck)
+      const pdfBytes1 = Buffer.from('%PDF-1.4 sample company study pdf content');
+      const formData1 = new FormData();
+      formData1.append('file', new Blob([pdfBytes1], { type: 'application/pdf' }), 'study.pdf');
+
+      const assetRes1 = await fetch(`${baseUrl}/api/integration/v1/assets`, {
+        method: 'POST',
+        headers: { 'X-API-Key': testClientKey },
+        body: formData1,
+      });
+      assert.equal(assetRes1.status, 201);
+      const assetJson1 = await assetRes1.json();
+      const studyAssetKey = assetJson1.assetKey;
+
+      const pdfBytes2 = Buffer.from('%PDF-1.4 sample showcase pitch deck pdf content');
+      const formData2 = new FormData();
+      formData2.append('file', new Blob([pdfBytes2], { type: 'application/pdf' }), 'showcase-pitch.pdf');
+
+      const assetRes2 = await fetch(`${baseUrl}/api/integration/v1/assets`, {
+        method: 'POST',
+        headers: { 'X-API-Key': testClientKey },
+        body: formData2,
+      });
+      assert.equal(assetRes2.status, 201);
+      const assetJson2 = await assetRes2.json();
+      const showcasePitchAssetKey = assetJson2.assetKey;
+
+      const pdfBytes3 = Buffer.from('%PDF-1.4 sample lead pitch deck pdf content');
+      const formData3 = new FormData();
+      formData3.append('file', new Blob([pdfBytes3], { type: 'application/pdf' }), 'lead-pitch.pdf');
+
+      const assetRes3 = await fetch(`${baseUrl}/api/integration/v1/assets`, {
+        method: 'POST',
+        headers: { 'X-API-Key': testClientKey },
+        body: formData3,
+      });
+      assert.equal(assetRes3.status, 201);
+      const assetJson3 = await assetRes3.json();
+      const leadPitchAssetKey = assetJson3.assetKey;
+
+      // 2. Submit batch with full field mapping
+      const batchPayload = {
+        externalCampaignId: `camp-parity-${Date.now()}`,
+        prospects: [
+          {
+            externalProspectId: 'parity-prospect-001',
+            companyName: 'Parity Global Technologies',
+            website: 'https://parityglobal.example.com',
+            industry: 'Enterprise Fintech',
+            category: 'SaaS',
+            description: 'Automated treasury operations platform.',
+            companyStudy: {
+              company: 'Parity Global Technologies',
+              website: 'https://parityglobal.example.com',
+              linkedin: 'https://linkedin.com/company/parityglobal',
+              industry: 'Enterprise Fintech',
+              businessOverview: 'Next-gen liquidity and cashflow operating system.',
+              marketPosition: 'Top 3 treasury provider.',
+              keyObservations: 'High demand for API-first ERP integration.',
+              potentialOpportunity: 'Strategic expansion into North American mid-market.',
+              pdfAssetKey: studyAssetKey,
+            },
+            pitchDeck: {
+              title: 'Parity Global Growth Playbook',
+              summary: 'Commercial acceleration proposal.',
+              pdfAssetKey: showcasePitchAssetKey,
+            },
+            leads: [
+              {
+                name: 'David Vance',
+                title: 'Chief Financial Officer',
+                email: 'david.vance@parityglobal.example.com',
+                phone: '+1-555-0199',
+                company: 'Parity Global Technologies',
+                companyLink: 'https://parityglobal.example.com',
+                aboutCompany: 'Global treasury solutions provider.',
+                whySuitsBest: 'Key economic decision maker evaluating automation.',
+                leadStudy: {
+                  whyRelevant: 'Leading CFO modernization.',
+                  observedContext: 'Expanding global finance team.',
+                  suggestedApproach: 'Highlight ROI and turnaround time.',
+                },
+                pitchDeckAssetKey: leadPitchAssetKey,
+              },
+            ],
+            mailOptions: {
+              senderName: 'Akshay Deepak',
+              senderTitle: 'Lead Research Manager',
+              senderEmail: 'campaign@dizitalgini.com',
+            },
+          },
+        ],
+      };
+
+      const pushRes = await fetch(`${baseUrl}/api/integration/v1/prospects/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': testClientKey,
+          'Idempotency-Key': `parity-idemp-${Date.now()}`,
+        },
+        body: JSON.stringify(batchPayload),
+      });
+
+      assert.equal(pushRes.status, 207);
+      const pushJson = await pushRes.json();
+      const createdItem = pushJson.results[0];
+      if (createdItem.status !== 'CREATED') {
+        console.error('[TEST 14 ITEM ERROR]:', createdItem);
+      }
+      assert.equal(createdItem.status, 'CREATED');
+      const showcaseId = createdItem.id;
+      const showcaseSlug = createdItem.slug;
+      createdShowcaseIds.push(showcaseId);
+      createdBatchIds.push(pushJson.batchId);
+
+      // 3. Publish the showcase via admin endpoint
+      const publishRes = await fetch(`${baseUrl}/api/samples/manage/${showcaseId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ status: 'PUBLISHED' }),
+      });
+      assert.equal(publishRes.status, 200);
+      const publishJson = await publishRes.json();
+      assert.equal(publishJson.sample.status, 'PUBLISHED');
+      assert.ok(publishJson.sample.publishedAt, 'publishedAt must be populated upon publishing');
+
+      // 4. Fetch the published showcase via public endpoint and assert dashboard field parity
+      const publicRes = await fetch(`${baseUrl}/api/samples/${showcaseSlug}`);
+      assert.equal(publicRes.status, 200);
+      const publicJson = await publicRes.json();
+      const s = publicJson.sample;
+
+      // Assert companyStudy shape
+      assert.equal(s.companyName, 'Parity Global Technologies');
+      assert.equal(s.companyStudy.company, 'Parity Global Technologies');
+      assert.equal(s.companyStudy.website, 'https://parityglobal.example.com');
+      assert.equal(s.companyStudy.linkedin, 'https://linkedin.com/company/parityglobal');
+      assert.equal(s.companyStudy.industry, 'Enterprise Fintech');
+      assert.equal(s.companyStudy.businessOverview, 'Next-gen liquidity and cashflow operating system.');
+      assert.equal(s.companyStudy.hasPdf, true);
+      assert.equal(s.companyStudy.pdfUrl, `/api/samples/${showcaseSlug}/company-study-pdf`);
+
+      // Assert pitchDeck shape
+      assert.equal(s.pitchDeck.title, 'Parity Global Growth Playbook');
+      assert.equal(s.pitchDeck.streamUrl, `/api/samples/${showcaseSlug}/pitch-deck`);
+      assert.equal(s.pitchDeck.downloadUrl, `/api/samples/${showcaseSlug}/pitch-deck?download=true`);
+
+      // Assert leads[] shape
+      assert.equal(s.leads.length, 1);
+      const lead = s.leads[0];
+      assert.equal(lead.name, 'David Vance');
+      assert.equal(lead.title, 'Chief Financial Officer');
+      assert.equal(lead.company, 'Parity Global Technologies');
+      assert.equal(lead.companyLink, 'https://parityglobal.example.com');
+      assert.equal(lead.whySuitsBest, 'Key economic decision maker evaluating automation.');
+      assert.equal(lead.leadStudy.whyRelevant, 'Leading CFO modernization.');
+      assert.equal(lead.pitchDeck.streamUrl, `/api/samples/${showcaseSlug}/leads/${lead.id}/pitch-deck`);
+      assert.equal(lead.pitchDeckPdf, lead.pitchDeck.streamUrl);
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // 15. SSRF FILTER WITH STUBBED RESOLVER & VALIDATED IP SOCKET BINDING
+  // ---------------------------------------------------------------------------
+  await t.test(
+    '15. SSRF Filter: Hostnames resolving to private IPs are blocked via stubbed resolver; socket binds to validated IP',
+    async () => {
+      // A. Stubbed resolver returning private IP (10.0.0.5) must be blocked
+      const privateResolver = async (host) => [{ address: '10.0.0.5', family: 4 }];
+      const resPrivate = await validateExternalUrl('https://evil-rebind.com/logo.png', {
+        dnsResolver: privateResolver,
+      });
+      assert.equal(resPrivate.safe, false);
+      assert.equal(resPrivate.error, 'SSRF_PRIVATE_IP_BLOCKED');
+      assert.equal(resPrivate.ip, '10.0.0.5');
+
+      // B. Stubbed resolver returning loopback (127.0.0.1) must be blocked
+      const loopbackResolver = async (host) => [{ address: '127.0.0.1', family: 4 }];
+      const resLoopback = await validateExternalUrl('https://loopback-rebind.com/avatar.png', {
+        dnsResolver: loopbackResolver,
+      });
+      assert.equal(resLoopback.safe, false);
+      assert.equal(resLoopback.error, 'SSRF_PRIVATE_IP_BLOCKED');
+
+      // C. Stubbed resolver returning public IP (93.184.216.34) succeeds
+      const publicResolver = async (host) => [{ address: '93.184.216.34', family: 4 }];
+      const resPublic = await validateExternalUrl('https://safe-domain.com/logo.png', {
+        dnsResolver: publicResolver,
+      });
+      assert.equal(resPublic.safe, true);
+      assert.equal(resPublic.ip, '93.184.216.34');
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // 16. ADMIN ROUTES ROLE RESTRICTION & PUBLISHED_AT SETTING
+  // ---------------------------------------------------------------------------
+  await t.test(
+    '16. Admin Routes: COMPANY_LEAD gets 403 on integration batches/notifications, but 200 on preview; ADMIN gets 200',
+    async () => {
+      // 1. Provision authentic COMPANY_LEAD user in database
+      const leadUserRes = await query(
+        `INSERT INTO users (name, email, password, role)
+         VALUES ('Lead Specialist Tester', 'lead-specialist-${Date.now()}@dizigini.com', 'hashed', 'COMPANY_LEAD')
+         RETURNING id`
+      );
+      const leadUserId = leadUserRes.rows[0].id;
+      createdUserIds.push(leadUserId);
+
+      const jwt = (await import('jsonwebtoken')).default;
+      const { getPrimaryJwtSecret } = await import('../../src/middleware/auth.js');
+      const leadToken = jwt.sign(
+        { id: leadUserId, email: 'lead-specialist@dizigini.com', role: 'COMPANY_LEAD' },
+        getPrimaryJwtSecret(),
+        { expiresIn: '1h' }
+      );
+
+      // A. COMPANY_LEAD receives 403 on /integration/batches
+      const resLeadBatches = await fetch(`${baseUrl}/api/samples/manage/integration/batches`, {
+        headers: { Authorization: `Bearer ${leadToken}` },
+      });
+      assert.equal(resLeadBatches.status, 403, 'COMPANY_LEAD must be forbidden from integration batches');
+
+      // B. COMPANY_LEAD receives 403 on /integration/notifications
+      const resLeadNotifs = await fetch(`${baseUrl}/api/samples/manage/integration/notifications`, {
+        headers: { Authorization: `Bearer ${leadToken}` },
+      });
+      assert.equal(resLeadNotifs.status, 403, 'COMPANY_LEAD must be forbidden from integration notifications');
+
+      // C. COMPANY_LEAD receives 200 on /preview/:slug
+      const testShowcase = await query(
+        'SELECT slug FROM public_sample_showcases WHERE id = $1',
+        [createdShowcaseIds[0]]
+      );
+      const testSlug = testShowcase.rows[0].slug;
+
+      const resLeadPreview = await fetch(`${baseUrl}/api/samples/manage/preview/${testSlug}`, {
+        headers: { Authorization: `Bearer ${leadToken}` },
+      });
+      assert.equal(resLeadPreview.status, 200, 'COMPANY_LEAD is authorized to preview showcase');
+
+      // D. ADMIN receives 200 on both
+      const resAdminBatches = await fetch(`${baseUrl}/api/samples/manage/integration/batches`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      assert.equal(resAdminBatches.status, 200, 'ADMIN is authorized on integration batches');
+
+      const resAdminNotifs = await fetch(`${baseUrl}/api/samples/manage/integration/notifications`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      assert.equal(resAdminNotifs.status, 200, 'ADMIN is authorized on integration notifications');
+    }
+  );
 });

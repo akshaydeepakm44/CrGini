@@ -90,7 +90,7 @@ if (isDirectExecution) {
       let allowedSenderEmails = '';
 
       for (let i = 0; i < args.length; i++) {
-        if (args[i] === '--client-name' && args[i + 1]) {
+        if ((args[i] === '--client-name' || args[i] === '-n') && args[i + 1]) {
           clientName = args[i + 1];
           i++;
         } else if (args[i] === '--scopes' && args[i + 1]) {
@@ -98,9 +98,11 @@ if (isDirectExecution) {
           i++;
         } else if (args[i] === '--allow-auto-publish') {
           allowAutoPublish = true;
-        } else if (args[i] === '--allowed-sender-emails' && args[i + 1]) {
+        } else if ((args[i] === '--allowed-sender-emails' || args[i] === '--allowed-senders') && args[i + 1]) {
           allowedSenderEmails = args[i + 1];
           i++;
+        } else if (!clientName && !args[i].startsWith('-')) {
+          clientName = args[i];
         }
       }
 

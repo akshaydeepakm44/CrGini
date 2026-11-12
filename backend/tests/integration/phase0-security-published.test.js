@@ -344,4 +344,46 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
     const res = await fetch(`${baseUrl}/api/samples/${testDraftSlug}/leads/${testLeadId}/logo`);
     assert.equal(res.status, 404, 'Draft lead logo must return 404');
   });
+
+  // --- STRICT SLUG MATCHING FOR NON-DEMO SHOWCASES ---
+  await t.test('Public slug lookup: published non-demo showcase "acme-global-x7k2" requires exact match', async () => {
+    const uniqueSlug = 'acme-global-x7k2';
+    // Create published non-demo showcase
+    const created = await query(`
+      INSERT INTO public_sample_showcases (
+        slug, title, company_name, description, status, is_demo, source_platform, published_at
+      ) VALUES (
+        $1, 'Acme Global Intelligence', 'Acme Global Systems', 'Enterprise Software', 'PUBLISHED', false, 'DIZITALGINI', NOW()
+      ) RETURNING id, slug, status, is_demo
+    `, [uniqueSlug]);
+
+    const createdId = created.rows[0].id;
+
+    try {
+      // 1. Partial / prefix / unhyphenated queries must return 404 for non-demo showcase
+      const resPrefix = await fetch(`${baseUrl}/api/samples/acme`);
+      assert.equal(resPrefix.status, 404, 'Non-demo showcase must NOT be reachable via prefix /samples/acme');
+
+      const resUnhyphen = await fetch(`${baseUrl}/api/samples/acmeglobal`);
+      assert.equal(resUnhyphen.status, 404, 'Non-demo showcase must NOT be reachable via unhyphenated /samples/acmeglobal');
+
+      const resSubstring = await fetch(`${baseUrl}/api/samples/acme-global`);
+      assert.equal(resSubstring.status, 404, 'Non-demo showcase must NOT be reachable via company substring /samples/acme-global');
+
+      // 2. Exact match on slug succeeds (200 OK)
+      const resExact = await fetch(`${baseUrl}/api/samples/${uniqueSlug}`);
+      assert.equal(resExact.status, 200, 'Non-demo showcase MUST be reachable via exact slug /samples/acme-global-x7k2');
+      const exactBody = await resExact.json();
+      assert.equal(exactBody.sample.slug, uniqueSlug);
+
+      // 3. Demo showcases (is_demo = true) still support prefix and unhyphenated lookups
+      const resDemoExact = await fetch(`${baseUrl}/api/samples/data-i2i`);
+      assert.equal(resDemoExact.status, 200, 'Demo showcase must be reachable via exact slug');
+
+      const resDemoUnhyphen = await fetch(`${baseUrl}/api/samples/datai2i`);
+      assert.equal(resDemoUnhyphen.status, 200, 'Demo showcase must be reachable via unhyphenated slug');
+    } finally {
+      await query('DELETE FROM public_sample_showcases WHERE id = $1', [createdId]);
+    }
+  });
 });

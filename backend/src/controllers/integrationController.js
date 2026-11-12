@@ -22,9 +22,12 @@ const getMaxStagedQuota = () =>
  */
 export async function getIntegrationHealth(req, res) {
   return res.status(200).json({
+    success: true,
     status: 'ok',
+    clientId: req.apiClient.clientId,
     clientName: req.apiClient.clientName,
     scopes: req.apiClient.scopes,
+    timestamp: new Date().toISOString(),
   });
 }
 
@@ -105,17 +108,27 @@ export async function getIntegrationSchema(req, res) {
       companyStudy: {
         type: 'object',
         properties: {
-          overview: { type: 'string' },
-          website: { type: 'string' },
-          strengths: { type: 'array', items: { type: 'string' } },
-          weaknesses: { type: 'array', items: { type: 'string' } },
-          opportunities: { type: 'array', items: { type: 'string' } },
-          threats: { type: 'array', items: { type: 'string' } },
-          customNotes: { type: 'string' },
+          company: { type: 'string', description: 'Target company name' },
+          website: { type: 'string', description: 'Target company website' },
+          linkedin: { type: 'string', description: 'Target company LinkedIn URL' },
+          industry: { type: 'string', description: 'Target company industry' },
+          businessOverview: { type: 'string', description: 'Overview and core positioning' },
+          marketPosition: { type: 'string', description: 'Market footprint and positioning' },
+          keyObservations: { type: 'string', description: 'Key opportunities and observations' },
+          potentialOpportunity: { type: 'string', description: 'Recommended strategic growth focus' },
           pdfAssetKey: {
             type: 'string',
             description: 'Staged asset key for company study PDF.',
           },
+        },
+      },
+      pitchDeck: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          summary: { type: 'string' },
+          pdfAssetKey: { type: 'string', description: 'Staged asset key for showcase proposal pitch deck PDF.' },
+          assetKey: { type: 'string', description: 'Alternative alias for staged asset key.' },
         },
       },
       leads: {
@@ -129,7 +142,20 @@ export async function getIntegrationSchema(req, res) {
             title: { type: 'string' },
             email: { type: 'string', format: 'email' },
             phone: { type: 'string' },
+            company: { type: 'string' },
+            companyLink: { type: 'string' },
+            companyLinkedin: { type: 'string' },
             linkedin: { type: 'string', format: 'uri' },
+            aboutCompany: { type: 'string' },
+            whySuitsBest: { type: 'string' },
+            leadStudy: {
+              type: 'object',
+              properties: {
+                whyRelevant: { type: 'string' },
+                observedContext: { type: 'string' },
+                suggestedApproach: { type: 'string' },
+              },
+            },
             pitchDeckAssetKey: {
               type: 'string',
               description: 'Staged asset key for customized lead pitch deck PDF.',
@@ -230,6 +256,7 @@ export async function uploadIntegrationAsset(req, res) {
   const objectKey = `temp/${clientId}/${uuid}.pdf`;
 
   let fileEncountered = false;
+  let uploadedFileName = null;
   let fileError = null; // { status, error, message }
   let bytesReceived = 0;
   let hasher = crypto.createHash('sha256');
@@ -248,6 +275,7 @@ export async function uploadIntegrationAsset(req, res) {
   };
 
   bb.on('file', (fieldname, fileStream, info) => {
+    uploadedFileName = info?.filename || null;
     if (fieldname !== 'file') {
       fileStream.resume(); // drain unexpected fields
       fileError = {
@@ -398,8 +426,10 @@ export async function uploadIntegrationAsset(req, res) {
       return res.status(201).json({
         success: true,
         assetKey: assetRow.asset_key,
+        fileName: uploadedFileName || null,
         sha256: assetRow.sha256,
         size: Number(assetRow.size),
+        mimeType: 'application/pdf',
         expiresAt: assetRow.expires_at,
       });
     } catch (err) {

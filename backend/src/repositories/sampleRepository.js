@@ -72,6 +72,7 @@ const mapSampleRow = (row) => {
     externalProspectId: row.external_prospect_id || null,
     createdByEmail: row.created_by_email || null,
     batchId: row.batch_id || null,
+    isDemo: Boolean(row.is_demo),
     outreachMailTemplate: row.outreach_mail_template || {},
     publishedAt: row.published_at,
     createdAt: row.created_at,
@@ -82,24 +83,23 @@ const mapSampleRow = (row) => {
 export const findSampleBySlug = async (slug, onlyPublished = true) => {
   await ensureSampleTable();
   if (!slug) return null;
-  const shouldFilterPublished = typeof onlyPublished === 'object' && onlyPublished !== null
-    ? onlyPublished.onlyPublished !== false
-    : Boolean(onlyPublished);
+  // Fail-closed: filter to PUBLISHED unless onlyPublished === false exactly (or { onlyPublished: false })
+  const shouldFilterPublished = onlyPublished !== false && !(typeof onlyPublished === 'object' && onlyPublished !== null && onlyPublished.onlyPublished === false);
   const rawSlug = String(slug).toLowerCase().trim();
 
-  // If generic keywords requested, return the flagship published showcase
+  // If generic keywords requested, return the flagship published demo showcase
   const genericKeywords = ['prospect', 'prospects', 'sample', 'samples', 'showcase', 'showcases', 'demo', 'default'];
   if (genericKeywords.includes(rawSlug)) {
     const defaultRes = await query(`
       SELECT * FROM public_sample_showcases
-      WHERE status = 'PUBLISHED'
+      WHERE is_demo = true AND status = 'PUBLISHED'
       ORDER BY CASE WHEN slug = 'data-i2i' THEN 0 WHEN slug = 'siift-ai' THEN 1 ELSE 2 END, id ASC
       LIMIT 1
     `);
     if (defaultRes.rows[0]) return mapSampleRow(defaultRes.rows[0]);
   }
 
-  // 1. Exact match on slug
+  // 1. Exact match on slug (applies to both demo and non-demo showcases)
   const exactRes = await query(`
     SELECT * FROM public_sample_showcases
     WHERE slug = $1 ${shouldFilterPublished ? "AND status = 'PUBLISHED'" : ""}
@@ -107,32 +107,35 @@ export const findSampleBySlug = async (slug, onlyPublished = true) => {
   `, [rawSlug]);
   if (exactRes.rows[0]) return mapSampleRow(exactRes.rows[0]);
 
-  // 2. Numeric ID lookup if slug is a number (e.g. /samples/1, /samples/5)
+  // For non-demo showcases, strict exact slug match is required.
+  // Prefix, substring, unhyphenated, and ID lookups are strictly restricted to is_demo = true.
+
+  // 2. Numeric ID lookup if slug is a number (demo only)
   if (/^\d+$/.test(rawSlug)) {
     const idRes = await query(`
       SELECT * FROM public_sample_showcases
-      WHERE id = $1 ${shouldFilterPublished ? "AND status = 'PUBLISHED'" : ""}
+      WHERE id = $1 AND is_demo = true ${shouldFilterPublished ? "AND status = 'PUBLISHED'" : ""}
       LIMIT 1
     `, [parseInt(rawSlug, 10)]);
     if (idRes.rows[0]) return mapSampleRow(idRes.rows[0]);
   }
 
-  // 3. Match without hyphens (e.g. 'datai2i' -> 'data-i2i', 'siiftai' -> 'siift-ai')
+  // 3. Match without hyphens (demo only, e.g. 'datai2i' -> 'data-i2i', 'siiftai' -> 'siift-ai')
   const unhyphenated = rawSlug.replace(/[^a-z0-9]/g, '');
   if (unhyphenated.length >= 2) {
     const unhyphenRes = await query(`
       SELECT * FROM public_sample_showcases
-      WHERE REPLACE(REPLACE(slug, '-', ''), '_', '') = $1
+      WHERE REPLACE(REPLACE(slug, '-', ''), '_', '') = $1 AND is_demo = true
       ${shouldFilterPublished ? "AND status = 'PUBLISHED'" : ""}
       LIMIT 1
     `, [unhyphenated]);
     if (unhyphenRes.rows[0]) return mapSampleRow(unhyphenRes.rows[0]);
   }
 
-  // 4. Prefix or Company Name matching (e.g. 'siift' -> 'siift-ai', 'finkr' -> 'finkr')
+  // 4. Prefix or Company Name matching (demo only, e.g. 'siift' -> 'siift-ai')
   const fuzzyRes = await query(`
     SELECT * FROM public_sample_showcases
-    WHERE (
+    WHERE is_demo = true AND (
       slug LIKE $1 || '-%' OR
       slug LIKE $1 || '%' OR
       LOWER(company_name) = $1 OR
@@ -144,7 +147,6 @@ export const findSampleBySlug = async (slug, onlyPublished = true) => {
   `, [rawSlug]);
   if (fuzzyRes.rows[0]) return mapSampleRow(fuzzyRes.rows[0]);
 
-  // 5. Fallback if onlyPublished blocked a DRAFT showcase: REMOVED (Strict PUBLISHED isolation)
   return null;
 };
 
@@ -275,7 +277,8 @@ export const createSampleShowcase = async ({
       batchId,
       isDemo,
       JSON.stringify(outreachMailTemplate || {}),
-    ].filter((_, idx) => hasExplicitId || idx > 0);
+      status === 'PUBLISHED' ? new Date() : null,
+    ].filter((val, idx) => hasExplicitId || idx > 0);
 
     const placeholders = values.map((_, i) => '$' + (i + 1)).join(', ');
 
@@ -284,11 +287,14 @@ export const createSampleShowcase = async ({
       INSERT INTO public_sample_showcases (
         ${columns.join(',\n        ')}
       )
-      VALUES (${placeholders}, NOW())
+      VALUES (${placeholders})
       RETURNING id
       `,
       values
     );
+    if (hasExplicitId) {
+      await query(`SELECT setval('public_sample_showcases_id_seq', GREATEST((SELECT COALESCE(MAX(id), 0) FROM public_sample_showcases), nextval('public_sample_showcases_id_seq')))`).catch(() => {});
+    }
     return findSampleById(result.rows[0].id);
   } catch (err) {
     if (err.code === '23505') {
@@ -341,6 +347,8 @@ export const updateSampleShowcase = async (id, updates = {}) => {
     lead_studies: 'lead_studies',
     pitchDeck: 'pitch_deck',
     pitch_deck: 'pitch_deck',
+    publishedAt: 'published_at',
+    published_at: 'published_at',
   };
 
   // Map target DB column -> resolved value to ensure each column is updated only once
@@ -363,6 +371,11 @@ export const updateSampleShowcase = async (id, updates = {}) => {
   for (const [col, val] of colMap.entries()) {
     values.push(typeof val === 'object' && val !== null ? JSON.stringify(val) : val);
     setClauses.push(`${col} = $${values.length}`);
+  }
+
+  // Ensure published_at is set when transitioning to PUBLISHED
+  if (colMap.get('status') === 'PUBLISHED' && !colMap.has('published_at')) {
+    setClauses.push('published_at = COALESCE(published_at, NOW())');
   }
 
   values.push(id);

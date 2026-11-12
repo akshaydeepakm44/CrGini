@@ -51,14 +51,25 @@ const sampleManagementAuth = (req, res, next) => {
 const manageRouter = express.Router();
 manageRouter.use(sampleManagementAuth);
 
+// Helper middleware: restrict integration batch and notification auditing to ADMIN / SUPER_ADMIN
+const requireAdminRole = (req, res, next) => {
+  if (['ADMIN', 'SUPER_ADMIN'].includes(req.user?.role)) {
+    return next();
+  }
+  return res.status(403).json({
+    success: false,
+    message: `Forbidden: Role '${req.user?.role}' does not have permission to manage integration batches or notifications.`,
+  });
+};
+
 manageRouter.get('/', getAdminSamples);
 manageRouter.post('/', createAdminSample);
 
 // Integration management routes (must be mounted before /:id)
-manageRouter.get('/integration/notifications', getAdminIntegrationNotifications);
-manageRouter.patch('/integration/notifications/:id/read', markAdminNotificationRead);
-manageRouter.get('/integration/batches', getAdminIntegrationBatches);
-manageRouter.get('/integration/batches/:batchId', getAdminIntegrationBatchDetail);
+manageRouter.get('/integration/notifications', requireAdminRole, getAdminIntegrationNotifications);
+manageRouter.patch('/integration/notifications/:id/read', requireAdminRole, markAdminNotificationRead);
+manageRouter.get('/integration/batches', requireAdminRole, getAdminIntegrationBatches);
+manageRouter.get('/integration/batches/:batchId', requireAdminRole, getAdminIntegrationBatchDetail);
 manageRouter.get('/preview/:slug', getAdminShowcasePreview);
 
 manageRouter.get('/:id', getAdminSampleById);

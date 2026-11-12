@@ -297,6 +297,15 @@ export async function createIntegrationProspectBatch(req, res) {
 
       // G. Relocate staged assets to permanent paths
       const updatedCompanyStudy = { ...p.companyStudy };
+      updatedCompanyStudy.company = updatedCompanyStudy.company || p.companyName.trim();
+      updatedCompanyStudy.website = updatedCompanyStudy.website || p.website || '';
+      updatedCompanyStudy.linkedin = updatedCompanyStudy.linkedin || updatedCompanyStudy.companyLinkedin || '';
+      updatedCompanyStudy.industry = updatedCompanyStudy.industry || p.industry || 'Enterprise Software & Tech';
+      updatedCompanyStudy.businessOverview = updatedCompanyStudy.businessOverview || updatedCompanyStudy.overview || p.description || '';
+      updatedCompanyStudy.marketPosition = updatedCompanyStudy.marketPosition || '';
+      updatedCompanyStudy.keyObservations = updatedCompanyStudy.keyObservations || '';
+      updatedCompanyStudy.potentialOpportunity = updatedCompanyStudy.potentialOpportunity || '';
+
       if (updatedCompanyStudy.pdfAssetKey) {
         const permKey = await relocateStagedAsset({
           clientId,
@@ -305,6 +314,9 @@ export async function createIntegrationProspectBatch(req, res) {
         });
         updatedCompanyStudy.pdfAssetKey = permKey;
         updatedCompanyStudy.pdfUrl = `/api/samples/${targetSlug}/company-study-pdf`;
+        updatedCompanyStudy.hasPdf = true;
+      } else {
+        updatedCompanyStudy.hasPdf = Boolean(updatedCompanyStudy.hasPdf);
       }
 
       let updatedLogoAssetKey = p.logoAssetKey;
@@ -316,11 +328,42 @@ export async function createIntegrationProspectBatch(req, res) {
         });
       }
 
+      let updatedPitchDeck = p.pitchDeck ? { ...p.pitchDeck } : {};
+      const showcasePitchAssetKey = p.pitchDeck?.pdfAssetKey || p.pitchDeck?.assetKey;
+      if (showcasePitchAssetKey) {
+        const permShowcasePitchKey = await relocateStagedAsset({
+          clientId,
+          assetKey: showcasePitchAssetKey,
+          targetPrefix: `public-samples/${targetSlug}/pitch-deck`,
+        });
+        updatedPitchDeck = {
+          ...p.pitchDeck,
+          title: p.pitchDeck?.title || `${p.companyName} Proposal Pitch Deck`,
+          summary: p.pitchDeck?.summary || '',
+          assetKey: permShowcasePitchKey,
+          streamUrl: `/api/samples/${targetSlug}/pitch-deck`,
+          downloadUrl: `/api/samples/${targetSlug}/pitch-deck?download=true`,
+          fileName: p.pitchDeck?.fileName || `${p.companyName.replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
+        };
+      }
+
       const updatedLeads = [];
       for (const lead of p.leads) {
         const leadCopy = { ...lead };
         const leadId = leadCopy.id || `lead-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         leadCopy.id = leadId;
+        leadCopy.company = leadCopy.company || p.companyName.trim();
+        leadCopy.companyLink = leadCopy.companyLink || p.website || '';
+        leadCopy.aboutCompany = leadCopy.aboutCompany || p.description || '';
+        leadCopy.whySuitsBest = leadCopy.whySuitsBest || '';
+        leadCopy.logoUrl = leadCopy.logoUrl || leadCopy.logo || leadCopy.companyLogo || '';
+
+        leadCopy.leadStudy = {
+          whyRelevant: leadCopy.leadStudy?.whyRelevant || leadCopy.whyRelevant || '',
+          observedContext: leadCopy.leadStudy?.observedContext || leadCopy.observedContext || '',
+          suggestedApproach: leadCopy.leadStudy?.suggestedApproach || leadCopy.suggestedApproach || '',
+          ...(leadCopy.leadStudy || {}),
+        };
 
         if (leadCopy.pitchDeckAssetKey) {
           const permPitchKey = await relocateStagedAsset({
@@ -331,10 +374,14 @@ export async function createIntegrationProspectBatch(req, res) {
           leadCopy.pitchDeckAssetKey = permPitchKey;
           leadCopy.pitchDeck = {
             ...(leadCopy.pitchDeck || {}),
+            title: leadCopy.pitchDeck?.title || `${(leadCopy.name || leadCopy.company || 'Prospect').trim()} Proposal Pitch Deck`,
+            summary: leadCopy.pitchDeck?.summary || '',
             assetKey: permPitchKey,
             streamUrl: `/api/samples/${targetSlug}/leads/${leadId}/pitch-deck`,
             downloadUrl: `/api/samples/${targetSlug}/leads/${leadId}/pitch-deck?download=true`,
+            fileName: leadCopy.pitchDeck?.fileName || `${(leadCopy.name || leadCopy.company || 'Prospect').trim().replace(/\s+/g, '_')}_Pitch_Deck.pdf`,
           };
+          leadCopy.pitchDeckPdf = leadCopy.pitchDeck.streamUrl;
         }
 
         if (leadCopy.leadStudyPdfAssetKey) {
@@ -345,6 +392,11 @@ export async function createIntegrationProspectBatch(req, res) {
           });
           leadCopy.leadStudyPdfAssetKey = permStudyKey;
           leadCopy.leadStudyPdf = `/api/samples/${targetSlug}/leads/${leadId}/lead-study-pdf`;
+          leadCopy.leadStudy = {
+            ...leadCopy.leadStudy,
+            hasPdf: true,
+            pdfUrl: leadCopy.leadStudyPdf,
+          };
         }
 
         updatedLeads.push(leadCopy);
@@ -374,7 +426,7 @@ export async function createIntegrationProspectBatch(req, res) {
         status: effectiveStatus,
         companyStudy: updatedCompanyStudy,
         leads: updatedLeads,
-        pitchDeck: p.pitchDeck,
+        pitchDeck: updatedPitchDeck,
         sourcePlatform: 'DIZITALGINI',
         externalCampaignId: externalCampaignId.trim(),
         externalProspectId: p.externalProspectId.trim(),
