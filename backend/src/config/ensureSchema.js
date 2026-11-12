@@ -290,11 +290,143 @@ export async function ensureSchemaIntegrity() {
       console.warn('[Schema] alignDatabasePayments note:', e8.message);
     }
 
+    // 10. Ensure integration tables, columns, indexes, and constraints
+    try {
+      await ensureIntegrationSchema();
+    } catch (e9) {
+      console.warn('[Schema] ensureIntegrationSchema note:', e9.message);
+    }
+
     console.log('[Schema] Database schema integrity verified & updated successfully.');
     return true;
   } catch (err) {
     console.error('[Schema Warning] ensureSchemaIntegrity error:', err.message);
     return false;
+  }
+}
+
+/**
+ * Ensures integration tables, idempotency store, asset tracking, and prospect columns
+ */
+export async function ensureIntegrationSchema() {
+  try {
+    try {
+      await query(`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
+    } catch (_) {}
+
+    // 1. api_clients table
+    await query(`
+      CREATE TABLE IF NOT EXISTS api_clients (
+        id                    SERIAL PRIMARY KEY,
+        client_id             VARCHAR(64) UNIQUE NOT NULL,
+        client_name           VARCHAR(100) NOT NULL,
+        api_key_hash          VARCHAR(64) NOT NULL,
+        scopes                TEXT[] DEFAULT ARRAY['prospects:read', 'prospects:write'],
+        status                VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+        allow_auto_publish    BOOLEAN DEFAULT false,
+        allowed_sender_emails TEXT[] DEFAULT ARRAY[]::TEXT[],
+        created_at            TIMESTAMPTZ DEFAULT NOW(),
+        last_used_at          TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS idx_api_clients_hash ON api_clients (api_key_hash);
+    `);
+
+    await query(`
+      ALTER TABLE api_clients
+      ADD COLUMN IF NOT EXISTS allow_auto_publish BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS allowed_sender_emails TEXT[] DEFAULT ARRAY[]::TEXT[];
+    `);
+
+    // 2. integration_idempotency_keys table
+    await query(`
+      CREATE TABLE IF NOT EXISTS integration_idempotency_keys (
+        client_id       VARCHAR(64) NOT NULL,
+        idempotency_key VARCHAR(128) NOT NULL,
+        status          VARCHAR(20) NOT NULL DEFAULT 'IN_PROGRESS',
+        body_hash       VARCHAR(64) NOT NULL,
+        response_status INT,
+        response_body   JSONB,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        expires_at      TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 HOURS'),
+        PRIMARY KEY (client_id, idempotency_key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_idemp_expires ON integration_idempotency_keys (expires_at);
+    `);
+
+    await query(`
+      ALTER TABLE integration_idempotency_keys
+      ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'IN_PROGRESS';
+    `);
+
+    // 3. integration_batches table
+    await query(`
+      CREATE TABLE IF NOT EXISTS integration_batches (
+        id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        client_id            VARCHAR(64) NOT NULL,
+        external_campaign_id VARCHAR(255) NOT NULL,
+        pushed_by_email      VARCHAR(255) NOT NULL,
+        total_count          INT NOT NULL DEFAULT 0,
+        success_count        INT NOT NULL DEFAULT 0,
+        fail_count           INT NOT NULL DEFAULT 0,
+        status               VARCHAR(30) NOT NULL DEFAULT 'RECEIVED',
+        idempotency_key      VARCHAR(128),
+        created_at           TIMESTAMPTZ DEFAULT NOW(),
+        completed_at         TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS idx_batches_campaign ON integration_batches (external_campaign_id);
+    `);
+
+    // 4. integration_events table
+    await query(`
+      CREATE TABLE IF NOT EXISTS integration_events (
+        id         BIGSERIAL PRIMARY KEY,
+        batch_id   UUID REFERENCES integration_batches(id) ON DELETE CASCADE,
+        event_type VARCHAR(50) NOT NULL,
+        payload    JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_events_batch ON integration_events (batch_id);
+    `);
+
+    // 5. integration_assets table
+    await query(`
+      CREATE TABLE IF NOT EXISTS integration_assets (
+        id          SERIAL PRIMARY KEY,
+        asset_key   VARCHAR(500) UNIQUE NOT NULL,
+        client_id   VARCHAR(64) NOT NULL,
+        sha256      VARCHAR(64),
+        size        BIGINT NOT NULL,
+        mime_type   VARCHAR(100) DEFAULT 'application/pdf',
+        status      VARCHAR(30) NOT NULL DEFAULT 'STAGED',
+        claimed_by  INTEGER REFERENCES public_sample_showcases(id) ON DELETE SET NULL,
+        expires_at  TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 HOURS'),
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_integration_assets_client ON integration_assets (client_id, status);
+    `);
+
+    // 6. Enhance public_sample_showcases
+    await query(`
+      ALTER TABLE public_sample_showcases
+      ADD COLUMN IF NOT EXISTS source_platform VARCHAR(50) DEFAULT 'MANUAL',
+      ADD COLUMN IF NOT EXISTS external_campaign_id VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS external_prospect_id VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS batch_id UUID REFERENCES integration_batches(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS created_by_email VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS outreach_mail_template JSONB DEFAULT '{}'::jsonb;
+    `);
+
+    // 7. Partial UNIQUE index for deduplication across external campaign + prospect
+    await query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_showcase_external_id 
+      ON public_sample_showcases (source_platform, external_campaign_id, external_prospect_id)
+      WHERE external_campaign_id IS NOT NULL AND external_prospect_id IS NOT NULL;
+    `);
+
+    return true;
+  } catch (err) {
+    console.error('[Schema Warning] ensureIntegrationSchema error:', err.message);
+    throw err;
   }
 }
 

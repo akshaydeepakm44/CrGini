@@ -19,7 +19,9 @@
     "test:lifecycle": "node tests/e2e/multi-service-lifecycle.test.js",
     "test:integration": "node tests/integration/email-complete-audit.test.js",
     "test:bulk-import": "node tests/integration/bulk-lead-import.test.js",
-    "test:phase0": "node --test tests/integration/phase0-security-published.test.js"
+    "test:phase0": "node --test tests/integration/phase0-security-published.test.js",
+    "test:phase1": "node --test tests/integration/phase1-prospect-service.test.js",
+    "test:integration-core": "node --test tests/integration/phase0-security-published.test.js tests/integration/phase1-prospect-service.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
