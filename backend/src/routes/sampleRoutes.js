@@ -28,32 +28,35 @@ const router = express.Router();
 // Resilient authentication middleware for sample management
 const sampleManagementAuth = (req, res, next) => {
   protect(req, res, (err) => {
-    if (!err && req.user && ['COMPANY_LEAD', 'ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
-      return next();
+    if (!err && req.user) {
+      if (['COMPANY_LEAD', 'ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
+        return next();
+      }
+      return res.status(403).json({
+        success: false,
+        message: `Forbidden: Role '${req.user.role}' does not have permission to manage sample showcases.`,
+      });
     }
     (async () => {
       try {
-        const { findUserByEmail, findUserById } = await import('../repositories/userRepository.js');
+        const { findUserById } = await import('../repositories/userRepository.js');
         const token = req.headers.authorization?.split(' ')[1] || req.query?.token || req.body?._token;
         if (token) {
           const jwt = (await import('jsonwebtoken')).default;
           const decoded = jwt.decode(token);
           if (decoded?.id) {
             const u = await findUserById(decoded.id);
-            if (u && ['COMPANY_LEAD', 'ADMIN', 'SUPER_ADMIN'].includes(u.role)) {
-              req.user = u;
-              return next();
+            if (u) {
+              if (['COMPANY_LEAD', 'ADMIN', 'SUPER_ADMIN'].includes(u.role)) {
+                req.user = u;
+                return next();
+              }
+              return res.status(403).json({
+                success: false,
+                message: `Forbidden: Role '${u.role}' does not have permission to manage sample showcases.`,
+              });
             }
           }
-        }
-        const specialist = (await findUserByEmail('lead@dizigini.com')) || 
-                           (await findUserByEmail('team@dizigini.com')) || 
-                           (await findUserByEmail('admin@dizigini.com')) || 
-                           (await findUserByEmail('lead@creativegini.com')) || 
-                           (await findUserByEmail('team@creativegini.com'));
-        if (specialist) {
-          req.user = specialist;
-          return next();
         }
       } catch (_) {}
       return res.status(401).json({ success: false, message: 'Authentication required' });

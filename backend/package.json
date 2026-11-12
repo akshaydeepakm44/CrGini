@@ -18,7 +18,8 @@
     "test:e2e": "node tests/e2e/onboarding-workflow.test.js",
     "test:lifecycle": "node tests/e2e/multi-service-lifecycle.test.js",
     "test:integration": "node tests/integration/email-complete-audit.test.js",
-    "test:bulk-import": "node tests/integration/bulk-lead-import.test.js"
+    "test:bulk-import": "node tests/integration/bulk-lead-import.test.js",
+    "test:phase0": "node --test tests/integration/phase0-security-published.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

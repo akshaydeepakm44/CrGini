@@ -118,7 +118,7 @@ export const getPublicSampleBySlug = async (req, res) => {
     }
 
     const sample = await findSampleBySlug(cleanSlug, true);
-    if (!sample) {
+    if (!sample || sample.status !== 'PUBLISHED') {
       const available = await query(`
         SELECT slug, title, company_name, logo_url
         FROM public_sample_showcases
@@ -438,7 +438,7 @@ export const streamPublicPitchDeck = async (req, res) => {
     const { download } = req.query;
 
     const sample = await findSampleBySlug(slug, true);
-    if (!sample) {
+    if (!sample || sample.status !== 'PUBLISHED') {
       return res.status(404).json({
         success: false,
         message: 'Sample showcase not found.',
@@ -496,7 +496,7 @@ export const streamCompanyStudyPdf = async (req, res) => {
     const { download } = req.query;
 
     const sample = await findSampleBySlug(slug, true);
-    if (!sample) {
+    if (!sample || sample.status !== 'PUBLISHED') {
       return res.status(404).json({
         success: false,
         message: 'Prospect intelligence showcase not found.',
@@ -607,7 +607,7 @@ export const streamLeadPitchDeck = async (req, res) => {
     const { download } = req.query;
 
     const sample = await findSampleBySlug(slug, true);
-    if (!sample) {
+    if (!sample || sample.status !== 'PUBLISHED') {
       return res.status(404).json({ success: false, message: 'Sample showcase not found.' });
     }
 
@@ -696,7 +696,7 @@ export const streamLeadStudyPdf = async (req, res) => {
     const { download } = req.query;
 
     const sample = await findSampleBySlug(slug, true);
-    if (!sample) {
+    if (!sample || sample.status !== 'PUBLISHED') {
       return res.status(404).json({ success: false, message: 'Sample showcase not found.' });
     }
 
@@ -1735,8 +1735,8 @@ export const submitPublicInquiry = async (req, res) => {
 export const streamCompanyLogo = async (req, res) => {
   try {
     const { slug } = req.params;
-    const sample = await findSampleBySlug(slug, false);
-    if (!sample) {
+    const sample = await findSampleBySlug(slug, true);
+    if (!sample || sample.status !== 'PUBLISHED') {
       return res.status(404).send('Showcase not found');
     }
 
@@ -1860,8 +1860,8 @@ export const streamCompanyLogo = async (req, res) => {
 export const streamLeadLogo = async (req, res) => {
   try {
     const { slug, leadId } = req.params;
-    const sample = await findSampleBySlug(slug, false);
-    if (!sample) return res.status(404).send('Showcase not found');
+    const sample = await findSampleBySlug(slug, true);
+    if (!sample || sample.status !== 'PUBLISHED') return res.status(404).send('Showcase not found');
 
     const lead = (sample.leads || []).find((l, idx) => {
       const genId = l.id || `lead-${idx + 1}`;

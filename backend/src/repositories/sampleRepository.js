@@ -132,21 +132,7 @@ export const findSampleBySlug = async (slug, onlyPublished = true) => {
   `, [rawSlug]);
   if (fuzzyRes.rows[0]) return mapSampleRow(fuzzyRes.rows[0]);
 
-  // 5. Fallback if onlyPublished blocked a DRAFT showcase:
-  // If the showcase exists in DRAFT, return it so the creator or preview link works
-  if (onlyPublished) {
-    const draftRes = await query(`
-      SELECT * FROM public_sample_showcases
-      WHERE slug = $1 OR REPLACE(slug, '-', '') = $2 OR LOWER(company_name) = $1
-      LIMIT 1
-    `, [rawSlug, unhyphenated]);
-    if (draftRes.rows[0]) {
-      const mapped = mapSampleRow(draftRes.rows[0]);
-      mapped.isDraft = true;
-      return mapped;
-    }
-  }
-
+  // 5. Fallback if onlyPublished blocked a DRAFT showcase: REMOVED (Strict PUBLISHED isolation)
   return null;
 };
 
