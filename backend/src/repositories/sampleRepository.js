@@ -210,54 +210,85 @@ export const createSampleShowcase = async ({
   leads = [],
   leadStudies = [],
   pitchDeck = {},
+  sourcePlatform = 'MANUAL',
+  externalCampaignId = null,
+  externalProspectId = null,
+  createdByEmail = null,
+  batchId = null,
+  isDemo = false,
 }) => {
   await ensureSampleTable();
-  const result = await query(
-    `
-    INSERT INTO public_sample_showcases (
-      slug,
-      title,
-      company_name,
-      description,
-      logo_url,
-      logo_asset_key,
-      status,
-      company_study,
-      leads,
-      lead_studies,
-      pitch_deck,
-      published_at
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
-    ON CONFLICT (slug) DO UPDATE SET
-      title = EXCLUDED.title,
-      company_name = EXCLUDED.company_name,
-      description = EXCLUDED.description,
-      logo_url = COALESCE(EXCLUDED.logo_url, public_sample_showcases.logo_url),
-      logo_asset_key = COALESCE(EXCLUDED.logo_asset_key, public_sample_showcases.logo_asset_key),
-      status = EXCLUDED.status,
-      company_study = EXCLUDED.company_study,
-      leads = EXCLUDED.leads,
-      lead_studies = EXCLUDED.lead_studies,
-      pitch_deck = EXCLUDED.pitch_deck,
-      updated_at = NOW()
-    RETURNING id
-    `,
-    [
-      slug.toLowerCase().trim(),
-      title.trim(),
-      companyName.trim(),
-      description,
-      logoUrl,
-      logoAssetKey,
-      status,
-      JSON.stringify(companyStudy),
-      JSON.stringify(leads),
-      JSON.stringify(leadStudies),
-      JSON.stringify(pitchDeck),
-    ]
-  );
-  return findSampleById(result.rows[0].id);
+  const cleanSlugVal = slug.toLowerCase().trim();
+  try {
+    const result = await query(
+      `
+      INSERT INTO public_sample_showcases (
+        slug,
+        title,
+        company_name,
+        description,
+        logo_url,
+        logo_asset_key,
+        status,
+        company_study,
+        leads,
+        lead_studies,
+        pitch_deck,
+        source_platform,
+        external_campaign_id,
+        external_prospect_id,
+        created_by_email,
+        batch_id,
+        is_demo,
+        published_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
+      RETURNING id
+      `,
+      [
+        cleanSlugVal,
+        title.trim(),
+        companyName.trim(),
+        description,
+        logoUrl,
+        logoAssetKey,
+        status,
+        JSON.stringify(companyStudy),
+        JSON.stringify(leads),
+        JSON.stringify(leadStudies),
+        JSON.stringify(pitchDeck),
+        sourcePlatform,
+        externalCampaignId,
+        externalProspectId,
+        createdByEmail,
+        batchId,
+        isDemo,
+      ]
+    );
+    return findSampleById(result.rows[0].id);
+  } catch (err) {
+    if (err.code === '23505') {
+      const constraint = err.constraint || '';
+      const detail = err.detail || err.message || '';
+      if (constraint === 'uq_showcase_external_id' || detail.includes('external')) {
+        const conflictErr = new Error(`A prospect for this campaign and target account already exists (${externalCampaignId || 'campaign'} / ${externalProspectId || 'prospect'}).`);
+        conflictErr.status = 409;
+        conflictErr.code = 'DUPLICATE_EXTERNAL_PROSPECT';
+        throw conflictErr;
+      }
+      if (constraint === 'idx_public_samples_slug' || constraint.includes('slug') || detail.includes('slug') || constraint.includes('public_sample_showcases_pkey')) {
+        const conflictErr = new Error(`Slug '${cleanSlugVal}' is already taken.`);
+        conflictErr.status = 409;
+        conflictErr.code = 'SLUG_CONFLICT';
+        throw conflictErr;
+      }
+      const conflictErr = new Error(`Unique constraint violation: ${detail || constraint}`);
+      conflictErr.status = 409;
+      conflictErr.code = 'UNIQUE_VIOLATION';
+      throw conflictErr;
+    }
+    throw err;
+  }
 };
 
 export const updateSampleShowcase = async (id, updates = {}) => {

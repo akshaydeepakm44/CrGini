@@ -305,6 +305,8 @@ export async function ensureSchemaIntegrity() {
   }
 }
 
+export let isIntegrationSchemaReady = false;
+
 /**
  * Ensures integration tables, idempotency store, asset tracking, and prospect columns
  */
@@ -392,7 +394,7 @@ export async function ensureIntegrationSchema() {
     await query(`
       CREATE TABLE IF NOT EXISTS integration_assets (
         id          SERIAL PRIMARY KEY,
-        asset_key   VARCHAR(500) UNIQUE NOT NULL,
+        asset_key   TEXT UNIQUE NOT NULL,
         client_id   VARCHAR(64) NOT NULL,
         sha256      VARCHAR(64),
         size        BIGINT NOT NULL,
@@ -402,6 +404,7 @@ export async function ensureIntegrationSchema() {
         expires_at  TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 HOURS'),
         created_at  TIMESTAMPTZ DEFAULT NOW()
       );
+      ALTER TABLE integration_assets ALTER COLUMN asset_key TYPE TEXT;
       CREATE INDEX IF NOT EXISTS idx_integration_assets_client ON integration_assets (client_id, status);
     `);
 
@@ -423,9 +426,11 @@ export async function ensureIntegrationSchema() {
       WHERE external_campaign_id IS NOT NULL AND external_prospect_id IS NOT NULL;
     `);
 
+    isIntegrationSchemaReady = true;
     return true;
   } catch (err) {
-    console.error('[Schema Warning] ensureIntegrationSchema error:', err.message);
+    isIntegrationSchemaReady = false;
+    console.error('[Schema Error] ensureIntegrationSchema failed:', err.message);
     throw err;
   }
 }

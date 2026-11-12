@@ -5,58 +5,46 @@ import {
   createSampleShowcase,
   updateSampleShowcase,
 } from '../repositories/sampleRepository.js';
-import { query } from '../config/postgres.js';
-import {
-  uploadFile,
-  isDataUrl,
-} from './storageService.js';
-import { isMockDummyLead, invalidateShowcaseCache } from '../controllers/sampleController.js';
+import { uploadFile, isDataUrl } from './storageService.js';
+import { cleanSlug, isMockDummyLead, invalidateShowcaseCache } from './showcaseShared.js';
+
+export { cleanSlug };
 
 /**
- * Sanitizes an input string into a valid URL slug
+ * Resolves slug collisions according to policy:
+ * - When allowIncrement is true (manual dashboard path): appends -2, -3...
+ * - When allowIncrement is false (integration/server-to-server path): throws 409 SLUG_CONFLICT
  */
-export const cleanSlug = (input) => {
-  if (!input) return '';
-  return String(input)
-    .replace(/^https?:\/\//i, '')
-    .replace(/^www\./i, '')
-    .replace(/\/+$/, '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9_-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+export const resolveSlugCollision = async (baseSlug, { allowIncrement = true } = {}) => {
+  const clean = cleanSlug(baseSlug);
+  if (!clean) {
+    const err = new Error('Slug must contain valid alphanumeric characters.');
+    err.status = 400;
+    err.code = 'INVALID_SLUG';
+    throw err;
+  }
+
+  const existing = await findSampleBySlug(clean, false);
+  if (!existing) {
+    return clean;
+  }
+
+  if (!allowIncrement) {
+    const err = new Error(`Slug '${clean}' is already taken.`);
+    err.status = 409;
+    err.code = 'SLUG_CONFLICT';
+    throw err;
+  }
+
+  let counter = 2;
+  while (await findSampleBySlug(`${clean}-${counter}`, false)) {
+    counter++;
+  }
+  return `${clean}-${counter}`;
 };
 
 /**
- * Resolves a slug, handling collisions according to flow rules
- */
-export const resolveSlugCollision = async (baseSlug, { allowIncrement = true, existingId = null } = {}) => {
-  let effectiveSlug = cleanSlug(baseSlug);
-  if (!effectiveSlug) {
-    effectiveSlug = `showcase-${Date.now()}`;
-  }
-
-  const existing = await findSampleBySlug(effectiveSlug, false);
-  if (existing && (!existingId || String(existing.id) !== String(existingId))) {
-    if (!allowIncrement) {
-      const err = new Error(`Slug '${effectiveSlug}' is already in use by an existing showcase.`);
-      err.code = 'SLUG_CONFLICT';
-      err.status = 409;
-      throw err;
-    }
-    let counter = 2;
-    while (await findSampleBySlug(`${effectiveSlug}-${counter}`, false)) {
-      counter++;
-    }
-    effectiveSlug = `${effectiveSlug}-${counter}`;
-  }
-
-  return effectiveSlug;
-};
-
-/**
- * Offloads inlined base64 PDF payloads in leads array to storage service
+ * Offloads base64 PDF payloads in leads array to object storage, preserving existing asset keys
  */
 export const processLeadsPayload = async (leads, slug, existingLeads = []) => {
   if (!Array.isArray(leads) || leads.length === 0) return [];
@@ -68,9 +56,12 @@ export const processLeadsPayload = async (leads, slug, existingLeads = []) => {
     l.id = leadId;
 
     const existingLead = (existingLeads || []).find(
-      (el) => String(el.id) === String(leadId) || (el.name && l.name && String(el.name).toLowerCase() === String(l.name).toLowerCase())
+      (el) =>
+        String(el.id) === String(leadId) ||
+        (el.name && l.name && String(el.name).toLowerCase() === String(l.name).toLowerCase())
     );
 
+    // Preserve existing asset keys & phone if client didn't supply replacement
     if (!l.logoAssetKey && existingLead?.logoAssetKey) {
       l.logoAssetKey = existingLead.logoAssetKey;
     }
@@ -108,8 +99,8 @@ export const processLeadsPayload = async (leads, slug, existingLeads = []) => {
     const pitchDataUrl = (l.pitchDeckPdf && isDataUrl(l.pitchDeckPdf))
       ? l.pitchDeckPdf
       : (l.pitchDeck?.streamUrl && isDataUrl(l.pitchDeck?.streamUrl))
-      ? l.pitchDeck.streamUrl
-      : null;
+        ? l.pitchDeck.streamUrl
+        : null;
 
     if (pitchDataUrl) {
       try {
@@ -124,46 +115,33 @@ export const processLeadsPayload = async (leads, slug, existingLeads = []) => {
         l.pitchDeckPdf = `/api/samples/${slug}/leads/${leadId}/pitch-deck`;
         if (!l.pitchDeck) l.pitchDeck = {};
         l.pitchDeck.assetKey = uploadRes.objectKey;
-        l.pitchDeck.fileName = originalName;
         l.pitchDeck.streamUrl = `/api/samples/${slug}/leads/${leadId}/pitch-deck`;
-        l.pitchDeck.downloadUrl = `/api/samples/${slug}/leads/${leadId}/pitch-deck?download=true`;
+        l.pitchDeck.fileName = originalName;
+        l.pitchDeck.fileSize = uploadRes.size;
+        l.pitchDeck.mimeType = uploadRes.mimeType;
       } catch (err) {
-        console.error(`[prospectService.processLeadsPayload] Failed to upload pitchDeckPdf for ${l.name}:`, err.message);
+        console.error(`[prospectService.processLeadsPayload] Failed to upload pitchDeck for ${l.name}:`, err.message);
       }
     }
 
-    if (l.pitchDeck?.streamUrl && isDataUrl(l.pitchDeck.streamUrl)) {
-      l.pitchDeck.streamUrl = `/api/samples/${slug}/leads/${leadId}/pitch-deck`;
-    }
-    if (l.pitchDeck?.downloadUrl && isDataUrl(l.pitchDeck.downloadUrl)) {
-      l.pitchDeck.downloadUrl = `/api/samples/${slug}/leads/${leadId}/pitch-deck?download=true`;
-    }
-
-    const rawLogoDataUrl = (l.logo && isDataUrl(l.logo))
-      ? l.logo
-      : ((l.companyLogo && isDataUrl(l.companyLogo))
-      ? l.companyLogo
-      : ((l.logoUrl && isDataUrl(l.logoUrl)) ? l.logoUrl : null));
-
-    if (rawLogoDataUrl) {
+    // Offload individual lead company logos if provided as base64 data URLs
+    const leadLogoCandidate = l.logo || l.companyLogo || l.logoUrl || l.company_logo || l.avatarUrl || null;
+    if (leadLogoCandidate && isDataUrl(leadLogoCandidate)) {
       try {
+        const originalName = `${leadId}_lead_logo.png`;
         const uploadRes = await uploadFile({
-          dataUrl: rawLogoDataUrl,
-          originalName: `${slug}_lead_${leadId}_logo.png`,
+          dataUrl: leadLogoCandidate,
+          originalName,
           mimeType: 'image/png',
           prefix: `public-samples/${slug}/leads/${leadId}/logo`,
         });
         l.logoAssetKey = uploadRes.objectKey;
         l.logo = `/api/samples/${slug}/leads/${leadId}/logo`;
-        l.companyLogo = l.logo;
-        l.logoUrl = l.logo;
+        delete l.companyLogo;
+        delete l.avatarUrl;
       } catch (err) {
-        console.error(`[prospectService.processLeadsPayload] Failed to upload logo for ${l.name}:`, err.message);
+        console.error(`[prospectService.processLeadsPayload] Failed to upload lead logo for ${l.name}:`, err.message);
       }
-    } else if (l.logoAssetKey && (!l.logo || l.logo.startsWith('data:'))) {
-      l.logo = `/api/samples/${slug}/leads/${leadId}/logo`;
-      l.companyLogo = l.logo;
-      l.logoUrl = l.logo;
     }
 
     processed.push(l);
@@ -173,7 +151,7 @@ export const processLeadsPayload = async (leads, slug, existingLeads = []) => {
 };
 
 /**
- * Resolves the primary company logo
+ * Resolves or auto-discovers company logo URL and offloads Data URLs to object storage
  */
 export const resolveCompanyLogo = async ({ companyName, slug, companyStudy = {}, logoUrl = null }) => {
   let effectiveLogoUrl = (logoUrl && logoUrl !== '/logo.png') ? String(logoUrl).trim() : null;
@@ -272,7 +250,7 @@ export const createProspect = async (data = {}, { allowSlugIncrement = true } = 
     keyObservations: 'Opportunity for strategic acceleration.',
   };
 
-  // Upload company study PDF if provided as Data URL
+  // Upload company study PDF if provided as a Data URL during creation
   if (initialCompanyStudy.pdfFileDataUrl && isDataUrl(initialCompanyStudy.pdfFileDataUrl)) {
     try {
       const originalName = initialCompanyStudy.pdfFileName || `${companyName.trim()}_Company_Study.pdf`;
@@ -295,7 +273,7 @@ export const createProspect = async (data = {}, { allowSlugIncrement = true } = 
     }
   }
 
-  // Upload pitch deck if provided as Data URL
+  // Upload pitch deck if provided as a Data URL during creation
   let initialPitchDeck = pitchDeck ? { ...pitchDeck } : {};
   if (initialPitchDeck.fileDataUrl && isDataUrl(initialPitchDeck.fileDataUrl)) {
     try {
@@ -335,65 +313,27 @@ export const createProspect = async (data = {}, { allowSlugIncrement = true } = 
     initialCompanyStudy.logoAssetKey = logoAssetKey;
   }
 
-  // Insert showcase into PostgreSQL
-  const res = await query(
-    `
-    INSERT INTO public_sample_showcases (
-      slug,
-      title,
-      company_name,
-      description,
-      logo_url,
-      logo_asset_key,
-      status,
-      company_study,
-      leads,
-      lead_studies,
-      pitch_deck,
-      source_platform,
-      external_campaign_id,
-      external_prospect_id,
-      created_by_email,
-      batch_id,
-      published_at
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
-    ON CONFLICT (slug) DO UPDATE SET
-      title = EXCLUDED.title,
-      company_name = EXCLUDED.company_name,
-      description = EXCLUDED.description,
-      logo_url = COALESCE(EXCLUDED.logo_url, public_sample_showcases.logo_url),
-      logo_asset_key = COALESCE(EXCLUDED.logo_asset_key, public_sample_showcases.logo_asset_key),
-      status = EXCLUDED.status,
-      company_study = EXCLUDED.company_study,
-      leads = EXCLUDED.leads,
-      lead_studies = EXCLUDED.lead_studies,
-      pitch_deck = EXCLUDED.pitch_deck,
-      updated_at = NOW()
-    RETURNING id
-    `,
-    [
-      effectiveSlug,
-      effectiveTitle,
-      companyName.trim(),
-      description || `Curated account intelligence and sales acceleration brief prepared for ${companyName.trim()}.`,
-      resolvedLogoUrl,
-      logoAssetKey,
-      status,
-      JSON.stringify(initialCompanyStudy),
-      JSON.stringify(processedLeads),
-      JSON.stringify(Array.isArray(leadStudies) ? leadStudies : []),
-      JSON.stringify(initialPitchDeck),
-      sourcePlatform,
-      externalCampaignId,
-      externalProspectId,
-      createdByEmail,
-      batchId,
-    ]
-  );
+  const created = await createSampleShowcase({
+    slug: effectiveSlug,
+    title: effectiveTitle,
+    companyName: companyName.trim(),
+    description: description || `Curated account intelligence and sales acceleration brief prepared for ${companyName.trim()}.`,
+    logoUrl: resolvedLogoUrl,
+    logoAssetKey,
+    status,
+    companyStudy: initialCompanyStudy,
+    leads: processedLeads,
+    leadStudies: Array.isArray(leadStudies) ? leadStudies : [],
+    pitchDeck: initialPitchDeck,
+    sourcePlatform,
+    externalCampaignId,
+    externalProspectId,
+    createdByEmail,
+    batchId,
+  });
 
   invalidateShowcaseCache();
-  return findSampleById(res.rows[0].id);
+  return created;
 };
 
 /**
@@ -488,25 +428,79 @@ export const updateProspect = async (id, updates = {}) => {
     }
   }
 
-  // 3. Process leads array
+  // 3. Process leads array with full leadStudies sync
   if (Array.isArray(body.leads)) {
     const cleanLeadsInput = body.leads.filter((l) => !isMockDummyLead(l));
-    body.leads = await processLeadsPayload(cleanLeadsInput, sample.slug, sample.leads || []);
+    body.leads = await processLeadsPayload(cleanLeadsInput, body.slug || sample.slug, sample.leads || []);
+    body.leadStudies = body.leads.map((l, index) => ({
+      id: l.leadStudy?.id || `study-${index + 1}`,
+      leadName: l.name || '',
+      role: l.title || '',
+      company: l.company || body.companyName || sample.companyName || '',
+      whyRelevant: l.leadStudy?.whyRelevant || l.whyRelevant || '',
+      observedContext: l.leadStudy?.observedContext || l.observedContext || '',
+      potentialOpportunity: l.leadStudy?.potentialOpportunity || l.potentialOpportunity || '',
+      suggestedApproach: l.leadStudy?.suggestedApproach || l.suggestedApproach || '',
+    }));
   }
 
-  // 4. Logo resolution
-  if (body.logoUrl && isDataUrl(body.logoUrl)) {
+  // 4. Update logo with complete fallback parity
+  let logoAssetKey = sample.logoAssetKey || sample.logo_asset_key || sample.companyStudy?.logoAssetKey || null;
+  let effectiveLogoUrl = body.logoUrl !== undefined ? (body.logoUrl ? String(body.logoUrl).trim() : null) : sample.logoUrl;
+  if (effectiveLogoUrl === '/logo.png') effectiveLogoUrl = null;
+
+  if (!effectiveLogoUrl && body.companyStudy?.logoUrl && body.companyStudy.logoUrl !== '/logo.png') {
+    effectiveLogoUrl = body.companyStudy.logoUrl;
+  }
+
+  if (!effectiveLogoUrl) {
+    let domain = '';
+    const targetSlug = body.slug || sample.slug || '';
+    // ONLY check target company's explicit website (NEVER borrow from leads)
+    const explicitWebsite = body.companyStudy?.website || sample.companyStudy?.website;
+    if (explicitWebsite && typeof explicitWebsite === 'string') {
+      domain = explicitWebsite.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0].trim();
+    }
+    if (!domain || !domain.includes('.')) {
+      if (targetSlug.includes('.')) {
+        domain = targetSlug;
+      } else if (targetSlug.endsWith('-ai')) {
+        domain = `${targetSlug.replace(/-ai$/, '')}.ai`;
+      } else if (targetSlug.endsWith('-io')) {
+        domain = `${targetSlug.replace(/-io$/, '')}.io`;
+      } else if (targetSlug === 'finkr') {
+        domain = 'finkr.co.uk';
+      } else if (body.companyName || sample.companyName) {
+        domain = `${(body.companyName || sample.companyName).toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+      }
+    }
+    if (domain && domain.includes('.')) {
+      effectiveLogoUrl = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain.toLowerCase()}&size=128`;
+    }
+  }
+
+  if (effectiveLogoUrl && isDataUrl(effectiveLogoUrl)) {
     try {
       const uploadRes = await uploadFile({
-        dataUrl: body.logoUrl,
-        originalName: `${sample.slug}_company_logo.png`,
+        dataUrl: effectiveLogoUrl,
+        originalName: `${body.slug || sample.slug}_company_logo.png`,
         mimeType: 'image/png',
-        prefix: `public-samples/${sample.slug}/logo`,
+        prefix: `public-samples/${body.slug || sample.slug}/logo`,
       });
-      body.logoAssetKey = uploadRes.objectKey;
-      body.logoUrl = `/api/samples/${sample.slug}/logo`;
+      logoAssetKey = uploadRes.objectKey;
+      effectiveLogoUrl = `/api/samples/${body.slug || sample.slug}/logo`;
     } catch (uploadErr) {
-      console.error('[prospectService.updateProspect] Failed to upload updated logo:', uploadErr.message);
+      console.error('[prospectService.updateProspect] Failed to upload company logo:', uploadErr.message);
+    }
+  }
+
+  body.logoUrl = effectiveLogoUrl;
+  delete body.logo_url;
+  if (logoAssetKey) {
+    body.logoAssetKey = logoAssetKey;
+    delete body.logo_asset_key;
+    if (body.companyStudy) {
+      body.companyStudy.logoAssetKey = logoAssetKey;
     }
   }
 
@@ -514,4 +508,3 @@ export const updateProspect = async (id, updates = {}) => {
   invalidateShowcaseCache();
   return updated;
 };
-

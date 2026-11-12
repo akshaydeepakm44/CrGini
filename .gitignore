@@ -23,6 +23,8 @@ backend/storage/
 qa-artifacts/
 qa-reports/qa_screenshots/
 scratch/
+backend/tests/worktree-*/
+tests/worktree-*/
 
 # Test coverage
 coverage/

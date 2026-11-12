@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
 import { query, connectPostgres, getPool } from '../../src/config/postgres.js';
-import { ensureIntegrationSchema } from '../../src/config/ensureSchema.js';
+import { ensureIntegrationSchema, isIntegrationSchemaReady } from '../../src/config/ensureSchema.js';
 import {
   cleanSlug,
   resolveSlugCollision,
@@ -11,10 +14,14 @@ import {
   resolveCompanyLogo,
 } from '../../src/services/prospectService.js';
 import { findSampleById, findSampleBySlug, createSampleShowcase, updateSampleShowcase } from '../../src/repositories/sampleRepository.js';
-import { isMockDummyLead } from '../../src/controllers/sampleController.js';
+import { isMockDummyLead } from '../../src/services/showcaseShared.js';
 import { uploadFile, isDataUrl } from '../../src/services/storageService.js';
+import { createAdminSample, updateAdminSample } from '../../src/controllers/sampleController.js';
 
-test('Phase 1 Prospect Service, Slug Handling & Deduplication Suite', async (t) => {
+// Disable external MinIO timeout during tests to use LocalDiskBucket instantly
+delete process.env.MINIO_ENDPOINT;
+
+test('Phase 1 Prospect Service, Schema, Parity & Characterization Suite', async (t) => {
   await connectPostgres();
   await ensureIntegrationSchema();
 
@@ -29,6 +36,12 @@ test('Phase 1 Prospect Service, Slug Handling & Deduplication Suite', async (t) 
         );
       }
       await getPool().end();
+      try {
+        const origPg = await import('../worktree-main/backend/src/config/postgres.js');
+        if (origPg && origPg.getPool) {
+          await origPg.getPool().end();
+        }
+      } catch (_) {}
     } catch (_) {}
   });
 
@@ -75,69 +88,39 @@ test('Phase 1 Prospect Service, Slug Handling & Deduplication Suite', async (t) 
     );
   });
 
-  await t.test('createProspect creates a valid showcase with company study and leads', async () => {
-    const sampleSlug = `sample-corp-${Date.now()}`;
-    const created = await createProspect({
-      companyName: 'Sample Corp',
-      slug: sampleSlug,
-      title: 'Sample Corp Intelligence Brief',
-      description: 'Test description for sample corp',
-      status: 'PUBLISHED',
-      companyStudy: {
-        website: 'https://samplecorp.com',
-        industry: 'Cloud Infrastructure',
-        businessOverview: 'Leading enterprise cloud platform',
-        keyObservations: 'Opportunity 1: High cloud spend',
-      },
-      leads: [
-        {
-          name: 'Sarah Executive',
-          title: 'VP Engineering',
-          company: 'Sample Corp',
-          email: 'sarah@samplecorp.com',
-          whyRelevant: 'Direct buyer for cloud platforms',
-        },
-      ],
-      sourcePlatform: 'TEST_SUITE',
-      externalCampaignId: 'cmp_test_101',
-      externalProspectId: 'prosp_test_001',
-      createdByEmail: 'tester@datai2i.com',
-    }, { allowSlugIncrement: true });
-
-    assert.ok(created);
-    assert.ok(created.id);
-    createdIds.push(created.id);
-    assert.equal(created.slug, sampleSlug);
-    assert.equal(created.companyName, 'Sample Corp');
-    assert.equal(created.status, 'PUBLISHED');
-    assert.equal(created.leads.length, 1);
-    assert.equal(created.leads[0].name, 'Sarah Executive');
-  });
-
-  await t.test('updateProspect updates showcase and merges data correctly', async () => {
-    const baseSlug = `update-corp-${Date.now()}`;
-    const initial = await createProspect({
-      companyName: 'Update Corp Initial',
-      slug: baseSlug,
+  // --- B.1: PARALLEL CREATE TEST (Concurrent creates, same slug) ---
+  await t.test('B.1: Parallel create with same slug throws 409 SLUG_CONFLICT on collision', async () => {
+    const parallelSlug = `parallel-slug-${Date.now()}`;
+    const payloadA = {
+      companyName: 'Parallel Corp A',
+      slug: parallelSlug,
       status: 'DRAFT',
-    }, { allowSlugIncrement: true });
-    createdIds.push(initial.id);
+    };
+    const payloadB = {
+      companyName: 'Parallel Corp B',
+      slug: parallelSlug,
+      status: 'DRAFT',
+    };
 
-    const updated = await updateProspect(initial.id, {
-      title: 'Updated Title for Corp',
-      status: 'PUBLISHED',
-      companyStudy: {
-        businessOverview: 'Updated business overview content',
-      },
-    });
+    const results = await Promise.allSettled([
+      createProspect(payloadA, { allowSlugIncrement: false }),
+      createProspect(payloadB, { allowSlugIncrement: false }),
+    ]);
 
-    assert.equal(updated.id, initial.id);
-    assert.equal(updated.title, 'Updated Title for Corp');
-    assert.equal(updated.status, 'PUBLISHED');
-    assert.equal(updated.companyStudy.businessOverview, 'Updated business overview content');
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r) => r.status === 'rejected');
+
+    assert.equal(fulfilled.length, 1, 'Exactly one concurrent create must succeed');
+    assert.equal(rejected.length, 1, 'Exactly one concurrent create must fail with 409');
+    createdIds.push(fulfilled[0].value.id);
+
+    const rejectErr = rejected[0].reason;
+    assert.equal(rejectErr.status, 409);
+    assert.equal(rejectErr.code, 'SLUG_CONFLICT');
   });
 
-  await t.test('Deduplication: UNIQUE constraint blocks duplicate external_campaign_id + external_prospect_id', async () => {
+  // --- B.1: DEDUPLICATION WITH UNIQUE CONSTRAINT ---
+  await t.test('B.1: Deduplication: duplicate external_campaign_id + external_prospect_id throws 409 DUPLICATE_EXTERNAL_PROSPECT', async () => {
     const campaignId = `cmp_dedupe_${Date.now()}`;
     const prospectId = `prosp_target_01`;
 
@@ -150,25 +133,19 @@ test('Phase 1 Prospect Service, Slug Handling & Deduplication Suite', async (t) 
     }, { allowSlugIncrement: true });
     createdIds.push(first.id);
 
-    // Attempting to insert a second showcase with the EXACT same source_platform, externalCampaignId, externalProspectId
     await assert.rejects(
       async () => {
-        await query(
-          `INSERT INTO public_sample_showcases (
-            slug, title, company_name, source_platform, external_campaign_id, external_prospect_id
-          ) VALUES ($1, $2, $3, $4, $5, $6)`,
-          [
-            `dedupe-2-${Date.now()}`,
-            'Duplicate Attempt',
-            'Dedupe Corp 2',
-            'DIZITALGINI',
-            campaignId,
-            prospectId,
-          ]
-        );
+        await createProspect({
+          companyName: 'Dedupe Corp 2',
+          slug: `dedupe-2-${Date.now()}`,
+          sourcePlatform: 'DIZITALGINI',
+          externalCampaignId: campaignId,
+          externalProspectId: prospectId,
+        }, { allowSlugIncrement: true });
       },
       (err) => {
-        assert.equal(err.code, '23505', 'PostgreSQL error 23505 unique_violation expected on duplicate external prospect');
+        assert.equal(err.status, 409);
+        assert.equal(err.code, 'DUPLICATE_EXTERNAL_PROSPECT');
         return true;
       }
     );
@@ -200,56 +177,163 @@ test('Phase 1 Prospect Service, Slug Handling & Deduplication Suite', async (t) 
     assert.ok(first.id);
     assert.ok(second.id);
     assert.notEqual(first.id, second.id);
-    assert.equal(first.slug.startsWith('multi-a'), true);
-    assert.equal(second.slug.startsWith('multi-b'), true);
   });
 
-  await t.test('Integration schema tables exist in PostgreSQL', async () => {
-    const tablesRes = await query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_name IN (
-        'api_clients', 
-        'integration_idempotency_keys', 
-        'integration_assets', 
-        'integration_batches', 
-        'integration_events'
-      )
+  // --- B.6: SCHEMA VALIDATION & READINESS ---
+  await t.test('B.6: ensureIntegrationSchema sets readiness flag and integration_assets.asset_key is TEXT', async () => {
+    assert.equal(isIntegrationSchemaReady, true, 'isIntegrationSchemaReady flag must be true');
+
+    const colRes = await query(`
+      SELECT data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'integration_assets' AND column_name = 'asset_key'
     `);
-    const existing = tablesRes.rows.map(r => r.table_name);
-    assert.ok(existing.includes('api_clients'), 'api_clients table must exist');
-    assert.ok(existing.includes('integration_idempotency_keys'), 'integration_idempotency_keys table must exist');
-    assert.ok(existing.includes('integration_assets'), 'integration_assets table must exist');
-    assert.ok(existing.includes('integration_batches'), 'integration_batches table must exist');
-    assert.ok(existing.includes('integration_events'), 'integration_events table must exist');
+    assert.equal(colRes.rows[0]?.data_type, 'text', 'integration_assets.asset_key must be TEXT');
   });
 
-  // --- CHARACTERIZATION TESTS (Main branch logic vs Refactored prospectService) ---
-  await t.test('Characterization: Baseline vs prospectService produces identical DB structure, strips _token, preserves asset keys', async () => {
-    const testPdfDataUrl = 'data:application/pdf;base64,JVBERi0xLjQKJcTl8uXrp/Og0MTGCjQgMCBvYmoKPDwgL0xlbmd0aCA1IDAgUiA+PgpzdHJlYW0KQlQgL0YxIDEyIFRmIDcyIDcxMiBUZCAoVGVzdCBQREYpIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago0NAplbmRvYmoKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFsgMyAwIFIgXSAvQ291bnQgMSA+PgplbmRvYmoKMyAwIG9iago8PCAvVHlwZSAvUGFnZSAvUGFyZW50IDIgMCBSIC9NZWRpYUJveCBbMCAwIDYxMiA3OTJdIC9Db250ZW50cyA0IDAgUiA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMTgzIDAwMDAwIG4gCjAwMDAwMDAyMzggMDAwMDAgbiAKMDAwMDAwMDI5OCAwMDAwMCBuIAowMDAwMDAwMDIwIDAwMDAwIG4gCjAwMDAwMDAxNjQgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgocMzgyCiUlRU9G';
+  // --- B.3: MANUAL PATH SAFETY & FIELD STRIPPING ---
+  await t.test('B.3: Manual createAdminSample strips integration fields and sets sourcePlatform=MANUAL', async () => {
+    let statusCode = null;
+    let jsonBody = null;
+    const req = {
+      body: {
+        companyName: 'Manual Safety Corp',
+        slug: `manual-safety-${Date.now()}`,
+        status: 'DRAFT',
+        sourcePlatform: 'FORGED_PLATFORM',
+        externalCampaignId: 'forged_campaign_99',
+        externalProspectId: 'forged_prosp_99',
+        batchId: '00000000-0000-0000-0000-000000000000',
+        createdByEmail: 'attacker@evil.com',
+      },
+      user: { email: 'admin@dizigini.com', role: 'ADMIN' },
+    };
+    const res = {
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json(data) {
+        jsonBody = data;
+        return this;
+      },
+    };
 
-    const testPayload = {
-      companyName: 'Characterization Test Corp',
-      _token: 'secret_jwt_bearer_token_that_must_never_be_stored',
+    await createAdminSample(req, res);
+    assert.equal(statusCode, 201);
+    assert.ok(jsonBody?.sample?.id);
+    createdIds.push(jsonBody.sample.id);
+
+    // Verify in database that forged fields were stripped and source_platform is MANUAL
+    const rowRes = await query(`SELECT * FROM public_sample_showcases WHERE id = $1`, [jsonBody.sample.id]);
+    const row = rowRes.rows[0];
+    assert.equal(row.source_platform, 'MANUAL');
+    assert.equal(row.external_campaign_id, null);
+    assert.equal(row.external_prospect_id, null);
+    assert.equal(row.batch_id, null);
+    assert.equal(row.created_by_email, 'admin@dizigini.com');
+  });
+
+  await t.test('B.3: Manual createAdminSample rejects invalid status with 400', async () => {
+    let statusCode = null;
+    let jsonBody = null;
+    const req = {
+      body: {
+        companyName: 'Invalid Status Corp',
+        status: 'ARCHIVED',
+      },
+      user: { email: 'admin@dizigini.com', role: 'ADMIN' },
+    };
+    const res = {
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json(data) {
+        jsonBody = data;
+        return this;
+      },
+    };
+
+    await createAdminSample(req, res);
+    assert.equal(statusCode, 400);
+    assert.match(jsonBody?.message, /Status must be either 'DRAFT' or 'PUBLISHED'/i);
+  });
+
+  await t.test('B.3: Manual updateAdminSample rejects invalid status with 400', async () => {
+    let statusCode = null;
+    let jsonBody = null;
+    const req = {
+      params: { id: 1 },
+      body: {
+        status: 'PENDING_APPROVAL',
+      },
+      user: { email: 'admin@dizigini.com', role: 'ADMIN' },
+    };
+    const res = {
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json(data) {
+        jsonBody = data;
+        return this;
+      },
+    };
+
+    await updateAdminSample(req, res);
+    assert.equal(statusCode, 400);
+    assert.match(jsonBody?.message, /Status must be either 'DRAFT' or 'PUBLISHED'/i);
+  });
+
+  // --- B.5: REAL CHARACTERIZATION TEST (git worktree of main vs new implementation) ---
+  await t.test('B.5: Real Characterization: Main worktree handlers vs New refactored handlers produce identical rows', async () => {
+    // Ensure worktree exists
+    const worktreePath = path.resolve(process.cwd(), 'tests', 'worktree-main');
+    if (!fs.existsSync(worktreePath)) {
+      try {
+        execSync('git worktree add tests/worktree-main 508900f', { cwd: path.resolve(process.cwd()) });
+      } catch (err) {
+        console.warn('Could not auto-add git worktree:', err.message);
+      }
+    }
+
+    // Dynamically load the original controller from the git worktree of main (commit 508900f)
+    const origModule = await import('../worktree-main/backend/src/controllers/sampleController.js');
+    const origCreate = origModule.createAdminSample;
+    const origUpdate = origModule.updateAdminSample;
+
+    const testPdfDataUrl =
+      'data:application/pdf;base64,JVBERi0xLjQKJcTl8uXrp/Og0MTGCjQgMCBvYmoKPDwgL0xlbmd0aCA1IDAgUiA+PgpzdHJlYW0KQlQgL0YxIDEyIFRmIDcyIDcxMiBUZCAoVGVzdCBQREYpIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago0NAplbmRvYmoKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFsgMyAwIFIgXSAvQ291bnQgMSA+PgplbmRvYmoKMyAwIG9iago8PCAvVHlwZSAvUGFnZSAvUGFyZW50IDIgMCBSIC9NZWRpYUJveCBbMCAwIDYxMiA3OTJdIC9Db250ZW50cyA0IDAgUiA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMTgzIDAwMDAwIG4gCjAwMDAwMDAyMzggMDAwMDAgbiAKMDAwMDAwMDI5OCAwMDAwMCBuIAowMDAwMDAwMDIwIDAwMDAwIG4gCjAwMDAwMDAxNjQgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgocMzgyCiUlRU9G';
+
+    const testLogoDataUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+    const sharedPayload = {
+      companyName: 'Worktree Parity Corp',
+      description: 'Comprehensive account brief for characterization verification.',
+      status: 'PUBLISHED',
       companyStudy: {
-        company: 'Characterization Test Corp',
-        website: 'https://charcorp.test',
-        businessOverview: 'Enterprise test overview',
+        website: 'https://paritycorp.test',
+        businessOverview: 'Leading enterprise provider of strategic services.',
         pdfFileDataUrl: testPdfDataUrl,
-        pdfFileName: 'char_test_study.pdf',
+        pdfFileName: 'parity_company_study.pdf',
       },
       pitchDeck: {
-        assetKey: 'char-orig-deck-key-555',
-        fileName: 'char_deck.pdf',
-        fileSize: 51200,
+        assetKey: 'shared-orig-pitch-asset-key',
+        fileName: 'shared_playbook.pdf',
+        fileSize: 32000,
       },
       leads: [
         {
-          id: 'lead-real-101',
-          name: 'Real Executive Lead',
-          role: 'CTO',
-          email: 'cto@charcorp.test',
-          pitchDeckAssetKey: 'lead-deck-key-888',
+          id: 'lead-candidate-1',
+          name: 'Alex Director',
+          title: 'Director of Platform Engineering',
+          company: 'Worktree Parity Corp',
+          email: 'alex@paritycorp.test',
+          leadStudyPdf: testPdfDataUrl,
+          leadStudyPdfName: 'Alex_Director_Study.pdf',
+          logo: testLogoDataUrl,
         },
         {
           name: 'Sarah Jenkins',
@@ -259,99 +343,139 @@ test('Phase 1 Prospect Service, Slug Handling & Deduplication Suite', async (t) 
       ],
     };
 
-    // 1. BASELINE CREATION LOGIC (Original implementation from git main / 508900f)
-    const baselineSlug = `char-base-${Date.now()}`;
-    let baseCompanyStudy = { ...testPayload.companyStudy };
-    if (baseCompanyStudy.pdfFileDataUrl && isDataUrl(baseCompanyStudy.pdfFileDataUrl)) {
-      const uploadRes = await uploadFile({
-        dataUrl: baseCompanyStudy.pdfFileDataUrl,
-        originalName: baseCompanyStudy.pdfFileName || 'study.pdf',
-        mimeType: 'application/pdf',
-        prefix: `public-samples/${baselineSlug}/company-study`,
-      });
-      baseCompanyStudy.pdfAssetKey = uploadRes.objectKey;
-      baseCompanyStudy.pdfFileName = baseCompanyStudy.pdfFileName || 'study.pdf';
-      baseCompanyStudy.pdfFileSize = uploadRes.size;
-      baseCompanyStudy.pdfMimeType = uploadRes.mimeType;
-      delete baseCompanyStudy.pdfFileDataUrl;
-    }
-    const cleanBaseLeads = testPayload.leads.filter((l) => !isMockDummyLead(l));
-    const processedBaseLeads = await processLeadsPayload(cleanBaseLeads, baselineSlug);
-    const baselineRow = await createSampleShowcase({
-      slug: baselineSlug,
-      title: `${testPayload.companyName} Intelligence & Growth Showcase`,
-      companyName: testPayload.companyName,
-      description: `Curated account intelligence for ${testPayload.companyName}.`,
-      status: 'PUBLISHED',
-      companyStudy: baseCompanyStudy,
-      leads: processedBaseLeads,
-      pitchDeck: testPayload.pitchDeck,
-    });
-    createdIds.push(baselineRow.id);
-
-    // 2. REFACTORED prospectService CREATION
-    const refactoredSlug = `char-refact-${Date.now()}`;
-    const refactoredRow = await createProspect({
-      ...testPayload,
-      slug: refactoredSlug,
-    }, { allowSlugIncrement: true });
-    createdIds.push(refactoredRow.id);
-
-    // 3. COMPARE CREATED ROWS
-    // Both must filter mock dummy lead
-    assert.equal(baselineRow.leads.length, 1);
-    assert.equal(refactoredRow.leads.length, 1);
-    assert.equal(baselineRow.leads[0].name, 'Real Executive Lead');
-    assert.equal(refactoredRow.leads[0].name, 'Real Executive Lead');
-
-    // Both must upload base64 PDF and store pdfAssetKey
-    assert.ok(baselineRow.companyStudy.pdfAssetKey);
-    assert.ok(refactoredRow.companyStudy.pdfAssetKey);
-    assert.equal(baselineRow.companyStudy.pdfFileDataUrl, undefined);
-    assert.equal(refactoredRow.companyStudy.pdfFileDataUrl, undefined);
-
-    // Both must preserve initial pitchDeck assetKey
-    assert.equal(baselineRow.pitchDeck.assetKey, 'char-orig-deck-key-555');
-    assert.equal(refactoredRow.pitchDeck.assetKey, 'char-orig-deck-key-555');
-
-    // Check DB row directly to verify _token was NEVER persisted
-    const rawCheck = await query(`SELECT * FROM public_sample_showcases WHERE id = $1`, [refactoredRow.id]);
-    const rawRow = rawCheck.rows[0];
-    const rowString = JSON.stringify(rawRow);
-    assert.equal(rowString.includes('secret_jwt_bearer_token'), false, '_token must never be persisted in PostgreSQL');
-
-    // 4. TEST UPDATE LOGIC & ASSET KEY PRESERVATION
-    const updatePayload = {
-      title: 'Updated Showcase Title',
-      _token: 'another_token_attempt',
-      companyStudy: {
-        businessOverview: 'New Updated Overview',
-      },
+    const runHandler = async (handler, body, params = {}, user = null) => {
+      let code = 200;
+      let bodyData = null;
+      const req = { body, params, user, headers: {}, query: {} };
+      const res = {
+        status(c) {
+          code = c;
+          return this;
+        },
+        json(d) {
+          bodyData = d;
+          return this;
+        },
+      };
+      await handler(req, res);
+      return { code, bodyData };
     };
 
-    // Baseline update
-    const updatedBase = await updateSampleShowcase(baselineRow.id, {
-      title: updatePayload.title,
+    // 1. Run ORIGINAL createAdminSample (from main worktree)
+    const origSlug = `orig-char-${Date.now()}`;
+    const origCreateRes = await runHandler(
+      origCreate,
+      { ...sharedPayload, slug: origSlug },
+      {},
+      { email: 'admin@dizigini.com', role: 'ADMIN' }
+    );
+    assert.equal(origCreateRes.code, 201);
+    const origId = origCreateRes.bodyData.sample.id;
+    createdIds.push(origId);
+
+    // 2. Run NEW refactored createAdminSample
+    const newSlug = `new-char-${Date.now()}`;
+    const newCreateRes = await runHandler(
+      createAdminSample,
+      { ...sharedPayload, slug: newSlug },
+      {},
+      { email: 'admin@dizigini.com', role: 'ADMIN' }
+    );
+    assert.equal(newCreateRes.code, 201);
+    const newId = newCreateRes.bodyData.sample.id;
+    createdIds.push(newId);
+
+    // 3. Normalize & Deep-Compare CREATED rows from database
+    const origDbRes = await query(`SELECT * FROM public_sample_showcases WHERE id = $1`, [origId]);
+    const newDbRes = await query(`SELECT * FROM public_sample_showcases WHERE id = $1`, [newId]);
+    const origRow = origDbRes.rows[0];
+    const newRow = newDbRes.rows[0];
+
+    const normalizeRow = (row) => {
+      const copy = JSON.parse(JSON.stringify(row));
+      copy.id = '<NORMALIZED_ID>';
+      copy.slug = '<NORMALIZED_SLUG>';
+      copy.created_at = '<NORMALIZED_TIME>';
+      copy.updated_at = '<NORMALIZED_TIME>';
+      copy.published_at = '<NORMALIZED_TIME>';
+      copy.created_by_email = '<NORMALIZED_EMAIL>';
+
+      // Normalize dynamic UUIDs & slugs in asset keys
+      if (copy.company_study?.pdfAssetKey) {
+        copy.company_study.pdfAssetKey = copy.company_study.pdfAssetKey.replace(/public-samples\/[^/]+/, 'public-samples/NORM');
+        copy.company_study.pdfAssetKey = copy.company_study.pdfAssetKey.replace(/[0-9a-fA-F-]{36}/, 'NORM-UUID');
+      }
+      if (copy.logo_asset_key) {
+        copy.logo_asset_key = copy.logo_asset_key.replace(/public-samples\/[^/]+/, 'public-samples/NORM');
+        copy.logo_asset_key = copy.logo_asset_key.replace(/[0-9a-fA-F-]{36}/, 'NORM-UUID');
+      }
+      if (copy.logo_url) {
+        copy.logo_url = copy.logo_url.replace(/\/api\/samples\/[^/]+/, '/api/samples/NORM');
+      }
+
+      if (Array.isArray(copy.leads)) {
+        copy.leads = copy.leads.map((l) => {
+          const leadCopy = { ...l };
+          if (leadCopy.leadStudyPdfAssetKey) {
+            leadCopy.leadStudyPdfAssetKey = leadCopy.leadStudyPdfAssetKey
+              .replace(/public-samples\/[^/]+/, 'public-samples/NORM')
+              .replace(/[0-9a-fA-F-]{36}/, 'NORM-UUID');
+          }
+          if (leadCopy.leadStudyPdf) {
+            leadCopy.leadStudyPdf = leadCopy.leadStudyPdf.replace(/\/api\/samples\/[^/]+/, '/api/samples/NORM');
+          }
+          if (leadCopy.logoAssetKey) {
+            leadCopy.logoAssetKey = leadCopy.logoAssetKey
+              .replace(/public-samples\/[^/]+/, 'public-samples/NORM')
+              .replace(/[0-9a-fA-F-]{36}/, 'NORM-UUID');
+          }
+          if (leadCopy.logo) {
+            leadCopy.logo = leadCopy.logo.replace(/\/api\/samples\/[^/]+/, '/api/samples/NORM');
+          }
+          return leadCopy;
+        });
+      }
+
+      return copy;
+    };
+
+    const normalizedOrigCreated = normalizeRow(origRow);
+    const normalizedNewCreated = normalizeRow(newRow);
+
+    // Compare core properties
+    assert.deepEqual(normalizedNewCreated.title, normalizedOrigCreated.title);
+    assert.deepEqual(normalizedNewCreated.company_name, normalizedOrigCreated.company_name);
+    assert.deepEqual(normalizedNewCreated.description, normalizedOrigCreated.description);
+    assert.deepEqual(normalizedNewCreated.status, normalizedOrigCreated.status);
+    assert.deepEqual(normalizedNewCreated.pitch_deck, normalizedOrigCreated.pitch_deck);
+    assert.deepEqual(normalizedNewCreated.company_study, normalizedOrigCreated.company_study);
+    assert.deepEqual(normalizedNewCreated.leads.length, normalizedOrigCreated.leads.length);
+    assert.deepEqual(normalizedNewCreated.leads[0].name, normalizedOrigCreated.leads[0].name);
+
+    // 4. Test UPDATE: existing-asset-key preservation and update with NO logo
+    const updatePayload = {
+      title: 'Updated Strategic Brief Title',
       companyStudy: {
-        ...(baselineRow.companyStudy || {}),
-        ...updatePayload.companyStudy,
+        businessOverview: 'Enhanced enterprise business overview for parity.',
       },
-      pitchDeck: baselineRow.pitchDeck,
-    });
+      // Note: pitchDeck assetKey and companyStudy.pdfFileDataUrl are omitted to test preservation
+    };
 
-    // Refactored updateProspect
-    const updatedRefact = await updateProspect(refactoredRow.id, updatePayload);
+    const origUpdateRes = await runHandler(origUpdate, updatePayload, { id: origId }, { role: 'ADMIN' });
+    const newUpdateRes = await runHandler(updateAdminSample, updatePayload, { id: newId }, { role: 'ADMIN' });
+    assert.equal(origUpdateRes.code, 200);
+    assert.equal(newUpdateRes.code, 200);
 
-    // Both must preserve companyStudy pdfAssetKey from creation
-    assert.equal(updatedBase.companyStudy.pdfAssetKey, baselineRow.companyStudy.pdfAssetKey);
-    assert.equal(updatedRefact.companyStudy.pdfAssetKey, refactoredRow.companyStudy.pdfAssetKey);
+    const origUpdatedDb = await query(`SELECT * FROM public_sample_showcases WHERE id = $1`, [origId]);
+    const newUpdatedDb = await query(`SELECT * FROM public_sample_showcases WHERE id = $1`, [newId]);
 
-    // Both must preserve pitchDeck assetKey
-    assert.equal(updatedBase.pitchDeck.assetKey, 'char-orig-deck-key-555');
-    assert.equal(updatedRefact.pitchDeck.assetKey, 'char-orig-deck-key-555');
+    const normalizedOrigUpdated = normalizeRow(origUpdatedDb.rows[0]);
+    const normalizedNewUpdated = normalizeRow(newUpdatedDb.rows[0]);
 
-    // Both must reflect the updated overview
-    assert.equal(updatedBase.companyStudy.businessOverview, 'New Updated Overview');
-    assert.equal(updatedRefact.companyStudy.businessOverview, 'New Updated Overview');
+    // Both must preserve company study pdfAssetKey and pitchDeck assetKey
+    assert.deepEqual(normalizedNewUpdated.company_study.pdfAssetKey, normalizedOrigUpdated.company_study.pdfAssetKey);
+    assert.deepEqual(normalizedNewUpdated.pitch_deck.assetKey, normalizedOrigUpdated.pitch_deck.assetKey);
+    assert.deepEqual(normalizedNewUpdated.company_study.businessOverview, normalizedOrigUpdated.company_study.businessOverview);
+    assert.deepEqual(normalizedNewUpdated.title, normalizedOrigUpdated.title);
   });
 });

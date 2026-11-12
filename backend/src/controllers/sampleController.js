@@ -18,8 +18,16 @@ import {
 import {
   createProspect,
   updateProspect,
-  cleanSlug,
 } from '../services/prospectService.js';
+import {
+  cleanSlug,
+  isMockDummyLead,
+  invalidateShowcaseCache,
+  showcaseCache,
+  CACHE_TTL_MS,
+} from '../services/showcaseShared.js';
+
+export { isMockDummyLead, invalidateShowcaseCache, cleanSlug };
 import {
   streamGeneratedCompanyStudyPdf,
   streamGeneratedLeadStudyPdf,
@@ -61,35 +69,6 @@ const maskPhone = (phone) => {
   const clean = phone.trim();
   if (clean.length < 5) return '+1 (•••) •••-••••';
   return `${clean.slice(0, 4)} •••-••••`;
-};
-
-/**
- * Helper to identify mock/dummy template leads that must never be shown or saved
- */
-export const isMockDummyLead = (l) => {
-  if (!l) return true;
-  const email = (l.email || '').toLowerCase().trim();
-  const company = (l.company || '').toLowerCase().trim();
-  const name = (l.name || '').toLowerCase().trim();
-  return (
-    email === 's.jenkins@acmeglobal.com' ||
-    (name === 'sarah jenkins' && company === 'acme global systems') ||
-    (name === 'sample decision maker' && company.includes('partner'))
-  );
-};
-
-/**
- * In-memory high performance cache for public showcases
- */
-const showcaseCache = new Map();
-const CACHE_TTL_MS = 5 * 1000; // 5s short TTL
-
-export const invalidateShowcaseCache = (slug) => {
-  if (!slug) {
-    showcaseCache.clear();
-  } else {
-    showcaseCache.delete(String(slug).toLowerCase().trim());
-  }
 };
 
 /**
@@ -854,7 +833,31 @@ export const getAdminSampleById = async (req, res) => {
  */
 export const createAdminSample = async (req, res) => {
   try {
-    const created = await createProspect(req.body, { allowSlugIncrement: true });
+    const rawBody = { ...req.body };
+    delete rawBody.sourcePlatform;
+    delete rawBody.source_platform;
+    delete rawBody.externalCampaignId;
+    delete rawBody.external_campaign_id;
+    delete rawBody.externalProspectId;
+    delete rawBody.external_prospect_id;
+    delete rawBody.batchId;
+    delete rawBody.batch_id;
+    delete rawBody.createdByEmail;
+    delete rawBody.created_by_email;
+
+    if (rawBody.status && !['DRAFT', 'PUBLISHED'].includes(rawBody.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be either 'DRAFT' or 'PUBLISHED'.",
+      });
+    }
+
+    const created = await createProspect({
+      ...rawBody,
+      sourcePlatform: 'MANUAL',
+      createdByEmail: req.user?.email || null,
+    }, { allowSlugIncrement: true });
+
     return res.status(201).json({
       success: true,
       sample: created,
@@ -878,11 +881,30 @@ export const createAdminSample = async (req, res) => {
 export const updateAdminSample = async (req, res) => {
   try {
     const { id } = req.params;
-    const updated = await updateProspect(id, req.body);
+    const rawBody = { ...req.body };
+    delete rawBody.sourcePlatform;
+    delete rawBody.source_platform;
+    delete rawBody.externalCampaignId;
+    delete rawBody.external_campaign_id;
+    delete rawBody.externalProspectId;
+    delete rawBody.external_prospect_id;
+    delete rawBody.batchId;
+    delete rawBody.batch_id;
+    delete rawBody.createdByEmail;
+    delete rawBody.created_by_email;
+
+    if (rawBody.status && !['DRAFT', 'PUBLISHED'].includes(rawBody.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be either 'DRAFT' or 'PUBLISHED'.",
+      });
+    }
+
+    const updated = await updateProspect(id, rawBody);
     return res.status(200).json({
       success: true,
       sample: updated,
-      message: 'Sample showcase updated successfully.',
+      message: 'Prospect showcase updated successfully.',
     });
   } catch (error) {
     console.error('[SampleController.updateAdminSample] Error:', error);
@@ -894,11 +916,6 @@ export const updateAdminSample = async (req, res) => {
   }
 };
 
-/**
- * @desc    Delete sample showcase
- * @route   DELETE /api/samples-manage/:id
- * @access  Private (Lead Specialist & Admin)
- */
 export const deleteAdminSample = async (req, res) => {
   try {
     const { id } = req.params;
