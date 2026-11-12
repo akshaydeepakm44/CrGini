@@ -216,54 +216,66 @@ export const createSampleShowcase = async ({
   createdByEmail = null,
   batchId = null,
   isDemo = false,
+  id = null,
 }) => {
   await ensureSampleTable();
   const cleanSlugVal = slug.toLowerCase().trim();
   try {
+    const hasExplicitId = id !== null && id !== undefined;
+    const columns = [
+      hasExplicitId ? 'id' : null,
+      'slug',
+      'title',
+      'company_name',
+      'description',
+      'logo_url',
+      'logo_asset_key',
+      'status',
+      'company_study',
+      'leads',
+      'lead_studies',
+      'pitch_deck',
+      'source_platform',
+      'external_campaign_id',
+      'external_prospect_id',
+      'created_by_email',
+      'batch_id',
+      'is_demo',
+      'published_at',
+    ].filter(Boolean);
+
+    const values = [
+      hasExplicitId ? id : null,
+      cleanSlugVal,
+      title.trim(),
+      companyName.trim(),
+      description,
+      logoUrl,
+      logoAssetKey,
+      status,
+      JSON.stringify(companyStudy),
+      JSON.stringify(leads),
+      JSON.stringify(leadStudies),
+      JSON.stringify(pitchDeck),
+      sourcePlatform,
+      externalCampaignId,
+      externalProspectId,
+      createdByEmail,
+      batchId,
+      isDemo,
+    ].filter((_, idx) => hasExplicitId || idx > 0);
+
+    const placeholders = values.map((_, i) => '$' + (i + 1)).join(', ');
+
     const result = await query(
       `
       INSERT INTO public_sample_showcases (
-        slug,
-        title,
-        company_name,
-        description,
-        logo_url,
-        logo_asset_key,
-        status,
-        company_study,
-        leads,
-        lead_studies,
-        pitch_deck,
-        source_platform,
-        external_campaign_id,
-        external_prospect_id,
-        created_by_email,
-        batch_id,
-        is_demo,
-        published_at
+        ${columns.join(',\n        ')}
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
+      VALUES (${placeholders}, NOW())
       RETURNING id
       `,
-      [
-        cleanSlugVal,
-        title.trim(),
-        companyName.trim(),
-        description,
-        logoUrl,
-        logoAssetKey,
-        status,
-        JSON.stringify(companyStudy),
-        JSON.stringify(leads),
-        JSON.stringify(leadStudies),
-        JSON.stringify(pitchDeck),
-        sourcePlatform,
-        externalCampaignId,
-        externalProspectId,
-        createdByEmail,
-        batchId,
-        isDemo,
-      ]
+      values
     );
     return findSampleById(result.rows[0].id);
   } catch (err) {
@@ -276,7 +288,13 @@ export const createSampleShowcase = async ({
         conflictErr.code = 'DUPLICATE_EXTERNAL_PROSPECT';
         throw conflictErr;
       }
-      if (constraint === 'idx_public_samples_slug' || constraint.includes('slug') || detail.includes('slug') || constraint.includes('public_sample_showcases_pkey')) {
+      if (constraint === 'public_sample_showcases_pkey' || constraint.includes('pkey') || detail.includes('Key (id)=')) {
+        const conflictErr = new Error(`A showcase with ID ${id || 'specified'} already exists.`);
+        conflictErr.status = 409;
+        conflictErr.code = 'PRIMARY_KEY_CONFLICT';
+        throw conflictErr;
+      }
+      if (constraint === 'idx_public_samples_slug' || constraint.includes('slug') || detail.includes('Key (slug)=')) {
         const conflictErr = new Error(`Slug '${cleanSlugVal}' is already taken.`);
         conflictErr.status = 409;
         conflictErr.code = 'SLUG_CONFLICT';

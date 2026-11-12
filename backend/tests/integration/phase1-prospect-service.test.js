@@ -151,6 +151,38 @@ test('Phase 1 Prospect Service, Schema, Parity & Characterization Suite', async 
     );
   });
 
+  // --- B.1: PRIMARY KEY CONSTRAINT SEPARATION TEST ---
+  await t.test('B.1: Duplicate ID throws 409 PRIMARY_KEY_CONFLICT separate from SLUG_CONFLICT', async () => {
+    const pkSlug1 = `pk-test-1-${Date.now()}`;
+    const first = await createSampleShowcase({
+      slug: pkSlug1,
+      title: 'PK Corp 1',
+      companyName: 'PK Corp 1',
+      status: 'DRAFT',
+    });
+    createdIds.push(first.id);
+
+    // Attempt to insert with identical primary key ID but DIFFERENT slug
+    const pkSlug2 = `pk-test-2-${Date.now()}`;
+    await assert.rejects(
+      async () => {
+        await createSampleShowcase({
+          id: first.id, // Explicit duplicate primary key
+          slug: pkSlug2, // Different slug so slug uniqueness does NOT trigger
+          title: 'PK Corp 2 Duplicate ID',
+          companyName: 'PK Corp 2',
+          status: 'DRAFT',
+        });
+      },
+      (err) => {
+        assert.equal(err.status, 409, 'Must return 409');
+        assert.equal(err.code, 'PRIMARY_KEY_CONFLICT', 'Must map to PRIMARY_KEY_CONFLICT, NOT SLUG_CONFLICT');
+        assert.match(err.message, /already exists/i);
+        return true;
+      }
+    );
+  });
+
   await t.test('Multi-company campaign: distinct external_prospect_id under same external_campaign_id succeeds', async () => {
     const campaignId = `cmp_multi_${Date.now()}`;
     const prospectA = `prosp_company_a`;
