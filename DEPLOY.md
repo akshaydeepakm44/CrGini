@@ -100,3 +100,106 @@ pm2 save
 - **Client Portal**: `http://dizigini.com/portal`
 - **Lead Specialist Portal**: `http://dizigini.com/lead`
 - **Admin Console**: `http://dizigini.com/admin`
+
+---
+
+## 4. Hotfix Deployment Runbook (`hotfix/phase-0-security`)
+
+### Environment Prerequisites
+- `NODE_ENV=production` must be set in `backend/.env` and in PM2 environment (`ecosystem.config.cjs`).
+- `JWT_SECRET` must be set with **at least 32 characters** of high-entropy random data. Server fails closed and terminates immediately if shorter than 32 characters or unset outside dev/test.
+- **Confirm `JWT_SECRET_PREVIOUS` is UNSET** (empty / commented out) in `backend/.env` to ensure no insecure development or legacy fallback secrets are accepted.
+
+### Deployment Execution (Step-by-Step)
+```bash
+# Step 1: SSH into server
+ssh ubuntu@dizigini.com
+cd /home/ubuntu/Dizigini  # (or your server root /var/www/dizi)
+
+# Step 2: Database Snapshot Backup
+pg_dump -U postgres -h 127.0.0.1 -d dizigini_db -F c -b -v -f ~/backup_dizigini_$(date +%Y%m%d_%H%M%S).dump
+
+# Step 3: Pull Hotfix Branch
+PREV_COMMIT=$(git rev-parse HEAD)
+git fetch origin
+git checkout hotfix/phase-0-security
+git pull origin hotfix/phase-0-security
+
+# Step 4: Build Frontend Static Bundle
+cd frontend
+npm install --production=false
+npm run build
+cd ..
+
+# Step 5: Update Backend Dependencies & Restart PM2
+cd backend
+npm install --production
+# Restart real PM2 app 'dizigini-backend' with updated environment
+pm2 restart dizigini-backend --update-env
+pm2 save
+cd ..
+
+# Step 6: Verify PM2 Process & Environment
+pm2 status dizigini-backend
+pm2 env 0 | grep -E "NODE_ENV|JWT_SECRET"
+# Must confirm: NODE_ENV: 'production'
+# Must confirm: JWT_SECRET_PREVIOUS is unset
+
+# Step 7: Post-Deploy Security Verification
+# 1. Unauthenticated hit to sample management must return HTTP 401:
+curl -s -o /dev/null -w "%{http_code}\n" http://dizigini.com/api/samples/manage
+# Expected: 401
+
+# 2. Direct static access to /storage must return HTTP 404 (leak closed):
+curl -s -o /dev/null -w "%{http_code}\n" http://dizigini.com/storage/buckets/dizigini-assets/test.pdf
+# Expected: 404
+
+# 3. Public 404 demo isolation check:
+curl -s http://dizigini.com/api/samples/non-existent-test-slug | grep -o "availableShowcases"
+# Expected: Returns availableShowcases strictly containing data-i2i and siift-ai only
+
+# 4. Check post-deploy logs for any unauthenticated anomalies:
+pm2 logs dizigini-backend --lines 50
+
+# Step 8: Rollback Procedure (in case of unexpected issue)
+# git checkout $PREV_COMMIT
+# cd frontend && npm run build && cd ../backend && pm2 restart dizigini-backend --update-env
+```
+
+---
+
+## 5. Integration API Security & Nginx Configuration (`/api/integration/v1/`)
+
+> [!WARNING]
+> **HTTPS Mandate for Integration API**: The server-to-server Integration API (`ENABLE_INTEGRATION_API`) must **ONLY** be enabled in production environments when serving over **HTTPS** (SSL/TLS). Exposing API keys (`X-API-Key`) over plain HTTP risks man-in-the-middle credential interception.
+
+- **Feature Flag**: `ENABLE_INTEGRATION_API=false` by default. Set `ENABLE_INTEGRATION_API=true` in `backend/.env` only when SSL is configured.
+- **Nginx Streamed Multipart Configuration**:
+  Add this location block to `/etc/nginx/sites-available/dizigini.com` before the general `/api/` proxy block:
+
+```nginx
+    # --------------------------------------------------------------------------
+    # Integration API Reverse Proxy (Streamed Multipart File Uploads)
+    # --------------------------------------------------------------------------
+    location /api/integration/ {
+        proxy_pass http://dizigini_api;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # 30MB payload limit for PDF uploads
+        client_max_body_size 30M;
+
+        # Disable Nginx request body buffering to stream directly to backend disk/storage
+        proxy_request_buffering off;
+        proxy_buffering off;
+
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 120s;
+        proxy_read_timeout 120s;
+    }
+```
+

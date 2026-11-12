@@ -27,32 +27,34 @@ const PORT = process.env.PORT || 5001;
 // Direct static media fallbacks: /storage is intentionally NOT served statically to prevent bypassing status checks
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
-// Connect to PostgreSQL
-connectPostgres().then(async (ok) => {
-  if (ok) {
-    console.log('[DiziGini API] PostgreSQL connected successfully.');
-    try {
-      const { ensureSchemaIntegrity } = await import('./config/ensureSchema.js');
-      await ensureSchemaIntegrity();
-    } catch (err) {
-      console.error('[DiziGini API] ensureSchemaIntegrity error:', err.message);
+// Connect to PostgreSQL (in test mode, test harness manages connection lifecycle)
+if (process.env.NODE_ENV !== 'test') {
+  connectPostgres().then(async (ok) => {
+    if (ok) {
+      console.log('[DiziGini API] PostgreSQL connected successfully.');
+      try {
+        const { ensureSchemaIntegrity } = await import('./config/ensureSchema.js');
+        await ensureSchemaIntegrity();
+      } catch (err) {
+        console.error('[DiziGini API] ensureSchemaIntegrity error:', err.message);
+      }
+      try {
+        const { ensureDataI2IAccount } = await import('./controllers/authController.js');
+        await ensureDataI2IAccount();
+      } catch (err) {
+        console.error('[DiziGini API] ensureDataI2IAccount error:', err.message);
+      }
+      try {
+        const { ensureSampleTable } = await import('./repositories/sampleRepository.js');
+        await ensureSampleTable();
+      } catch (err) {
+        console.error('[DiziGini API] ensureSampleTable error:', err.message);
+      }
+    } else {
+      console.error('[DiziGini API] PostgreSQL connection failed. Check credentials.');
     }
-    try {
-      const { ensureDataI2IAccount } = await import('./controllers/authController.js');
-      await ensureDataI2IAccount();
-    } catch (err) {
-      console.error('[DiziGini API] ensureDataI2IAccount error:', err.message);
-    }
-    try {
-      const { ensureSampleTable } = await import('./repositories/sampleRepository.js');
-      await ensureSampleTable();
-    } catch (err) {
-      console.error('[DiziGini API] ensureSampleTable error:', err.message);
-    }
-  } else {
-    console.error('[DiziGini API] PostgreSQL connection failed. Check credentials.');
-  }
-});
+  });
+}
 
 // CORS configuration: allow origins from CLIENT_URL or dizigini.com domain
 const defaultOrigins = [
@@ -207,9 +209,14 @@ app.use((err, req, res, next) => {
   });
 });
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[DiziGini API] Server running on port ${PORT} (mapped for dizigini.com)`);
-});
+export { app };
+
+let server = null;
+if (process.env.NODE_ENV !== 'test') {
+  server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[DiziGini API] Server running on port ${PORT} (mapped for dizigini.com)`);
+  });
+}
 
 // Process Crash Shields
 process.on('unhandledRejection', (reason, promise) => {
@@ -223,16 +230,20 @@ process.on('uncaughtException', (err) => {
 // Graceful Connection Draining
 const handleShutdown = async (signal) => {
   console.log(`[DiziGini API] Received ${signal}. Draining pool and closing server gracefully...`);
-  server.close(async () => {
-    try {
-      const pool = getPool();
-      await pool.end();
-      console.log('[DiziGini API] PostgreSQL pool closed cleanly.');
-    } catch (err) {
-      console.error('[DiziGini API] Error during pool drain:', err.message);
-    }
+  if (server) {
+    server.close(async () => {
+      try {
+        const pool = getPool();
+        await pool.end();
+        console.log('[DiziGini API] PostgreSQL pool closed cleanly.');
+      } catch (err) {
+        console.error('[DiziGini API] Error during pool drain:', err.message);
+      }
+      process.exit(0);
+    });
+  } else {
     process.exit(0);
-  });
+  }
 };
 
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));

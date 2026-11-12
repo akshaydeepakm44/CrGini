@@ -19,6 +19,11 @@ export const getPrimaryJwtSecret = () => {
     }
     return 'dizigini_dev_jwt_secret_key_only';
   }
+  if (!isExplicitDevOrTest() && secret.length < 32) {
+    throw new Error(
+      `FATAL: JWT_SECRET must be at least 32 characters long in production (got ${secret.length} characters).`
+    );
+  }
   return secret;
 };
 

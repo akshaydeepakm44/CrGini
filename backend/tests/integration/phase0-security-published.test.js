@@ -1,3 +1,5 @@
+process.env.NODE_ENV = 'test';
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
@@ -6,6 +8,17 @@ import { query, connectPostgres, getPool } from '../../src/config/postgres.js';
 import { findSampleBySlug, ensureSampleTable } from '../../src/repositories/sampleRepository.js';
 import { getPrimaryJwtSecret } from '../../src/middleware/auth.js';
 import sampleRoutes from '../../src/routes/sampleRoutes.js';
+
+// Load real server.js dynamically after NODE_ENV=test is set
+const { app: realServerApp } = await import('../../src/server.js');
+
+const restoreEnv = (key, val) => {
+  if (val === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = val;
+  }
+};
 
 test('Phase 0 Security & Status Validation Suite', async (t) => {
   await connectPostgres();
@@ -95,6 +108,7 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
       await query(`DELETE FROM users WHERE id IN ($1, $2)`, [testUserId, testAdminId]);
       await getPool().end();
     } catch (_) {}
+    setTimeout(() => process.exit(0), 100);
   });
 
   // --- REPOSITORY TESTS ---
@@ -212,8 +226,8 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
       assert.equal(json.success, false);
       assert.match(json.message, /invalid or expired/i);
     } finally {
-      process.env.NODE_ENV = savedNodeEnv;
-      process.env.JWT_SECRET = savedSecret;
+      restoreEnv('NODE_ENV', savedNodeEnv);
+      restoreEnv('JWT_SECRET', savedSecret);
     }
   });
 
@@ -234,17 +248,50 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
         /FATAL: JWT_SECRET environment variable is missing and NODE_ENV is not explicitly "development" or "test"/
       );
     } finally {
-      process.env.NODE_ENV = savedNodeEnv;
-      process.env.JWT_SECRET = savedSecret;
+      restoreEnv('NODE_ENV', savedNodeEnv);
+      restoreEnv('JWT_SECRET', savedSecret);
     }
   });
 
-  await t.test('Storage: Direct request to /storage/ returns 404 and cannot bypass controller status check', async () => {
-    // Attempt to access storage files directly via static URL
-    const res = await fetch(`${baseUrl}/storage/buckets/dizigini-assets/public-samples/${testDraftSlug}/company-study/test.pdf`);
-    assert.equal(res.status, 404, 'Direct static /storage access must return 404');
-    const json = await res.json();
-    assert.equal(json.success, false);
+  await t.test('Auth: JWT_SECRET length < 32 throws outside dev/test', () => {
+    const savedNodeEnv = process.env.NODE_ENV;
+    const savedSecret = process.env.JWT_SECRET;
+    try {
+      process.env.NODE_ENV = 'production';
+      process.env.JWT_SECRET = 'short_secret_only_20_chars';
+      assert.throws(
+        () => getPrimaryJwtSecret(),
+        /FATAL: JWT_SECRET must be at least 32 characters long in production/
+      );
+    } finally {
+      restoreEnv('NODE_ENV', savedNodeEnv);
+      restoreEnv('JWT_SECRET', savedSecret);
+    }
+  });
+
+  await t.test('Storage: Real server.js mounts NO static handler on /storage and returns 404', async () => {
+    // 1. Structural Layer Assertion on real server app
+    const hasStorageStaticLayer = realServerApp._router.stack.some(
+      (layer) => layer.regexp && layer.regexp.toString().includes('storage')
+    );
+    assert.equal(
+      hasStorageStaticLayer,
+      false,
+      'server.js must NOT mount any static middleware on /storage (fails against previous server.js which mounted express.static on /storage)'
+    );
+
+    // 2. Real App HTTP Execution: Start ephemeral listener with real server.js app
+    const realHttpServer = realServerApp.listen(0);
+    const realPort = realHttpServer.address().port;
+    try {
+      const res = await fetch(`http://127.0.0.1:${realPort}/storage/buckets/dizigini-assets/public-samples/${testDraftSlug}/company-study/test.pdf`);
+      assert.equal(res.status, 404, 'Real server app must return 404 for /storage requests');
+      const json = await res.json();
+      assert.equal(json.success, false);
+      assert.match(json.message, /Route \/storage\/.* not found/i);
+    } finally {
+      await new Promise((resolve) => realHttpServer.close(resolve));
+    }
   });
 
   // --- HTTP-LEVEL PUBLIC ROUTE STATUS GUARDS (ALL 7 ROUTES) ---
