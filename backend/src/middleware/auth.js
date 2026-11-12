@@ -4,22 +4,39 @@ import {
   getEffectiveDashboardAccess,
 } from '../repositories/userRepository.js';
 
+export const isExplicitDevOrTest = () => {
+  const env = process.env.NODE_ENV;
+  return env === 'development' || env === 'test';
+};
+
 export const getPrimaryJwtSecret = () => {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('FATAL: JWT_SECRET environment variable is missing in production.');
+    if (!isExplicitDevOrTest()) {
+      throw new Error(
+        'FATAL: JWT_SECRET environment variable is missing and NODE_ENV is not explicitly "development" or "test". Refusing to use insecure default secrets.'
+      );
     }
     return 'dizigini_dev_jwt_secret_key_only';
   }
   return secret;
 };
 
-const getFallbackSecrets = (primarySecret) => {
-  if (process.env.NODE_ENV === 'production') {
+export const getFallbackSecrets = (primarySecret) => {
+  if (!isExplicitDevOrTest()) {
     return process.env.JWT_SECRET_PREVIOUS ? [process.env.JWT_SECRET_PREVIOUS] : [];
   }
   return ['dizigini_dev_jwt_secret_key_only'].filter((s) => s !== primarySecret);
+};
+
+export const enforceServerJwtConfig = () => {
+  try {
+    getPrimaryJwtSecret();
+    return true;
+  } catch (err) {
+    console.error(`[FATAL] ${err.message}`);
+    process.exit(1);
+  }
 };
 
 export const protect = async (req, res, next) => {

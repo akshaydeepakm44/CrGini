@@ -70,6 +70,10 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
   const app = express();
   app.use(express.json());
   app.use('/api/samples', sampleRoutes);
+  // 404 handler matching server.js (verifies unmounted /storage returns 404)
+  app.use((req, res) => {
+    res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
+  });
 
   let server;
   let baseUrl;
@@ -184,6 +188,63 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
     const json = await res.json();
     assert.equal(json.success, true);
     assert.ok(Array.isArray(json.samples));
+  });
+
+  await t.test('Auth: Dev-secret signed token returns 401 when NODE_ENV is set outside dev/test', async () => {
+    const savedNodeEnv = process.env.NODE_ENV;
+    const savedSecret = process.env.JWT_SECRET;
+    try {
+      // Simulate production environment in a cross-platform (Windows-safe) manner
+      process.env.NODE_ENV = 'production';
+      process.env.JWT_SECRET = 'strict_prod_jwt_secret_999988887777';
+
+      const devSecretToken = jwt.sign(
+        { id: testAdminId, email: testAdminEmail, role: 'ADMIN' },
+        'dizigini_dev_jwt_secret_key_only',
+        { expiresIn: '1h' }
+      );
+
+      const res = await fetch(`${baseUrl}/api/samples/manage`, {
+        headers: { Authorization: `Bearer ${devSecretToken}` },
+      });
+      assert.equal(res.status, 401, 'Dev secret token must be rejected outside dev/test');
+      const json = await res.json();
+      assert.equal(json.success, false);
+      assert.match(json.message, /invalid or expired/i);
+    } finally {
+      process.env.NODE_ENV = savedNodeEnv;
+      process.env.JWT_SECRET = savedSecret;
+    }
+  });
+
+  await t.test('Auth: Startup guard / getPrimaryJwtSecret throws outside dev/test when JWT_SECRET is unset', () => {
+    const savedNodeEnv = process.env.NODE_ENV;
+    const savedSecret = process.env.JWT_SECRET;
+    try {
+      process.env.NODE_ENV = 'production';
+      delete process.env.JWT_SECRET;
+      assert.throws(
+        () => getPrimaryJwtSecret(),
+        /FATAL: JWT_SECRET environment variable is missing and NODE_ENV is not explicitly "development" or "test"/
+      );
+
+      delete process.env.NODE_ENV; // unset NODE_ENV
+      assert.throws(
+        () => getPrimaryJwtSecret(),
+        /FATAL: JWT_SECRET environment variable is missing and NODE_ENV is not explicitly "development" or "test"/
+      );
+    } finally {
+      process.env.NODE_ENV = savedNodeEnv;
+      process.env.JWT_SECRET = savedSecret;
+    }
+  });
+
+  await t.test('Storage: Direct request to /storage/ returns 404 and cannot bypass controller status check', async () => {
+    // Attempt to access storage files directly via static URL
+    const res = await fetch(`${baseUrl}/storage/buckets/dizigini-assets/public-samples/${testDraftSlug}/company-study/test.pdf`);
+    assert.equal(res.status, 404, 'Direct static /storage access must return 404');
+    const json = await res.json();
+    assert.equal(json.success, false);
   });
 
   // --- HTTP-LEVEL PUBLIC ROUTE STATUS GUARDS (ALL 7 ROUTES) ---

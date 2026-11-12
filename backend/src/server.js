@@ -13,22 +13,19 @@ import assetRoutes from './routes/assetRoutes.js';
 import sampleRoutes from './routes/sampleRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import { apiLimiter, authLimiter, paymentLimiter } from './middleware/rateLimiter.js';
+import { enforceServerJwtConfig } from './middleware/auth.js';
 
 dotenv.config();
 
-// Enforce mandatory JWT_SECRET in production environment
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  console.error('[FATAL] JWT_SECRET environment variable is missing in production! Server cannot start securely.');
-  process.exit(1);
-}
+// Enforce mandatory JWT_SECRET: fails closed outside explicit "development" or "test"
+enforceServerJwtConfig();
 
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5001;
 
-// Direct static media fallbacks
+// Direct static media fallbacks: /storage is intentionally NOT served statically to prevent bypassing status checks
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
-app.use('/storage', express.static(path.resolve(process.cwd(), 'storage')));
 
 // Connect to PostgreSQL
 connectPostgres().then(async (ok) => {
