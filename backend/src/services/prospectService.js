@@ -227,6 +227,7 @@ export const createProspect = async (data = {}, { allowSlugIncrement = true } = 
     externalProspectId = null,
     createdByEmail = null,
     batchId = null,
+    outreachMailTemplate = {},
   } = sanitizedData;
 
   if (!companyName || !companyName.trim()) {
@@ -330,6 +331,7 @@ export const createProspect = async (data = {}, { allowSlugIncrement = true } = 
     externalProspectId,
     createdByEmail,
     batchId,
+    outreachMailTemplate,
   });
 
   invalidateShowcaseCache();

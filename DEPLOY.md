@@ -241,4 +241,3 @@ To rotate an API key without service interruption:
    # Must return 403 { success: false, error: 'CLIENT_REVOKED' }
    ```
 
-

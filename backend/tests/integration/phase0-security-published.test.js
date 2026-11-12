@@ -102,13 +102,14 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
   t.after(async () => {
     try {
       if (server) {
+        if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
         await new Promise((res) => server.close(res));
       }
       await query(`DELETE FROM public_sample_showcases WHERE id IN ($1, $2)`, [draftId, pubId]);
       await query(`DELETE FROM users WHERE id IN ($1, $2)`, [testUserId, testAdminId]);
       await getPool().end();
     } catch (_) {}
-    setTimeout(() => process.exit(0), 100);
+    setTimeout(() => process.exit(0), 50);
   });
 
   // --- REPOSITORY TESTS ---
@@ -290,6 +291,9 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
       assert.equal(json.success, false);
       assert.match(json.message, /Route \/storage\/.* not found/i);
     } finally {
+      if (typeof realHttpServer.closeAllConnections === 'function') {
+        realHttpServer.closeAllConnections();
+      }
       await new Promise((resolve) => realHttpServer.close(resolve));
     }
   });

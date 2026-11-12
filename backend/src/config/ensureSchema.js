@@ -416,7 +416,8 @@ export async function ensureIntegrationSchema() {
       ADD COLUMN IF NOT EXISTS external_prospect_id VARCHAR(255),
       ADD COLUMN IF NOT EXISTS batch_id UUID REFERENCES integration_batches(id) ON DELETE SET NULL,
       ADD COLUMN IF NOT EXISTS created_by_email VARCHAR(255),
-      ADD COLUMN IF NOT EXISTS outreach_mail_template JSONB DEFAULT '{}'::jsonb;
+      ADD COLUMN IF NOT EXISTS outreach_mail_template JSONB DEFAULT '{}'::jsonb,
+      ADD COLUMN IF NOT EXISTS view_count INT DEFAULT 0;
     `);
 
     // 7. Partial UNIQUE index for deduplication across external campaign + prospect

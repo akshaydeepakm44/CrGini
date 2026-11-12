@@ -8,7 +8,7 @@ import rateLimit from 'express-rate-limit';
 export const regularIntegrationLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: () => {
-    if (process.env.TEST_INTEGRATION_REGULAR_LIMIT) {
+    if (process.env.NODE_ENV === 'test' && process.env.TEST_INTEGRATION_REGULAR_LIMIT) {
       return parseInt(process.env.TEST_INTEGRATION_REGULAR_LIMIT, 10);
     }
     return 60;
@@ -17,7 +17,7 @@ export const regularIntegrationLimiter = rateLimit({
     if (req.apiClient && req.apiClient.clientId) {
       return `client:${req.apiClient.clientId}`;
     }
-    return req.ip || req.connection?.remoteAddress || 'unknown';
+    return req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown';
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -35,7 +35,7 @@ export const regularIntegrationLimiter = rateLimit({
 export const assetUploadLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: () => {
-    if (process.env.TEST_INTEGRATION_ASSET_LIMIT) {
+    if (process.env.NODE_ENV === 'test' && process.env.TEST_INTEGRATION_ASSET_LIMIT) {
       return parseInt(process.env.TEST_INTEGRATION_ASSET_LIMIT, 10);
     }
     return 10;
@@ -44,7 +44,7 @@ export const assetUploadLimiter = rateLimit({
     if (req.apiClient && req.apiClient.clientId) {
       return `client:asset:${req.apiClient.clientId}`;
     }
-    return req.ip || req.connection?.remoteAddress || 'unknown';
+    return req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown';
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -62,7 +62,7 @@ export const assetUploadLimiter = rateLimit({
 export const failedAuthLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: () => {
-    if (process.env.TEST_INTEGRATION_AUTH_LIMIT) {
+    if (process.env.NODE_ENV === 'test' && process.env.TEST_INTEGRATION_AUTH_LIMIT) {
       return parseInt(process.env.TEST_INTEGRATION_AUTH_LIMIT, 10);
     }
     return 10;
@@ -71,7 +71,7 @@ export const failedAuthLimiter = rateLimit({
   // Only authentication failures (HTTP 401) count towards the brute-force limit
   requestWasSuccessful: (req, res) => res.statusCode !== 401,
   keyGenerator: (req) => {
-    return req.headers['x-test-ip'] || req.ip || req.connection?.remoteAddress || 'unknown';
+    return req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown';
   },
   standardHeaders: true,
   legacyHeaders: false,

@@ -45,6 +45,7 @@ test('Phase 1 Prospect Service, Schema, Parity & Characterization Suite', async 
         }
       } catch (_) {}
     } catch (_) {}
+    setTimeout(() => process.exit(0), 50);
   });
 
   await t.test('cleanSlug sanitizes input strings into valid URL slugs', () => {

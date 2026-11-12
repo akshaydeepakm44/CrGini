@@ -10,7 +10,11 @@ import { connectPostgres, getPool, query } from '../../src/config/postgres.js';
 import { ensureIntegrationSchema } from '../../src/config/ensureSchema.js';
 import { issueApiKey } from '../../scripts/issue-api-key.js';
 import { revokeApiKey } from '../../scripts/revoke-api-key.js';
-import { runAssetCleanup, stopAssetCleanupJob } from '../../src/services/assetCleanupService.js';
+import {
+  runAssetCleanup,
+  stopAssetCleanupJob,
+  ASSET_CLEANUP_ADVISORY_LOCK_KEY,
+} from '../../src/services/assetCleanupService.js';
 import { getBucketName } from '../../src/services/storageService.js';
 
 // Dynamically import real server app
@@ -62,11 +66,14 @@ test('Phase 2A API Client Auth & Asset Upload Suite', async (t) => {
       }
     }
 
-    // Close HTTP server and DB pool
+    // Close HTTP server
     stopAssetCleanupJob();
-    await new Promise((resolve) => server.close(resolve));
+    if (server) {
+      if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
     await getPool().end();
-    setTimeout(() => process.exit(0), 100);
+    setTimeout(() => process.exit(0), 50);
   });
 
   // ---------------------------------------------------------------------------
@@ -205,11 +212,12 @@ test('Phase 2A API Client Auth & Asset Upload Suite', async (t) => {
     const savedAuthLimit = process.env.TEST_INTEGRATION_AUTH_LIMIT;
     try {
       process.env.TEST_INTEGRATION_AUTH_LIMIT = '3';
+      const clientIp = '198.51.100.99';
       for (let i = 0; i < 3; i++) {
         const resFail = await fetch(`${baseUrl}/api/integration/v1/health`, {
           headers: {
             'X-API-Key': `dzg_live_badkey_${i}`,
-            'X-Test-IP': '10.0.0.99',
+            'X-Forwarded-For': clientIp,
           },
         });
         assert.equal(resFail.status, 401);
@@ -217,7 +225,7 @@ test('Phase 2A API Client Auth & Asset Upload Suite', async (t) => {
       const resRateLimited = await fetch(`${baseUrl}/api/integration/v1/health`, {
         headers: {
           'X-API-Key': 'dzg_live_badkey_overflow',
-          'X-Test-IP': '10.0.0.99',
+          'X-Forwarded-For': clientIp,
         },
       });
       assert.equal(resRateLimited.status, 429, 'Failed authentication attempts exceeding limit must return 429');
@@ -685,11 +693,14 @@ test('Phase 2A API Client Auth & Asset Upload Suite', async (t) => {
       fs.promises.unlink(unexpiredStagedFile).catch(() => {});
       fs.promises.unlink(expiredClaimedFile).catch(() => {});
 
-      // 4. Advisory Lock Contention Test
+      // 4. Advisory Lock Contention & Release Test with dedicated pool client
       const pool = getPool();
       const lockClient = await pool.connect();
       try {
-        await lockClient.query('SELECT pg_try_advisory_lock(982347101)');
+        const lockAcquired = await lockClient.query('SELECT pg_try_advisory_lock($1) AS acquired', [
+          ASSET_CLEANUP_ADVISORY_LOCK_KEY,
+        ]);
+        assert.equal(lockAcquired.rows[0].acquired, true, 'First dedicated client must acquire the lock');
 
         // Second pass while lock is held by separate client must fail to acquire and skip
         const contentionResult = await runAssetCleanup();
@@ -699,8 +710,22 @@ test('Phase 2A API Client Auth & Asset Upload Suite', async (t) => {
           'Cleanup must honor advisory lock and skip when held by another instance'
         );
         assert.equal(contentionResult.cleanedCount, 0);
+
+        // Release the lock on the first client
+        const unlockRes = await lockClient.query('SELECT pg_advisory_unlock($1) AS released', [
+          ASSET_CLEANUP_ADVISORY_LOCK_KEY,
+        ]);
+        assert.equal(unlockRes.rows[0].released, true, 'First client must release the advisory lock');
+
+        // Third pass after unlock must acquire the lock successfully
+        const postUnlockResult = await runAssetCleanup();
+        assert.equal(
+          postUnlockResult.acquired,
+          true,
+          'Cleanup must acquire the advisory lock once previous owner releases it'
+        );
       } finally {
-        await lockClient.query('SELECT pg_advisory_unlock(982347101)').catch(() => {});
+        await lockClient.query('SELECT pg_advisory_unlock($1)', [ASSET_CLEANUP_ADVISORY_LOCK_KEY]).catch(() => {});
         lockClient.release();
       }
     }
@@ -740,4 +765,28 @@ test('Phase 2A API Client Auth & Asset Upload Suite', async (t) => {
       restoreEnv('TEST_INTEGRATION_REGULAR_LIMIT', savedLimit);
     }
   });
+
+  // ---------------------------------------------------------------------------
+  // 13. >2MB JSON body rejected with 413 before auth
+  // ---------------------------------------------------------------------------
+  await t.test(
+    '13. Server Body Limits: >2MB JSON body to /api/integration is rejected with 413 before auth',
+    async () => {
+      // 2.5MB payload string
+      const largePayload = JSON.stringify({
+        data: 'x'.repeat(2.5 * 1024 * 1024),
+      });
+
+      // Send request without any API key or auth headers
+      const res = await fetch(`${baseUrl}/api/integration/v1/prospects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: largePayload,
+      });
+
+      assert.equal(res.status, 413, 'Unauthenticated request with >2MB JSON body must return 413');
+      const json = await res.json();
+      assert.equal(json.error, 'PAYLOAD_TOO_LARGE');
+    }
+  );
 });

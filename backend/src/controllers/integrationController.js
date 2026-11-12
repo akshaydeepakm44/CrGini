@@ -1,20 +1,20 @@
 import busboy from 'busboy';
 import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
 import { query } from '../config/postgres.js';
-import { getBucketName } from '../services/storageService.js';
+import { putStorageObject, deleteFile } from '../services/storageService.js';
 
 const MAX_ASSET_SIZE = 25 * 1024 * 1024; // 25MB
 const DEFAULT_STAGED_BYTES_QUOTA = 500 * 1024 * 1024; // 500MB
 const getMaxAssetSize = () =>
-  process.env.TEST_MAX_ASSET_SIZE
+  process.env.NODE_ENV === 'test' && process.env.TEST_MAX_ASSET_SIZE
     ? parseInt(process.env.TEST_MAX_ASSET_SIZE, 10)
     : MAX_ASSET_SIZE;
 const getMaxStagedQuota = () =>
-  process.env.CLIENT_STAGED_BYTES_QUOTA
-    ? parseInt(process.env.CLIENT_STAGED_BYTES_QUOTA, 10)
-    : DEFAULT_STAGED_BYTES_QUOTA;
+  process.env.NODE_ENV === 'test' && process.env.TEST_CLIENT_STAGED_BYTES_QUOTA
+    ? parseInt(process.env.TEST_CLIENT_STAGED_BYTES_QUOTA, 10)
+    : (process.env.CLIENT_STAGED_BYTES_QUOTA
+        ? parseInt(process.env.CLIENT_STAGED_BYTES_QUOTA, 10)
+        : DEFAULT_STAGED_BYTES_QUOTA);
 
 /**
  * GET /api/integration/v1/health
@@ -227,44 +227,19 @@ export async function uploadIntegrationAsset(req, res) {
   }
 
   const uuid = crypto.randomUUID();
-  const bucket = getBucketName();
-  const targetDir = path.resolve(
-    process.cwd(),
-    'storage',
-    'buckets',
-    bucket,
-    'temp',
-    clientId
-  );
-  const targetPath = path.join(targetDir, `${uuid}.pdf`);
-  const metaPath = `${targetPath}.meta.json`;
+  const objectKey = `temp/${clientId}/${uuid}.pdf`;
 
   let fileEncountered = false;
   let fileError = null; // { status, error, message }
   let bytesReceived = 0;
-  let writeStream = null;
   let hasher = crypto.createHash('sha256');
   let firstChunkInspected = false;
   let responseSent = false;
-
-  const safeCleanup = async () => {
-    try {
-      if (writeStream && !writeStream.destroyed) {
-        writeStream.destroy();
-      }
-      if (fs.existsSync(targetPath)) {
-        await fs.promises.unlink(targetPath).catch(() => {});
-      }
-      if (fs.existsSync(metaPath)) {
-        await fs.promises.unlink(metaPath).catch(() => {});
-      }
-    } catch (_) {}
-  };
+  const chunks = [];
 
   const sendErrorOnce = async (status, error, message) => {
     if (responseSent) return;
     responseSent = true;
-    await safeCleanup();
     return res.status(status).json({
       success: false,
       error,
@@ -294,19 +269,6 @@ export async function uploadIntegrationAsset(req, res) {
     }
 
     fileEncountered = true;
-
-    try {
-      fs.mkdirSync(targetDir, { recursive: true });
-      writeStream = fs.createWriteStream(targetPath);
-    } catch (fsErr) {
-      fileStream.resume();
-      fileError = {
-        status: 500,
-        error: 'STORAGE_INIT_ERROR',
-        message: fsErr.message,
-      };
-      return;
-    }
 
     fileStream.on('data', (chunk) => {
       if (fileError) return;
@@ -351,7 +313,7 @@ export async function uploadIntegrationAsset(req, res) {
       }
 
       hasher.update(chunk);
-      writeStream.write(chunk);
+      chunks.push(chunk);
     });
 
     fileStream.on('limit', () => {
@@ -360,7 +322,6 @@ export async function uploadIntegrationAsset(req, res) {
         error: 'FILE_TOO_LARGE',
         message: 'File size exceeds maximum allowed limit of 25MB.',
       };
-      if (writeStream) writeStream.destroy();
     });
 
     fileStream.on('error', (err) => {
@@ -372,16 +333,10 @@ export async function uploadIntegrationAsset(req, res) {
         };
       }
     });
-
-    fileStream.on('end', () => {
-      if (writeStream && !writeStream.destroyed) {
-        writeStream.end();
-      }
-    });
   });
 
   req.on('aborted', async () => {
-    await safeCleanup();
+    // If request aborted, nothing was persisted
   });
 
   bb.on('error', async (err) => {
@@ -411,26 +366,18 @@ export async function uploadIntegrationAsset(req, res) {
       );
     }
 
-    // Wait for writeStream to finish flushing to disk
-    if (writeStream && !writeStream.writableEnded) {
-      await new Promise((resolve) => writeStream.on('finish', resolve));
-    }
+    const fileBuffer = Buffer.concat(chunks);
+    const assetKey = `dzg_ast_${uuid}`;
+    const sha256Hex = hasher.digest('hex');
 
     try {
-      // Persist metadata sidecar
-      const metaPayload = {
-        size: bytesReceived,
-        metaData: {
-          'content-type': 'application/pdf',
-          'client-id': clientId,
-        },
-        lastModified: new Date().toISOString(),
-      };
-      await fs.promises.writeFile(metaPath, JSON.stringify(metaPayload, null, 2), 'utf-8');
+      // 1. Store file via unified storage abstraction
+      await putStorageObject(objectKey, fileBuffer, bytesReceived, {
+        'content-type': 'application/pdf',
+        'client-id': clientId,
+      });
 
-      const assetKey = `dzg_ast_${uuid}`;
-      const sha256Hex = hasher.digest('hex');
-
+      // 2. Insert row into PostgreSQL
       const dbRes = await query(
         `INSERT INTO integration_assets (
           asset_key,
@@ -455,12 +402,12 @@ export async function uploadIntegrationAsset(req, res) {
         size: Number(assetRow.size),
         expiresAt: assetRow.expires_at,
       });
-    } catch (dbErr) {
-      await safeCleanup();
+    } catch (err) {
+      await deleteFile(objectKey).catch(() => {});
       return sendErrorOnce(
         500,
-        'DATABASE_ERROR',
-        `Failed to register staged asset: ${dbErr.message}`
+        'STORAGE_ERROR',
+        `Failed to store staged asset: ${err.message}`
       );
     }
   });

@@ -18,6 +18,13 @@ import {
   streamLeadLogo,
 } from '../controllers/sampleController.js';
 import { protect, authorize } from '../middleware/auth.js';
+import {
+  getAdminIntegrationNotifications,
+  markAdminNotificationRead,
+  getAdminIntegrationBatches,
+  getAdminIntegrationBatchDetail,
+  getAdminShowcasePreview,
+} from '../controllers/adminIntegrationController.js';
 
 const router = express.Router();
 
@@ -46,6 +53,14 @@ manageRouter.use(sampleManagementAuth);
 
 manageRouter.get('/', getAdminSamples);
 manageRouter.post('/', createAdminSample);
+
+// Integration management routes (must be mounted before /:id)
+manageRouter.get('/integration/notifications', getAdminIntegrationNotifications);
+manageRouter.patch('/integration/notifications/:id/read', markAdminNotificationRead);
+manageRouter.get('/integration/batches', getAdminIntegrationBatches);
+manageRouter.get('/integration/batches/:batchId', getAdminIntegrationBatchDetail);
+manageRouter.get('/preview/:slug', getAdminShowcasePreview);
+
 manageRouter.get('/:id', getAdminSampleById);
 manageRouter.put('/:id', updateAdminSample);
 manageRouter.delete('/:id', deleteAdminSample);

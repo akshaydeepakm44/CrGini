@@ -1,58 +1,67 @@
-import { query } from '../config/postgres.js';
+import { getPool } from '../config/postgres.js';
 import { deleteFile } from './storageService.js';
 
 // Dedicated 32-bit signed integer key for PostgreSQL advisory lock
-const ADVISORY_LOCK_KEY = 982347101;
+export const ASSET_CLEANUP_ADVISORY_LOCK_KEY = 982347101;
+const ADVISORY_LOCK_KEY = ASSET_CLEANUP_ADVISORY_LOCK_KEY;
 
 let cleanupTimer = null;
 
 /**
- * Execute a single asset cleanup pass using PostgreSQL advisory lock.
+ * Execute a single asset cleanup pass using a dedicated PostgreSQL connection and advisory lock.
  *
- * Safe for multi-instance deployments: only the instance holding the advisory lock
- * will perform file deletion and row cleanup.
+ * Safe for multi-instance deployments: the session-level advisory lock is bound strictly
+ * to the dedicated pool connection. Only the instance holding this lock will perform file
+ * deletion and row cleanup. Concurrent runners will skip immediately.
  *
  * @returns {Promise<{ acquired: boolean, cleanedCount: number }>}
  */
 export async function runAssetCleanup() {
-  // Attempt to acquire advisory lock non-blockingly
-  const lockRes = await query('SELECT pg_try_advisory_lock($1) AS acquired', [ADVISORY_LOCK_KEY]);
-  const acquired = Boolean(lockRes.rows[0]?.acquired);
-
-  if (!acquired) {
-    return { acquired: false, cleanedCount: 0 };
-  }
+  const pool = getPool();
+  const client = await pool.connect();
 
   try {
-    // Find all expired STAGED assets. Excludes CLAIMED assets regardless of expiration!
-    const expiredRes = await query(
-      `SELECT id, asset_key, client_id
-       FROM integration_assets
-       WHERE status = 'STAGED' AND expires_at < NOW()`
-    );
+    // Attempt to acquire session-level advisory lock non-blockingly on this dedicated connection
+    const lockRes = await client.query('SELECT pg_try_advisory_lock($1) AS acquired', [ADVISORY_LOCK_KEY]);
+    const acquired = Boolean(lockRes.rows[0]?.acquired);
 
-    let cleanedCount = 0;
+    if (!acquired) {
+      return { acquired: false, cleanedCount: 0 };
+    }
 
-    for (const row of expiredRes.rows) {
-      try {
-        const uuid = row.asset_key.replace(/^dzg_ast_/, '');
-        const objectKey = `temp/${row.client_id}/${uuid}.pdf`;
-        await deleteFile(objectKey);
-      } catch (fileErr) {
-        console.warn(`[AssetCleanup] Failed to delete file for asset ${row.asset_key}:`, fileErr.message);
+    try {
+      // Find all expired STAGED assets. Excludes CLAIMED assets regardless of expiration!
+      const expiredRes = await client.query(
+        `SELECT id, asset_key, client_id
+         FROM integration_assets
+         WHERE status = 'STAGED' AND expires_at < NOW()`
+      );
+
+      let cleanedCount = 0;
+
+      for (const row of expiredRes.rows) {
+        try {
+          const uuid = row.asset_key.replace(/^dzg_ast_/, '');
+          const objectKey = `temp/${row.client_id}/${uuid}.pdf`;
+          await deleteFile(objectKey);
+        } catch (fileErr) {
+          console.warn(`[AssetCleanup] Failed to delete file for asset ${row.asset_key}:`, fileErr.message);
+        }
+
+        await client.query('DELETE FROM integration_assets WHERE id = $1', [row.id]);
+        cleanedCount++;
       }
 
-      await query('DELETE FROM integration_assets WHERE id = $1', [row.id]);
-      cleanedCount++;
+      return { acquired: true, cleanedCount };
+    } finally {
+      try {
+        await client.query('SELECT pg_advisory_unlock($1)', [ADVISORY_LOCK_KEY]);
+      } catch (unlockErr) {
+        console.warn('[AssetCleanup] Failed to release advisory lock:', unlockErr.message);
+      }
     }
-
-    return { acquired: true, cleanedCount };
   } finally {
-    try {
-      await query('SELECT pg_advisory_unlock($1)', [ADVISORY_LOCK_KEY]);
-    } catch (unlockErr) {
-      console.warn('[AssetCleanup] Failed to release advisory lock:', unlockErr.message);
-    }
+    client.release();
   }
 }
 

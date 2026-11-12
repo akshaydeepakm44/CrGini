@@ -91,6 +91,15 @@ app.use(cors({
   credentials: true
 }));
 
+// Strict 2MB JSON body limit for Integration API, evaluated before global 150MB parser
+app.use('/api/integration', (req, res, next) => {
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('application/json')) {
+    return express.json({ limit: '2mb' })(req, res, next);
+  }
+  next();
+});
+
 app.use(express.json({ limit: '150mb' }));
 app.use(express.urlencoded({ extended: true, limit: '150mb' }));
 
@@ -99,7 +108,8 @@ app.use((err, req, res, next) => {
   if (err && (err.type === 'entity.too.large' || err.status === 413)) {
     return res.status(413).json({
       success: false,
-      message: 'Upload payload is too large. Please reduce the combined upload size and try again.'
+      error: 'PAYLOAD_TOO_LARGE',
+      message: 'Upload payload is too large. Please reduce the payload size and try again.'
     });
   }
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {

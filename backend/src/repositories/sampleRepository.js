@@ -67,6 +67,12 @@ const mapSampleRow = (row) => {
     leads: row.leads || [],
     leadStudies: row.lead_studies || [],
     pitchDeck: row.pitch_deck || {},
+    sourcePlatform: row.source_platform || 'MANUAL',
+    externalCampaignId: row.external_campaign_id || null,
+    externalProspectId: row.external_prospect_id || null,
+    createdByEmail: row.created_by_email || null,
+    batchId: row.batch_id || null,
+    outreachMailTemplate: row.outreach_mail_template || {},
     publishedAt: row.published_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -76,6 +82,9 @@ const mapSampleRow = (row) => {
 export const findSampleBySlug = async (slug, onlyPublished = true) => {
   await ensureSampleTable();
   if (!slug) return null;
+  const shouldFilterPublished = typeof onlyPublished === 'object' && onlyPublished !== null
+    ? onlyPublished.onlyPublished !== false
+    : Boolean(onlyPublished);
   const rawSlug = String(slug).toLowerCase().trim();
 
   // If generic keywords requested, return the flagship published showcase
@@ -93,7 +102,7 @@ export const findSampleBySlug = async (slug, onlyPublished = true) => {
   // 1. Exact match on slug
   const exactRes = await query(`
     SELECT * FROM public_sample_showcases
-    WHERE slug = $1 ${onlyPublished ? "AND status = 'PUBLISHED'" : ""}
+    WHERE slug = $1 ${shouldFilterPublished ? "AND status = 'PUBLISHED'" : ""}
     LIMIT 1
   `, [rawSlug]);
   if (exactRes.rows[0]) return mapSampleRow(exactRes.rows[0]);
@@ -102,7 +111,7 @@ export const findSampleBySlug = async (slug, onlyPublished = true) => {
   if (/^\d+$/.test(rawSlug)) {
     const idRes = await query(`
       SELECT * FROM public_sample_showcases
-      WHERE id = $1 ${onlyPublished ? "AND status = 'PUBLISHED'" : ""}
+      WHERE id = $1 ${shouldFilterPublished ? "AND status = 'PUBLISHED'" : ""}
       LIMIT 1
     `, [parseInt(rawSlug, 10)]);
     if (idRes.rows[0]) return mapSampleRow(idRes.rows[0]);
@@ -114,7 +123,7 @@ export const findSampleBySlug = async (slug, onlyPublished = true) => {
     const unhyphenRes = await query(`
       SELECT * FROM public_sample_showcases
       WHERE REPLACE(REPLACE(slug, '-', ''), '_', '') = $1
-      ${onlyPublished ? "AND status = 'PUBLISHED'" : ""}
+      ${shouldFilterPublished ? "AND status = 'PUBLISHED'" : ""}
       LIMIT 1
     `, [unhyphenated]);
     if (unhyphenRes.rows[0]) return mapSampleRow(unhyphenRes.rows[0]);
@@ -129,7 +138,7 @@ export const findSampleBySlug = async (slug, onlyPublished = true) => {
       LOWER(company_name) = $1 OR
       LOWER(company_name) LIKE '%' || $1 || '%'
     )
-    ${onlyPublished ? "AND status = 'PUBLISHED'" : ""}
+    ${shouldFilterPublished ? "AND status = 'PUBLISHED'" : ""}
     ORDER BY CASE WHEN slug LIKE $1 || '-%' THEN 0 ELSE 1 END, id ASC
     LIMIT 1
   `, [rawSlug]);
@@ -216,6 +225,7 @@ export const createSampleShowcase = async ({
   createdByEmail = null,
   batchId = null,
   isDemo = false,
+  outreachMailTemplate = {},
   id = null,
 }) => {
   await ensureSampleTable();
@@ -241,6 +251,7 @@ export const createSampleShowcase = async ({
       'created_by_email',
       'batch_id',
       'is_demo',
+      'outreach_mail_template',
       'published_at',
     ].filter(Boolean);
 
@@ -263,6 +274,7 @@ export const createSampleShowcase = async ({
       createdByEmail,
       batchId,
       isDemo,
+      JSON.stringify(outreachMailTemplate || {}),
     ].filter((_, idx) => hasExplicitId || idx > 0);
 
     const placeholders = values.map((_, i) => '$' + (i + 1)).join(', ');

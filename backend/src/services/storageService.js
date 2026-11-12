@@ -164,6 +164,30 @@ class LocalDiskStorageDriver {
     };
   }
 
+  async copyObject(bucket, targetObjectKey, sourceObjectKey) {
+    const cleanSourceKey = String(sourceObjectKey)
+      .replace(new RegExp(`^\\/?${bucket}\\/`), '')
+      .replace(/^\/+/, '');
+    const { targetPath: srcPath } = this._resolveSafePath(bucket, cleanSourceKey);
+    const { targetPath: dstPath } = this._resolveSafePath(bucket, targetObjectKey);
+    const dstDir = path.dirname(dstPath);
+    if (!fs.existsSync(dstDir)) {
+      await fs.promises.mkdir(dstDir, { recursive: true });
+    }
+    if (!fs.existsSync(srcPath)) {
+      const err = new Error(`Source object ${cleanSourceKey} not found in bucket ${bucket}`);
+      err.code = 'NotFound';
+      throw err;
+    }
+    await fs.promises.copyFile(srcPath, dstPath);
+    const srcMeta = `${srcPath}.meta.json`;
+    const dstMeta = `${dstPath}.meta.json`;
+    if (fs.existsSync(srcMeta)) {
+      await fs.promises.copyFile(srcMeta, dstMeta);
+    }
+    return { etag: crypto.createHash('md5').update(targetObjectKey).digest('hex') };
+  }
+
   async removeObject(bucket, objectKey) {
     const { targetPath } = this._resolveSafePath(bucket, objectKey);
     if (fs.existsSync(targetPath)) {
@@ -663,6 +687,58 @@ export const deleteFile = async (objectKey, bucket = getBucketName()) => {
     // If the object is already gone, treat as successful deletion
     if (err.code === 'NotFound' || err.message?.includes('NoSuchKey')) {
       return;
+    }
+    throw err;
+  }
+};
+
+/**
+ * Copy an object from source key to target key within Object Storage.
+ */
+export const copyStorageObject = async (sourceObjectKey, targetObjectKey, bucket = getBucketName()) => {
+  let client = getMinioClient();
+  if (!client) {
+    throw new Error('Storage client is not available.');
+  }
+
+  const cleanSourceKey = String(sourceObjectKey).replace(/^\/+/, '');
+  const cleanTargetKey = String(targetObjectKey).replace(/^\/+/, '');
+  const copySource = `/${bucket}/${cleanSourceKey}`;
+
+  try {
+    return await client.copyObject(bucket, cleanTargetKey, copySource);
+  } catch (err) {
+    if (client instanceof Minio.Client && isConnectionError(err)) {
+      console.warn('[StorageService] MinIO network call failed in copyObject, falling back to LocalDiskBucket:', err.message);
+      isMinioReachable = false;
+      minioClient = null;
+      client = getMinioClient();
+      return await client.copyObject(bucket, cleanTargetKey, copySource);
+    }
+    throw err;
+  }
+};
+
+/**
+ * Put an object (Buffer or Stream) into Object Storage.
+ */
+export const putStorageObject = async (objectKey, streamOrBuffer, size, metaData = {}, bucket = getBucketName()) => {
+  let client = getMinioClient();
+  if (!client) {
+    throw new Error('Storage client is not available.');
+  }
+
+  const cleanObjectKey = String(objectKey).replace(/^\/+/, '');
+
+  try {
+    return await client.putObject(bucket, cleanObjectKey, streamOrBuffer, size, metaData);
+  } catch (err) {
+    if (client instanceof Minio.Client && isConnectionError(err)) {
+      console.warn('[StorageService] MinIO network call failed in putObject, falling back to LocalDiskBucket:', err.message);
+      isMinioReachable = false;
+      minioClient = null;
+      client = getMinioClient();
+      return await client.putObject(bucket, cleanObjectKey, streamOrBuffer, size, metaData);
     }
     throw err;
   }
