@@ -122,9 +122,9 @@ export const getPublicSampleBySlug = async (req, res) => {
       const available = await query(`
         SELECT slug, title, company_name, logo_url
         FROM public_sample_showcases
-        WHERE status = 'PUBLISHED'
+        WHERE status = 'PUBLISHED' AND is_demo = true
         ORDER BY CASE WHEN slug = 'data-i2i' THEN 0 WHEN slug = 'siift-ai' THEN 1 ELSE 2 END, id ASC
-        LIMIT 6
+        LIMIT 2
       `).catch(() => ({ rows: [] }));
 
       return res.status(404).json({

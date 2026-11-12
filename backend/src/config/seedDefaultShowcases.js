@@ -310,16 +310,17 @@ export async function seedDefaultShowcases() {
       if (existing.rows.length === 0) {
         await query(`
           INSERT INTO public_sample_showcases (
-            slug, title, company_name, description, logo_url, status,
+            slug, title, company_name, description, logo_url, status, is_demo,
             company_study, leads, lead_studies, pitch_deck, published_at
           )
-          VALUES ($1, $2, $3, $4, $5, 'PUBLISHED', $6, $7, $8, $9, NOW())
+          VALUES ($1, $2, $3, $4, $5, 'PUBLISHED', true, $6, $7, $8, $9, NOW())
           ON CONFLICT (slug) DO UPDATE
           SET
             title = EXCLUDED.title,
             company_name = EXCLUDED.company_name,
             description = EXCLUDED.description,
             status = 'PUBLISHED',
+            is_demo = true,
             company_study = EXCLUDED.company_study,
             leads = EXCLUDED.leads,
             lead_studies = EXCLUDED.lead_studies,
@@ -336,9 +337,9 @@ export async function seedDefaultShowcases() {
           JSON.stringify(sc.pitch_deck || {})
         ]);
         console.log('[Showcase Seeder] Seeded default showcase: ' + sc.company_name + ' (' + sc.slug + ')');
-      } else if (existing.rows[0].status !== 'PUBLISHED') {
-        await query("UPDATE public_sample_showcases SET status = 'PUBLISHED' WHERE slug = $1", [sc.slug]);
-        console.log('[Showcase Seeder] Published showcase: ' + sc.slug);
+      } else {
+        await query("UPDATE public_sample_showcases SET status = 'PUBLISHED', is_demo = true WHERE slug = $1", [sc.slug]);
+        console.log('[Showcase Seeder] Verified demo showcase: ' + sc.slug);
       }
     }
 

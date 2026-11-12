@@ -27,8 +27,11 @@ export async function ensureSampleTable() {
           );
 
           ALTER TABLE public_sample_showcases ADD COLUMN IF NOT EXISTS logo_asset_key TEXT;
+          ALTER TABLE public_sample_showcases ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT false;
           CREATE INDEX IF NOT EXISTS idx_public_samples_slug ON public_sample_showcases (slug);
           CREATE INDEX IF NOT EXISTS idx_public_samples_status ON public_sample_showcases (status);
+          CREATE INDEX IF NOT EXISTS idx_public_samples_demo ON public_sample_showcases (is_demo) WHERE is_demo = true;
+          UPDATE public_sample_showcases SET is_demo = true WHERE slug IN ('data-i2i', 'siift-ai');
         `);
         tableEnsured = true;
 

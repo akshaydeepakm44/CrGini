@@ -16,6 +16,12 @@ import { apiLimiter, authLimiter, paymentLimiter } from './middleware/rateLimite
 
 dotenv.config();
 
+// Enforce mandatory JWT_SECRET in production environment
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.error('[FATAL] JWT_SECRET environment variable is missing in production! Server cannot start securely.');
+  process.exit(1);
+}
+
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5001;

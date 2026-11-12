@@ -26,11 +26,12 @@ import {
   markMagicTokenAsUsed,
 } from '../repositories/magicTokenRepository.js';
 import { sendPasswordResetEmail, sendMagicLinkEmail } from '../services/emailService.js';
+import { getPrimaryJwtSecret } from '../middleware/auth.js';
 
 const generateToken = (id) => {
   return jwt.sign(
     { id },
-    process.env.JWT_SECRET || 'dizigini_secure_jwt_secret_key_2026',
+    getPrimaryJwtSecret(),
     {
       expiresIn: '30d',
     }

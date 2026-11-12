@@ -25,42 +25,19 @@ const router = express.Router();
 // MANAGEMENT ENDPOINTS (Lead Specialist & Admin only)
 // Must be defined before parameterized /:slug routes
 // =========================================================================
-// Resilient authentication middleware for sample management
+// Strict authentication middleware for sample management: protect() is the only authenticator
 const sampleManagementAuth = (req, res, next) => {
-  protect(req, res, (err) => {
-    if (!err && req.user) {
-      if (['COMPANY_LEAD', 'ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
-        return next();
-      }
-      return res.status(403).json({
-        success: false,
-        message: `Forbidden: Role '${req.user.role}' does not have permission to manage sample showcases.`,
-      });
-    }
-    (async () => {
-      try {
-        const { findUserById } = await import('../repositories/userRepository.js');
-        const token = req.headers.authorization?.split(' ')[1] || req.query?.token || req.body?._token;
-        if (token) {
-          const jwt = (await import('jsonwebtoken')).default;
-          const decoded = jwt.decode(token);
-          if (decoded?.id) {
-            const u = await findUserById(decoded.id);
-            if (u) {
-              if (['COMPANY_LEAD', 'ADMIN', 'SUPER_ADMIN'].includes(u.role)) {
-                req.user = u;
-                return next();
-              }
-              return res.status(403).json({
-                success: false,
-                message: `Forbidden: Role '${u.role}' does not have permission to manage sample showcases.`,
-              });
-            }
-          }
-        }
-      } catch (_) {}
+  protect(req, res, () => {
+    if (!req.user) {
       return res.status(401).json({ success: false, message: 'Authentication required' });
-    })();
+    }
+    if (['COMPANY_LEAD', 'ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
+      return next();
+    }
+    return res.status(403).json({
+      success: false,
+      message: `Forbidden: Role '${req.user.role}' does not have permission to manage sample showcases.`,
+    });
   });
 };
 

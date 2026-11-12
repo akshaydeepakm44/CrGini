@@ -1231,53 +1231,39 @@ export const api = {
 
   // Prospect Sample Showcase Management (Lead Specialists & Admin)
   async getAdminSamples() {
-    const token = getStoredToken();
-    const url = `${API_BASE}/samples/manage${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-    const res = await fetch(url, {
+    const res = await fetch(`${API_BASE}/samples/manage`, {
       headers: getHeaders(true)
     });
     return parseApiResponse(res, 'Failed to load sample showcases');
   },
 
   async getAdminSampleById(id) {
-    const token = getStoredToken();
-    const url = `${API_BASE}/samples/manage/${encodeURIComponent(id)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-    const res = await fetch(url, {
+    const res = await fetch(`${API_BASE}/samples/manage/${encodeURIComponent(id)}`, {
       headers: getHeaders(true)
     });
     return parseApiResponse(res, 'Failed to load sample showcase');
   },
 
   async createAdminSample(sampleData) {
-    const token = getStoredToken();
-    const payload = { ...sampleData };
-    if (token) payload._token = token;
-    const url = `${API_BASE}/samples/manage${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-    const res = await fetch(url, {
+    const res = await fetch(`${API_BASE}/samples/manage`, {
       method: 'POST',
       headers: getHeaders(true),
-      body: JSON.stringify(payload)
+      body: JSON.stringify(sampleData)
     });
     return parseApiResponse(res, 'Failed to create sample showcase');
   },
 
   async updateAdminSample(id, sampleData) {
-    const token = getStoredToken();
-    const payload = { ...sampleData };
-    if (token) payload._token = token;
-    const url = `${API_BASE}/samples/manage/${encodeURIComponent(id)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-    const res = await fetch(url, {
+    const res = await fetch(`${API_BASE}/samples/manage/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: getHeaders(true),
-      body: JSON.stringify(payload)
+      body: JSON.stringify(sampleData)
     });
     return parseApiResponse(res, 'Failed to update sample showcase');
   },
 
   async deleteAdminSample(id) {
-    const token = getStoredToken();
-    const url = `${API_BASE}/samples/manage/${encodeURIComponent(id)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-    const res = await fetch(url, {
+    const res = await fetch(`${API_BASE}/samples/manage/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers: getHeaders(true)
     });

@@ -4,6 +4,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { query, connectPostgres, getPool } from '../../src/config/postgres.js';
 import { findSampleBySlug, ensureSampleTable } from '../../src/repositories/sampleRepository.js';
+import { getPrimaryJwtSecret } from '../../src/middleware/auth.js';
 import sampleRoutes from '../../src/routes/sampleRoutes.js';
 
 test('Phase 0 Security & Status Validation Suite', async (t) => {
@@ -17,8 +18,8 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
   // 1. Seed test DRAFT showcase with lead
   const draftRes = await query(
     `INSERT INTO public_sample_showcases (
-       slug, title, company_name, status, description, leads, pitch_deck, company_study
-     ) VALUES ($1, $2, $3, 'DRAFT', 'Draft description', $4, $5, $6)
+       slug, title, company_name, status, description, leads, pitch_deck, company_study, is_demo
+     ) VALUES ($1, $2, $3, 'DRAFT', 'Draft description', $4, $5, $6, false)
      RETURNING id`,
     [
       testDraftSlug,
@@ -31,11 +32,11 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
   );
   const draftId = draftRes.rows[0].id;
 
-  // 2. Seed test PUBLISHED showcase
+  // 2. Seed test PUBLISHED showcase (non-demo)
   const pubRes = await query(
     `INSERT INTO public_sample_showcases (
-       slug, title, company_name, status, description
-     ) VALUES ($1, $2, $3, 'PUBLISHED', 'Published description')
+       slug, title, company_name, status, description, is_demo
+     ) VALUES ($1, $2, $3, 'PUBLISHED', 'Published description', false)
      RETURNING id`,
     [testPublishedSlug, 'Test Published Showcase', 'Published Corp']
   );
@@ -61,7 +62,7 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
   );
   const testAdminId = adminRes.rows[0].id;
 
-  const jwtSecret = process.env.JWT_SECRET || 'dizigini_secure_jwt_secret_key_2026';
+  const jwtSecret = getPrimaryJwtSecret();
   const userToken = jwt.sign({ id: testUserId, email: testUserEmail, role: 'USER' }, jwtSecret, { expiresIn: '1h' });
   const adminToken = jwt.sign({ id: testAdminId, email: testAdminEmail, role: 'ADMIN' }, jwtSecret, { expiresIn: '1h' });
 
@@ -112,13 +113,57 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
     assert.equal(result.status, 'PUBLISHED');
   });
 
-  // --- AUTH MIDDLEWARE TESTS ---
+  // --- AUTH MIDDLEWARE TESTS (Mandatory Attack & Token Security Tests) ---
   await t.test('Auth: Unauthenticated request to sample management endpoint receives 401', async () => {
     const res = await fetch(`${baseUrl}/api/samples/manage`);
     assert.equal(res.status, 401, 'Unauthenticated request must receive 401');
     const json = await res.json();
     assert.equal(json.success, false);
     assert.equal(json.message, 'Access denied. No authentication token provided.');
+  });
+
+  await t.test('Auth: Forged token (wrong signature with admin payload) receives 401', async () => {
+    const forgedToken = jwt.sign(
+      { id: testAdminId, email: testAdminEmail, role: 'ADMIN' },
+      'attacker_invalid_secret_key_999',
+      { expiresIn: '1h' }
+    );
+    const res = await fetch(`${baseUrl}/api/samples/manage`, {
+      headers: { Authorization: `Bearer ${forgedToken}` },
+    });
+    assert.equal(res.status, 401, 'Forged token must receive 401');
+    const json = await res.json();
+    assert.equal(json.success, false);
+    assert.match(json.message, /invalid|expired|token/i);
+  });
+
+  await t.test('Auth: alg:none token (unsigned with admin payload) receives 401', async () => {
+    const headerNone = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+    const payloadNone = Buffer.from(
+      JSON.stringify({ id: testAdminId, email: testAdminEmail, role: 'ADMIN' })
+    ).toString('base64url');
+    const algNoneToken = `${headerNone}.${payloadNone}.`;
+
+    const res = await fetch(`${baseUrl}/api/samples/manage`, {
+      headers: { Authorization: `Bearer ${algNoneToken}` },
+    });
+    assert.equal(res.status, 401, 'alg:none token must receive 401');
+    const json = await res.json();
+    assert.equal(json.success, false);
+  });
+
+  await t.test('Auth: Expired token receives 401', async () => {
+    const expiredToken = jwt.sign(
+      { id: testAdminId, email: testAdminEmail, role: 'ADMIN' },
+      jwtSecret,
+      { expiresIn: -3600 }
+    );
+    const res = await fetch(`${baseUrl}/api/samples/manage`, {
+      headers: { Authorization: `Bearer ${expiredToken}` },
+    });
+    assert.equal(res.status, 401, 'Expired token must receive 401');
+    const json = await res.json();
+    assert.equal(json.success, false);
   });
 
   await t.test('Auth: Authenticated user with role USER receives 403 Forbidden on management endpoint', async () => {
@@ -142,17 +187,19 @@ test('Phase 0 Security & Status Validation Suite', async (t) => {
   });
 
   // --- HTTP-LEVEL PUBLIC ROUTE STATUS GUARDS (ALL 7 ROUTES) ---
-  await t.test('Route 1: GET /api/samples/:slug returns 404 for DRAFT and excludes drafts from availableShowcases', async () => {
+  await t.test('Route 1: GET /api/samples/:slug returns 404 for DRAFT and excludes drafts & non-demo from fallback', async () => {
     const res = await fetch(`${baseUrl}/api/samples/${testDraftSlug}`);
     assert.equal(res.status, 404, 'Must return 404 for draft showcase');
     const json = await res.json();
     assert.equal(json.success, false);
     assert.equal(json.requestedSlug, testDraftSlug);
 
-    // Verify 404 body availableShowcases does NOT contain this draft or any non-PUBLISHED showcase
+    // Verify 404 body availableShowcases does NOT contain draft or non-demo published showcase
     if (Array.isArray(json.availableShowcases)) {
       const foundDraft = json.availableShowcases.find((s) => s.slug === testDraftSlug);
       assert.equal(foundDraft, undefined, 'Draft slug must NEVER appear in availableShowcases fallback listing');
+      const foundNonDemo = json.availableShowcases.find((s) => s.slug === testPublishedSlug);
+      assert.equal(foundNonDemo, undefined, 'Non-demo published slug must NEVER appear in availableShowcases fallback listing');
     }
   });
 
