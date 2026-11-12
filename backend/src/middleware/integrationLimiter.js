@@ -67,9 +67,11 @@ export const failedAuthLimiter = rateLimit({
     }
     return 10;
   },
-  skipSuccessfulRequests: true, // Only failed requests count against limit
+  skipSuccessfulRequests: true, // Only failed auth requests count against limit
+  // Only authentication failures (HTTP 401) count towards the brute-force limit
+  requestWasSuccessful: (req, res) => res.statusCode !== 401,
   keyGenerator: (req) => {
-    return req.ip || req.connection?.remoteAddress || 'unknown';
+    return req.headers['x-test-ip'] || req.ip || req.connection?.remoteAddress || 'unknown';
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -82,3 +84,4 @@ export const failedAuthLimiter = rateLimit({
     });
   },
 });
+

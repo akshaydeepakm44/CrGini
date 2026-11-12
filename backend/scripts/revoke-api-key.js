@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import readline from 'node:readline/promises';
 import { query, connectPostgres, getPool } from '../src/config/postgres.js';
 
 /**
@@ -36,6 +37,27 @@ export async function revokeApiKey({ clientId, keyHash, rawKey } = {}) {
   return res.rows[0];
 }
 
+async function readKeyFromStdinOrPrompt() {
+  if (!process.stdin.isTTY) {
+    return new Promise((resolve) => {
+      let data = '';
+      process.stdin.setEncoding('utf-8');
+      process.stdin.on('data', (chunk) => {
+        data += chunk;
+      });
+      process.stdin.on('end', () => resolve(data.trim()));
+    });
+  }
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  const answer = await rl.question('Enter API key to revoke: ');
+  rl.close();
+  return answer.trim();
+}
+
 // CLI Execution Support
 const isDirectExecution =
   process.argv[1] &&
@@ -57,16 +79,20 @@ if (isDirectExecution) {
         } else if (args[i] === '--key-hash' && args[i + 1]) {
           keyHash = args[i + 1];
           i++;
-        } else if (args[i] === '--key' && args[i + 1]) {
-          rawKey = args[i + 1];
-          i++;
+        } else if (args[i] === '--key') {
+          console.error('Security Violation: Passing API keys as command line arguments is forbidden.');
+          console.error('Please enter the API key securely via prompt or pipe through stdin.');
+          process.exit(1);
         }
       }
 
-      if (!clientId && !keyHash && !rawKey) {
-        console.error('Error: specify --client-id, --key-hash, or --key');
-        console.error('Usage: node backend/scripts/revoke-api-key.js --client-id "client_xxx"');
-        process.exit(1);
+      if (!clientId && !keyHash) {
+        // Read key from secure prompt or piped stdin
+        rawKey = await readKeyFromStdinOrPrompt();
+        if (!rawKey) {
+          console.error('Error: No API key provided.');
+          process.exit(1);
+        }
       }
 
       await connectPostgres();
@@ -74,7 +100,7 @@ if (isDirectExecution) {
       const client = await revokeApiKey({ clientId, keyHash, rawKey });
 
       if (!client) {
-        console.error('Error: No matching API client found to revoke.');
+        console.error('Error: No matching active API client found to revoke.');
         await getPool().end();
         process.exit(1);
       }

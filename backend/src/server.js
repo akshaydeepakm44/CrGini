@@ -52,15 +52,6 @@ if (process.env.NODE_ENV !== 'test') {
       } catch (err) {
         console.error('[DiziGini API] ensureSampleTable error:', err.message);
       }
-      if (process.env.ENABLE_INTEGRATION_API === 'true') {
-        try {
-          const { ensureIntegrationSchema } = await import('./config/ensureSchema.js');
-          await ensureIntegrationSchema();
-          startAssetCleanupJob();
-        } catch (err) {
-          console.error('[DiziGini API] ensureIntegrationSchema / cleanup job error:', err.message);
-        }
-      }
     } else {
       console.error('[DiziGini API] PostgreSQL connection failed. Check credentials.');
     }
@@ -120,6 +111,9 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
+// Server-to-Server Integration API Routes (Isolated from browser global apiLimiter)
+app.use('/api/integration', integrationRoutes);
+
 // Prevent client/browser caching on API endpoints
 app.use('/api', apiLimiter);
 app.use('/api', (req, res, next) => {
@@ -138,7 +132,6 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/samples', sampleRoutes);
 app.use('/api/payments', paymentLimiter, paymentRoutes);
-app.use('/api/integration', integrationRoutes);
 
 import { getServiceVisibility } from './controllers/serviceVisibilityController.js';
 app.get('/api/services/visibility', getServiceVisibility);
@@ -242,7 +235,6 @@ process.on('uncaughtException', (err) => {
 // Graceful Connection Draining
 const handleShutdown = async (signal) => {
   console.log(`[DiziGini API] Received ${signal}. Draining pool and closing server gracefully...`);
-  stopAssetCleanupJob();
   if (server) {
     server.close(async () => {
       try {

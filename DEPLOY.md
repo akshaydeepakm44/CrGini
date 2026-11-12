@@ -203,3 +203,42 @@ pm2 logs dizigini-backend --lines 50
     }
 ```
 
+---
+
+## 6. Integration API Key Issuance & Zero-Downtime Rotation Procedure
+
+### Initial API Key Issuance
+```bash
+# On server (or local administrative console):
+cd /home/ubuntu/Dizigini/backend
+node scripts/issue-api-key.js --client-name "DizitalGini Production" --scopes "prospects:write,assets:write"
+# Output displays the plain key once (dzg_live_<hex32>). Copy and configure in DizitalGini client env.
+```
+
+### Zero-Downtime Key Rotation Runbook
+To rotate an API key without service interruption:
+1. **Step 1 - Issue New Key**:
+   Run `node scripts/issue-api-key.js --client-name "DizitalGini Production (Rotated <Date>)"`. Store the new raw key.
+2. **Step 2 - Verify New Key**:
+   Test health endpoint using new key:
+   ```bash
+   curl -H "X-API-Key: dzg_live_NEWKEY" https://dizigini.com/api/integration/v1/health
+   # Must return 200 { status: 'ok', ... }
+   ```
+3. **Step 3 - Switch Originating Client (DizitalGini)**:
+   Update `DIZIGINI_API_KEY` in DizitalGini's environment to the new key and deploy/restart DizitalGini.
+4. **Step 4 - Revoke Old Key**:
+   Revoke the previous key securely via stdin/prompt (never pass plaintext keys in command line flags):
+   ```bash
+   node scripts/revoke-api-key.js --client-id "client_OLD_ID"
+   # OR securely input the old key via prompt:
+   node scripts/revoke-api-key.js
+   # Enter API key to revoke: dzg_live_OLDKEY
+   ```
+5. **Step 5 - Confirm Revocation**:
+   ```bash
+   curl -H "X-API-Key: dzg_live_OLDKEY" https://dizigini.com/api/integration/v1/health
+   # Must return 403 { success: false, error: 'CLIENT_REVOKED' }
+   ```
+
+

@@ -51,6 +51,17 @@ test('Phase 2A API Client Auth & Asset Upload Suite', async (t) => {
       ]).catch(() => {});
     }
 
+    // Clean up temporary files on storage disk for created clients
+    const bucket = getBucketName();
+    for (const cId of createdClientIds) {
+      const clientDir = path.resolve(process.cwd(), 'storage', 'buckets', bucket, 'temp', cId);
+      if (fs.existsSync(clientDir)) {
+        try {
+          fs.rmSync(clientDir, { recursive: true, force: true });
+        } catch (_) {}
+      }
+    }
+
     // Close HTTP server and DB pool
     stopAssetCleanupJob();
     await new Promise((resolve) => server.close(resolve));
@@ -137,6 +148,16 @@ test('Phase 2A API Client Auth & Asset Upload Suite', async (t) => {
       `${baseUrl}/api/integration/v1/health?token=${activeRawKey}`
     );
     assert.equal(resQueryToken.status, 401, 'Token in query string must return 401');
+
+    // 2.4 Key passed in request body MUST be rejected (401)
+    const resBodyKey = await fetch(`${baseUrl}/api/integration/v1/assets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: activeRawKey }),
+    });
+    assert.equal(resBodyKey.status, 401, 'Credentials in request body must return 401');
+    const jsonBodyKey = await resBodyKey.json();
+    assert.equal(jsonBodyKey.error, 'CREDENTIALS_IN_URL_OR_BODY_FORBIDDEN');
   });
 
   // ---------------------------------------------------------------------------
@@ -179,6 +200,32 @@ test('Phase 2A API Client Auth & Asset Upload Suite', async (t) => {
     assert.equal(resMissingScope.status, 403, 'Missing required scope must return 403');
     const jsonMissingScope = await resMissingScope.json();
     assert.equal(jsonMissingScope.error, 'INSUFFICIENT_SCOPE');
+
+    // 3.4 Failed-auth per-IP limiter: returns 429 after burst limit of failed authentication attempts
+    const savedAuthLimit = process.env.TEST_INTEGRATION_AUTH_LIMIT;
+    try {
+      process.env.TEST_INTEGRATION_AUTH_LIMIT = '3';
+      for (let i = 0; i < 3; i++) {
+        const resFail = await fetch(`${baseUrl}/api/integration/v1/health`, {
+          headers: {
+            'X-API-Key': `dzg_live_badkey_${i}`,
+            'X-Test-IP': '10.0.0.99',
+          },
+        });
+        assert.equal(resFail.status, 401);
+      }
+      const resRateLimited = await fetch(`${baseUrl}/api/integration/v1/health`, {
+        headers: {
+          'X-API-Key': 'dzg_live_badkey_overflow',
+          'X-Test-IP': '10.0.0.99',
+        },
+      });
+      assert.equal(resRateLimited.status, 429, 'Failed authentication attempts exceeding limit must return 429');
+      const jsonRateLimited = await resRateLimited.json();
+      assert.equal(jsonRateLimited.error, 'RATE_LIMIT_EXCEEDED');
+    } finally {
+      restoreEnv('TEST_INTEGRATION_AUTH_LIMIT', savedAuthLimit);
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -373,6 +420,159 @@ test('Phase 2A API Client Auth & Asset Upload Suite', async (t) => {
     assert.equal(res.status, 403, 'Client without assets:write scope must return 403');
     const json = await res.json();
     assert.equal(json.error, 'INSUFFICIENT_SCOPE');
+  });
+
+  // ---------------------------------------------------------------------------
+  // 10b. Aborted upload leaves no file and no database row
+  // ---------------------------------------------------------------------------
+  await t.test('10b. POST /assets: Client aborted upload leaves no file and no database row', async () => {
+    const abortController = new AbortController();
+    const pdfChunk = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n');
+
+    const formData = new FormData();
+    const blob = new Blob([pdfChunk], { type: 'application/pdf' });
+    formData.append('file', blob, 'aborted.pdf');
+
+    const uploadPromise = fetch(`${baseUrl}/api/integration/v1/assets`, {
+      method: 'POST',
+      headers: { 'X-API-Key': activeRawKey },
+      body: formData,
+      signal: abortController.signal,
+    }).catch((err) => err);
+
+    // Abort request
+    abortController.abort();
+    await uploadPromise;
+
+    // Verify no row created in integration_assets
+    const hash = crypto.createHash('sha256').update(pdfChunk).digest('hex');
+    const dbRes = await query('SELECT * FROM integration_assets WHERE sha256 = $1', [hash]);
+    assert.equal(dbRes.rows.length, 0, 'No DB row must exist for aborted upload');
+  });
+
+  // ---------------------------------------------------------------------------
+  // 10c. Security: Staged asset is unreachable via any public URL or static path
+  // ---------------------------------------------------------------------------
+  await t.test('10c. Security: Staged asset is unreachable via any public URL or static path', async () => {
+    assert.ok(createdAssetKeys.length > 0, 'Must have at least one created staged asset');
+    const assetKey = createdAssetKeys[0];
+    const uuid = assetKey.replace(/^dzg_ast_/, '');
+    const clientId = activeClient.client_id;
+
+    // Public showcase endpoint by uuid
+    const resPublic = await fetch(`${baseUrl}/api/samples/${uuid}`);
+    assert.equal(resPublic.status, 404, 'Staged asset uuid must not be accessible via public sample endpoint');
+
+    // Public company study pdf endpoint
+    const resStudy = await fetch(`${baseUrl}/api/samples/${uuid}/company-study-pdf`);
+    assert.equal(resStudy.status, 404, 'Staged asset uuid must not be accessible via company study endpoint');
+
+    // Public pitch deck endpoint
+    const resDeck = await fetch(`${baseUrl}/api/samples/${uuid}/pitch-deck`);
+    assert.equal(resDeck.status, 404, 'Staged asset uuid must not be accessible via pitch deck endpoint');
+
+    // Direct static /storage/ access
+    const resStatic = await fetch(`${baseUrl}/storage/buckets/dizigini-assets/temp/${clientId}/${uuid}.pdf`);
+    assert.equal(resStatic.status, 404, 'Direct static /storage access to staged temp file must return 404');
+  });
+
+  // ---------------------------------------------------------------------------
+  // 10d. Per-client staged-bytes quota enforcement
+  // ---------------------------------------------------------------------------
+  await t.test('10d. POST /assets: Per-client staged-bytes quota rejected with 413 STAGED_QUOTA_EXCEEDED', async () => {
+    const savedQuota = process.env.CLIENT_STAGED_BYTES_QUOTA;
+    try {
+      process.env.CLIENT_STAGED_BYTES_QUOTA = '1000'; // 1000 bytes max staged
+
+      const { client: quotaClient, rawKey: quotaKey } = await issueApiKey({
+        clientName: 'Quota Test Client',
+        scopes: ['assets:write'],
+      });
+      createdClientIds.push(quotaClient.client_id);
+
+      // 1. Upload 600 bytes (within quota)
+      const buffer1 = Buffer.alloc(600);
+      buffer1.write('%PDF-1.4\n');
+      const formData1 = new FormData();
+      formData1.append('file', new Blob([buffer1], { type: 'application/pdf' }), 'file1.pdf');
+
+      const res1 = await fetch(`${baseUrl}/api/integration/v1/assets`, {
+        method: 'POST',
+        headers: { 'X-API-Key': quotaKey },
+        body: formData1,
+      });
+      assert.equal(res1.status, 201, 'Upload within quota must succeed');
+      const json1 = await res1.json();
+      createdAssetKeys.push(json1.assetKey);
+
+      // 2. Upload second 600 bytes (total staged = 1200 > 1000 quota)
+      const buffer2 = Buffer.alloc(600);
+      buffer2.write('%PDF-1.4\nSecond distinct content for quota check\n');
+      const formData2 = new FormData();
+      formData2.append('file', new Blob([buffer2], { type: 'application/pdf' }), 'file2.pdf');
+
+      const res2 = await fetch(`${baseUrl}/api/integration/v1/assets`, {
+        method: 'POST',
+        headers: { 'X-API-Key': quotaKey },
+        body: formData2,
+      });
+      assert.equal(res2.status, 413, 'Upload exceeding staged quota must return 413');
+      const json2 = await res2.json();
+      assert.equal(json2.error, 'STAGED_QUOTA_EXCEEDED');
+
+      // Verify no row created in DB for exceeded upload
+      const hash2 = crypto.createHash('sha256').update(buffer2).digest('hex');
+      const dbRes2 = await query('SELECT * FROM integration_assets WHERE sha256 = $1', [hash2]);
+      assert.equal(dbRes2.rows.length, 0, 'No row must exist for quota-exceeded upload');
+    } finally {
+      restoreEnv('CLIENT_STAGED_BYTES_QUOTA', savedQuota);
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // 10e. Storage: Non-connection error in deleteFile does NOT mutate storage driver
+  // ---------------------------------------------------------------------------
+  await t.test('10e. Storage: Non-connection error in deleteFile does NOT mutate storage driver', async () => {
+    const { setStorageDriver, resetStorageDriver, deleteFile: storageDeleteFile } = await import(
+      '../../src/services/storageService.js'
+    );
+    let removeCalled = false;
+    const mockDriver = {
+      async removeObject() {
+        removeCalled = true;
+        const err = new Error('AccessDenied: Insufficient S3 permissions');
+        err.code = 'AccessDenied';
+        throw err;
+      },
+    };
+    setStorageDriver(mockDriver);
+    try {
+      await assert.rejects(
+        () => storageDeleteFile('test-object-key.pdf'),
+        /AccessDenied/
+      );
+      assert.equal(removeCalled, true, 'removeObject must have been called');
+    } finally {
+      resetStorageDriver();
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // 10f. Server Mounting: Integration routes are mounted before global apiLimiter
+  // ---------------------------------------------------------------------------
+  await t.test('10f. Server Mounting: Integration routes are mounted before global apiLimiter', () => {
+    const integrationLayerIdx = realServerApp._router.stack.findIndex(
+      (layer) => layer.regexp && layer.regexp.toString().includes('integration')
+    );
+    const globalApiLimiterIdx = realServerApp._router.stack.findIndex(
+      (layer) => layer.regexp && layer.regexp.toString().includes('^\\/api\\/?(?=\\/|$)')
+    );
+    assert.ok(integrationLayerIdx !== -1, 'Integration router layer must be mounted in Express app');
+    assert.ok(globalApiLimiterIdx !== -1, 'Global apiLimiter layer must be mounted in Express app');
+    assert.ok(
+      integrationLayerIdx < globalApiLimiterIdx,
+      `Integration router (index ${integrationLayerIdx}) must precede global apiLimiter (index ${globalApiLimiterIdx}) so server-to-server traffic is not throttled by browser limits`
+    );
   });
 
   // ---------------------------------------------------------------------------

@@ -619,6 +619,22 @@ export const objectExists = async (objectKey, bucket = getBucketName()) => {
 /**
  * Delete an object from Object Storage.
  */
+const isConnectionError = (err) => {
+  if (!err) return false;
+  const code = (err.code || '').toUpperCase();
+  const msg = (err.message || '').toLowerCase();
+  return (
+    code === 'ECONNREFUSED' ||
+    code === 'ECONNRESET' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ENOTFOUND' ||
+    msg.includes('econnrefused') ||
+    msg.includes('econnreset') ||
+    msg.includes('connect etimedout') ||
+    msg.includes('timeout')
+  );
+};
+
 export const deleteFile = async (objectKey, bucket = getBucketName()) => {
   if (!objectKey) return;
   let client = getMinioClient();
@@ -629,7 +645,8 @@ export const deleteFile = async (objectKey, bucket = getBucketName()) => {
   try {
     await client.removeObject(bucket, objectKey);
   } catch (err) {
-    if (client instanceof Minio.Client) {
+    if (client instanceof Minio.Client && isConnectionError(err)) {
+      console.warn('[StorageService] MinIO network call failed in deleteFile, falling back to LocalDiskBucket:', err.message);
       isMinioReachable = false;
       minioClient = null;
       client = getMinioClient();

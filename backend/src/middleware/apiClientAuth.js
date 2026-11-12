@@ -126,3 +126,4 @@ export function requireScope(scope) {
     next();
   };
 }
+

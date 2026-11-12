@@ -6,10 +6,15 @@ import { query } from '../config/postgres.js';
 import { getBucketName } from '../services/storageService.js';
 
 const MAX_ASSET_SIZE = 25 * 1024 * 1024; // 25MB
+const DEFAULT_STAGED_BYTES_QUOTA = 500 * 1024 * 1024; // 500MB
 const getMaxAssetSize = () =>
   process.env.TEST_MAX_ASSET_SIZE
     ? parseInt(process.env.TEST_MAX_ASSET_SIZE, 10)
     : MAX_ASSET_SIZE;
+const getMaxStagedQuota = () =>
+  process.env.CLIENT_STAGED_BYTES_QUOTA
+    ? parseInt(process.env.CLIENT_STAGED_BYTES_QUOTA, 10)
+    : DEFAULT_STAGED_BYTES_QUOTA;
 
 /**
  * GET /api/integration/v1/health
@@ -193,6 +198,34 @@ export async function uploadIntegrationAsset(req, res) {
   }
 
   const clientId = req.apiClient.clientId;
+  const maxStagedQuota = getMaxStagedQuota();
+
+  // Check current staged assets byte volume for client
+  let currentStagedBytes = 0;
+  try {
+    const quotaRes = await query(
+      `SELECT COALESCE(SUM(size), 0) AS total_staged_bytes
+       FROM integration_assets
+       WHERE client_id = $1 AND status = 'STAGED'`,
+      [clientId]
+    );
+    currentStagedBytes = parseInt(quotaRes.rows[0]?.total_staged_bytes || '0', 10);
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: 'DATABASE_ERROR',
+      message: 'Failed to inspect client asset quota.',
+    });
+  }
+
+  if (currentStagedBytes >= maxStagedQuota) {
+    return res.status(413).json({
+      success: false,
+      error: 'STAGED_QUOTA_EXCEEDED',
+      message: `Client staged assets quota exceeded (${Math.round(maxStagedQuota / (1024 * 1024))}MB limit).`,
+    });
+  }
+
   const uuid = crypto.randomUUID();
   const bucket = getBucketName();
   const targetDir = path.resolve(
@@ -301,6 +334,17 @@ export async function uploadIntegrationAsset(req, res) {
           status: 413,
           error: 'FILE_TOO_LARGE',
           message: 'File size exceeds maximum allowed limit of 25MB.',
+        };
+        fileStream.destroy();
+        return;
+      }
+
+      // 3. Staged quota check
+      if (currentStagedBytes + bytesReceived > maxStagedQuota) {
+        fileError = {
+          status: 413,
+          error: 'STAGED_QUOTA_EXCEEDED',
+          message: `Client staged assets quota exceeded (${Math.round(maxStagedQuota / (1024 * 1024))}MB limit).`,
         };
         fileStream.destroy();
         return;
