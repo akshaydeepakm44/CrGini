@@ -21,10 +21,12 @@
     "test:bulk-import": "node tests/integration/bulk-lead-import.test.js",
     "test:phase0": "node --test tests/integration/phase0-security-published.test.js",
     "test:phase1": "node --test tests/integration/phase1-prospect-service.test.js",
-    "test:integration-core": "node --test tests/integration/phase0-security-published.test.js tests/integration/phase1-prospect-service.test.js"
+    "test:phase2a": "node --test tests/integration/phase2a-api-client-assets.test.js",
+    "test:integration-core": "node --test tests/integration/phase0-security-published.test.js tests/integration/phase1-prospect-service.test.js tests/integration/phase2a-api-client-assets.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "busboy": "^1.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

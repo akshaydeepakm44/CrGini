@@ -1,0 +1,543 @@
+process.env.NODE_ENV = 'test';
+process.env.ENABLE_INTEGRATION_API = 'true';
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { connectPostgres, getPool, query } from '../../src/config/postgres.js';
+import { ensureIntegrationSchema } from '../../src/config/ensureSchema.js';
+import { issueApiKey } from '../../scripts/issue-api-key.js';
+import { revokeApiKey } from '../../scripts/revoke-api-key.js';
+import { runAssetCleanup, stopAssetCleanupJob } from '../../src/services/assetCleanupService.js';
+import { getBucketName } from '../../src/services/storageService.js';
+
+// Dynamically import real server app
+const { app: realServerApp } = await import('../../src/server.js');
+
+const restoreEnv = (key, val) => {
+  if (val === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = val;
+  }
+};
+
+test('Phase 2A API Client Auth & Asset Upload Suite', async (t) => {
+  await connectPostgres();
+  await ensureIntegrationSchema();
+
+  // Start real HTTP server on ephemeral random port
+  const server = realServerApp.listen(0);
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  const createdClientIds = [];
+  const createdAssetKeys = [];
+
+  t.after(async () => {
+    // Clean up created clients
+    if (createdClientIds.length > 0) {
+      await query(`DELETE FROM api_clients WHERE client_id = ANY($1::text[])`, [
+        createdClientIds,
+      ]).catch(() => {});
+    }
+
+    // Clean up created assets
+    if (createdAssetKeys.length > 0) {
+      await query(`DELETE FROM integration_assets WHERE asset_key = ANY($1::text[])`, [
+        createdAssetKeys,
+      ]).catch(() => {});
+    }
+
+    // Close HTTP server and DB pool
+    stopAssetCleanupJob();
+    await new Promise((resolve) => server.close(resolve));
+    await getPool().end();
+    setTimeout(() => process.exit(0), 100);
+  });
+
+  // ---------------------------------------------------------------------------
+  // 1. issue-api-key & revoke-api-key CLI/Scripts
+  // ---------------------------------------------------------------------------
+  let activeClient = null;
+  let activeRawKey = null;
+
+  await t.test('1. issue-api-key creates active client with hashed key; revoke sets status REVOKED', async () => {
+    const { client, rawKey } = await issueApiKey({
+      clientName: 'Phase2A Test Client',
+      scopes: ['prospects:write', 'assets:write'],
+    });
+
+    createdClientIds.push(client.client_id);
+    activeClient = client;
+    activeRawKey = rawKey;
+
+    assert.ok(rawKey.startsWith('dzg_live_'), 'Key must start with dzg_live_ prefix');
+    assert.equal(rawKey.length, 41, 'Key length must be 9 (prefix) + 32 (hex) = 41');
+    assert.equal(client.status, 'ACTIVE');
+    assert.deepEqual(client.scopes, ['prospects:write', 'assets:write']);
+
+    // Check DB record
+    const dbRes = await query('SELECT * FROM api_clients WHERE client_id = $1', [client.client_id]);
+    assert.equal(dbRes.rows.length, 1);
+    const dbRow = dbRes.rows[0];
+
+    const expectedHash = crypto.createHash('sha256').update(rawKey).digest('hex');
+    assert.equal(dbRow.api_key_hash, expectedHash, 'Database must store SHA-256 hash only');
+    assert.notEqual(dbRow.api_key_hash, rawKey, 'Plain key must never be stored in database');
+
+    // Test revoke
+    const { client: tempClient, rawKey: tempKey } = await issueApiKey({
+      clientName: 'Client to Revoke',
+      scopes: ['prospects:write'],
+    });
+    createdClientIds.push(tempClient.client_id);
+
+    const revoked = await revokeApiKey({ clientId: tempClient.client_id });
+    assert.equal(revoked.status, 'REVOKED');
+
+    const revokedDbRes = await query('SELECT status FROM api_clients WHERE client_id = $1', [
+      tempClient.client_id,
+    ]);
+    assert.equal(revokedDbRes.rows[0].status, 'REVOKED');
+  });
+
+  // ---------------------------------------------------------------------------
+  // 2. Authentication header extraction and query string rejection
+  // ---------------------------------------------------------------------------
+  await t.test('2. Valid key in X-API-Key authenticates; valid key in Bearer authenticates; key in query string rejected', async () => {
+    // 2.1 X-API-Key header
+    const resXApiKey = await fetch(`${baseUrl}/api/integration/v1/health`, {
+      headers: { 'X-API-Key': activeRawKey },
+    });
+    assert.equal(resXApiKey.status, 200, 'X-API-Key must authenticate successfully');
+    const jsonXApiKey = await resXApiKey.json();
+    assert.equal(jsonXApiKey.status, 'ok');
+    assert.equal(jsonXApiKey.clientName, 'Phase2A Test Client');
+
+    // 2.2 Authorization: Bearer header
+    const resBearer = await fetch(`${baseUrl}/api/integration/v1/health`, {
+      headers: { Authorization: `Bearer ${activeRawKey}` },
+    });
+    assert.equal(resBearer.status, 200, 'Bearer token must authenticate successfully');
+    const jsonBearer = await resBearer.json();
+    assert.equal(jsonBearer.status, 'ok');
+
+    // 2.3 Key passed in query string MUST be rejected (401)
+    const resQueryApiKey = await fetch(
+      `${baseUrl}/api/integration/v1/health?apiKey=${activeRawKey}`
+    );
+    assert.equal(resQueryApiKey.status, 401, 'Credentials in query string must return 401');
+    const jsonQueryApiKey = await resQueryApiKey.json();
+    assert.equal(jsonQueryApiKey.error, 'CREDENTIALS_IN_URL_OR_BODY_FORBIDDEN');
+
+    const resQueryToken = await fetch(
+      `${baseUrl}/api/integration/v1/health?token=${activeRawKey}`
+    );
+    assert.equal(resQueryToken.status, 401, 'Token in query string must return 401');
+  });
+
+  // ---------------------------------------------------------------------------
+  // 3. Invalid key -> 401; revoked key -> 403; missing scope -> 403
+  // ---------------------------------------------------------------------------
+  await t.test('3. Invalid key -> 401; revoked key -> 403; missing scope -> 403', async () => {
+    // 3.1 Non-existent key
+    const resInvalid = await fetch(`${baseUrl}/api/integration/v1/health`, {
+      headers: { 'X-API-Key': 'dzg_live_00000000000000000000000000000000' },
+    });
+    assert.equal(resInvalid.status, 401, 'Invalid key must return 401');
+    const jsonInvalid = await resInvalid.json();
+    assert.equal(jsonInvalid.error, 'INVALID_API_KEY');
+
+    // 3.2 Revoked client
+    const { client: revokedClient, rawKey: revokedKey } = await issueApiKey({
+      clientName: 'Revoked Test Client',
+      scopes: ['prospects:write', 'assets:write'],
+    });
+    createdClientIds.push(revokedClient.client_id);
+    await revokeApiKey({ clientId: revokedClient.client_id });
+
+    const resRevoked = await fetch(`${baseUrl}/api/integration/v1/health`, {
+      headers: { 'X-API-Key': revokedKey },
+    });
+    assert.equal(resRevoked.status, 403, 'Revoked client key must return 403');
+    const jsonRevoked = await resRevoked.json();
+    assert.equal(jsonRevoked.error, 'CLIENT_REVOKED');
+
+    // 3.3 Missing required scope (has assets:write only, attempts to access /schema which requires prospects:write)
+    const { client: assetOnlyClient, rawKey: assetOnlyKey } = await issueApiKey({
+      clientName: 'Asset Only Client',
+      scopes: ['assets:write'],
+    });
+    createdClientIds.push(assetOnlyClient.client_id);
+
+    const resMissingScope = await fetch(`${baseUrl}/api/integration/v1/schema`, {
+      headers: { 'X-API-Key': assetOnlyKey },
+    });
+    assert.equal(resMissingScope.status, 403, 'Missing required scope must return 403');
+    const jsonMissingScope = await resMissingScope.json();
+    assert.equal(jsonMissingScope.error, 'INSUFFICIENT_SCOPE');
+  });
+
+  // ---------------------------------------------------------------------------
+  // 4. Feature Flag: Disabled ENABLE_INTEGRATION_API -> 404
+  // ---------------------------------------------------------------------------
+  await t.test('4. Disabled ENABLE_INTEGRATION_API -> 404 on all endpoints', async () => {
+    const savedFlag = process.env.ENABLE_INTEGRATION_API;
+    try {
+      process.env.ENABLE_INTEGRATION_API = 'false';
+
+      const resHealth = await fetch(`${baseUrl}/api/integration/v1/health`, {
+        headers: { 'X-API-Key': activeRawKey },
+      });
+      assert.equal(resHealth.status, 404, 'Health endpoint must 404 when integration API is disabled');
+
+      const resSchema = await fetch(`${baseUrl}/api/integration/v1/schema`, {
+        headers: { 'X-API-Key': activeRawKey },
+      });
+      assert.equal(resSchema.status, 404, 'Schema endpoint must 404 when integration API is disabled');
+    } finally {
+      restoreEnv('ENABLE_INTEGRATION_API', savedFlag);
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // 5. Discovery endpoint: GET /health
+  // ---------------------------------------------------------------------------
+  await t.test('5. GET /health returns client metadata', async () => {
+    const res = await fetch(`${baseUrl}/api/integration/v1/health`, {
+      headers: { 'X-API-Key': activeRawKey },
+    });
+    assert.equal(res.status, 200);
+    const json = await res.json();
+    assert.equal(json.status, 'ok');
+    assert.equal(json.clientName, 'Phase2A Test Client');
+    assert.deepEqual(json.scopes, ['prospects:write', 'assets:write']);
+  });
+
+  // ---------------------------------------------------------------------------
+  // 6. Discovery endpoint: GET /schema
+  // ---------------------------------------------------------------------------
+  await t.test('6. GET /schema returns payload contract', async () => {
+    const res = await fetch(`${baseUrl}/api/integration/v1/schema`, {
+      headers: { 'X-API-Key': activeRawKey },
+    });
+    assert.equal(res.status, 200);
+    const json = await res.json();
+    assert.equal(json.success, true);
+    assert.ok(json.schema, 'Response must include JSON Schema');
+    assert.ok(json.schema.required.includes('companyName'));
+    assert.ok(json.schema.required.includes('externalCampaignId'));
+    assert.ok(json.schema.required.includes('externalProspectId'));
+    assert.ok(json.schema.properties.companyName);
+    assert.ok(json.schema.properties.leads);
+  });
+
+  // ---------------------------------------------------------------------------
+  // 7. POST /assets: valid PDF creates STAGED asset row and file in storage -> 201
+  // ---------------------------------------------------------------------------
+  await t.test('7. POST /assets: valid PDF creates STAGED asset row and file in storage, returns 201', async () => {
+    const pdfContent = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n%%EOF');
+    const formData = new FormData();
+    const blob = new Blob([pdfContent], { type: 'application/pdf' });
+    formData.append('file', blob, 'sample_study.pdf');
+
+    const res = await fetch(`${baseUrl}/api/integration/v1/assets`, {
+      method: 'POST',
+      headers: { 'X-API-Key': activeRawKey },
+      body: formData,
+    });
+
+    assert.equal(res.status, 201, 'Valid PDF upload must return 201 Created');
+    const json = await res.json();
+    assert.equal(json.success, true);
+    assert.ok(json.assetKey.startsWith('dzg_ast_'));
+    createdAssetKeys.push(json.assetKey);
+
+    const expectedHash = crypto.createHash('sha256').update(pdfContent).digest('hex');
+    assert.equal(json.sha256, expectedHash, 'Computed SHA-256 must match payload');
+    assert.equal(json.size, pdfContent.length);
+    assert.ok(json.expiresAt);
+
+    // Verify row in database
+    const dbRes = await query('SELECT * FROM integration_assets WHERE asset_key = $1', [
+      json.assetKey,
+    ]);
+    assert.equal(dbRes.rows.length, 1);
+    const assetRow = dbRes.rows[0];
+    assert.equal(assetRow.status, 'STAGED');
+    assert.equal(assetRow.client_id, activeClient.client_id);
+    assert.equal(assetRow.sha256, expectedHash);
+
+    // Verify file on disk
+    const uuid = json.assetKey.replace(/^dzg_ast_/, '');
+    const bucket = getBucketName();
+    const filePath = path.resolve(
+      process.cwd(),
+      'storage',
+      'buckets',
+      bucket,
+      'temp',
+      activeClient.client_id,
+      `${uuid}.pdf`
+    );
+    assert.ok(fs.existsSync(filePath), `Storage file must exist at ${filePath}`);
+    const fileBytes = fs.readFileSync(filePath);
+    assert.deepEqual(fileBytes, pdfContent);
+  });
+
+  // ---------------------------------------------------------------------------
+  // 8. POST /assets: non-PDF rejected by magic bytes -> 400
+  // ---------------------------------------------------------------------------
+  await t.test('8. POST /assets: non-PDF (text file disguised as .pdf) rejected by magic bytes -> 400', async () => {
+    const fakePdfContent = Buffer.from('NOT A PDF FILE - plain text pretending to be a document');
+    const formData = new FormData();
+    const blob = new Blob([fakePdfContent], { type: 'application/pdf' });
+    formData.append('file', blob, 'fake.pdf');
+
+    const res = await fetch(`${baseUrl}/api/integration/v1/assets`, {
+      method: 'POST',
+      headers: { 'X-API-Key': activeRawKey },
+      body: formData,
+    });
+
+    assert.equal(res.status, 400, 'Non-PDF magic bytes must return 400 Bad Request');
+    const json = await res.json();
+    assert.equal(json.error, 'INVALID_FILE_TYPE');
+
+    // Confirm no row was written to integration_assets
+    const fakeHash = crypto.createHash('sha256').update(fakePdfContent).digest('hex');
+    const dbRes = await query('SELECT * FROM integration_assets WHERE sha256 = $1', [fakeHash]);
+    assert.equal(dbRes.rows.length, 0, 'No DB row must be created for rejected upload');
+  });
+
+  // ---------------------------------------------------------------------------
+  // 9. POST /assets: file > 25MB rejected, no orphan file or DB row left -> 413
+  // ---------------------------------------------------------------------------
+  await t.test('9. POST /assets: file > 25MB rejected, no orphan file or DB row left -> 413', async () => {
+    // Set test max size to 50KB to test limit cleanly and fast without allocating huge memory
+    const savedMaxSize = process.env.TEST_MAX_ASSET_SIZE;
+    try {
+      process.env.TEST_MAX_ASSET_SIZE = '50000'; // 50 KB
+
+      // Create a 70 KB payload with valid %PDF- magic bytes
+      const oversizeBuffer = Buffer.alloc(70 * 1024);
+      oversizeBuffer.write('%PDF-1.4\n');
+
+      const formData = new FormData();
+      const blob = new Blob([oversizeBuffer], { type: 'application/pdf' });
+      formData.append('file', blob, 'oversize.pdf');
+
+      const res = await fetch(`${baseUrl}/api/integration/v1/assets`, {
+        method: 'POST',
+        headers: { 'X-API-Key': activeRawKey },
+        body: formData,
+      });
+
+      assert.equal(res.status, 413, 'File exceeding size limit must return 413 Payload Too Large');
+      const json = await res.json();
+      assert.equal(json.error, 'FILE_TOO_LARGE');
+
+      // Verify no orphan DB row
+      const oversizeHash = crypto.createHash('sha256').update(oversizeBuffer).digest('hex');
+      const dbRes = await query('SELECT * FROM integration_assets WHERE sha256 = $1', [oversizeHash]);
+      assert.equal(dbRes.rows.length, 0, 'No DB row must exist for oversize file');
+    } finally {
+      restoreEnv('TEST_MAX_ASSET_SIZE', savedMaxSize);
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // 10. POST /assets: client lacking assets:write scope -> 403
+  // ---------------------------------------------------------------------------
+  await t.test('10. POST /assets: client lacking assets:write scope -> 403', async () => {
+    const { client: prospectOnlyClient, rawKey: prospectOnlyKey } = await issueApiKey({
+      clientName: 'Prospects Only Client',
+      scopes: ['prospects:write'],
+    });
+    createdClientIds.push(prospectOnlyClient.client_id);
+
+    const pdfContent = Buffer.from('%PDF-1.4\nValid PDF content\n%%EOF');
+    const formData = new FormData();
+    const blob = new Blob([pdfContent], { type: 'application/pdf' });
+    formData.append('file', blob, 'test.pdf');
+
+    const res = await fetch(`${baseUrl}/api/integration/v1/assets`, {
+      method: 'POST',
+      headers: { 'X-API-Key': prospectOnlyKey },
+      body: formData,
+    });
+
+    assert.equal(res.status, 403, 'Client without assets:write scope must return 403');
+    const json = await res.json();
+    assert.equal(json.error, 'INSUFFICIENT_SCOPE');
+  });
+
+  // ---------------------------------------------------------------------------
+  // 11. Asset cleanup job deletes expired STAGED files and rows, does not touch claimed ones, honors advisory lock
+  // ---------------------------------------------------------------------------
+  await t.test(
+    '11. Asset cleanup job deletes expired STAGED files and rows, does not touch claimed ones, honors advisory lock',
+    async () => {
+      const bucket = getBucketName();
+      const testClientId = activeClient.client_id;
+      const baseDir = path.resolve(
+        process.cwd(),
+        'storage',
+        'buckets',
+        bucket,
+        'temp',
+        testClientId
+      );
+      fs.mkdirSync(baseDir, { recursive: true });
+
+      // 1. Expired STAGED asset (should be deleted)
+      const expiredStagedUuid = crypto.randomUUID();
+      const expiredStagedKey = `dzg_ast_${expiredStagedUuid}`;
+      const expiredStagedFile = path.join(baseDir, `${expiredStagedUuid}.pdf`);
+      fs.writeFileSync(expiredStagedFile, '%PDF-1.4 expired staged');
+
+      await query(
+        `INSERT INTO integration_assets (asset_key, client_id, sha256, size, status, expires_at)
+         VALUES ($1, $2, 'dummy_hash_1', 100, 'STAGED', NOW() - INTERVAL '2 hours')`,
+        [expiredStagedKey, testClientId]
+      );
+      createdAssetKeys.push(expiredStagedKey);
+
+      // 2. Unexpired STAGED asset (should be preserved)
+      const unexpiredStagedUuid = crypto.randomUUID();
+      const unexpiredStagedKey = `dzg_ast_${unexpiredStagedUuid}`;
+      const unexpiredStagedFile = path.join(baseDir, `${unexpiredStagedUuid}.pdf`);
+      fs.writeFileSync(unexpiredStagedFile, '%PDF-1.4 unexpired staged');
+
+      await query(
+        `INSERT INTO integration_assets (asset_key, client_id, sha256, size, status, expires_at)
+         VALUES ($1, $2, 'dummy_hash_2', 100, 'STAGED', NOW() + INTERVAL '12 hours')`,
+        [unexpiredStagedKey, testClientId]
+      );
+      createdAssetKeys.push(unexpiredStagedKey);
+
+      // 3. Expired CLAIMED asset (should be preserved - claimed assets are permanent)
+      const expiredClaimedUuid = crypto.randomUUID();
+      const expiredClaimedKey = `dzg_ast_${expiredClaimedUuid}`;
+      const expiredClaimedFile = path.join(baseDir, `${expiredClaimedUuid}.pdf`);
+      fs.writeFileSync(expiredClaimedFile, '%PDF-1.4 expired claimed');
+
+      await query(
+        `INSERT INTO integration_assets (asset_key, client_id, sha256, size, status, expires_at)
+         VALUES ($1, $2, 'dummy_hash_3', 100, 'CLAIMED', NOW() - INTERVAL '2 hours')`,
+        [expiredClaimedKey, testClientId]
+      );
+      createdAssetKeys.push(expiredClaimedKey);
+
+      // Run cleanup pass
+      const cleanupResult = await runAssetCleanup();
+      assert.equal(cleanupResult.acquired, true);
+      assert.ok(cleanupResult.cleanedCount >= 1);
+
+      // Verify expired STAGED was deleted from DB and disk
+      const checkExpiredStagedDb = await query(
+        'SELECT * FROM integration_assets WHERE asset_key = $1',
+        [expiredStagedKey]
+      );
+      assert.equal(checkExpiredStagedDb.rows.length, 0, 'Expired STAGED asset row must be deleted');
+      assert.equal(
+        fs.existsSync(expiredStagedFile),
+        false,
+        'Expired STAGED asset file must be unlinked'
+      );
+
+      // Verify unexpired STAGED was PRESERVED in DB and disk
+      const checkUnexpiredStagedDb = await query(
+        'SELECT * FROM integration_assets WHERE asset_key = $1',
+        [unexpiredStagedKey]
+      );
+      assert.equal(
+        checkUnexpiredStagedDb.rows.length,
+        1,
+        'Unexpired STAGED asset row must be preserved'
+      );
+      assert.equal(
+        fs.existsSync(unexpiredStagedFile),
+        true,
+        'Unexpired STAGED asset file must be preserved'
+      );
+
+      // Verify expired CLAIMED was PRESERVED in DB and disk
+      const checkExpiredClaimedDb = await query(
+        'SELECT * FROM integration_assets WHERE asset_key = $1',
+        [expiredClaimedKey]
+      );
+      assert.equal(
+        checkExpiredClaimedDb.rows.length,
+        1,
+        'CLAIMED asset row must NEVER be deleted by cleanup'
+      );
+      assert.equal(
+        fs.existsSync(expiredClaimedFile),
+        true,
+        'CLAIMED asset file must NEVER be unlinked by cleanup'
+      );
+
+      // Clean up manually preserved test files
+      fs.promises.unlink(unexpiredStagedFile).catch(() => {});
+      fs.promises.unlink(expiredClaimedFile).catch(() => {});
+
+      // 4. Advisory Lock Contention Test
+      const pool = getPool();
+      const lockClient = await pool.connect();
+      try {
+        await lockClient.query('SELECT pg_try_advisory_lock(982347101)');
+
+        // Second pass while lock is held by separate client must fail to acquire and skip
+        const contentionResult = await runAssetCleanup();
+        assert.equal(
+          contentionResult.acquired,
+          false,
+          'Cleanup must honor advisory lock and skip when held by another instance'
+        );
+        assert.equal(contentionResult.cleanedCount, 0);
+      } finally {
+        await lockClient.query('SELECT pg_advisory_unlock(982347101)').catch(() => {});
+        lockClient.release();
+      }
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // 12. Rate limiter returns 429 when burst limit exceeded
+  // ---------------------------------------------------------------------------
+  await t.test('12. Rate limiter returns 429 when burst limit exceeded', async () => {
+    const savedLimit = process.env.TEST_INTEGRATION_REGULAR_LIMIT;
+    try {
+      // Set burst threshold to 3 requests
+      process.env.TEST_INTEGRATION_REGULAR_LIMIT = '3';
+
+      const { client: rateClient, rawKey: rateKey } = await issueApiKey({
+        clientName: 'Rate Limit Test Client',
+        scopes: ['prospects:write'],
+      });
+      createdClientIds.push(rateClient.client_id);
+
+      // Requests 1, 2, 3 should succeed
+      for (let i = 0; i < 3; i++) {
+        const res = await fetch(`${baseUrl}/api/integration/v1/health`, {
+          headers: { 'X-API-Key': rateKey },
+        });
+        assert.equal(res.status, 200, `Request ${i + 1} within limit must return 200`);
+      }
+
+      // 4th request must be rate limited (429)
+      const resExceeded = await fetch(`${baseUrl}/api/integration/v1/health`, {
+        headers: { 'X-API-Key': rateKey },
+      });
+      assert.equal(resExceeded.status, 429, 'Burst exceeding limit must return 429');
+      const jsonExceeded = await resExceeded.json();
+      assert.equal(jsonExceeded.error, 'RATE_LIMIT_EXCEEDED');
+    } finally {
+      restoreEnv('TEST_INTEGRATION_REGULAR_LIMIT', savedLimit);
+    }
+  });
+});

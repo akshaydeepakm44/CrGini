@@ -621,7 +621,7 @@ export const objectExists = async (objectKey, bucket = getBucketName()) => {
  */
 export const deleteFile = async (objectKey, bucket = getBucketName()) => {
   if (!objectKey) return;
-  const client = getMinioClient();
+  let client = getMinioClient();
   if (!client) {
     throw new Error('Storage client is not available.');
   }
@@ -629,6 +629,20 @@ export const deleteFile = async (objectKey, bucket = getBucketName()) => {
   try {
     await client.removeObject(bucket, objectKey);
   } catch (err) {
+    if (client instanceof Minio.Client) {
+      isMinioReachable = false;
+      minioClient = null;
+      client = getMinioClient();
+      try {
+        await client.removeObject(bucket, objectKey);
+        return;
+      } catch (fallbackErr) {
+        if (fallbackErr.code === 'NotFound' || fallbackErr.message?.includes('NoSuchKey')) {
+          return;
+        }
+        throw fallbackErr;
+      }
+    }
     // If the object is already gone, treat as successful deletion
     if (err.code === 'NotFound' || err.message?.includes('NoSuchKey')) {
       return;

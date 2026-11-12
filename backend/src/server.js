@@ -12,6 +12,8 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import assetRoutes from './routes/assetRoutes.js';
 import sampleRoutes from './routes/sampleRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import integrationRoutes from './routes/integrationRoutes.js';
+import { startAssetCleanupJob, stopAssetCleanupJob } from './services/assetCleanupService.js';
 import { apiLimiter, authLimiter, paymentLimiter } from './middleware/rateLimiter.js';
 import { enforceServerJwtConfig } from './middleware/auth.js';
 
@@ -49,6 +51,15 @@ if (process.env.NODE_ENV !== 'test') {
         await ensureSampleTable();
       } catch (err) {
         console.error('[DiziGini API] ensureSampleTable error:', err.message);
+      }
+      if (process.env.ENABLE_INTEGRATION_API === 'true') {
+        try {
+          const { ensureIntegrationSchema } = await import('./config/ensureSchema.js');
+          await ensureIntegrationSchema();
+          startAssetCleanupJob();
+        } catch (err) {
+          console.error('[DiziGini API] ensureIntegrationSchema / cleanup job error:', err.message);
+        }
       }
     } else {
       console.error('[DiziGini API] PostgreSQL connection failed. Check credentials.');
@@ -127,6 +138,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/samples', sampleRoutes);
 app.use('/api/payments', paymentLimiter, paymentRoutes);
+app.use('/api/integration', integrationRoutes);
 
 import { getServiceVisibility } from './controllers/serviceVisibilityController.js';
 app.get('/api/services/visibility', getServiceVisibility);
@@ -230,6 +242,7 @@ process.on('uncaughtException', (err) => {
 // Graceful Connection Draining
 const handleShutdown = async (signal) => {
   console.log(`[DiziGini API] Received ${signal}. Draining pool and closing server gracefully...`);
+  stopAssetCleanupJob();
   if (server) {
     server.close(async () => {
       try {
