@@ -78,6 +78,15 @@ export const recordEmailEvent = (entry) => {
   if (emailHistory.length > 200) emailHistory.shift();
 };
 
+const sanitizeEnv = (val) => {
+  if (!val) return val;
+  const str = String(val).trim();
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    return str.slice(1, -1).trim();
+  }
+  return str;
+};
+
 /**
  * Get nodemailer transporter or null if not configured.
  */
@@ -96,9 +105,9 @@ export const getTransporter = () => {
     return transporterInstance;
   }
 
-  const host = process.env.EMAIL_HOST;
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASSWORD;
+  const host = sanitizeEnv(process.env.EMAIL_HOST);
+  const user = sanitizeEnv(process.env.EMAIL_USER);
+  const pass = sanitizeEnv(process.env.EMAIL_PASSWORD);
   const port = parseInt(process.env.EMAIL_PORT || '587', 10);
   const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
 
@@ -134,9 +143,9 @@ export const getTransporter = () => {
  * Verify SMTP connection with current credentials.
  */
 export const verifySmtpConnection = async () => {
-  const host = process.env.EMAIL_HOST;
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASSWORD;
+  const host = sanitizeEnv(process.env.EMAIL_HOST);
+  const user = sanitizeEnv(process.env.EMAIL_USER);
+  const pass = sanitizeEnv(process.env.EMAIL_PASSWORD);
   const port = parseInt(process.env.EMAIL_PORT || '587', 10);
   const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
 
@@ -442,7 +451,7 @@ const sendEmail = async ({ to, subject, html, text, event, dedupeKey, attachment
     attachmentsCount: (attachments || []).length
   });
 
-  const from = process.env.EMAIL_FROM || 'DiziGini <team@dizigini.com>';
+  const from = sanitizeEnv(process.env.EMAIL_FROM) || 'DiziGini <team@dizigini.com>';
   const transporter = getTransporter();
 
   // If destination is a simulated or test domain (*.test, *.invalid, *.example), record and return simulated delivery safely
