@@ -338,6 +338,15 @@ export async function ensureSchemaIntegrity() {
         ADD COLUMN IF NOT EXISTS token_hash VARCHAR(64);
         ALTER TABLE password_reset_tokens 
         ADD COLUMN IF NOT EXISTS used_at TIMESTAMPTZ;
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'password_reset_tokens' AND column_name = 'token'
+          ) THEN
+            ALTER TABLE password_reset_tokens ALTER COLUMN token DROP NOT NULL;
+          END IF;
+        END $$;
         CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
         CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
       `);
