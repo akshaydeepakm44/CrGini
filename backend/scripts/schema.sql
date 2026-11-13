@@ -224,11 +224,13 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id              SERIAL PRIMARY KEY,
   user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token           VARCHAR(500) NOT NULL UNIQUE,
+  token_hash      VARCHAR(64) NOT NULL,
   expires_at      TIMESTAMPTZ NOT NULL,
-  used            BOOLEAN NOT NULL DEFAULT FALSE,
+  used_at         TIMESTAMPTZ,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
 
 -- 17. role_permissions
 CREATE TABLE IF NOT EXISTS role_permissions (
@@ -237,6 +239,12 @@ CREATE TABLE IF NOT EXISTS role_permissions (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Grant all permissions to app user
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO creativegini_app;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO creativegini_app;
+-- Grant permissions to creativegini_app if role exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'creativegini_app') THEN
+    GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO creativegini_app;
+    GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO creativegini_app;
+  END IF;
+END
+$$;

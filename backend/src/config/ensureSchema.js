@@ -1,5 +1,11 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { query } from './postgres.js';
 import { seedFinkrShowcase } from './seedFinkr.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Self-healing schema migration to ensure all required tables and columns exist
@@ -78,6 +84,26 @@ export async function ensureServiceSettingsTable() {
  */
 export async function ensureSchemaIntegrity() {
   try {
+    // 0. Ensure base schema from schema.sql if core 'users' table is missing
+    try {
+      const userTableCheck = await query(`
+        SELECT to_regclass('public.users') AS exists;
+      `);
+      if (!userTableCheck.rows[0]?.exists) {
+        console.log('[Schema] Core "users" table not found. Auto-initializing database schema from schema.sql...');
+        const schemaPath = path.resolve(__dirname, '../../scripts/schema.sql');
+        if (fs.existsSync(schemaPath)) {
+          const sql = fs.readFileSync(schemaPath, 'utf8');
+          await query(sql);
+          console.log('[Schema] Core schema initialized successfully from schema.sql.');
+        } else {
+          console.warn('[Schema] schema.sql file not found at:', schemaPath);
+        }
+      }
+    } catch (eInit) {
+      console.warn('[Schema] Base schema auto-initialization note:', eInit.message);
+    }
+
     // 1. Ensure request_deliverables has created_at and delivered_at columns
     try {
       await query(`
@@ -295,6 +321,32 @@ export async function ensureSchemaIntegrity() {
       await ensureIntegrationSchema();
     } catch (e9) {
       console.warn('[Schema] ensureIntegrationSchema note:', e9.message);
+    }
+
+    // 11. Ensure password_reset_tokens table, columns, and indexes
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          token_hash VARCHAR(64) NOT NULL,
+          expires_at TIMESTAMPTZ NOT NULL,
+          used_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+        CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
+      `);
+      await query(`
+        ALTER TABLE password_reset_tokens 
+        ADD COLUMN IF NOT EXISTS token_hash VARCHAR(64);
+      `);
+      await query(`
+        ALTER TABLE password_reset_tokens 
+        ADD COLUMN IF NOT EXISTS used_at TIMESTAMPTZ;
+      `);
+    } catch (eReset) {
+      console.warn('[Schema] password_reset_tokens step note:', eReset.message);
     }
 
     console.log('[Schema] Database schema integrity verified & updated successfully.');
