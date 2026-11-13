@@ -18,7 +18,7 @@ import { apiLimiter, authLimiter, paymentLimiter } from './middleware/rateLimite
 import { enforceServerJwtConfig } from './middleware/auth.js';
 import { enforcePortalBaseUrlConfig } from './config/portalConfig.js';
 
-dotenv.config();
+dotenv.config({ override: true });
 
 // Enforce mandatory JWT_SECRET: fails closed outside explicit "development" or "test"
 enforceServerJwtConfig();
