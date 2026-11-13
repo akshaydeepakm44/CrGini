@@ -248,28 +248,28 @@ const buildHtmlTemplate = ({
 
   const detailsRows = details.map(({ label, value }) => `
     <tr>
-      <td style="padding: 9px 0; font-size: 13px; color: #94A3B8; font-weight: 500; width: 38%; vertical-align: top;">
+      <td style="padding: 10px 0; font-size: 13px; color: #64748B; font-weight: 500; width: 38%; vertical-align: top;">
         ${label}
       </td>
-      <td style="padding: 9px 0; font-size: 13px; color: #F1F5F9; font-weight: 600; vertical-align: top;">
+      <td style="padding: 10px 0; font-size: 13px; color: #0F172A; font-weight: 600; vertical-align: top;">
         ${value}
       </td>
     </tr>
   `).join('');
 
   const highlightHtml = highlightBox ? `
-    <div style="margin: 20px 0; padding: 16px 18px; background: rgba(14, 27, 46, 0.85); border-left: 3px solid ${highlightBox.color || '#00E5FF'}; border-radius: 6px;">
-      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: ${highlightBox.color || '#00E5FF'}; font-weight: 700; margin-bottom: 6px;">
+    <div style="margin: 20px 0; padding: 16px 18px; background: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid ${highlightBox.color || '#6366F1'}; border-radius: 8px;">
+      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: ${highlightBox.color || '#4F46E5'}; font-weight: 700; margin-bottom: 6px;">
         ${highlightBox.title}
       </div>
-      <div style="font-size: 14px; line-height: 1.6; color: #CBD5E1;">
+      <div style="font-size: 14px; line-height: 1.6; color: #334155;">
         ${highlightBox.content}
       </div>
     </div>
   ` : '';
 
   const noteHtml = note ? `
-    <div style="margin: 16px 0; font-size: 13px; line-height: 1.5; color: #94A3B8; font-style: italic;">
+    <div style="margin: 16px 0; font-size: 13px; line-height: 1.5; color: #64748B; font-style: italic;">
       ${note}
     </div>
   ` : '';
@@ -282,44 +282,42 @@ const buildHtmlTemplate = ({
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title}</title>
   <style>
-    body { margin: 0; padding: 0; background-color: #060B13; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    body { margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #1E293B; }
     table { border-collapse: collapse; }
     @media only screen and (max-width: 620px) {
-      .email-container { width: 100% !important; padding: 12px !important; }
-      .email-card { padding: 24px 18px !important; }
+      .email-container { width: 100% !important; padding: 16px 12px !important; }
+      .email-card { padding: 24px 20px !important; }
     }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #060B13; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
   <!-- Preheader text for inbox preview -->
-  <div style="display: none; max-height: 0; overflow: hidden; font-size: 1px; line-height: 1px; color: #060B13;">
+  <div style="display: none; max-height: 0; overflow: hidden; font-size: 1px; line-height: 1px; color: #F8FAFC;">
     ${preheader || title}
   </div>
 
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #060B13; min-height: 100vh; padding: 32px 12px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F8FAFC; min-height: 100vh; padding: 36px 12px;">
     <tr>
       <td align="center" style="vertical-align: top;">
         
         <table class="email-container" width="560" cellpadding="0" cellspacing="0" border="0" style="width: 560px; max-width: 560px; text-align: left;">
           
-          <!-- BRAND HEADER -->
+          <!-- BRAND HEADER WITH OFFICIAL LOGO -->
           <tr>
-            <td style="padding: 0 0 20px 0; text-align: center;">
+            <td style="padding: 0 0 24px 0; text-align: center;">
               <a href="${portalUrl}" target="_blank" style="text-decoration: none; display: inline-block;">
-                <span style="font-size: 20px; font-weight: 800; letter-spacing: 2px; color: #FFFFFF;">
-                  CREATIVE<span style="color: #00E5FF;">GINI</span>
-                </span>
-                <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 2.5px; color: #64748B; margin-top: 3px; font-weight: 600;">
-                  Growth Operations Portal
-                </div>
+                <img src="https://dizigini.com/logo.png" alt="DiziGini" height="42" style="display: block; margin: 0 auto; height: 42px; width: auto; max-width: 200px; border: 0;" />
               </a>
+              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: #6366F1; margin-top: 8px;">
+                AI-Powered Research &bull; Human-Driven Leads
+              </div>
             </td>
           </tr>
 
           <!-- MAIN CARD -->
           <tr>
             <td>
-              <table class="email-card" width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #0B1321; border: 1px solid rgba(0, 229, 255, 0.15); border-radius: 12px; padding: 32px 28px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);">
+              <table class="email-card" width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 36px 32px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);">
                 
                 <!-- BADGE & TICKET -->
                 <tr>
@@ -328,13 +326,13 @@ const buildHtmlTemplate = ({
                       <tr>
                         <td>
                           ${headerBadge ? `
-                            <span style="display: inline-block; padding: 4px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: ${statusColor}; background: rgba(0, 229, 255, 0.08); border: 1px solid ${statusColor}40; border-radius: 4px;">
+                            <span style="display: inline-block; padding: 5px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #4F46E5; background-color: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 9999px;">
                               ${headerBadge}
                             </span>
                           ` : ''}
                         </td>
                         <td align="right" style="text-align: right;">
-                          <span style="font-size: 13px; font-family: monospace; font-weight: 700; color: #00E5FF; letter-spacing: 0.5px;">
+                          <span style="font-size: 13px; font-family: monospace; font-weight: 700; color: #6366F1; letter-spacing: 0.5px;">
                             ${ticketCode || ''}
                           </span>
                         </td>
@@ -346,10 +344,10 @@ const buildHtmlTemplate = ({
                 <!-- TITLE & SUBTITLE -->
                 <tr>
                   <td style="padding: 20px 0 10px 0;">
-                    <h1 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700; line-height: 1.3; color: #F8FAFC;">
+                    <h1 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700; line-height: 1.3; color: #0F172A;">
                       ${title}
                     </h1>
-                    <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #94A3B8;">
+                    <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #475569;">
                       ${subtitle}
                     </p>
                   </td>
@@ -362,7 +360,7 @@ const buildHtmlTemplate = ({
                 ${details.length > 0 ? `
                   <tr>
                     <td style="padding: 16px 0 20px 0;">
-                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top: 1px solid rgba(148, 163, 184, 0.12); border-bottom: 1px solid rgba(148, 163, 184, 0.12); margin: 8px 0;">
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0; margin: 8px 0;">
                         ${detailsRows}
                       </table>
                     </td>
@@ -374,7 +372,7 @@ const buildHtmlTemplate = ({
                 <!-- CALL TO ACTION BUTTON -->
                 <tr>
                   <td style="padding: 22px 0 10px 0; text-align: center;">
-                    <a href="${portalUrl}" target="_blank" style="display: inline-block; padding: 13px 32px; background: #00E5FF; color: #040810; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 6px; letter-spacing: 0.3px; box-shadow: 0 4px 14px rgba(0, 229, 255, 0.3);">
+                    <a href="${portalUrl}" target="_blank" style="display: inline-block; padding: 14px 36px; background: #6366F1; background-image: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%); color: #FFFFFF !important; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 8px; letter-spacing: 0.3px; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);">
                       ${actionText} &rarr;
                     </a>
                   </td>
@@ -383,10 +381,10 @@ const buildHtmlTemplate = ({
                 <!-- DIRECT LINK FALLBACK -->
                 <tr>
                   <td style="padding: 16px 0 0 0; text-align: center;">
-                    <span style="font-size: 11px; color: #64748B;">
-                      Link not working? Paste this URL in your browser:<br>
-                      <a href="${portalUrl}" style="color: #00E5FF; text-decoration: underline; word-break: break-all;">${portalUrl}</a>
-                    </span>
+                    <div style="background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0; padding: 12px 14px; font-size: 12px; color: #64748B; word-break: break-all; text-align: left;">
+                      <span style="font-weight: 600; color: #475569;">Link not working? Paste this URL into your browser:</span><br>
+                      <a href="${portalUrl}" style="color: #6366F1; text-decoration: underline; word-break: break-all;">${portalUrl}</a>
+                    </div>
                   </td>
                 </tr>
 
@@ -396,12 +394,15 @@ const buildHtmlTemplate = ({
 
           <!-- FOOTER -->
           <tr>
-            <td style="padding: 24px 12px 12px 12px; text-align: center;">
-              <p style="margin: 0 0 6px 0; font-size: 12px; color: #64748B;">
-                DiziGini &middot; Performance Marketing & Digital Growth Engine
+            <td style="padding: 28px 12px 12px 12px; text-align: center;">
+              <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 600; color: #475569;">
+                DiZiGiNi &bull; AI-Powered Research &bull; Human-Driven Leads
               </p>
-              <p style="margin: 0; font-size: 11px; color: #475569;">
-                This is an automated notification from the DiziGini client portal. Please do not reply directly to this email.
+              <p style="margin: 0 0 6px 0; font-size: 11px; color: #94A3B8;">
+                🔒 256-bit SSL &bull; Enterprise Privacy &bull; Client Portal Access
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #94A3B8;">
+                This is an automated notification from the DiziGini portal. Questions? Contact <a href="mailto:campaign@dizitalgini.com" style="color: #6366F1; text-decoration: none;">campaign@dizitalgini.com</a>
               </p>
             </td>
           </tr>
@@ -1133,8 +1134,8 @@ export const buildWelcomeEmailTemplate = ({
                 <!-- SECTION: INCLUDED ATTACHMENTS -->
                 <tr>
                   <td style="padding: 10px 0;">
-                    <div style="background: rgba(4, 12, 18, 0.95); border: 1px solid rgba(0, 229, 255, 0.25); border-radius: 8px; padding: 14px 18px;">
-                      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #00E5FF; font-weight: 700; margin-bottom: 10px;">
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 18px;">
+                      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: #4F46E5; font-weight: 700; margin-bottom: 10px;">
                         Included Attachments (${attachments.length})
                       </div>
                       <table width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -1143,9 +1144,9 @@ export const buildWelcomeEmailTemplate = ({
                           const sizeLabel = att.sizeFormatted || (att.size ? formatFileSize(att.size) : '');
                           return `
                             <tr>
-                              <td style="padding: 6px 0; font-size: 13px; color: #CBD5E1; vertical-align: middle;">
+                              <td style="padding: 6px 0; font-size: 13px; color: #334155; vertical-align: middle;">
                                 <span style="display: inline-block; margin-right: 6px;">&#128206;</span>
-                                <strong style="color: #F8FAFC;">${fname}</strong>
+                                <strong style="color: #0F172A;">${fname}</strong>
                                 ${sizeLabel ? `<span style="font-size: 11px; color: #64748B; margin-left: 8px;">(${sizeLabel})</span>` : ''}
                               </td>
                             </tr>
@@ -1165,21 +1166,21 @@ export const buildWelcomeEmailTemplate = ({
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${subject}</title>
   <style>
-    body { margin: 0; padding: 0; background-color: #060B13; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    body { margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #1E293B; }
     table { border-collapse: collapse; }
     @media only screen and (max-width: 620px) {
-      .email-container { width: 100% !important; padding: 12px !important; }
-      .email-card { padding: 24px 18px !important; }
+      .email-container { width: 100% !important; padding: 16px 12px !important; }
+      .email-card { padding: 24px 20px !important; }
     }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #060B13; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
   <!-- Preheader text for inbox preview -->
-  <div style="display: none; max-height: 0; overflow: hidden; font-size: 1px; line-height: 1px; color: #060B13;">
+  <div style="display: none; max-height: 0; overflow: hidden; font-size: 1px; line-height: 1px; color: #F8FAFC;">
     Welcome to DiziGini. Your client workspace and login credentials are ready.
   </div>
 
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #060B13; min-height: 100vh; padding: 32px 12px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F8FAFC; min-height: 100vh; padding: 36px 12px;">
     <tr>
       <td align="center" style="vertical-align: top;">
         
@@ -1187,22 +1188,20 @@ export const buildWelcomeEmailTemplate = ({
           
           <!-- SECTION 1: HEADER & LOGO -->
           <tr>
-            <td style="padding: 0 0 20px 0; text-align: center;">
+            <td style="padding: 0 0 24px 0; text-align: center;">
               <a href="${portalUrl}" target="_blank" style="text-decoration: none; display: inline-block;">
-                <span style="font-size: 22px; font-weight: 800; letter-spacing: 2px; color: #FFFFFF;">
-                  CREATIVE<span style="color: #00E5FF;">GINI</span>
-                </span>
-                <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 2.5px; color: #64748B; margin-top: 4px; font-weight: 600;">
-                  Growth Operations Portal
-                </div>
+                <img src="https://dizigini.com/logo.png" alt="DiziGini" height="42" style="display: block; margin: 0 auto; height: 42px; width: auto; max-width: 200px; border: 0;" />
               </a>
+              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: #6366F1; margin-top: 8px;">
+                AI-Powered Research &bull; Human-Driven Leads
+              </div>
             </td>
           </tr>
 
           <!-- MAIN EMAIL CARD -->
           <tr>
             <td>
-              <table class="email-card" width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #0B1321; border: 1px solid rgba(0, 229, 255, 0.2); border-radius: 12px; padding: 32px 28px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);">
+              <table class="email-card" width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 36px 32px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);">
                 
                 <!-- BADGE & ACCOUNT STATUS -->
                 <tr>
@@ -1210,12 +1209,12 @@ export const buildWelcomeEmailTemplate = ({
                     <table width="100%" cellpadding="0" cellspacing="0" border="0">
                       <tr>
                         <td>
-                          <span style="display: inline-block; padding: 4px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #00E5FF; background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.25); border-radius: 4px;">
+                          <span style="display: inline-block; padding: 5px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #4F46E5; background-color: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 9999px;">
                             Account Activation
                           </span>
                         </td>
                         <td align="right" style="text-align: right;">
-                          <span style="font-size: 11px; font-weight: 700; color: #34D399; letter-spacing: 0.5px; text-transform: uppercase;">
+                          <span style="font-size: 11px; font-weight: 700; color: #10B981; letter-spacing: 0.5px; text-transform: uppercase; background: #ECFDF5; padding: 4px 10px; border-radius: 9999px; border: 1px solid #A7F3D0;">
                             Status: Active
                           </span>
                         </td>
@@ -1227,10 +1226,10 @@ export const buildWelcomeEmailTemplate = ({
                 <!-- SECTION 2: GREETING & WELCOME MESSAGE -->
                 <tr>
                   <td style="padding: 22px 0 12px 0;">
-                    <h1 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 700; line-height: 1.3; color: #F8FAFC;">
+                    <h1 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 700; line-height: 1.3; color: #0F172A;">
                       ${displayGreeting}
                     </h1>
-                    <div style="font-size: 14px; line-height: 1.6; color: #CBD5E1;">
+                    <div style="font-size: 14px; line-height: 1.6; color: #334155;">
                       ${mainContent}
                     </div>
                   </td>
@@ -1239,20 +1238,20 @@ export const buildWelcomeEmailTemplate = ({
                 <!-- SECTION 3: ACCOUNT & WORKSPACE INFORMATION -->
                 <tr>
                   <td style="padding: 12px 0 8px 0;">
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top: 1px solid rgba(148, 163, 184, 0.15); border-bottom: 1px solid rgba(148, 163, 184, 0.15); margin: 6px 0;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0; margin: 6px 0;">
                       <tr>
-                        <td style="padding: 9px 0; font-size: 13px; color: #94A3B8; font-weight: 500; width: 38%; vertical-align: top;">
+                        <td style="padding: 10px 0; font-size: 13px; color: #64748B; font-weight: 500; width: 38%; vertical-align: top;">
                           Company / Workspace
                         </td>
-                        <td style="padding: 9px 0; font-size: 13px; color: #F1F5F9; font-weight: 600; vertical-align: top;">
+                        <td style="padding: 10px 0; font-size: 13px; color: #0F172A; font-weight: 600; vertical-align: top;">
                           ${companyName}
                         </td>
                       </tr>
                       <tr>
-                        <td style="padding: 9px 0; font-size: 13px; color: #94A3B8; font-weight: 500; width: 38%; vertical-align: top;">
+                        <td style="padding: 10px 0; font-size: 13px; color: #64748B; font-weight: 500; width: 38%; vertical-align: top;">
                           Account Role
                         </td>
-                        <td style="padding: 9px 0; font-size: 13px; color: #F1F5F9; font-weight: 600; vertical-align: top;">
+                        <td style="padding: 10px 0; font-size: 13px; color: #0F172A; font-weight: 600; vertical-align: top;">
                           Client Workspace Partner
                         </td>
                       </tr>
@@ -1263,24 +1262,24 @@ export const buildWelcomeEmailTemplate = ({
                 <!-- SECTION 4: LOGIN CREDENTIALS HIGHLIGHT BOX -->
                 <tr>
                   <td style="padding: 14px 0;">
-                    <div style="background: rgba(4, 12, 18, 0.95); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 8px; padding: 18px 20px;">
-                      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #00E5FF; font-weight: 700; margin-bottom: 12px;">
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid #6366F1; border-radius: 8px; padding: 18px 20px;">
+                      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: #4F46E5; font-weight: 700; margin-bottom: 12px;">
                         Your Login Credentials
                       </div>
                       <table width="100%" cellpadding="0" cellspacing="0" border="0">
                         <tr>
-                          <td style="padding: 6px 0; font-size: 13px; color: #94A3B8; width: 35%;">
+                          <td style="padding: 6px 0; font-size: 13px; color: #64748B; width: 35%;">
                             Login Email:
                           </td>
-                          <td style="padding: 6px 0; font-size: 13px; color: #F8FAFC; font-weight: 600;">
+                          <td style="padding: 6px 0; font-size: 13px; color: #0F172A; font-weight: 600;">
                             ${email}
                           </td>
                         </tr>
                         <tr>
-                          <td style="padding: 6px 0; font-size: 13px; color: #94A3B8; width: 35%;">
+                          <td style="padding: 6px 0; font-size: 13px; color: #64748B; width: 35%;">
                             Temporary Password:
                           </td>
-                          <td style="padding: 6px 0; font-size: 14px; font-family: monospace; color: #FFB000; font-weight: 700; letter-spacing: 0.5px;">
+                          <td style="padding: 6px 0; font-size: 14px; font-family: monospace; color: #4F46E5; font-weight: 700; letter-spacing: 0.5px;">
                             ${temporaryPassword || '—'}
                           </td>
                         </tr>
@@ -1294,12 +1293,12 @@ export const buildWelcomeEmailTemplate = ({
                 <!-- SECTION 5: DIZIGINI ACCESS / SEARCH INSTRUCTIONS -->
                 <tr>
                   <td style="padding: 8px 0 16px 0;">
-                    <div style="background: rgba(14, 27, 46, 0.85); border-left: 3px solid #00E5FF; border-radius: 6px; padding: 14px 16px;">
-                      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #00E5FF; font-weight: 700; margin-bottom: 4px;">
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 16px;">
+                      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: #6366F1; font-weight: 700; margin-bottom: 4px;">
                         How to Access DiziGini
                       </div>
-                      <div style="font-size: 13px; line-height: 1.5; color: #CBD5E1;">
-                        To access your client workspace at any time, search for <strong>DiziGini.com</strong> in your browser or visit the secure sign-in portal directly.
+                      <div style="font-size: 13px; line-height: 1.5; color: #475569;">
+                        To access your client workspace at any time, visit <strong>https://dizigini.com</strong> in your browser to sign in to your dashboard.
                       </div>
                     </div>
                   </td>
@@ -1308,7 +1307,7 @@ export const buildWelcomeEmailTemplate = ({
                 <!-- SECTION 6: CALL TO ACTION BUTTON -->
                 <tr>
                   <td style="padding: 18px 0 10px 0; text-align: center;">
-                    <a href="${portalUrl}" target="_blank" style="display: inline-block; padding: 13px 34px; background: #00E5FF; color: #040810; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 6px; letter-spacing: 0.3px; box-shadow: 0 4px 14px rgba(0, 229, 255, 0.3);">
+                    <a href="${portalUrl}" target="_blank" style="display: inline-block; padding: 14px 36px; background: #6366F1; background-image: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%); color: #FFFFFF !important; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 8px; letter-spacing: 0.3px; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);">
                       Access Client Portal &rarr;
                     </a>
                   </td>
@@ -1318,7 +1317,7 @@ export const buildWelcomeEmailTemplate = ({
                 <tr>
                   <td style="padding: 12px 0 16px 0; text-align: center;">
                     <span style="font-size: 11px; color: #64748B;">
-                      Portal URL: <a href="${portalUrl}" style="color: #00E5FF; text-decoration: underline;">DiziGini.com</a>
+                      Portal URL: <a href="${portalUrl}" style="color: #6366F1; text-decoration: underline;">https://dizigini.com</a>
                     </span>
                   </td>
                 </tr>
@@ -1326,8 +1325,8 @@ export const buildWelcomeEmailTemplate = ({
                 <!-- SECTION 7: SECURITY NOTE -->
                 <tr>
                   <td style="padding-top: 10px;">
-                    <div style="background: rgba(255, 255, 255, 0.02); border: 1px dashed rgba(148, 163, 184, 0.2); border-radius: 6px; padding: 12px 16px; font-size: 12px; line-height: 1.5; color: #94A3B8;">
-                      <strong style="color: #F1F5F9;">Security Notice:</strong> For your security, please update your temporary password immediately upon your first sign-in. DiziGini team members will never ask you for your password.
+                    <div style="background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 6px; padding: 12px 16px; font-size: 12px; line-height: 1.5; color: #64748B;">
+                      <strong style="color: #0F172A;">Security Notice:</strong> For your security, please update your temporary password immediately upon your first sign-in. DiziGini team members will never ask you for your password.
                     </div>
                   </td>
                 </tr>
@@ -1338,12 +1337,15 @@ export const buildWelcomeEmailTemplate = ({
 
           <!-- SECTION 8: FOOTER -->
           <tr>
-            <td style="padding: 24px 12px 12px 12px; text-align: center;">
-              <p style="margin: 0 0 6px 0; font-size: 12px; color: #64748B;">
-                DiziGini &middot; Performance Marketing & Digital Growth Engine
+            <td style="padding: 28px 12px 12px 12px; text-align: center;">
+              <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 600; color: #475569;">
+                DiZiGiNi &bull; AI-Powered Research &bull; Human-Driven Leads
               </p>
-              <p style="margin: 0; font-size: 11px; color: #475569;">
-                You received this email because an account was provisioned for you at DiziGini. If you believe this was in error, please contact support@dizigini.com.
+              <p style="margin: 0 0 6px 0; font-size: 11px; color: #94A3B8;">
+                🔒 256-bit SSL &bull; Enterprise Privacy &bull; Secure Client Workspace
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #94A3B8;">
+                You received this email because an account was provisioned for you at DiziGini. Questions? Contact <a href="mailto:campaign@dizitalgini.com" style="color: #6366F1; text-decoration: none;">campaign@dizitalgini.com</a>
               </p>
             </td>
           </tr>
@@ -1450,48 +1452,46 @@ const buildPasswordResetEmailTemplate = ({
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reset Your Password - DiziGini</title>
   <style>
-    body { margin: 0; padding: 0; background-color: #060B13; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    body { margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #1E293B; }
     table { border-collapse: collapse; }
     @media only screen and (max-width: 620px) {
-      .email-container { width: 100% !important; padding: 12px !important; }
-      .email-card { padding: 24px 18px !important; }
+      .email-container { width: 100% !important; padding: 16px 12px !important; }
+      .email-card { padding: 24px 20px !important; }
     }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #060B13; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <div style="display: none; max-height: 0; overflow: hidden; font-size: 1px; line-height: 1px; color: #060B13;">
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <div style="display: none; max-height: 0; overflow: hidden; font-size: 1px; line-height: 1px; color: #F8FAFC;">
     Password recovery request for your DiziGini account. This link will expire in ${expiresMinutes} minutes.
   </div>
 
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #060B13; min-height: 100vh; padding: 32px 12px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F8FAFC; min-height: 100vh; padding: 36px 12px;">
     <tr>
       <td align="center" style="vertical-align: top;">
         
         <table class="email-container" width="560" cellpadding="0" cellspacing="0" border="0" style="width: 560px; max-width: 560px; text-align: left;">
           
-          <!-- BRAND HEADER -->
+          <!-- BRAND HEADER WITH OFFICIAL LOGO -->
           <tr>
-            <td style="padding: 0 0 20px 0; text-align: center;">
+            <td style="padding: 0 0 24px 0; text-align: center;">
               <a href="https://dizigini.com" target="_blank" style="text-decoration: none; display: inline-block;">
-                <span style="font-size: 20px; font-weight: 800; letter-spacing: 2px; color: #FFFFFF;">
-                  CREATIVE<span style="color: #00E5FF;">GINI</span>
-                </span>
-                <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 2.5px; color: #64748B; margin-top: 3px; font-weight: 600;">
-                  Growth Operations Portal
-                </div>
+                <img src="https://dizigini.com/logo.png" alt="DiziGini" height="42" style="display: block; margin: 0 auto; height: 42px; width: auto; max-width: 200px; border: 0;" />
               </a>
+              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: #6366F1; margin-top: 8px;">
+                AI-Powered Research &bull; Human-Driven Leads
+              </div>
             </td>
           </tr>
 
           <!-- MAIN CARD -->
           <tr>
-            <td class="email-card" style="background: #0B1320; border: 1px solid rgba(0, 229, 255, 0.18); border-radius: 12px; padding: 32px 28px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <td>
+              <table class="email-card" width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 36px 32px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);">
                 
                 <!-- SECURITY BADGE -->
                 <tr>
-                  <td style="padding-bottom: 12px;">
-                    <div style="display: inline-block; padding: 4px 10px; background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 4px; font-size: 11px; font-weight: 700; color: #00E5FF; letter-spacing: 1px; text-transform: uppercase;">
+                  <td style="padding-bottom: 14px;">
+                    <div style="display: inline-block; padding: 5px 12px; background: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 9999px; font-size: 11px; font-weight: 700; color: #4F46E5; letter-spacing: 0.6px; text-transform: uppercase;">
                       Security &bull; Password Recovery
                     </div>
                   </td>
@@ -1500,7 +1500,7 @@ const buildPasswordResetEmailTemplate = ({
                 <!-- TITLE -->
                 <tr>
                   <td style="padding-bottom: 16px;">
-                    <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #FFFFFF; line-height: 1.3;">
+                    <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #0F172A; line-height: 1.3;">
                       Reset Your Password
                     </h1>
                   </td>
@@ -1509,24 +1509,24 @@ const buildPasswordResetEmailTemplate = ({
                 <!-- GREETING & BODY -->
                 <tr>
                   <td style="padding-bottom: 20px;">
-                    <p style="margin: 0 0 12px 0; font-size: 14px; line-height: 1.6; color: #CBD5E1;">
-                      Dear ${recipientName},
+                    <p style="margin: 0 0 12px 0; font-size: 14px; line-height: 1.6; color: #334155;">
+                      Dear <strong>${recipientName}</strong>,
                     </p>
-                    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #CBD5E1;">
-                      We received a request to reset the password for your DiziGini account. Click the button below to create a new password.
+                    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                      We received a request to reset the password for your DiziGini account. Click the button below to choose a new password.
                     </p>
                   </td>
                 </tr>
 
                 <!-- HIGHLIGHT EXPIRATION BOX -->
                 <tr>
-                  <td style="padding-bottom: 20px;">
-                    <div style="background: rgba(14, 27, 46, 0.85); border-left: 3px solid #00E5FF; border-radius: 6px; padding: 14px 16px;">
-                      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #00E5FF; font-weight: 700; margin-bottom: 4px;">
+                  <td style="padding-bottom: 24px;">
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid #6366F1; border-radius: 8px; padding: 14px 18px;">
+                      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: #4F46E5; font-weight: 700; margin-bottom: 4px;">
                         Single-Use Security Link
                       </div>
-                      <div style="font-size: 13px; line-height: 1.5; color: #CBD5E1;">
-                        This password reset link is valid for <strong>${expiresMinutes} minutes</strong> and can only be used once. Once used, it will automatically expire.
+                      <div style="font-size: 13px; line-height: 1.5; color: #475569;">
+                        This password reset link is valid for <strong>${expiresMinutes} minutes</strong> and can only be used once. Once used or expired, it will automatically deactivate.
                       </div>
                     </div>
                   </td>
@@ -1534,8 +1534,8 @@ const buildPasswordResetEmailTemplate = ({
 
                 <!-- CALL TO ACTION BUTTON -->
                 <tr>
-                  <td style="padding: 10px 0 16px 0; text-align: center;">
-                    <a href="${resetUrl}" target="_blank" style="display: inline-block; padding: 13px 34px; background: #00E5FF; color: #040810; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 6px; letter-spacing: 0.3px; box-shadow: 0 4px 14px rgba(0, 229, 255, 0.3);">
+                  <td style="padding: 6px 0 20px 0; text-align: center;">
+                    <a href="${resetUrl}" target="_blank" style="display: inline-block; padding: 14px 38px; background: #6366F1; background-image: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%); color: #FFFFFF !important; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 8px; letter-spacing: 0.3px; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);">
                       Reset Password &rarr;
                     </a>
                   </td>
@@ -1543,19 +1543,19 @@ const buildPasswordResetEmailTemplate = ({
 
                 <!-- DIRECT LINK FALLBACK -->
                 <tr>
-                  <td style="padding: 12px 0 18px 0; text-align: center;">
-                    <span style="font-size: 11px; color: #64748B;">
-                      Link not working? Paste this URL into your browser:<br>
-                      <a href="${resetUrl}" style="color: #00E5FF; text-decoration: underline; word-break: break-all;">${resetUrl}</a>
-                    </span>
+                  <td style="padding: 8px 0 20px 0; text-align: center;">
+                    <div style="background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0; padding: 12px 14px; font-size: 12px; color: #64748B; word-break: break-all; text-align: left;">
+                      <span style="font-weight: 600; color: #475569;">Link not working? Paste this URL into your browser:</span><br>
+                      <a href="${resetUrl}" style="color: #6366F1; text-decoration: underline; word-break: break-all;">${resetUrl}</a>
+                    </div>
                   </td>
                 </tr>
 
                 <!-- SECURITY NOTICE -->
                 <tr>
-                  <td style="padding-top: 10px; border-top: 1px solid rgba(148, 163, 184, 0.12);">
-                    <div style="font-size: 12px; line-height: 1.5; color: #94A3B8;">
-                      <strong style="color: #F1F5F9;">Didn't request this?</strong> If you did not make this request, you can safely ignore this email. Your password will remain unchanged and your account is secure.
+                  <td style="padding-top: 16px; border-top: 1px solid #E2E8F0;">
+                    <div style="font-size: 12px; line-height: 1.5; color: #64748B;">
+                      <strong style="color: #0F172A;">Didn't request this?</strong> If you did not make this request, you can safely ignore this email. Your password will remain unchanged and your account is secure.
                     </div>
                   </td>
                 </tr>
@@ -1566,12 +1566,15 @@ const buildPasswordResetEmailTemplate = ({
 
           <!-- FOOTER -->
           <tr>
-            <td style="padding: 24px 12px 12px 12px; text-align: center;">
-              <p style="margin: 0 0 6px 0; font-size: 12px; color: #64748B;">
-                DiziGini &middot; Performance Marketing & Digital Growth Engine
+            <td style="padding: 28px 12px 12px 12px; text-align: center;">
+              <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 600; color: #475569;">
+                DiZiGiNi &bull; AI-Powered Research &bull; Human-Driven Leads
               </p>
-              <p style="margin: 0; font-size: 11px; color: #475569;">
-                This is an automated security notification from the DiziGini portal. Please do not reply directly to this email.
+              <p style="margin: 0 0 6px 0; font-size: 11px; color: #94A3B8;">
+                🔒 256-bit SSL &bull; Single-Use Secure Link &bull; Enterprise Privacy
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #94A3B8;">
+                This is an automated security notification from the DiziGini platform. Questions? Contact <a href="mailto:campaign@dizitalgini.com" style="color: #6366F1; text-decoration: none;">campaign@dizitalgini.com</a>
               </p>
             </td>
           </tr>

@@ -53,6 +53,12 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
     }
   }, [initialView]);
 
+  // Live signup password checklist criteria
+  const signupHasMinLength = signupPassword.length >= 8;
+  const signupHasLetter = /[a-zA-Z]/.test(signupPassword);
+  const signupHasNumber = /[0-9]/.test(signupPassword);
+  const isSignupPasswordValid = signupHasMinLength && signupHasLetter && signupHasNumber;
+
   const handleSignupSubmit = async (e) => {
     e.preventDefault();
     setSignupError('');
@@ -69,8 +75,12 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
       setSignupError('Please enter your company or workspace name.');
       return;
     }
-    if (!signupPassword || signupPassword.length < 6) {
-      setSignupError('Password must be at least 6 characters long.');
+    if (!signupPassword || signupPassword.length < 8) {
+      setSignupError('Password must be at least 8 characters long.');
+      return;
+    }
+    if (!signupHasLetter || !signupHasNumber) {
+      setSignupError('Password must contain at least one letter and one number.');
       return;
     }
 
@@ -465,7 +475,7 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
                         <input
                           id="signup-password"
                           type={showSignupPassword ? 'text' : 'password'}
-                          placeholder="At least 6 characters"
+                          placeholder="At least 8 characters"
                           value={signupPassword}
                           onChange={(e) => setSignupPassword(e.target.value)}
                           className="auth-text-input"
@@ -480,6 +490,41 @@ export default function SignInPage({ onLogin, onBackHome, showToast, initialView
                         >
                           {showSignupPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
+                      </div>
+                    </div>
+
+                    {/* Password Requirements Checklist (Live Feedback) */}
+                    <div className="password-checklist-box" style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
+                      <div className="checklist-title">Password Requirements:</div>
+                      <div className="checklist-item">
+                        {signupHasMinLength ? (
+                          <CheckCircle2 size={14} className="check-icon success" />
+                        ) : (
+                          <span className="check-dot" />
+                        )}
+                        <span className={signupHasMinLength ? 'text-success' : ''}>
+                          At least 8 characters
+                        </span>
+                      </div>
+                      <div className="checklist-item">
+                        {signupHasLetter ? (
+                          <CheckCircle2 size={14} className="check-icon success" />
+                        ) : (
+                          <span className="check-dot" />
+                        )}
+                        <span className={signupHasLetter ? 'text-success' : ''}>
+                          Contains at least one letter
+                        </span>
+                      </div>
+                      <div className="checklist-item">
+                        {signupHasNumber ? (
+                          <CheckCircle2 size={14} className="check-icon success" />
+                        ) : (
+                          <span className="check-dot" />
+                        )}
+                        <span className={signupHasNumber ? 'text-success' : ''}>
+                          Contains at least one number
+                        </span>
                       </div>
                     </div>
 

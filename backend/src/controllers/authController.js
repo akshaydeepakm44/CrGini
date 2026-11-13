@@ -135,10 +135,17 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    if (!password || password.length < 6) {
+    // Password requirements: min 8 characters, at least 1 letter and 1 number
+    if (
+      !password ||
+      password.length < 8 ||
+      !/[a-zA-Z]/.test(password) ||
+      !/[0-9]/.test(password)
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 6 characters long.',
+        message:
+          'Password must be at least 8 characters long and contain at least one letter and one number.',
       });
     }
 
